@@ -1,6 +1,6 @@
 {
-  "name": "達芬奇密碼 AI V2",
-  "description": "DaVinci Code AI V2 - 全流程 AI 電商廣告與素材生成管理系統，包含素材庫、智能排版範本、批次生成任務、系統設定等模組",
+  "name": "达芬奇密码 AI 素材工作台 - 前端",
+  "description": "达芬奇密码 AI 素材工作台前端 SPA(React 19 + Vite 6 + Tailwind 4),对接 dafenqi-ai/ Spring Boot 后端,提供素材库、智能排版模板、批量生成任务、系统设置等模块。",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

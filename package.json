@@ -1,8 +1,9 @@
 {
-  "name": "react-example",
+  "name": "dafenqi-ai-web",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
+  "description": "达芬奇密码 AI 素材工作台 - 前端 SPA(React 19 + Vite 6 + Tailwind 4)",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
