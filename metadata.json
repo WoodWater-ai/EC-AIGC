@@ -1,0 +1,6 @@
+{
+  "name": "達芬奇密碼 AI V2",
+  "description": "DaVinci Code AI V2 - 全流程 AI 電商廣告與素材生成管理系統，包含素材庫、智能排版範本、批次生成任務、系統設定等模組",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
