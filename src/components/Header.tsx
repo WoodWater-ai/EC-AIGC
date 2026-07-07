@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { AppScreen, SystemNotification, SystemUser } from '../types';
+import { useAuth } from '../auth/AuthContext';
+import { toast } from 'sonner';
 
 interface HeaderProps {
   currentScreen: AppScreen;
@@ -16,9 +18,34 @@ export const Header: React.FC<HeaderProps> = ({
   notifications,
   markAllAsRead
 }) => {
+  const { logout } = useAuth();
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  /**
+   * 退出登录
+   *
+   * 调 useAuth().logout()：
+   * 1. 调后端 /v1/auth/logout（Sa-Token 注销当前 token）
+   * 2. clearToken + 清 AuthContext.user
+   * 3. App.tsx 的 useEffect 检测到 isAuthenticated=false → 自动 setScreen(LOGIN)
+   *
+   * 失败兜底：即使后端 logout 报错，前端 token 也会被清，UI 仍会跳登录页
+   */
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+      toast.success('已退出登录');
+    } catch {
+      // 拦截器已 toast 错误，UI 自动跳登录页
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   const getBreadcrumb = () => {
     switch (currentScreen) {
@@ -189,6 +216,21 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Quick Help Guide Button */}
           <button className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-700 cursor-pointer">
             <span className="material-symbols-outlined text-xl">help</span>
+          </button>
+
+          {/* Logout Button —— 调 /v1/auth/logout */}
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            title="退出登录"
+            className="h-9 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-600 hover:bg-danger/10 hover:text-danger border border-slate-200 hover:border-danger/30 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {loggingOut ? (
+              <span className="inline-block w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+            ) : (
+              <span className="material-symbols-outlined text-lg">logout</span>
+            )}
+            <span>退出</span>
           </button>
         </div>
       </div>

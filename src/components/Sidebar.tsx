@@ -37,7 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-6 border-b border-slate-800/80">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0256FF] to-[#3B82F6] flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <span className="material-symbols-outward font-bold text-white text-xl">blur_on</span>
+              <span className="material-symbols-outlined font-bold text-white text-xl">blur_on</span>
             </div>
             <div>
               <h1 className="text-white font-bold font-display text-base tracking-wide leading-none">达芬奇密码 AI</h1>

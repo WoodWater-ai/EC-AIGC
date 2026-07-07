@@ -3,23 +3,45 @@
 @theme {
   --font-sans: "Inter", "Noto Sans TC", system-ui, sans-serif;
   --font-display: "Hanken Grotesk", "Inter", sans-serif;
-  
+
   --color-primary: #0256FF;
   --color-primary-light: #EBF2FF;
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-danger: #EF4444;
   --color-info: #3B82F6;
-  
+
   --color-bg-base: #F5F7FB;
   --color-bg-card: #FFFFFF;
   --color-bg-dark: #0B1C30;
   --color-border-main: #E2E8F0;
-  
+
   --color-text-main: #0B1C30;
   --color-text-muted: #64748B;
-  
+
   --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/*
+ * Material Symbols font-family override
+ *
+ * 背景：项目用 className="material-symbols-outlined"（Google Fonts 约定），
+ * 但 @fontsource/material-symbols 导出的 font-family 是 "Material Symbols"（无 Outlined 后缀）。
+ * 这里 override 一下让现有 className 能匹配字体，无需改任何业务组件。
+ */
+.material-symbols-outlined {
+  font-family: 'Material Symbols';
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'liga';
 }
 
 /* Custom Webkit scrollbar for B-end internal panels */

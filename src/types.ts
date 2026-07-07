@@ -1,4 +1,5 @@
 export enum AppScreen {
+  LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD',
   TASKS = 'TASKS',
   CREATE_IMAGE_TASK = 'CREATE_IMAGE_TASK',
