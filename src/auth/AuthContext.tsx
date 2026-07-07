@@ -2,12 +2,17 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
 import type { LoginResponse, MenuResponse } from '../api/types';
-import { setToken as setTokenToStorage, clearToken } from '../api/auth';
+import {
+  getToken,
+  setToken as setTokenToStorage,
+  clearToken,
+} from '../api/auth';
 import * as authApi from '../api/modules/auth';
 
 /**
@@ -20,9 +25,12 @@ import * as authApi from '../api/modules/auth';
  * - 业务按钮用 useAuth().hasPermission(code) 控制可见性
  * - 后续 Sidebar 用 useAuth().menuTree 渲染真实菜单（CLAUDE.md TODO）
  *
- * 已知限制：
- * - 当前不持久化 user（刷新页面会丢 user → 跳登录页）
- *   待后续接 me() 改造为"refresh → load user"，详见 authApi.me()
+ * 启动恢复机制（解决"刷新页面跳回登录页"问题）：
+ * - AuthProvider 挂载时如 localStorage 有 token → 调 /v1/auth/me 恢复 user
+ * - 期间 initializing=true，App 层展示 spinner 避免闪 LOGIN
+ * - me() 成功 → setUser(resp)；失败（A0102xx 或 网络错误）→ clearToken() + setUser(null)
+ * - 网络错误不会触发 A0102xx toast（axios 拦截器对非 ApiError 走 generic toast），
+ *   业务仅清 token + 跳 LOGIN，不打扰用户
  */
 
 interface AuthState {
@@ -36,6 +44,11 @@ interface AuthState {
   menuTree: MenuResponse[];
   /** 是否已登录 */
   isAuthenticated: boolean;
+  /**
+   * 是否正在恢复登录态 —— AuthProvider 挂载后调 /v1/auth/me 的过程中为 true
+   * App 层用它在挂载瞬间展示全屏 spinner，避免"闪过 LOGIN → 再进 dashboard"
+   */
+  initializing: boolean;
 }
 
 interface AuthContextValue extends AuthState {
@@ -73,11 +86,61 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<LoginResponse | null>(null);
+  // initializing 启动时为 true；mount 后调 me()，无论成功失败都置 false
+  const [initializing, setInitializing] = useState<boolean>(true);
 
   const roles = useMemo<readonly string[]>(() => user?.roles ?? [], [user]);
   const permissions = useMemo<readonly string[]>(() => user?.permissions ?? [], [user]);
   const menuTree = useMemo<MenuResponse[]>(() => user?.menuTree ?? [], [user]);
   const isAuthenticated = user != null;
+
+  /**
+   * 启动恢复 —— 挂载时如有 token 则调 me() 恢复 user
+   *
+   * 时序：
+   * 1. App 渲染第一帧（initializing=true → 全屏 spinner）
+   * 2. useEffect 跑 → 调 me()
+   * 3. me() 成功 → setUser + setInitializing(false) → 渲染 dashboard
+   * 4. me() 失败 → clearToken + setUser(null) + setInitializing(false) → 渲染 LOGIN
+   *
+   * 注意：
+   * - axios 拦截器对 A0102xx 会 toast + setLoginRequiredHandler；网络错误不会
+   * - 这里 catch 不区分错误类型，统一清 token，让 App 层根据 isAuthenticated 跳 LOGIN
+   * - 不阻塞 UI：即使后端慢，用户看到的是 spinner，不会闪 LOGIN
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      const token = getToken();
+      if (!token) {
+        // 没 token → 直接结束初始化，跳 LOGIN
+        if (!cancelled) setInitializing(false);
+        return;
+      }
+      try {
+        const resp = await authApi.me();
+        if (!cancelled) {
+          setUser(resp);
+        }
+      } catch (err) {
+        // me() 失败 —— 大概率 token 已过期
+        // axios 拦截器已 toast（业务错误）或 console（网络错误）
+        // 这里仅清前端状态，让 App 渲染 LOGIN
+        if (!cancelled) {
+          clearToken();
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) setInitializing(false);
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const login = useCallback(async (username: string, passwordPlain: string) => {
     const resp = await authApi.login(username, passwordPlain);
@@ -119,12 +182,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       permissions,
       menuTree,
       isAuthenticated,
+      initializing,
       login,
       logout,
       hasPermission,
       hasRole,
     }),
-    [user, roles, permissions, menuTree, isAuthenticated, login, logout, hasPermission, hasRole]
+    [user, roles, permissions, menuTree, isAuthenticated, initializing, login, logout, hasPermission, hasRole]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

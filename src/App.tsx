@@ -67,10 +67,12 @@ function adaptAuthUser(authUser: ReturnType<typeof useAuth>['user']): SystemUser
 }
 
 export default function App() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, initializing, logout } = useAuth();
 
-  // 初次加载直接 LOGIN（user 暂未持久化，刷新需重新登录 — 待 /me 接口接入后改造）
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOGIN);
+  // 初次加载默认 DASHBOARD —— initializing=true 时显示 spinner 不进 switch；
+  // initializing=false 后根据 isAuthenticated 决定 LOGIN 还是 DASHBOARD。
+  // 旧版本初始值是 LOGIN（依赖 user 未持久化），现在 AuthProvider 会用 /me 恢复 user。
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
 
   // Core local states
   const [tasks, setTasks] = useState<GenerationTask[]>(mockTasks);
@@ -103,20 +105,6 @@ export default function App() {
       });
     };
   }, []);
-
-  /**
-   * 未登录自动跳 LOGIN
-   *
-   * 触发场景：
-   * - 初始加载（currentScreen 初始 LOGIN，不会触发）
-   * - 主动登出后
-   * - token 被 clear（虽然 A0102xx 已经会 setScreen(LOGIN)，这里是双保险）
-   */
-  useEffect(() => {
-    if (!isAuthenticated && currentScreen !== AppScreen.LOGIN) {
-      setCurrentScreen(AppScreen.LOGIN);
-    }
-  }, [isAuthenticated, currentScreen]);
 
   // State Mutators
   const handleAddTask = (newTask: GenerationTask) => {
@@ -229,6 +217,25 @@ export default function App() {
         );
     }
   };
+
+  // ===== 路由分支：启动恢复中（AuthProvider 调 /me 期间） =====
+  // 显示全屏 spinner，避免"闪一帧 LOGIN → 再进 dashboard"的体验问题
+  if (initializing) {
+    return (
+      <div
+        className="h-screen w-screen flex items-center justify-center bg-bg-base"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="flex flex-col items-center gap-3">
+          <span className="material-symbols-outlined text-5xl text-primary animate-spin">
+            progress_activity
+          </span>
+          <p className="text-sm text-slate-500">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   // ===== 路由分支：CREATE_* 任务页 =====
   if (currentScreen === AppScreen.CREATE_IMAGE_TASK) {
