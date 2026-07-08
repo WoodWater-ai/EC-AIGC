@@ -25,34 +25,46 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   const [isInternalTransitOpen, setIsInternalTransitOpen] = useState(false);
   const [transitTargetSlot, setTransitTargetSlot] = useState<'main' | 'top' | 'bottom' | 'detail' | 'style' | 'scene' | 'pose'>('main');
 
-  const handleTransitConfirmSelection = (selectedUrls: string[]) => {
-    if (selectedUrls.length === 0) return;
-    const firstUrl = selectedUrls[0];
+  // 7 个 slot 的 fileResourceId(真实业务标识,后续任务创建请求用)
+  const [mainFileResId, setMainFileResId] = useState<number | null>(null);
+  const [topClothingFileResId, setTopClothingFileResId] = useState<number | null>(null);
+  const [bottomClothingFileResId, setBottomClothingFileResId] = useState<number | null>(null);
+  const [detailFileResId, setDetailFileResId] = useState<number | null>(null);
+  const [styleFileResId, setStyleFileResId] = useState<number | null>(null);
+  const [sceneFileResId, setSceneFileResId] = useState<number | null>(null);
+  const [poseFileResId, setPoseFileResId] = useState<number | null>(null);
+
+  const handleTransitConfirmSelection = (selectedFileResourceIds: number[]) => {
+    if (selectedFileResourceIds.length === 0) return;
+    const firstId = selectedFileResourceIds[0];
 
     switch (transitTargetSlot) {
       case 'main':
-        setSelectedProduct({
-          ...selectedProduct,
-          thumbnail: firstUrl,
-          name: productName
-        });
+        // 主图:暂存 fileResourceId;UI 上保留 thumbnail 显示(由现有 selectedProduct.thumbnail)
+        setMainFileResId(firstId);
         break;
       case 'top':
+        setTopClothingFileResId(firstId);
         setTopClothingUploaded(true);
         break;
       case 'bottom':
+        setBottomClothingFileResId(firstId);
         setBottomClothingUploaded(true);
         break;
       case 'detail':
+        setDetailFileResId(firstId);
         setDetailRefUploaded(true);
         break;
       case 'style':
+        setStyleFileResId(firstId);
         setStyleRefParsed(true);
         break;
       case 'scene':
+        setSceneFileResId(firstId);
         setSceneRefUploaded(true);
         break;
       case 'pose':
+        setPoseFileResId(firstId);
         setPoseRefUploaded(true);
         break;
     }
@@ -339,13 +351,13 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                 <span className="material-symbols-outlined text-xl">cloud_upload</span>
               </div>
               <div className="text-blue-600 font-bold text-xs lg:text-sm mb-1">
-                点击上传图片打开资源中转站
+                点击上传图片打开资源中心
               </div>
               <div className="text-[10px] lg:text-xs text-slate-400 leading-relaxed max-w-[240px]">
-                所有资源选择都要打开资源中转站，支持本地上传与目录扫描，可多选及勾选上传。
+                所有资源选择都要打开资源中心，支持本地上传与目录扫描，可多选及勾选上传。
               </div>
               <div className="text-[9px] lg:text-[10px] text-slate-400 mt-2 font-mono">
-                通过资源中转站统一管理和添加主体素材
+                通过资源中心统一管理和添加主体素材
               </div>
             </div>
 
@@ -1043,7 +1055,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
 
       {isInternalTransitOpen && (
         <AssetTransitModal
-          products={products}
+          purpose="PRODUCT"
+          productId={selectedProduct?.id ? Number(selectedProduct.id) : undefined}
           onClose={() => setIsInternalTransitOpen(false)}
           onConfirmSelection={handleTransitConfirmSelection}
           targetSlot={transitTargetSlot}

@@ -8,7 +8,7 @@ export const mockUsers: SystemUser[] = [
 ];
 
 export const mockNotifications: SystemNotification[] = [
-  { id: 'n1', title: '任务生成成功', content: '「智能运动手表_夏日活力宣传图」批次生成已完成（10/10），已自动存入资源中转站。', type: 'success', time: '10 分钟前', read: false },
+  { id: 'n1', title: '任务生成成功', content: '「智能运动手表_夏日活力宣传图」批次生成已完成（10/10），已自动存入资源中心。', type: 'success', time: '10 分钟前', read: false },
   { id: 'n2', title: '算力额度预警', content: '本月企业算力点数已使用 78.4%，建议及时补充以免影响批次任务。', type: 'warning', time: '1 小时前', read: false },
   { id: 'n3', title: '任务生成失败', content: '「极地防寒羽绒服_动态飞雪场景短视频」由于底图复杂度过高导致渲染超时（Error Code: 504）。', type: 'error', time: '2 小时前', read: true },
   { id: 'n4', title: '新模板审核提醒', content: '设计师 陈美晴 提交了「3D极简展示模板」待审核发布。', type: 'info', time: '1 天前', read: true }

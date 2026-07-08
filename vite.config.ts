@@ -46,6 +46,24 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
+
+        // COS 直传 dev proxy —— 解决开发环境 CORS 问题
+        // 链路:
+        //   前端 hook: PUT /cos/admin/1/other/xxx.png?sign=...
+        //   rewrite:   /admin/1/other/xxx.png?sign=...   (去掉 /cos)
+        //   转发:      PUT https://<bucket>.cos.<region>.myqcloud.com/admin/1/other/xxx.png?sign=...
+        // 生产环境由运维在 COS 控制台配 CORS(允许 Origin),前端不需要走 proxy
+        '/cos': {
+          target: 'https://dafenqi-ai-1444778271.cos.ap-nanjing.myqcloud.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/cos/, ''),
+          // 强制 Origin / Referer 为 COS 域,绕开 COS bucket 可能配置的防盗链白名单
+          // (浏览器带的是 http://localhost:3000/,会被 COS 防盗链拒绝 → 403)
+          headers: {
+            Origin: 'https://dafenqi-ai-1444778271.cos.ap-nanjing.myqcloud.com',
+            Referer: 'https://dafenqi-ai-1444778271.cos.ap-nanjing.myqcloud.com/',
+          },
+        },
       },
     },
   };

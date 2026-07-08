@@ -1,46 +1,56 @@
-import React, { useState, useRef } from 'react';
-import { ProductAsset } from '../types';
+import React, { useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
+import type { ProductAsset } from '../types';
+import { assetApi, type AssetResourceItem, type AssetResourceQueryRequest } from '../api/modules/asset';
+import { assetCategoryApi, type AssetCategoryNode } from '../api/modules/assetCategory';
+import { useAuth } from '../auth/AuthContext';
+import { useFileUpload } from '../hooks/useFileUpload';
+import { AssetImage } from './AssetImage';
 
-export interface TransitAsset {
-  id: string;
+/**
+ * 左侧仅"分类导航"(调用真实分类树接口),无快捷视图。
+ * 默认无选中分类 = 全部资源;点击分类节点 = 后端 query 带 categoryId 过滤。
+ */
+
+/** 目录扫描结果文件的导入状态机 */
+type ScanStatus = 'pending' | 'importing' | 'success' | 'failed';
+interface ScannedFile {
   name: string;
+  /** 缩略图 URL —— 浏览模式下为 blob:...;mock 阶段为 https://... */
   url: string;
-  category: '全部图片' | '已上传图片' | '最新编辑' | '商品图库';
-  tag: string; // e.g. "商品原图", "白底图", "风格参考"
-  date: string;
+  tag: string;
+  /** 用户勾选(仅 status=pending 且 checked=true 才会在批量导入时被处理) */
+  checked: boolean;
+  /** 导入状态机 */
+  status: ScanStatus;
+  /** 0-100 进度(仅 status=importing 时动态变化) */
+  progress: number;
+  /** 失败原因(status=failed 时填充) */
+  errorMsg?: string;
+  /** 文件大小(浏览目录模式才有,字节) */
+  size?: number;
+  /** 扩展字段 —— 浏览模式下挂真实 File 对象,导入时直接走 useFileUpload */
+  extra?: { file?: File };
 }
 
+/** TransitAsset 直接 alias 到后端 AssetResourceItem —— 单一数据源 */
+type TransitAsset = AssetResourceItem;
+
 interface AssetTransitModalProps {
-  products: ProductAsset[];
+  /** 已废弃:父组件传 onConfirmSelection 后不再消费 products */
+  products?: ProductAsset[];
   onClose: () => void;
   onSelectProduct?: (product: ProductAsset) => void;
   selectedProduct?: ProductAsset;
-  onConfirmSelection?: (selectedUrls: string[]) => void;
+  /** 选中确认回调 —— 接收 fileResourceId 数组(真实业务标识) */
+  onConfirmSelection?: (selectedFileResourceIds: number[]) => void;
+  /** 上传用途:AVATAR / PRODUCT / OTHER —— 默认 OTHER */
+  purpose?: 'AVATAR' | 'PRODUCT' | 'OTHER';
+  /** 关联商品 ID —— purpose=PRODUCT 时必填 */
+  productId?: number;
+  /** 任务创建时的素材槽位提示,CreateImageTask / CreateVideoTask 用 */
   targetSlot?: string;
 }
-
-// Scanned folder mocked files map
-const folderMockFiles: Record<string, { name: string; url: string; tag: string }[]> = {
-  '/assets/brand_wear/': [
-    { name: 'Model_Autumn_Coat_01.jpg', url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=500&q=80', tag: '商品原图' },
-    { name: 'Fleece_Sweater_Detail.jpg', url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=500&q=80', tag: '商品原图' },
-    { name: 'Casual_Pants_Beige.jpg', url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=500&q=80', tag: '白底图' },
-    { name: 'Autumn_Vibe_Lookbook.jpg', url: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=500&q=80', tag: '风格参考' }
-  ],
-  '/assets/skincare_line/': [
-    { name: 'Organic_Serum_Green.png', url: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=500&q=80', tag: '白底图' },
-    { name: 'Hydration_Cream_Pot.jpg', url: 'https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?auto=format&fit=crop&w=500&q=80', tag: '商品原图' },
-    { name: 'Skincare_Glow_Essence.jpg', url: 'https://images.unsplash.com/photo-1608248597481-496100c8c836?auto=format&fit=crop&w=500&q=80', tag: '商品原图' }
-  ],
-  '/assets/tech_watches/': [
-    { name: 'Smart_Band_Active.jpg', url: 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?auto=format&fit=crop&w=500&q=80', tag: '商品原图' },
-    { name: 'Titanium_Case_Macro.jpg', url: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=400&q=80', tag: '风格参考' }
-  ],
-  '/assets/luxury_jewelry/': [
-    { name: 'Gold_Ring_Diamond.jpg', url: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=500&q=80', tag: '白底图' },
-    { name: 'Silver_Necklace_Display.jpg', url: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=500&q=80', tag: '商品原图' }
-  ]
-};
 
 export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   products,
@@ -48,95 +58,105 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   onSelectProduct,
   selectedProduct,
   onConfirmSelection,
+  purpose = 'OTHER',
+  productId,
   targetSlot = 'main'
 }) => {
-  const [activeNav, setActiveNav] = useState<'全部图片' | '已上传图片' | '最新编辑' | '商品图库'>('全部图片');
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
-  const [tagFilter, setTagFilter] = useState('');
+  /** 左侧分类树选中节点(联动后端 categoryId 过滤) */
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  /** 真实分类树(从 assetCategoryApi.tree 加载) */
+  const [categoryTree, setCategoryTree] = useState<AssetCategoryNode[]>([]);
+  const [categoryTreeError, setCategoryTreeError] = useState<string | null>(null);
 
-  // Local assets matching the prototype
-  const [assets, setAssets] = useState<TransitAsset[]>([
-    {
-      id: 'ta1',
-      name: 'MW_Series_7_Silver.jpg',
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCUV_M9m78EPGiJsk8SksM9F1eQT_pDSxsoPobZrIAJXIP1WiZ6OS6mD6qTmy__1staNUOhUUzM2Kl569mAx02RsQi41SQyJZ949ZEIYY313fN2ifWHO7DtBQk5lESZWNucVpx5h9mkd8OZIdkV4GO-mqyq4Bu-XgveqUce50rvBGmirhcQrtG85mpwAbaOh3y-kAVVTynZJnoNQu9QyJYx-3NL1OA4Cw8OhgGqIUaKRbs1KeZxQggY',
-      category: '商品图库',
-      tag: '商品原图',
-      date: '2023-11-24'
-    },
-    {
-      id: 'ta2',
-      name: 'Skincare_Collection_A.png',
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB2GNJdWM7mTReEcL1U4UKK9pLWFkFqbPL-H25g3TWwcGbG0mEAafJEJuIjyOVvrLsqzgI9ekLLXeRlmyZ9f8dzjlIdmvdbQxj2gqqW4l6CjwT8eQvkQnNGr77tuiKxQBEeMbzCJFDOqJw6S4moG98xkl7xhNbN-BNqTOSw5T2d2eZDEGEYJWDKSgPJF6V1aHG_iTojfqDsz5XzU9cYVAYztDJ00erRSJgp8l-plaSzjmDPwAdbhHNt',
-      category: '已上传图片',
-      tag: '白底图',
-      date: '2023-11-23'
-    },
-    {
-      id: 'ta3',
-      name: 'Concept_UI_Device.jpg',
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBs9GAGYGGDD3WdvTtkEaIKLItrTfzE1qVFLYV_uXHB1OPx6hwUn5V0HfwRlW-q0tyuXsaGfDY324XofzNGZJA-Hndzc2fHXU2XAOg8xVVSDqkI-ihdhKLuHnnGlc2rcC7FAfZXLTjkEiAVe4NVSkmenTJ_Ru_Fly4hP7I2ccdTCjg6ogm4Bmo-8NQ2D3WPttv8N3b8zigmhZA70BSnBySNnFevgO9Mx8CDrSYGjy-c2EQkCOYQoNOg',
-      category: '最新编辑',
-      tag: '风格参考',
-      date: '2023-11-23'
-    },
-    {
-      id: 'ta4',
-      name: 'Interior_Furn_02.png',
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAL8BL7B508lmbaob7sE1xAkzipIvZ4d-fLkl55GcdgvnapfvTqmLtWyjXdvne8ljl013dv6ELcYq_0nIAD692idYejWuV4GA7SWuwxh2icKBQE8W0SLZvZxBqSFey28x7T5ebCBE4YPjUeTbQert8sgxQaU5YJaMXjCO2qJdX-iEQJFJZakBBhcxdCrFziUsiiLk6LPWgOa5_j-Fi7nQlzDZ3YQ8m3O8EdNPBhwjFULnjiqX3SoZ-8',
-      category: '商品图库',
-      tag: '商品原图',
-      date: '2023-11-22'
-    },
-    {
-      id: 'ta5',
-      name: 'Texture_Tech_01.jpg',
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAvbzOUFydR_-NWPrpgFtXaJ9Rlr6aOwsW-Y_OwPkY626vvV34KrNkdS6IsZWMxTy6ZOtK9PU-S5WXPLs6ozo0yPy0glPBxWLgx9IxqsbctP9FxdCYf5F_BQLnDtr7jP7cjUk_xhLQbh7miC42cR1Rgyb5zKUaeGQHUsPAcDiX5j-SNi7MnCcK66b9iShMib2i2rEEMIxS5vjOfsJuNQh86Li8y2BcxxyG5VQcvyOdLIRF038Kzrk10',
-      category: '最新编辑',
-      tag: '风格参考',
-      date: '2023-11-22'
-    },
-    {
-      id: 'ta6',
-      name: 'Jewelry_Set_Silver.png',
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAXDPJnVzfXmolJYMd37Y_EPyzCwfK_kMl7DSqroTd_Gukz5pTHEgShVT99lNqWamWCsdg4Ls_EXIHWvxHffI0diU-pzlpj0pOXv3Fmm_moP9P7qUth0DBYUgJJSiukV60UrWtMBHQqawVTGQYS6wTbVXD1LUKi0HSTirWcPLs9Taz73HvP07KRkaPJL7cXZFDReUwZXkGqfOm4MD89M2wLwOOAqo5ioi33k_lxNmOWuUbQ18IpAa6Z',
-      category: '已上传图片',
-      tag: '白底图',
-      date: '2023-11-21'
+  // Selected asset list(资源 ID,number)
+  const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
+
+  // ============ 真后端数据 ============
+  const { user } = useAuth();
+  const currentUserId = user?.userId as number | undefined;
+
+  // 视图分类 → 后端 query 参数映射
+  // 仅由 selectedCategoryId 决定:无选中 = 全部,选中 = 后端 categoryId 过滤
+  const buildQuery = (): AssetResourceQueryRequest => {
+    const base: AssetResourceQueryRequest = {
+      pageNum: 1,
+      pageSize: 100,
+    };
+    if (selectedCategoryId !== null) {
+      return { ...base, categoryId: selectedCategoryId };
     }
-  ]);
+    return base;
+  };
 
-  // Selected asset list
-  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>(['ta1', 'ta3', 'ta4', 'ta5', 'ta6']);
+  // 当前页数据 + 刷新方法
+  const [assets, setAssets] = useState<TransitAsset[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [queryError, setQueryError] = useState<Error | null>(null);
+
+  const refetch = async () => {
+    setLoading(true);
+    setQueryError(null);
+    try {
+      const query = { ...buildQuery(), keyword: searchQuery || undefined };
+      const page = await assetApi.page(query);
+      setAssets(page.list);
+    } catch (err) {
+      setQueryError(err as Error);
+      setAssets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 触发刷新:searchQuery / currentUserId / productId / selectedCategoryId 任一变化都重发请求
+  useEffect(() => {
+    refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, currentUserId, productId, selectedCategoryId]);
+
+  /**
+   * 加载真实分类树(用户打开 modal 时一次性加载)
+   * 失败时只提示,不阻塞主流程(顶部 4 个视图按钮仍可用)
+   */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const tree = await assetCategoryApi.tree();
+        if (!cancelled) {
+          setCategoryTree(tree ?? []);
+          setCategoryTreeError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setCategoryTreeError((err as Error).message);
+          setCategoryTree([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Directory Scan Drawer overlay state
   const [isScanOpen, setIsScanOpen] = useState(false);
-  const [scanPath, setScanPath] = useState('/assets/brand_wear/');
+  const [scanPath, setScanPath] = useState('');
   const [isScanning, setIsScanning] = useState(false);
-  const [scannedFiles, setScannedFiles] = useState<{ name: string; url: string; tag: string; checked: boolean }[]>([]);
+  /** 扫描到的文件 + 导入状态机 */
+  const [scannedFiles, setScannedFiles] = useState<ScannedFile[]>([]);
   const [hasScanned, setHasScanned] = useState(false);
+  /** 浏览模式暂存的目录句柄 —— 扫描时用 */
+  const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
 
   // Hidden inputs refs
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Filter logic
-  const filteredAssets = assets.filter(item => {
-    // Nav category
-    if (activeNav !== '全部图片') {
-      if (item.category !== activeNav) return false;
-    }
-    // Search query
-    if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    // Date filter
-    if (dateFilter && item.date !== dateFilter) return false;
-    // Material Type / Tag filter
-    if (tagFilter && item.tag !== tagFilter) return false;
+  // Filter logic —— 服务端 query 已处理 keyword/categoryId,客户端不兜底过滤
+  const filteredAssets = assets;
 
-    return true;
-  });
-
-  const handleCardClick = (id: string) => {
+  const handleCardClick = (id: number) => {
     if (selectedAssetIds.includes(id)) {
       setSelectedAssetIds(prev => prev.filter(x => x !== id));
     } else {
@@ -148,28 +168,98 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setSelectedAssetIds([]);
   };
 
+  // ============ 移动到分类(批量) ============
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [moveTargetCategoryId, setMoveTargetCategoryId] = useState<number | null>(null);
+  const [moveTargetCategoryName, setMoveTargetCategoryName] = useState<string>('');
+  const [isMoving, setIsMoving] = useState(false);
+
+  const handleMoveClick = () => {
+    if (selectedAssetIds.length === 0) return;
+    setMoveTargetCategoryId(null);
+    setMoveTargetCategoryName('');
+    setIsMoveModalOpen(true);
+  };
+
+  const handleMoveCancel = () => {
+    if (isMoving) return;
+    setIsMoveModalOpen(false);
+  };
+
+  /**
+   * 批量移动:把 selectedAssetIds 的每个资源都更新到 moveTargetCategoryId(replace 语义)
+   * - 后端 updateCategories 是 per-resource,前端循环调用
+   * - 任一失败立刻中断,提示失败信息;成功的数量不回滚(移动不可逆)
+   */
+  const handleMoveConfirm = async () => {
+    if (moveTargetCategoryId === null || selectedAssetIds.length === 0) return;
+    setIsMoving(true);
+    try {
+      for (const id of selectedAssetIds) {
+        await assetApi.updateCategories(id, [moveTargetCategoryId]);
+      }
+      toast.success('移动完成,');
+      setIsMoveModalOpen(false);
+      setSelectedAssetIds([]);
+      await refetch();
+    } catch (err) {
+      toast.error(`移动失败: ${(err as Error).message}`);
+    } finally {
+      setIsMoving(false);
+    }
+  };
+
+  /** 判断节点是否为叶子(children 为空 / null / undefined) */
+  const isLeaf = (node: AssetCategoryNode): boolean =>
+    !node.children || node.children.length === 0;
+
+  /**
+   * 批量删除选中的资源
+   * - window.confirm 确认(避免误删)
+   * - 调 assetApi.deleteBatch(ids)
+   * - 后端:删除 asset_resource,若 file_resource 引用归 0,自动物理删除 COS 文件
+   * - 成功后清空选中 + 刷新列表
+   */
+  const handleDeleteSelected = async () => {
+    if (selectedAssetIds.length === 0) return;
+    const count = selectedAssetIds.length;
+    const confirmed = window.confirm(`确认要删除选择的 ${count} 个资源吗?`);
+    if (!confirmed) return;
+
+    try {
+      const successCount = await assetApi.deleteBatch([...selectedAssetIds]);
+      toast.success(`${successCount} 个资源已删除`);
+      setSelectedAssetIds([]);
+      await refetch();
+    } catch (err) {
+      toast.error(`删除失败: ${(err as Error).message}`);
+    }
+  };
+
   const handleConfirmSelection = () => {
-    // Get URLs for selected items
-    const urls = assets.filter(a => selectedAssetIds.includes(a.id)).map(a => a.url);
-    if (urls.length === 0) {
+    if (selectedAssetIds.length === 0) {
       alert('请至少选择一个资源！');
       return;
     }
-    
+
     if (onConfirmSelection) {
-      onConfirmSelection(urls);
-    } else if (onSelectProduct && products.length > 0) {
-      // Compatibility with existing standard product model selection
-      // Find a product that matches selected asset URL or name
-      const selectedItem = assets.find(a => selectedAssetIds.includes(a.id));
-      const matchedProduct = products.find(p => p.thumbnail === selectedItem?.url || p.name.includes(selectedItem?.name.split('_')[0] || ''));
-      if (matchedProduct) {
-        onSelectProduct(matchedProduct);
-      } else {
+      // 真后端协议:传 fileResourceId[] 给父组件
+      const fileResIds = selectedAssetIds
+        .map((id) => {
+          const item = assets.find((a) => a.id === id);
+          return item?.fileResourceId ?? null;
+        })
+        .filter((x): x is number => x !== null);
+
+      onConfirmSelection(fileResIds);
+    } else if (onSelectProduct && products && products.length > 0) {
+      // 兼容老 onSelectProduct 行为(若父组件没用 onConfirmSelection)
+      const firstItem = assets.find((a) => a.id === selectedAssetIds[0]);
+      if (firstItem) {
         onSelectProduct({
           ...products[0],
-          name: selectedItem?.name.replace(/\.[^/.]+$/, "") || products[0].name,
-          thumbnail: selectedItem?.url || products[0].thumbnail
+          name: firstItem.name,
+          thumbnail: firstItem.thumbnailUrl ?? products[0].thumbnail,
         });
       }
     }
@@ -183,69 +273,261 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     }
   };
 
-  const handleLocalUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const files = Array.from(e.target.files) as File[];
-      const newUploaded: TransitAsset[] = files.map((file, idx) => {
-        const fileUrl = URL.createObjectURL(file);
-        return {
-          id: `uploaded-${Date.now()}-${idx}`,
-          name: file.name,
-          url: fileUrl,
-          category: '已上传图片',
-          tag: '已上传素材',
-          date: new Date().toISOString().split('T')[0]
-        };
-      });
+  // 真上传 hook —— 走腾讯云 COS
+  const { upload, loading: uploadLoading } = useFileUpload({
+    purpose: (purpose ?? 'OTHER') as 'AVATAR' | 'PRODUCT' | 'OTHER',
+    productId,
+  });
 
-      setAssets(prev => [...newUploaded, ...prev]);
-      // Select the newly uploaded assets automatically
-      const newIds = newUploaded.map(u => u.id);
-      setSelectedAssetIds(prev => [...prev, ...newIds]);
-      alert(`成功上传并解析 ${newUploaded.length} 个本地素材！已自动添加到中转站列表中。`);
+  const handleLocalUploadChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files: File[] = Array.from(e.target.files);
+
+    let successCount = 0;
+    let failCount = 0;
+    for (const file of files) {
+      try {
+        // 1) COS 直传
+        const { fileResourceId } = await upload(file);
+        // 2) 创建业务资源 —— 后端自动 confirm file_resource
+        // assetType 兜底 PRODUCT_ORIGINAL(主图/商品原图),task-level slot 区分在 task 创建时再做
+        await assetApi.create({
+          fileResourceId,
+          name: file.name,
+          productId,
+          assetType: 'PRODUCT_ORIGINAL',
+        });
+        successCount++;
+      } catch (err) {
+        console.error('[Transit] 上传失败:', err);
+        toast.error(`文件上传失败: ${(err as Error).message}`);
+        failCount++;
+      }
+    }
+    // 成功后简短提示(不带文件名)
+    if (successCount > 0) {
+      toast.success(
+        files.length > 1
+          ? `${successCount} 个文件上传成功`
+          : '文件上传成功',
+      );
+    }
+    // 失败汇总(多文件场景)
+    if (files.length > 1 && failCount > 0) {
+      toast.error(`${failCount} 个文件上传失败`);
+    }
+    // 3) 上传完成后清空 input + 刷新列表
+    e.target.value = '';
+    await refetch();
+  };
+
+  // ============ 目录扫描真实数据(只走浏览模式,无 mock) ============
+
+  /**
+   * 触发扫描:enumerate 真实 PC 本地文件夹
+   * 必须先点"浏览"选择目录(dirHandleRef 有值),否则报错提示
+   */
+  const handleTriggerScan = async () => {
+    const dirHandle = dirHandleRef.current;
+    if (!dirHandle) {
+      toast.error('请先点击"浏览"选择文件夹');
+      return;
+    }
+    setIsScanning(true);
+    setHasScanned(false);
+    // 释放旧 objectURL
+    scannedFiles.forEach((f) => f.url.startsWith('blob:') && URL.revokeObjectURL(f.url));
+
+    try {
+      const imageExts = /\.(jpe?g|png|webp|bmp|gif)$/i;
+      const collected: ScannedFile[] = [];
+      const MAX = 50;
+      // values() 在 TS 类型里可能未定义,实际运行时可用
+      for await (const entry of (dirHandle as unknown as { values: () => AsyncIterable<FileSystemHandle> }).values()) {
+        if (collected.length >= MAX) break;
+        if (entry.kind !== 'file') continue;
+        const fileHandle = entry as FileSystemFileHandle;
+        const file = await fileHandle.getFile();
+        if (!file.type.startsWith('image/') && !imageExts.test(file.name)) continue;
+        collected.push({
+          name: file.name,
+          url: URL.createObjectURL(file),
+          tag: '本地目录',
+          checked: true,
+          status: 'pending',
+          progress: 0,
+          size: file.size,
+          extra: { file },
+        });
+      }
+      setIsScanning(false);
+      setHasScanned(true);
+      setScannedFiles(collected);
+      if (collected.length === 0) {
+        toast.error('所选目录中没有图片文件');
+      } else {
+        toast.success(`已扫描到 ${collected.length} 个图片文件`);
+      }
+    } catch (err) {
+      setIsScanning(false);
+      toast.error(`扫描失败: ${(err as Error).message}`);
     }
   };
 
-  // Directory scanning simulator
-  const handleTriggerScan = () => {
-    setIsScanning(true);
-    setHasScanned(false);
-    setTimeout(() => {
-      setIsScanning(false);
-      setHasScanned(true);
-      const files = folderMockFiles[scanPath] || [
-        { name: 'Custom_Scanned_Asset_01.jpg', url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80', tag: '商品原图' },
-        { name: 'Custom_Scanned_Asset_02.jpg', url: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=500&q=80', tag: '风格参考' }
-      ];
-      setScannedFiles(files.map(f => ({ ...f, checked: true })));
-    }, 1000);
+  /**
+   * 浏览器原生"选择目录" —— 使用 File System Access API 的 showDirectoryPicker
+   * 行为:只把 handle.name 回填到输入框,把 handle 存到 dirHandleRef
+   * 实际 enumerate 由"开始扫描"按钮触发(handleBrowseClick 不读取任何文件)
+   * 支持:Chrome / Edge / Opera;Safari 部分支持;Firefox 不支持
+   */
+  const handleBrowseClick = async () => {
+    type DirectoryPickerWindow = Window & {
+      showDirectoryPicker?: (opts?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
+    };
+    const picker = (window as DirectoryPickerWindow).showDirectoryPicker;
+    if (!picker) {
+      toast.error('当前浏览器不支持目录选择 API,请使用 Chrome / Edge,或手动输入路径');
+      return;
+    }
+    try {
+      const dirHandle = await picker({ mode: 'read' });
+      dirHandleRef.current = dirHandle;
+      setScanPath(`/${dirHandle.name}/`);
+      // 释放旧 objectURL,清空旧结果
+      scannedFiles.forEach((f) => f.url.startsWith('blob:') && URL.revokeObjectURL(f.url));
+      setHasScanned(false);
+      setScannedFiles([]);
+      toast.success(`已选择目录: /${dirHandle.name}/请点击"开始扫描"`);
+    } catch (err) {
+      // 用户取消选择 → 静默
+      if ((err as Error).name === 'AbortError') return;
+      toast.error(`目录选择失败: ${(err as Error).message}`);
+    }
   };
 
-  const handleImportScanned = () => {
-    const checkedFiles = scannedFiles.filter(f => f.checked);
-    if (checkedFiles.length === 0) {
-      alert('请至少勾选一个扫描到的文件进行导入！');
+  /**
+   * 真实导入单文件 —— 走 useFileUpload 上传到 COS,然后 assetApi.create 创建业务资源
+   * 失败时记录真实错误信息,允许"重试"
+   */
+  const importOneFile = async (idx: number) => {
+    const target = scannedFiles[idx];
+    // 标记 importing + 清空错误
+    setScannedFiles((prev) =>
+      prev.map((f, i) =>
+        i === idx
+          ? { ...f, status: 'importing', progress: 0, errorMsg: undefined, checked: false }
+          : f,
+      ),
+    );
+
+    if (!target.extra?.file) {
+      // 正常不会到这里(扫描必须经过浏览模式)—— 兜底提示
+      setScannedFiles((prev) =>
+        prev.map((f, i) =>
+          i === idx
+            ? { ...f, status: 'failed', progress: 0, errorMsg: '文件对象丢失,请重新扫描', checked: true }
+            : f,
+        ),
+      );
+      return false;
+    }
+
+    try {
+      const { fileResourceId } = await upload(target.extra.file, (pct) => {
+        setScannedFiles((prev) =>
+          prev.map((f, i) => (i === idx ? { ...f, progress: pct } : f)),
+        );
+      });
+      // 创建业务资源(与本地上传一致)
+      await assetApi.create({
+        fileResourceId,
+        name: target.name,
+        productId,
+        assetType: 'PRODUCT_ORIGINAL',
+      });
+      setScannedFiles((prev) =>
+        prev.map((f, i) => (i === idx ? { ...f, status: 'success', progress: 100 } : f)),
+      );
+      return true;
+    } catch (err) {
+      setScannedFiles((prev) =>
+        prev.map((f, i) =>
+          i === idx
+            ? {
+                ...f,
+                status: 'failed',
+                progress: 0,
+                errorMsg: (err as Error).message,
+                checked: true,
+              }
+            : f,
+        ),
+      );
+      return false;
+    }
+  };
+
+  const [isImporting, setIsImporting] = useState(false);
+
+  /**
+   * 批量导入 —— 对所有 checked + status='pending' 的文件并行模拟上传
+   */
+  const handleImportScanned = async () => {
+    const pendingIdx = scannedFiles
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => f.checked && f.status === 'pending')
+      .map(({ i }) => i);
+    if (pendingIdx.length === 0) {
+      toast.error('请至少勾选一个待导入的文件');
       return;
     }
 
-    const importedAssets: TransitAsset[] = checkedFiles.map((file, idx) => ({
-      id: `scanned-${Date.now()}-${idx}`,
-      name: file.name,
-      url: file.url,
-      category: '全部图片',
-      tag: file.tag,
-      date: new Date().toISOString().split('T')[0]
-    }));
+    setIsImporting(true);
+    const results = await Promise.all(pendingIdx.map((i) => importOneFile(i)));
+    setIsImporting(false);
 
-    setAssets(prev => [...importedAssets, ...prev]);
-    // Auto select imported assets
-    const importedIds = importedAssets.map(i => i.id);
-    setSelectedAssetIds(prev => [...prev, ...importedIds]);
+    const successCount = results.filter(Boolean).length;
+    const failCount = results.length - successCount;
 
-    alert(`成功从路径 ${scanPath} 导入 ${importedAssets.length} 个素材！`);
+    if (successCount > 0) {
+      toast.success(`已导入 ${successCount} 个文件`);
+    }
+    if (failCount > 0) {
+      toast.error(`${failCount} 个文件失败,点击行尾"重试"按钮可重新导入`);
+    }
+  };
+
+  /**
+   * 单文件重试 —— 把状态回到 pending 后调 importOneFile
+   */
+  const handleRetryFile = async (idx: number) => {
+    if (isImporting) return;
+    setIsImporting(true);
+    await importOneFile(idx);
+    setIsImporting(false);
+  };
+
+  /**
+   * 关闭扫描 modal —— 检查是否有上传成功的资源,有则刷新资源中心列表
+   * 适用于:头部 X、footer 取消、全成功时的"完成"按钮
+   */
+  const closeScanModal = () => {
+    const successCount = scannedFiles.filter((f) => f.status === 'success').length;
+    // 释放 objectURL
+    scannedFiles.forEach((f) => f.url.startsWith('blob:') && URL.revokeObjectURL(f.url));
+    dirHandleRef.current = null;
     setIsScanOpen(false);
     setHasScanned(false);
     setScannedFiles([]);
+    setScanPath('');  // 下次打开是空白状态,需重新选择
+    if (successCount > 0) {
+      refetch();
+    }
+  };
+
+  /** 完成按钮 —— 全部 success 时显示,与 closeScanModal 行为一致(都刷新) */
+  const handleFinishImport = () => {
+    closeScanModal();
   };
 
   return (
@@ -270,7 +552,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
               <span className="material-symbols-outlined font-bold text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>dataset</span>
             </div>
-            <h1 className="text-base font-extrabold text-slate-800">资源中转站</h1>
+            <h1 className="text-base font-extrabold text-slate-800">资源中心</h1>
           </div>
           <button 
             onClick={onClose} 
@@ -284,64 +566,55 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
         <div className="flex flex-1 overflow-hidden">
           
           {/* Left Navigation (分类导航) */}
-          <aside className="w-[240px] border-r border-slate-200 bg-white flex flex-col p-4 gap-6 shrink-0">
+          <aside className="w-[240px] border-r border-slate-200 bg-white flex flex-col p-4 gap-4 shrink-0 overflow-y-auto">
+
+            {/* 我的分类 —— 真实分类树(从 assetCategoryApi.tree 加载) */}
             <div className="flex flex-col gap-2">
-              <p className="text-[10px] font-extrabold text-slate-400 px-3 uppercase tracking-wider">分类导航</p>
-              <nav className="flex flex-col gap-1">
-                
-                {/* 1. 全部图片 */}
-                <button
-                  onClick={() => setActiveNav('全部图片')}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    activeNav === '全部图片' 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: activeNav === '全部图片' ? "'FILL' 1" : "'FILL' 0" }}>folder</span>
-                  <span>全部图片</span>
-                </button>
-
-                {/* 2. 已上传图片 */}
-                <button
-                  onClick={() => setActiveNav('已上传图片')}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    activeNav === '已上传图片' 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: activeNav === '已上传图片' ? "'FILL' 1" : "'FILL' 0" }}>cloud_upload</span>
-                  <span>已上传图片</span>
-                </button>
-
-                {/* 3. 最新编辑 */}
-                <button
-                  onClick={() => setActiveNav('最新编辑')}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    activeNav === '最新编辑' 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: activeNav === '最新编辑' ? "'FILL' 1" : "'FILL' 0" }}>edit_note</span>
-                  <span>最新编辑</span>
-                </button>
-
-                {/* 4. 商品图库 */}
-                <button
-                  onClick={() => setActiveNav('商品图库')}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    activeNav === '商品图库' 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: activeNav === '商品图库' ? "'FILL' 1" : "'FILL' 0" }}>image</span>
-                  <span>商品图库</span>
-                </button>
-
-              </nav>
+              <p className="text-[10px] font-extrabold text-slate-400 px-3 uppercase tracking-wider">我的分类</p>
+              {categoryTreeError ? (
+                <div className="px-3 py-2 text-[10px] text-red-500 font-medium">
+                  加载失败: {categoryTreeError}
+                </div>
+              ) : categoryTree.length === 0 ? (
+                <div className="px-3 py-2 text-[10px] text-slate-400 font-medium">
+                  暂无分类
+                </div>
+              ) : (() => {
+                // 递归渲染分类树
+                const renderNode = (node: AssetCategoryNode, depth: number): React.ReactNode => {
+                  const isSelected = selectedCategoryId === node.id;
+                  return (
+                    <React.Fragment key={node.id}>
+                      <button
+                        onClick={() => {
+                          // 切换选中:再次点同一节点取消选中(回到全部)
+                          setSelectedCategoryId(isSelected ? null : node.id);
+                        }}
+                        className={`flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                        style={{ paddingLeft: `${12 + depth * 12}px` }}
+                      >
+                        <span
+                          className="material-symbols-outlined text-base shrink-0"
+                          style={{ fontVariationSettings: isSelected ? "'FILL' 1" : "'FILL' 0" }}
+                        >
+                          {depth === 0 ? 'label' : 'subdirectory_arrow_right'}
+                        </span>
+                        <span className="truncate">{node.categoryName ?? '未命名分类'}</span>
+                      </button>
+                      {node.children?.map((child) => renderNode(child, depth + 1))}
+                    </React.Fragment>
+                  );
+                };
+                return (
+                  <nav className="flex flex-col gap-0.5">
+                    {categoryTree.map((node) => renderNode(node, 0))}
+                  </nav>
+                );
+              })()}
             </div>
 
             {/* Storage Progress Meter in bottom of navigation */}
@@ -392,29 +665,9 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   />
                 </div>
                 <div className="flex gap-2">
-                  <select
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
-                    className="pl-2 pr-6 py-1.5 border border-slate-200 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-500 outline-none cursor-pointer"
-                  >
-                    <option value="">日期筛选</option>
-                    <option value="2023-11-24">2023-11-24</option>
-                    <option value="2023-11-23">2023-11-23</option>
-                    <option value="2023-11-22">2023-11-22</option>
-                    <option value="2023-11-21">2023-11-21</option>
-                  </select>
-
-                  <select
-                    value={tagFilter}
-                    onChange={(e) => setTagFilter(e.target.value)}
-                    className="pl-2 pr-6 py-1.5 border border-slate-200 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-500 outline-none cursor-pointer"
-                  >
-                    <option value="">素材类型</option>
-                    <option value="商品原图">商品原图</option>
-                    <option value="白底图">白底图</option>
-                    <option value="风格参考">风格参考</option>
-                    <option value="已上传素材">已上传素材</option>
-                  </select>
+                  <span className="text-[10px] font-bold text-slate-400 self-center">
+                    左侧选择分类
+                  </span>
                 </div>
               </div>
             </div>
@@ -422,58 +675,59 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             {/* Scrollable grid area */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                
-                {filteredAssets.map((asset) => {
-                  const isSelected = selectedAssetIds.includes(asset.id);
-                  const selectIndex = selectedAssetIds.indexOf(asset.id) + 1;
-                  return (
-                    <div 
-                      key={asset.id}
-                      onClick={() => handleCardClick(asset.id)}
-                      className={`group relative flex flex-col bg-white rounded-xl border overflow-hidden hover:shadow-md transition-all cursor-pointer ${
-                        isSelected ? 'border-blue-500 bg-blue-50/10' : 'border-slate-200'
-                      }`}
-                    >
-                      <div className="aspect-square relative overflow-hidden bg-slate-50">
-                        <img 
-                          src={asset.url} 
-                          alt={asset.name}
-                          className="w-full h-full object-cover transition-transform group-hover:scale-102"
-                          referrerPolicy="no-referrer"
-                        />
-                        {/* Selected Index circular badge top-left */}
-                        <div className={`absolute top-3 left-3 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shadow-sm transition-all ${
-                          isSelected ? 'bg-blue-600 text-white' : 'border-2 border-white bg-black/20 text-transparent'
-                        }`}>
-                          {isSelected ? selectIndex : ''}
-                        </div>
-                        <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <div className="p-3">
-                        <p className="text-xs font-bold text-slate-800 truncate mb-1">{asset.name}</p>
-                        <div className="flex items-center justify-between">
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold ${
-                            asset.tag === '商品原图' ? 'bg-slate-100 text-slate-600' :
-                            asset.tag === '白底图' ? 'bg-emerald-50 text-emerald-600' :
-                            'bg-blue-50 text-blue-600'
-                          }`}>
-                            {asset.tag}
-                          </span>
-                          <span className="text-[9px] text-slate-400 font-mono font-medium">{asset.date}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
 
-                {/* Grid Item empty placeholder */}
-                <div 
+                {/* 固定首位:上传资源占位卡片(点击触发本地上传) */}
+                <div
                   onClick={handleLocalUploadTrigger}
                   className="group relative flex flex-col bg-white rounded-xl border border-slate-200 border-dashed overflow-hidden hover:bg-slate-50 transition-all cursor-pointer justify-center items-center p-6 aspect-square"
                 >
                   <span className="material-symbols-outlined text-slate-400 text-3xl group-hover:text-blue-500 mb-2 transition-colors">add_photo_alternate</span>
-                  <p className="text-xs font-bold text-slate-400 group-hover:text-blue-600 transition-colors">待上传素材...</p>
+                  <p className="text-xs font-bold text-slate-400 group-hover:text-blue-600 transition-colors">上传资源...</p>
                 </div>
+
+                {(() => {
+                  return filteredAssets.map((asset) => {
+                    const isSelected = selectedAssetIds.includes(asset.id);
+                    const selectIndex = selectedAssetIds.indexOf(asset.id) + 1;
+                    return (
+                      <div
+                        key={asset.id}
+                        onClick={() => handleCardClick(asset.id)}
+                        className={`group relative flex flex-col bg-white rounded-xl border overflow-hidden hover:shadow-md transition-all cursor-pointer ${
+                          isSelected ? 'border-blue-500 bg-blue-50/10' : 'border-slate-200'
+                        }`}
+                      >
+                        <div className="aspect-square relative overflow-hidden bg-slate-50">
+                          <AssetImage
+                            urls={[asset.originalUrl, asset.thumbnailUrl]}
+                            alt={asset.name}
+                            className="transition-transform group-hover:scale-102"
+                          />
+                          {/* Selected Index circular badge top-left */}
+                          <div className={`absolute top-3 left-3 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shadow-sm transition-all ${
+                            isSelected ? 'bg-blue-600 text-white' : 'border-2 border-white bg-black/20 text-transparent'
+                          }`}>
+                            {isSelected ? selectIndex : ''}
+                          </div>
+                          <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <div className="p-3">
+                          <p className="text-xs font-bold text-slate-800 truncate mb-1">{asset.name}</p>
+                          <div className="flex items-center justify-between">
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold ${
+                              asset.tags?.includes('商品原图') ? 'bg-slate-100 text-slate-600' :
+                              asset.tags?.includes('白底图') ? 'bg-emerald-50 text-emerald-600' :
+                              'bg-blue-50 text-blue-600'
+                            }`}>
+                              {asset.tags?.split(',')[0] ?? ''}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-mono font-medium">{asset.createTime?.split('T')[0] ?? ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
 
               </div>
             </div>
@@ -486,22 +740,38 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   <span className="text-xs font-extrabold text-blue-600">已选择 {selectedAssetIds.length} 个资源</span>
                 </div>
                 {selectedAssetIds.length > 0 && (
-                  <button 
-                    onClick={handleClearSelection}
-                    className="text-xs text-blue-600 hover:underline font-bold bg-transparent border-none cursor-pointer"
-                  >
-                    清除选择
-                  </button>
+                  <>
+                    <button
+                      onClick={handleClearSelection}
+                      className="text-xs text-blue-600 hover:underline font-bold bg-transparent border-none cursor-pointer"
+                    >
+                      清除选择
+                    </button>
+                    <button
+                      onClick={handleMoveClick}
+                      className="text-xs text-blue-600 hover:underline font-bold bg-transparent border-none cursor-pointer"
+                    >
+                      移动
+                    </button>
+                  </>
                 )}
               </div>
               <div className="flex items-center gap-3">
-                <button 
+                {selectedAssetIds.length > 0 && (
+                  <button
+                    onClick={handleDeleteSelected}
+                    className="text-xs font-bold text-red-600 hover:text-red-700 hover:underline bg-transparent border-none cursor-pointer"
+                  >
+                    删除资源
+                  </button>
+                )}
+                <button
                   onClick={onClose}
                   className="px-6 py-2 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   取消
                 </button>
-                <button 
+                <button
                   onClick={handleConfirmSelection}
                   className="px-8 py-2 bg-blue-600 text-white rounded-lg text-xs font-extrabold hover:bg-blue-700 hover:shadow-md transition-all cursor-pointer"
                 >
@@ -510,24 +780,133 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
               </div>
             </footer>
 
+            {/* MOVE TO CATEGORY OVERLAY */}
+            {isMoveModalOpen && (
+              <div className="absolute inset-0 bg-black/40 z-40 flex items-center justify-center p-6 animate-fadeIn">
+                <div
+                  className="bg-white max-w-md w-full rounded-xl shadow-2xl border border-slate-200 flex flex-col max-h-[80%] overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-800">移动到分类</h3>
+                      <p className="text-[10px] text-slate-400 font-medium mt-1">
+                        已选择 {selectedAssetIds.length} 个资源,请选择目标分类(仅叶子节点可选)
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleMoveCancel}
+                      disabled={isMoving}
+                      className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                  </div>
+
+                  {/* Tree body */}
+                  <div className="flex-1 overflow-y-auto p-3">
+                    {categoryTreeError ? (
+                      <div className="px-3 py-3 text-xs text-red-500 font-medium">
+                        分类加载失败: {categoryTreeError}
+                      </div>
+                    ) : categoryTree.length === 0 ? (
+                      <div className="px-3 py-3 text-xs text-slate-400 font-medium">
+                        暂无可用分类
+                      </div>
+                    ) : (() => {
+                      // 递归渲染 —— 叶子可点选,非叶子灰色 + 图标提示
+                      const renderMoveNode = (node: AssetCategoryNode, depth: number): React.ReactNode => {
+                        const leaf = isLeaf(node);
+                        const isSelected = moveTargetCategoryId === node.id;
+                        return (
+                          <React.Fragment key={node.id}>
+                            <button
+                              type="button"
+                              disabled={!leaf || isMoving}
+                              onClick={() => {
+                                if (!leaf) return;
+                                setMoveTargetCategoryId(node.id);
+                                setMoveTargetCategoryName(node.categoryName ?? '');
+                              }}
+                              className={`flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                                isSelected
+                                  ? 'bg-blue-50 text-blue-600 cursor-pointer'
+                                  : leaf
+                                    ? 'text-slate-700 hover:bg-slate-50 cursor-pointer'
+                                    : 'text-slate-300 cursor-not-allowed'
+                              } ${isMoving ? 'opacity-60' : ''}`}
+                              style={{ paddingLeft: `${12 + depth * 14}px` }}
+                            >
+                              <span
+                                className="material-symbols-outlined text-sm shrink-0"
+                                style={{ fontVariationSettings: isSelected ? "'FILL' 1" : "'FILL' 0" }}
+                              >
+                                {leaf ? (isSelected ? 'check_box' : 'check_box_outline_blank') : 'folder'}
+                              </span>
+                              <span className="truncate">{node.categoryName ?? '未命名分类'}</span>
+                              {!leaf && (
+                                <span className="ml-auto text-[10px] text-slate-300 font-medium shrink-0">
+                                  非叶子
+                                </span>
+                              )}
+                            </button>
+                            {node.children?.map((child) => renderMoveNode(child, depth + 1))}
+                          </React.Fragment>
+                        );
+                      };
+                      return (
+                        <div className="flex flex-col gap-0.5">
+                          {categoryTree.map((node) => renderMoveNode(node, 0))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between gap-3 bg-slate-50">
+                    <div className="text-[10px] text-slate-500 font-medium truncate">
+                      目标: <span className="text-blue-600 font-bold">{moveTargetCategoryName || '未选择'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={handleMoveCancel}
+                        disabled={isMoving}
+                        className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        取消
+                      </button>
+                      <button
+                        onClick={handleMoveConfirm}
+                        disabled={moveTargetCategoryId === null || isMoving}
+                        className="px-5 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-extrabold hover:bg-blue-700 hover:shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {isMoving ? '移动中...' : '确认移动'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* DIRECTORY SCAN OVERLAY DRAWER */}
             {isScanOpen && (
               <div className="absolute inset-0 bg-black/50 z-30 flex items-center justify-center p-6 animate-fadeIn">
                 <div className="bg-white max-w-lg w-full rounded-xl shadow-xl border border-slate-200 flex flex-col max-h-[90%] overflow-hidden">
-                  
+
                   {/* Scan Header */}
                   <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
                     <div className="flex items-center gap-2 text-slate-800">
                       <span className="material-symbols-outlined text-blue-600 font-bold">scan</span>
                       <h3 className="text-sm font-extrabold">目录扫描获取素材</h3>
                     </div>
-                    <button 
+                    <button
                       onClick={() => {
-                        setIsScanOpen(false);
-                        setHasScanned(false);
-                        setScannedFiles([]);
+                        if (isImporting) return;
+                        closeScanModal();
                       }}
-                      className="text-slate-400 hover:text-slate-600"
+                      disabled={isImporting}
+                      className="text-slate-400 hover:text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-base">close</span>
                     </button>
@@ -535,29 +914,40 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
                   {/* Scan Body */}
                   <div className="p-5 flex-1 overflow-y-auto space-y-4">
-                    
-                    {/* Path selector input */}
+
+                    {/* Path input + 浏览 + 扫描 */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700 block">请输入服务器/磁盘文件夹路径 <span className="text-red-500">*</span></label>
+                      <label className="text-xs font-bold text-slate-700 block">
+                        当前选择的文件夹路径 <span className="text-red-500">*</span>
+                      </label>
                       <div className="flex gap-2">
-                        <select
+                        <input
+                          type="text"
                           value={scanPath}
-                          onChange={(e) => setScanPath(e.target.value)}
-                          className="flex-1 h-9 px-3 border border-slate-250 rounded-lg text-xs font-medium outline-none bg-white focus:border-blue-500 cursor-pointer"
+                          readOnly
+                          placeholder="请点击右侧'浏览'选择文件夹"
+                          disabled={isImporting}
+                          className="flex-1 min-w-0 h-9 px-3 border border-slate-200 rounded-lg text-xs font-medium outline-none bg-slate-50 text-slate-600 cursor-not-allowed disabled:cursor-not-allowed"
+                        />
+                        <button
+                          onClick={handleBrowseClick}
+                          disabled={isScanning || isImporting}
+                          className="px-3 h-9 border border-slate-200 text-slate-700 font-bold text-xs rounded-lg hover:bg-slate-50 cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          <option value="/assets/brand_wear/">/assets/brand_wear/ (户外服饰/新款套组)</option>
-                          <option value="/assets/skincare_line/">/assets/skincare_line/ (美妆护肤/高精原图)</option>
-                          <option value="/assets/tech_watches/">/assets/tech_watches/ (智能穿戴/钛金属系列)</option>
-                          <option value="/assets/luxury_jewelry/">/assets/luxury_jewelry/ (珠宝轻奢/白底系列)</option>
-                        </select>
-                        <button 
+                          <span className="material-symbols-outlined text-sm">folder_open</span>
+                          浏览
+                        </button>
+                        <button
                           onClick={handleTriggerScan}
-                          disabled={isScanning}
-                          className="px-4 bg-blue-600 text-white font-bold text-xs rounded-lg hover:bg-blue-700 transition-colors cursor-pointer flex items-center shrink-0 disabled:bg-blue-400"
+                          disabled={isScanning || isImporting}
+                          className="px-4 h-9 bg-blue-600 text-white font-bold text-xs rounded-lg hover:bg-blue-700 cursor-pointer flex items-center shrink-0 disabled:bg-blue-400 disabled:cursor-not-allowed"
                         >
                           {isScanning ? '扫描中...' : '开始扫描'}
                         </button>
                       </div>
+                      <p className="text-[10px] text-slate-400 font-medium">
+                        请点击"浏览"选择文件夹(会自动列出其中的图片)
+                      </p>
                     </div>
 
                     {isScanning && (
@@ -567,38 +957,126 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                       </div>
                     )}
 
-                    {hasScanned && scannedFiles.length > 0 && (
-                      <div className="space-y-3">
-                        <p className="text-xs font-bold text-slate-600 flex justify-between">
-                          <span>已扫描到以下文件 ({scannedFiles.length} 个):</span>
-                          <span className="text-blue-600 font-mono">100% 解析成功</span>
-                        </p>
+                    {hasScanned && scannedFiles.length > 0 && (() => {
+                      // 状态计数
+                      const successCount = scannedFiles.filter((f) => f.status === 'success').length;
+                      const failedCount = scannedFiles.filter((f) => f.status === 'failed').length;
+                      const importingCount = scannedFiles.filter((f) => f.status === 'importing').length;
+                      const pendingCheckedCount = scannedFiles.filter((f) => f.checked && f.status === 'pending').length;
+                      const allSuccess = successCount === scannedFiles.length && scannedFiles.length > 0;
+                      return (
+                        <div className="space-y-3">
+                          <p className="text-xs font-bold text-slate-600 flex justify-between items-center">
+                            <span>
+                              已扫描到以下文件 ({scannedFiles.length} 个):
+                              {importingCount > 0 && (
+                                <span className="ml-2 text-blue-600 font-mono">导入中 {importingCount}</span>
+                              )}
+                              {successCount > 0 && (
+                                <span className="ml-2 text-green-600 font-mono">已完成 {successCount}</span>
+                              )}
+                              {failedCount > 0 && (
+                                <span className="ml-2 text-red-600 font-mono">失败 {failedCount}</span>
+                              )}
+                            </span>
+                          </p>
 
-                        {/* Files Checklist */}
-                        <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-60 overflow-y-auto">
-                          {scannedFiles.map((file, idx) => (
-                            <div key={idx} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                              <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
-                                <input 
-                                  type="checkbox" 
-                                  checked={file.checked}
-                                  onChange={(e) => {
-                                    const checked = e.target.checked;
-                                    setScannedFiles(prev => prev.map((f, i) => i === idx ? { ...f, checked } : f));
-                                  }}
-                                  className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300 cursor-pointer"
-                                />
-                                <img src={file.url} className="w-8 h-8 rounded object-cover" referrerPolicy="no-referrer" />
-                                <div className="truncate text-xs font-bold text-slate-800">
-                                  {file.name}
+                          {/* Files Checklist —— 每行带状态机视觉 */}
+                          <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                            {scannedFiles.map((file, idx) => {
+                              const isLocked = file.status === 'success' || file.status === 'importing';
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`p-3 flex items-center gap-3 transition-colors ${
+                                    file.status === 'success' ? 'bg-green-50/40' :
+                                    file.status === 'failed' ? 'bg-red-50/40' :
+                                    file.status === 'importing' ? 'bg-blue-50/30' :
+                                    'hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={file.checked}
+                                    disabled={isLocked}
+                                    onChange={(e) => {
+                                      const checked = e.target.checked;
+                                      setScannedFiles((prev) =>
+                                        prev.map((f, i) => (i === idx ? { ...f, checked } : f)),
+                                      );
+                                    }}
+                                    className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                                  />
+                                  <img
+                                    src={file.url}
+                                    className="w-10 h-10 rounded object-cover shrink-0"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className={`truncate text-xs font-bold ${
+                                      file.status === 'success'
+                                        ? 'text-slate-400 line-through'
+                                        : 'text-slate-800'
+                                    }`}>
+                                      {file.name}
+                                    </div>
+                                    {/* 进度条(只在 importing 显示) */}
+                                    {file.status === 'importing' && (
+                                      <div className="mt-1.5 w-full h-1 bg-slate-200 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-blue-600 transition-all duration-200"
+                                          style={{ width: `${file.progress}%` }}
+                                        />
+                                      </div>
+                                    )}
+                                    {/* 失败原因 */}
+                                    {file.status === 'failed' && file.errorMsg && (
+                                      <div className="text-[10px] text-red-500 font-medium mt-0.5 truncate">
+                                        {file.errorMsg}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {/* 行尾状态徽标/按钮 */}
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {file.status === 'success' && (
+                                      <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-green-50 text-green-600">
+                                        <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                                        已导入
+                                      </span>
+                                    )}
+                                    {file.status === 'failed' && (
+                                      <button
+                                        onClick={() => handleRetryFile(idx)}
+                                        disabled={isImporting}
+                                        className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold text-red-600 hover:bg-red-50 hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        <span className="material-symbols-outlined text-[12px]">refresh</span>
+                                        重试
+                                      </button>
+                                    )}
+                                    {file.status === 'pending' && (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-600">
+                                        {file.tag}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              </label>
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-600">{file.tag}</span>
+                              );
+                            })}
+                          </div>
+
+                          {/* 状态提示(全失败/有失败可重试) */}
+                          {failedCount > 0 && successCount > 0 && (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-100 rounded-lg">
+                              <span className="material-symbols-outlined text-amber-500 text-sm">info</span>
+                              <span className="text-[10px] font-bold text-amber-700">
+                                {successCount} 个已导入,{failedCount} 个失败,请点击失败行"重试"按钮重新导入
+                              </span>
                             </div>
-                          ))}
+                          )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {hasScanned && scannedFiles.length === 0 && (
                       <div className="py-12 text-center text-slate-400 text-xs font-bold">
@@ -609,26 +1087,46 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   </div>
 
                   {/* Scan Footer */}
-                  {hasScanned && scannedFiles.length > 0 && (
-                    <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0">
-                      <button 
-                        onClick={() => {
-                          setIsScanOpen(false);
-                          setHasScanned(false);
-                          setScannedFiles([]);
-                        }}
-                        className="px-4 py-2 border border-slate-200 font-bold text-slate-500 rounded-lg text-xs bg-white hover:bg-slate-50 cursor-pointer"
-                      >
-                        取消
-                      </button>
-                      <button 
-                        onClick={handleImportScanned}
-                        className="px-6 py-2 bg-blue-600 text-white font-extrabold rounded-lg text-xs hover:bg-blue-700 transition-colors cursor-pointer"
-                      >
-                        导入至中转站
-                      </button>
-                    </div>
-                  )}
+                  {hasScanned && scannedFiles.length > 0 && (() => {
+                    const allSuccess = scannedFiles.every((f) => f.status === 'success');
+                    const pendingCheckedCount = scannedFiles.filter((f) => f.checked && f.status === 'pending').length;
+                    return (
+                      <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
+                        <div className="text-[10px] text-slate-500 font-medium truncate">
+                          待导入 <span className="text-blue-600 font-extrabold">{pendingCheckedCount}</span> 个
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <button
+                            onClick={() => {
+                              if (isImporting) return;
+                              closeScanModal();
+                            }}
+                            disabled={isImporting}
+                            className="px-4 py-2 border border-slate-200 font-bold text-slate-500 rounded-lg text-xs bg-white hover:bg-slate-50 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            取消
+                          </button>
+                          {allSuccess ? (
+                            <button
+                              onClick={handleFinishImport}
+                              className="px-6 py-2 bg-green-600 text-white font-extrabold rounded-lg text-xs hover:bg-green-700 transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                              完成
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleImportScanned}
+                              disabled={isImporting || pendingCheckedCount === 0}
+                              className="px-6 py-2 bg-blue-600 text-white font-extrabold rounded-lg text-xs hover:bg-blue-700 transition-colors cursor-pointer disabled:bg-blue-400 disabled:cursor-not-allowed"
+                            >
+                              {isImporting ? '导入中...' : '导入至资源中心'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                 </div>
               </div>

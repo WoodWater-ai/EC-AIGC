@@ -252,9 +252,12 @@ export default function App() {
         />
         {isTransitOpen && (
           <AssetTransitModal
-            products={products}
-            selectedProduct={selectedProduct}
-            onSelectProduct={setSelectedProduct}
+            purpose="OTHER"
+            onConfirmSelection={(fileResIds) => {
+              // App.tsx 全局兜底:无业务上下文,仅打日志
+              console.log('[Transit] App 全局选中(未消费):', fileResIds);
+              setIsTransitOpen(false);
+            }}
             onClose={() => setIsTransitOpen(false)}
           />
         )}
@@ -276,9 +279,12 @@ export default function App() {
         />
         {isTransitOpen && (
           <AssetTransitModal
-            products={products}
-            selectedProduct={selectedProduct}
-            onSelectProduct={setSelectedProduct}
+            purpose="OTHER"
+            onConfirmSelection={(fileResIds) => {
+              // App.tsx 全局兜底:无业务上下文,仅打日志
+              console.log('[Transit] App 全局选中(未消费):', fileResIds);
+              setIsTransitOpen(false);
+            }}
             onClose={() => setIsTransitOpen(false)}
           />
         )}
@@ -335,9 +341,12 @@ export default function App() {
       {/* 3. Global Modal Overlay: Asset Transit Station */}
       {isTransitOpen && (
         <AssetTransitModal
-          products={products}
-          selectedProduct={selectedProduct}
-          onSelectProduct={setSelectedProduct}
+          purpose="OTHER"
+          onConfirmSelection={(fileResIds) => {
+            // 全局工具模式 —— 没有明确业务上下文,仅打 console 提示用户
+            console.log('[Transit] App 全局选中(未消费):', fileResIds);
+            setIsTransitOpen(false);
+          }}
           onClose={() => setIsTransitOpen(false)}
         />
       )}

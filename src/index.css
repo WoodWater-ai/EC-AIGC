@@ -78,3 +78,18 @@
   transform: translateY(-2px);
   box-shadow: 0 8px 24px -4px rgba(11, 28, 48, 0.08);
 }
+
+/* ==================== Sonner Toast 自适应宽度 ==================== */
+/* sonner 默认 min-width: 356px,导致"文件上传成功"也撑大。
+   改成 width: fit-content,让 toast 宽度贴合文本(配合 max-width 防溢出)。 */
+[data-sonner-toast] {
+  width: fit-content !important;
+  min-width: 0 !important;
+  max-width: min(90vw, 420px) !important;
+  padding: 10px 14px !important;
+  font-size: 13px !important;
+}
+
+[data-sonner-toast] [data-content] {
+  width: auto !important;
+}

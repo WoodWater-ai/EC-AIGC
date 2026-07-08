@@ -227,7 +227,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex justify-between items-center mb-5">
               <div>
                 <h3 className="text-base font-bold text-[#0B1C30]">最近产出高保真广告素材</h3>
-                <p className="text-xs text-slate-400 mt-1">此处展示已审核通过、并自动完成智能排版的素材。可随时加入中转站。</p>
+                <p className="text-xs text-slate-400 mt-1">此处展示已审核通过、并自动完成智能排版的素材。可随时加入资源中心。</p>
               </div>
               <button
                 onClick={() => setScreen(AppScreen.TASKS)}

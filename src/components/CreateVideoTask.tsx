@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ProductAsset, GenerationTask, AppScreen } from '../types';
 import { AssetTransitModal } from './AssetTransitModal';
+import { assetApi } from '../api/modules/asset';
 
 interface CreateVideoTaskProps {
   products: ProductAsset[];
@@ -95,27 +96,30 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     setNegativeTags(prev => prev.filter(t => t !== tagToDelete));
   };
 
-  // Handle selected items from transit modal
-  const handleConfirmTransitSelection = (urls: string[]) => {
-    if (urls.length === 0) return;
-    
-    const newItems: SourceImage[] = urls.map((url, idx) => {
-      // derive name from url or generate
-      const nameMatch = url.match(/\/([^\/?#]+)$/);
-      const fileName = nameMatch ? nameMatch[1].split('.')[0] : `素材图片_${idx + 1}`;
-      return {
-        id: `transit-${Date.now()}-${idx}`,
-        name: fileName.length > 20 ? fileName.substring(0, 15) + '...' : fileName,
-        url: url,
-        tag: '中转站导入 - 优质素材',
-        score: Math.floor(85 + Math.random() * 14),
-        archived: Math.random() > 0.5,
-        selected: true
-      };
-    });
+  // Handle selected items from transit modal —— 接 fileResourceIds,异步反查详情生成 SourceImage
+  const handleConfirmTransitSelection = async (fileResourceIds: number[]) => {
+    if (fileResourceIds.length === 0) return;
 
-    setSourceImages(prev => [...newItems, ...prev]);
-    setIsTransitOpen(false);
+    try {
+      const items = await Promise.all(
+        fileResourceIds.map((id) => assetApi.get(id)),
+      );
+      const newItems: SourceImage[] = items.map((asset, idx) => ({
+        id: `transit-${Date.now()}-${idx}`,
+        name: asset.name.length > 20 ? asset.name.substring(0, 15) + '...' : asset.name,
+        url: asset.thumbnailUrl ?? '',
+        tag: '资源中心导入 - 优质素材',
+        score: 85,  // 视频任务不强依赖评分,统一给一个默认
+        archived: false,
+        selected: true,
+      }));
+      setSourceImages((prev) => [...newItems, ...prev]);
+    } catch (err) {
+      console.error('[CreateVideoTask] 资源中心导入失败:', err);
+      alert(`导入失败: ${(err as Error).message}`);
+    } finally {
+      setIsTransitOpen(false);
+    }
   };
 
   // Selection counts
@@ -318,7 +322,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
 
             {sourceImages.length === 0 && (
               <div className="text-center py-12 text-[#424655] text-xs font-bold">
-                暂未添加参考图片。请点击上方按钮通过资源中转站选择并添加。
+                暂未添加参考图片。请点击上方按钮通过资源中心选择并添加。
               </div>
             )}
           </div>
@@ -644,7 +648,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       {/* Transit Station Overlay inside Video Task component context */}
       {isTransitOpen && (
         <AssetTransitModal
-          products={products}
+          purpose="PRODUCT"
+          productId={selectedProduct?.id ? Number(selectedProduct.id) : undefined}
           onClose={() => setIsTransitOpen(false)}
           onConfirmSelection={handleConfirmTransitSelection}
         />

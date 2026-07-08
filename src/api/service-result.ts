@@ -20,3 +20,33 @@ export interface ServiceResult<T> {
   /** 处理时长（毫秒），后端业务方选填 */
   costTime?: number;
 }
+
+/**
+ * 分页响应包装 —— 对应后端 com.github.pagehelper.PageInfo<T>
+ *
+ * 后端 PageHelper 的 PageInfo 字段:
+ *   pageNum / pageSize / size / total / pages / list / prePage / nextPage ...
+ *
+ * 注意:前端组件只需关注 list + total + pageNum + pageSize + pages,
+ * 其余字段(extendMap、firstPage、lastPage 等)忽略即可。
+ *
+ * 使用:
+ *   const page = await assetApi.page({ pageNum: 1, pageSize: 20 });
+ *   page.list    // 当前页数据
+ *   page.total   // 总条数
+ *   page.pages   // 总页数
+ */
+export interface PageInfo<T> {
+  pageNum: number;
+  pageSize: number;
+  size: number;
+  total: number;
+  pages: number;
+  list: T[];
+  prePage: number;
+  nextPage: number;
+  isFirstPage: boolean;
+  isLastPage: boolean;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}

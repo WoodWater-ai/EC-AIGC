@@ -133,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="w-full h-9 px-3 rounded-lg flex items-center gap-3 font-medium text-sm text-slate-400 hover:bg-[#142337] hover:text-slate-200 cursor-pointer transition-all duration-150"
           >
             <span className="material-symbols-outlined text-lg text-slate-500">grid_view</span>
-            资源中转存档站
+            资源中心
           </button>
         </div>
       </div>
@@ -174,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="relative">
               <img
-                src={currentUser.avatar}
+                src={currentUser.avatar || undefined}
                 alt={currentUser.name}
                 className="w-9 h-9 rounded-full object-cover border border-slate-700"
                 referrerPolicy="no-referrer"

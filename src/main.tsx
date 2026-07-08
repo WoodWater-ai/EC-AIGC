@@ -28,7 +28,7 @@ createRoot(document.getElementById('root')!).render(
     <Toaster
       position="top-center"
       richColors
-      closeButton
+      closeButton={false}
       duration={4000}
     />
   </StrictMode>,
