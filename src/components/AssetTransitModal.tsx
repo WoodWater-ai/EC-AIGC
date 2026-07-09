@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Globe, Lock, ChevronRight, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProductAsset } from '../types';
 import { assetApi, type AssetResourceItem, type AssetResourceQueryRequest } from '../api/modules/asset';
@@ -63,6 +64,16 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   targetSlot = 'main'
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  /** 分类树折叠状态 —— 存被折叠的节点 id,默认空 = 全部展开 */
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
+  const toggleCollapse = (id: number) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   /** 左侧分类树选中节点(联动后端 categoryId 过滤) */
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   /** 真实分类树(从 assetCategoryApi.tree 加载) */
@@ -214,6 +225,68 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     !node.children || node.children.length === 0;
 
   /**
+   * 根据 File 推 assetKind(IMAGE/VIDEO)
+   * - 优先 mime 头(浏览器能识别就走 mime)
+   * - 兜底用扩展名(部分视频格式浏览器识别不出 mime)
+   */
+  const inferAssetKind = (file: File): 'IMAGE' | 'VIDEO' => {
+    if (file.type.startsWith('video/')) return 'VIDEO';
+    if (file.type.startsWith('image/')) return 'IMAGE';
+    if (/\.(mp4|mov|avi|mkv|webm|flv|wmv|m4v|mpg|mpeg|3gp)$/i.test(file.name)) return 'VIDEO';
+    if (/\.(jpe?g|png|webp|bmp|gif)$/i.test(file.name)) return 'IMAGE';
+    return 'IMAGE';
+  };
+
+  /**
+   * 视频抽帧:从本地 video File 截取首帧,生成 base64 dataURL(用作 <img> 缩略图)
+   * 失败返回空串(让 UI 显示缺损图)
+   * 抽帧后立即 revoke video blob URL,避免内存泄漏
+   */
+  const generateVideoThumbnail = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      const blobUrl = URL.createObjectURL(file);
+      video.src = blobUrl;
+      let settled = false;
+      const cleanup = () => {
+        URL.revokeObjectURL(blobUrl);
+        video.removeAttribute('src');
+        video.load();
+      };
+      video.onloadedmetadata = () => {
+        // 跳到首帧(0.1s 避免部分视频黑帧;clamp 到 duration/2 防止超长视频)
+        video.currentTime = Math.min(0.1, (video.duration || 0.1) / 2);
+      };
+      video.onseeked = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 320;
+          canvas.height = video.videoHeight || 240;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('canvas 2d unavailable');
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+          settled = true;
+          cleanup();
+          resolve(dataURL);
+        } catch (err) {
+          settled = true;
+          cleanup();
+          reject(err);
+        }
+      };
+      video.onerror = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error('video load failed'));
+      };
+    });
+
+  /**
    * 批量删除选中的资源
    * - window.confirm 确认(避免误删)
    * - 调 assetApi.deleteBatch(ids)
@@ -291,10 +364,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
         const { fileResourceId } = await upload(file);
         // 2) 创建业务资源 —— 后端自动 confirm file_resource
         // assetType 兜底 PRODUCT_ORIGINAL(主图/商品原图),task-level slot 区分在 task 创建时再做
+        // assetKind 根据 mime/扩展名自动推断(IMAGE/VIDEO)
         await assetApi.create({
           fileResourceId,
           name: file.name,
           productId,
+          assetKind: inferAssetKind(file),
           assetType: 'PRODUCT_ORIGINAL',
         });
         successCount++;
@@ -340,6 +415,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
     try {
       const imageExts = /\.(jpe?g|png|webp|bmp|gif)$/i;
+      const videoExts = /\.(mp4|mov|avi|mkv|webm|flv|wmv|m4v|mpg|mpeg|3gp)$/i;
       const collected: ScannedFile[] = [];
       const MAX = 50;
       // values() 在 TS 类型里可能未定义,实际运行时可用
@@ -348,11 +424,30 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
         if (entry.kind !== 'file') continue;
         const fileHandle = entry as FileSystemFileHandle;
         const file = await fileHandle.getFile();
-        if (!file.type.startsWith('image/') && !imageExts.test(file.name)) continue;
+        // 接受图片或视频(优先 mime,fallback 扩展名)
+        const isMedia =
+          file.type.startsWith('image/') ||
+          file.type.startsWith('video/') ||
+          imageExts.test(file.name) ||
+          videoExts.test(file.name);
+        if (!isMedia) continue;
+        // 推断类型 + 生成缩略图(视频需抽帧,图片直接用 blob URL)
+        const kind = inferAssetKind(file);
+        let thumbUrl = '';
+        if (kind === 'VIDEO') {
+          try {
+            thumbUrl = await generateVideoThumbnail(file);
+          } catch {
+            // 抽帧失败 → thumbUrl 空,UI 显示缺损图(不会上传,因为 extra.file 还在)
+            thumbUrl = '';
+          }
+        } else {
+          thumbUrl = URL.createObjectURL(file);
+        }
         collected.push({
           name: file.name,
-          url: URL.createObjectURL(file),
-          tag: '本地目录',
+          url: thumbUrl,
+          tag: kind === 'VIDEO' ? '视频' : '图片',
           checked: true,
           status: 'pending',
           progress: 0,
@@ -439,10 +534,13 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
         );
       });
       // 创建业务资源(与本地上传一致)
+      // assetKind 根据 target.extra.file 推断(IMAGE/VIDEO)
+      const kind = target.extra?.file ? inferAssetKind(target.extra.file) : 'IMAGE';
       await assetApi.create({
         fileResourceId,
         name: target.name,
         productId,
+        assetKind: kind,
         assetType: 'PRODUCT_ORIGINAL',
       });
       setScannedFiles((prev) =>
@@ -507,10 +605,31 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setIsImporting(false);
   };
 
+  /** 分类类型(categoryKind) → 图标 + 颜色 的映射(我的分类区 + 移动 modal 共用) */
+  const KIND_META: Record<string, { icon: string; cls: string }> = {
+    IMAGE: { icon: 'image', cls: 'text-blue-500' },
+    VIDEO: { icon: 'videocam', cls: 'text-purple-500' },
+    MIXED: { icon: 'perm_media', cls: 'text-amber-500' },
+  };
+
+  /** 公开/私有(isPublic: 'Y' / 'N') → Lucide 图标 + 颜色 的映射(对齐 ResourceCategoryList) */
+  const VISIBILITY_META: Record<'Y' | 'N', { Icon: typeof Globe; cls: string; title: string }> = {
+    Y: { Icon: Globe, cls: 'text-emerald-500', title: '公开分类' },
+    N: { Icon: Lock, cls: 'text-slate-300', title: '私有分类' },
+  };
+
   /**
    * 关闭扫描 modal —— 检查是否有上传成功的资源,有则刷新资源中心列表
    * 适用于:头部 X、footer 取消、全成功时的"完成"按钮
    */
+  /** 关闭整个 AssetTransitModal —— 重置折叠状态 + 调父组件 onClose */
+  const handleMainClose = () => {
+    setCollapsedIds(new Set());
+    setSelectedCategoryId(null);
+    setSelectedAssetIds([]);
+    onClose();
+  };
+
   const closeScanModal = () => {
     const successCount = scannedFiles.filter((f) => f.status === 'success').length;
     // 释放 objectURL
@@ -534,12 +653,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 md:p-10 select-none animate-fadeIn">
       
       {/* Hidden Upload Input */}
-      <input 
-        type="file" 
-        multiple 
-        accept="image/*" 
-        ref={fileInputRef} 
-        onChange={handleLocalUploadChange} 
+      <input
+        type="file"
+        multiple
+        accept="image/*,video/*"
+        ref={fileInputRef}
+        onChange={handleLocalUploadChange}
         className="hidden" 
       />
 
@@ -554,8 +673,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             </div>
             <h1 className="text-base font-extrabold text-slate-800">资源中心</h1>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={handleMainClose}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 cursor-pointer"
           >
             <span className="material-symbols-outlined text-xl">close</span>
@@ -580,9 +699,15 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   暂无分类
                 </div>
               ) : (() => {
-                // 递归渲染分类树
+// 分类类型(categoryKind) → 图标 + 颜色 来自外层 KIND_META
+
+                // 递归渲染分类树 —— 折叠/展开支持
                 const renderNode = (node: AssetCategoryNode, depth: number): React.ReactNode => {
                   const isSelected = selectedCategoryId === node.id;
+                  const kindMeta = node.categoryKind ? KIND_META[node.categoryKind] : undefined;
+                  const visMeta = node.isPublic === 'Y' || node.isPublic === 'N' ? VISIBILITY_META[node.isPublic] : undefined;
+                  const hasChildren = (node.children?.length ?? 0) > 0;
+                  const isCollapsed = collapsedIds.has(node.id);
                   return (
                     <React.Fragment key={node.id}>
                       <button
@@ -597,15 +722,59 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                         }`}
                         style={{ paddingLeft: `${12 + depth * 12}px` }}
                       >
+                        {/* 展开/折叠按钮(对齐 ResourceCategoryList) */}
+                        {hasChildren ? (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleCollapse(node.id);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                toggleCollapse(node.id);
+                              }
+                            }}
+                            className="shrink-0 w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                            title={isCollapsed ? '展开' : '折叠'}
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 w-4 h-4" />
+                        )}
                         <span
                           className="material-symbols-outlined text-base shrink-0"
                           style={{ fontVariationSettings: isSelected ? "'FILL' 1" : "'FILL' 0" }}
                         >
                           {depth === 0 ? 'label' : 'subdirectory_arrow_right'}
                         </span>
-                        <span className="truncate">{node.categoryName ?? '未命名分类'}</span>
+                        <span className="truncate flex-1">{node.categoryName ?? '未命名分类'}</span>
+                        {kindMeta && (
+                          <span
+                            className={`material-symbols-outlined text-[14px] shrink-0 ${kindMeta.cls}`}
+                            title={node.categoryKind}
+                            style={{ fontVariationSettings: "'FILL' 1" }}
+                          >
+                            {kindMeta.icon}
+                          </span>
+                        )}
+                        {visMeta && (
+                          <visMeta.Icon
+                            className={`shrink-0 w-3.5 h-3.5 ${visMeta.cls}`}
+                            title={visMeta.title}
+                            strokeWidth={2.5}
+                          />
+                        )}
                       </button>
-                      {node.children?.map((child) => renderNode(child, depth + 1))}
+                      {!isCollapsed && node.children?.map((child) => renderNode(child, depth + 1))}
                     </React.Fragment>
                   );
                 };
@@ -701,14 +870,37 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                           <AssetImage
                             urls={[asset.originalUrl, asset.thumbnailUrl]}
                             alt={asset.name}
+                            assetKind={asset.assetKind}
                             className="transition-transform group-hover:scale-102"
                           />
                           {/* Selected Index circular badge top-left */}
-                          <div className={`absolute top-3 left-3 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shadow-sm transition-all ${
+                          <div className={`absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shadow-sm transition-all ${
                             isSelected ? 'bg-blue-600 text-white' : 'border-2 border-white bg-black/20 text-transparent'
                           }`}>
                             {isSelected ? selectIndex : ''}
                           </div>
+                          {/* 资源类型三角形角标(右上角,小尺寸) */}
+                          {asset.assetKind && (
+                            <div
+                              className="absolute top-0 right-0 w-7 h-7 pointer-events-none"
+                              title={asset.assetKind === 'VIDEO' ? '视频' : '图片'}
+                            >
+                              {/* 三角形(右上等腰,斜边 45°) */}
+                              <div
+                                className={`absolute inset-0 ${
+                                  asset.assetKind === 'VIDEO' ? 'bg-purple-500/90' : 'bg-blue-500/90'
+                                }`}
+                                style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
+                              />
+                              {/* 图标嵌在三角形"内角"位置 */}
+                              <span
+                                className="absolute top-0.5 right-0.5 material-symbols-outlined text-white text-[10px] leading-none"
+                                style={{ fontVariationSettings: "'FILL' 1" }}
+                              >
+                                {asset.assetKind === 'VIDEO' ? 'videocam' : 'image'}
+                              </span>
+                            </div>
+                          )}
                           <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                         <div className="p-3">
@@ -766,7 +958,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   </button>
                 )}
                 <button
-                  onClick={onClose}
+                  onClick={handleMainClose}
                   className="px-6 py-2 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   取消
@@ -819,6 +1011,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                       const renderMoveNode = (node: AssetCategoryNode, depth: number): React.ReactNode => {
                         const leaf = isLeaf(node);
                         const isSelected = moveTargetCategoryId === node.id;
+                        const kindMeta = node.categoryKind ? KIND_META[node.categoryKind] : undefined;
+                        const visMeta = node.isPublic === 'Y' || node.isPublic === 'N' ? VISIBILITY_META[node.isPublic] : undefined;
                         return (
                           <React.Fragment key={node.id}>
                             <button
@@ -844,9 +1038,25 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                               >
                                 {leaf ? (isSelected ? 'check_box' : 'check_box_outline_blank') : 'folder'}
                               </span>
-                              <span className="truncate">{node.categoryName ?? '未命名分类'}</span>
+                              <span className="truncate flex-1">{node.categoryName ?? '未命名分类'}</span>
+                              {kindMeta && (
+                                <span
+                                  className={`material-symbols-outlined text-[14px] shrink-0 ${kindMeta.cls} ${!leaf ? 'opacity-40' : ''}`}
+                                  title={node.categoryKind}
+                                  style={{ fontVariationSettings: "'FILL' 1" }}
+                                >
+                                  {kindMeta.icon}
+                                </span>
+                              )}
+                              {visMeta && (
+                                <visMeta.Icon
+                                  className={`shrink-0 w-3.5 h-3.5 ${visMeta.cls} ${!leaf ? 'opacity-40' : ''}`}
+                                  title={visMeta.title}
+                                  strokeWidth={2.5}
+                                />
+                              )}
                               {!leaf && (
-                                <span className="ml-auto text-[10px] text-slate-300 font-medium shrink-0">
+                                <span className="text-[10px] text-slate-300 font-medium shrink-0">
                                   非叶子
                                 </span>
                               )}
@@ -1007,11 +1217,29 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                                     }}
                                     className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                                   />
-                                  <img
-                                    src={file.url}
-                                    className="w-10 h-10 rounded object-cover shrink-0"
-                                    referrerPolicy="no-referrer"
-                                  />
+                                  <div className="w-10 h-10 rounded shrink-0 relative overflow-hidden bg-slate-100">
+                                    {file.url ? (
+                                      <img
+                                        src={file.url}
+                                        className="w-full h-full object-cover"
+                                        referrerPolicy="no-referrer"
+                                        onError={(e) => {
+                                          // 抽帧失败或 URL 无效 → 隐藏 img,显示下方占位
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    ) : null}
+                                    {file.tag === '视频' && (
+                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <span
+                                          className="material-symbols-outlined text-purple-400 text-base"
+                                          style={{ fontVariationSettings: "'FILL' 1" }}
+                                        >
+                                          play_circle
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
                                   <div className="flex-1 min-w-0">
                                     <div className={`truncate text-xs font-bold ${
                                       file.status === 'success'
@@ -1055,7 +1283,13 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                                       </button>
                                     )}
                                     {file.status === 'pending' && (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-600">
+                                      <span
+                                        className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold ${
+                                          file.tag === '视频'
+                                            ? 'bg-purple-50 text-purple-600'
+                                            : 'bg-blue-50 text-blue-600'
+                                        }`}
+                                      >
                                         {file.tag}
                                       </span>
                                     )}

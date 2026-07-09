@@ -9,6 +9,8 @@ interface AssetImageProps {
   aspectRatio?: 'square' | 'video' | 'auto';
   /** 自定义 fallback(覆盖默认缺损图),传 null/false 时不渲染任何东西 */
   fallback?: React.ReactNode;
+  /** 资源类型:视频用 <video> 元素,图片用 <img> */
+  assetKind?: 'IMAGE' | 'VIDEO';
 }
 
 /**
@@ -30,6 +32,7 @@ export const AssetImage: React.FC<AssetImageProps> = ({
   className,
   aspectRatio = 'square',
   fallback,
+  assetKind,
 }) => {
   // 过滤掉空值,记录当前尝试到第几个
   const validUrls = urls.filter((u): u is string => !!u);
@@ -55,11 +58,45 @@ export const AssetImage: React.FC<AssetImageProps> = ({
         className={`relative overflow-hidden bg-slate-100 flex flex-col items-center justify-center text-slate-400 ${aspectClass} ${className ?? ''}`}
       >
         <ImageOff className="w-8 h-8 mb-1" strokeWidth={1.5} />
-        <span className="text-[10px] font-medium">图片加载失败</span>
+        <span className="text-[10px] font-medium">
+          {assetKind === 'VIDEO' ? '视频加载失败' : '图片加载失败'}
+        </span>
       </div>
     );
   }
 
+  // 视频:用 <video> 元素,preload="metadata" 只下载头部(几 KB),显示首帧
+  if (assetKind === 'VIDEO') {
+    return (
+      <div
+        className={`relative overflow-hidden bg-slate-900 ${aspectClass} ${className ?? ''}`}
+      >
+        <video
+          src={validUrls[urlIndex]}
+          // 第二个 URL(thumbnailUrl)作为 poster 海报
+          poster={validUrls[1] || undefined}
+          preload="metadata"
+          muted
+          playsInline
+          onError={handleError}
+          className="w-full h-full object-cover"
+        />
+        {/* 中心 play 图标(指示这是视频) */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+            <span
+              className="material-symbols-outlined text-white text-2xl"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              play_arrow
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 图片:用 <img> 元素
   return (
     <div
       className={`relative overflow-hidden bg-slate-50 ${aspectClass} ${className ?? ''}`}
