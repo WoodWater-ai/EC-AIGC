@@ -7,7 +7,8 @@ export enum AppScreen {
   TEMPLATES = 'TEMPLATES',
   ASSETS = 'ASSETS',
   ANALYTICS = 'ANALYTICS',
-  SYSTEM_CONFIG = 'SYSTEM_CONFIG'
+  SYSTEM_CONFIG = 'SYSTEM_CONFIG',
+  ASSET_CATEGORY = 'ASSET_CATEGORY'
 }
 
 export interface GenerationTask {

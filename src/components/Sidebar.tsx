@@ -28,6 +28,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { screen: AppScreen.ASSETS, label: '商品素材库', icon: 'inventory_2' },
     { screen: AppScreen.ANALYTICS, label: '数据效能复盘', icon: 'insights' },
     { screen: AppScreen.SYSTEM_CONFIG, label: '系统配置模块', icon: 'settings_applications' },
+    { screen: AppScreen.ASSET_CATEGORY, label: '资源分类', icon: 'account_tree' },
   ];
 
   return (

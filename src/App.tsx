@@ -12,6 +12,7 @@ import { DataAnalytics } from './components/DataAnalytics';
 import { SystemConfig } from './components/SystemConfig';
 import { AssetTransitModal } from './components/AssetTransitModal';
 import { LoginPage } from './components/LoginPage';
+import { ResourceCategoryList } from './components/ResourceCategoryList';
 
 import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
@@ -207,6 +208,10 @@ export default function App() {
             onToggleChannel={handleToggleChannel}
             onUpdateUserRole={handleUpdateUserRole}
           />
+        );
+      case AppScreen.ASSET_CATEGORY:
+        return (
+          <ResourceCategoryList setScreen={setCurrentScreen} />
         );
       default:
         return (
