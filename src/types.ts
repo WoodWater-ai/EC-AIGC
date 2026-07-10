@@ -58,74 +58,8 @@ export interface GenerationTask {
   };
 }
 
-export interface AdTemplate {
-  id: string;
-  title: string;
-  type: 'image' | 'video';
-  category: '电商主图' | '社群海报' | '节日促销' | '场景融合' | '短视频脚本' | '主打短视频';
-  ratio: string;
-  usedCount: number;
-  status: 'active' | 'draft';
-  modifier: string;
-  updatedTime: string;
-  previewUrl: string;
-  promptTemplate: string;
-  // Prototype extension fields
-  tabCategory?: 'image_task' | 'style_scene' | 'video_prompt' | 'platform_spec' | 'negative_constraint';
-  taskType?: string;
-  applicableCategory?: string;
-  defaultStyle?: string;
-  defaultCount?: string;
-  defaultChannel?: string;
-  version?: string;
-  avgAestheticScore?: number;
-  approvalRate?: string;
-  negativePrompt?: string;
-
-  // 1. 图片任务 (Image Task) Specific fields
-  imageTaskType?: '主图' | '场景图' | '细节图' | '上身三视图' | '通用';
-  variableFields?: string[]; // e.g., ["商品名", "颜色", "面料", "卖点"]
-  relatedNegativeConstraints?: string[]; // e.g., ["高精度手部与面部保真约束"]
-
-  // 2. 风格场景 (Style Scene) Specific fields
-  styleType?: '风格' | '场景' | '动作姿势' | '组合预设';
-  styleTags?: string[]; // e.g., ["甜美网红风", "中式国风"]
-  sceneTags?: string[]; // e.g., ["室内影棚", "室外街拍"]
-  poseTags?: string[]; // e.g., ["站姿", "坐姿", "抱臂"]
-  promptFragment?: string; // Prompt Fragment text
-  stylePreviewUrl?: string; // Aesthetic preview image
-
-  // 3. 视频 Prompt (Video Prompt) Specific fields
-  videoMode?: 'reference2video' | 'img2video';
-  applicableImageTypes?: string[]; // e.g., ["主图", "场景图", "细节图"]
-  recommendationConditions?: string; // Conditions for recommended
-  defaultDuration?: string; // e.g., "5s", "8s", "15s"
-  defaultResolution?: string; // e.g., "1080p", "4K"
-  motionRange?: 'small' | 'medium' | 'large';
-  threeStageStructure?: {
-    opening: string; // 开场主体
-    dynamic: string; // 动态展示
-    detailEnding: string; // 细节收束
-  };
-
-  // 4. 平台规格 (Platform Spec) Specific fields
-  specUsage?: '商品主图' | '详情页场景图' | '短视频素材' | '通用';
-  specMaterialType?: '图片' | '视频' | '双核通用';
-  specWidth?: number;
-  specHeight?: number;
-  specFormat?: 'jpg' | 'png' | 'webp' | 'mp4' | 'gif';
-  maxFileSize?: string; // e.g., "5MB", "50MB"
-  isDefaultRecommended?: boolean;
-
-  // 5. 负面约束 (Negative Constraint) Specific fields
-  applicableMaterialTypes?: '图片' | '视频' | '通用';
-  applicableTaskTypes?: string[]; // e.g., ["主图", "场景图", "视频"]
-  constraintCategory?: '商品保真' | '人物人体' | '画面质量' | '视频稳定性';
-  severityLevel?: 'P0' | 'P1' | 'P2';
-  chineseDescription?: string; // Explanation for operators
-  referencedTemplatesCount?: number;
-  conflictRules?: string[];
-}
+// 模板类型已迁移到 src/api/modules/template.ts 的 TemplateDTO
+// 业务代码: import { TemplateDTO, templateApi } from './api/modules/template';
 
 export interface ProductAsset {
   id: string;

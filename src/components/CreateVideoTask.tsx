@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { ProductAsset, GenerationTask, AppScreen } from '../types';
 import { AssetTransitModal } from './AssetTransitModal';
 import { assetApi } from '../api/modules/asset';
+import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import { templateApi, type TemplateDTO } from '../api/modules/template';
 
 interface CreateVideoTaskProps {
   products: ProductAsset[];
@@ -28,6 +30,10 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   selectedProduct,
   setSelectedProduct
 }) => {
+  const { data } = useServiceQuery(() =>
+    templateApi.page({ pageSize: 200, status: 'NORMAL' }),
+  );
+  const templates: TemplateDTO[] = data?.list ?? [];
   // Modal states for Transit Station
   const [isTransitOpen, setIsTransitOpen] = useState(false);
 

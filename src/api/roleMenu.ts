@@ -39,6 +39,35 @@ export async function assignUserRoles(userId: string, roleIds: string[]): Promis
   return http.post<void>('/v1/admin/user/roles', { userId, roleIds });
 }
 
+export interface RoleFormPayload {
+  roleName: string;
+  roleCode: string;
+  description?: string;
+  sort?: number;
+  scope: 'CURRENT_DOMAIN' | 'SUB_DOMAIN';
+  status: 'NORMAL' | 'DISABLED';
+}
+
+export interface RoleUpdatePayload extends RoleFormPayload {
+  id: string;
+}
+
+export async function getRoleDetail(id: string): Promise<RoleInfo> {
+  return http.get<RoleInfo>('/v1/admin/role/detail', { params: { id } });
+}
+
+export async function addRole(payload: RoleFormPayload): Promise<void> {
+  return http.post<void>('/v1/admin/role/add', payload);
+}
+
+export async function updateRole(payload: RoleUpdatePayload): Promise<void> {
+  return http.post<void>('/v1/admin/role/update', payload);
+}
+
+export async function deleteRole(id: string): Promise<void> {
+  return http.post<void>('/v1/admin/role/delete', null, { params: { id } });
+}
+
 export interface MenuAddPayload {
   type: 'CATALOG' | 'MENU' | 'BUTTON';
   menuName: string;

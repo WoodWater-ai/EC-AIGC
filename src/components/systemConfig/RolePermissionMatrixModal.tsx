@@ -275,7 +275,7 @@ export const RolePermissionMatrixModal: React.FC<RolePermissionMatrixModalProps>
               <div className="bg-blue-50/60 p-3 rounded-lg text-[11px] text-slate-500 leading-relaxed border border-blue-100/30 mb-4 flex items-start gap-2">
                 <Info className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
                 <span>
-                  勾选或取消勾选对应的按钮。保存后,隶属于「{roleName || ''}」角色的所有协作账号会立即按新矩阵生效,并同步记录入系统审计操作日志。
+                  勾选或取消勾选对应的权限节点。保存后,隶属于「{roleName || ''}」角色的所有协作账号会立即按新矩阵生效,并同步记录入系统审计操作日志。
                 </span>
               </div>
               <div className="space-y-0.5">

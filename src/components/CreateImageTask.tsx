@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ProductAsset, GenerationTask, AdTemplate, AppScreen } from '../types';
+import { ProductAsset, GenerationTask, AppScreen } from '../types';
 import { AssetTransitModal } from './AssetTransitModal';
+import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import { templateApi, type TemplateDTO } from '../api/modules/template';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
-  templates: AdTemplate[];
   onAddTask: (task: GenerationTask) => void;
   setScreen: (screen: AppScreen) => void;
   openTransit: () => void;
@@ -14,13 +15,16 @@ interface CreateImageTaskProps {
 
 export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   products,
-  templates,
   onAddTask,
   setScreen,
   openTransit,
   selectedProduct,
   setSelectedProduct
 }) => {
+  const { data } = useServiceQuery(() =>
+    templateApi.page({ pageSize: 200, status: 'NORMAL' }),
+  );
+  const templates: TemplateDTO[] = data?.list ?? [];
   // Internal Asset Transit Modal states for Image Task
   const [isInternalTransitOpen, setIsInternalTransitOpen] = useState(false);
   const [transitTargetSlot, setTransitTargetSlot] = useState<'main' | 'top' | 'bottom' | 'detail' | 'style' | 'scene' | 'pose'>('main');

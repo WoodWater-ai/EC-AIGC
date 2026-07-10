@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { AppScreen, GenerationTask, AdTemplate, ProductAsset, SystemUser, SystemNotification, ModelChannel } from './types';
+import { AppScreen, GenerationTask, ProductAsset, SystemUser, SystemNotification, ModelChannel } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { TaskList } from './components/TaskList';
 import { CreateImageTask } from './components/CreateImageTask';
 import { CreateVideoTask } from './components/CreateVideoTask';
-import { TemplateCenter } from './components/TemplateCenter';
+import TemplateCenter from './components/TemplateCenter';
 import { ProductAssetLibrary } from './components/ProductAssetLibrary';
 import { DataAnalytics } from './components/DataAnalytics';
 import { SystemConfig } from './components/SystemConfig';
@@ -20,7 +20,6 @@ import { setLoginRequiredHandler } from './api/error';
 import {
   mockTasks,
   mockProducts,
-  mockTemplates,
   mockModelChannels,
   mockUsers,
   mockNotifications
@@ -78,7 +77,6 @@ export default function App() {
   // Core local states
   const [tasks, setTasks] = useState<GenerationTask[]>(mockTasks);
   const [products, setProducts] = useState<ProductAsset[]>(mockProducts);
-  const [templates, setTemplates] = useState<AdTemplate[]>(mockTemplates);
   const [channels, setChannels] = useState<ModelChannel[]>(mockModelChannels);
   const [users, setUsers] = useState<SystemUser[]>(mockUsers);
   const [notifications, setNotifications] = useState<SystemNotification[]>(mockNotifications);
@@ -122,14 +120,6 @@ export default function App() {
 
   const handleUpdateTask = (updatedTask: GenerationTask) => {
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
-  };
-
-  const handleAddTemplate = (newTemp: AdTemplate) => {
-    setTemplates(prev => [newTemp, ...prev]);
-  };
-
-  const handleUpdateTemplate = (updatedTemp: AdTemplate) => {
-    setTemplates(prev => prev.map(t => t.id === updatedTemp.id ? updatedTemp : t));
   };
 
   const handleToggleChannel = (id: string) => {
@@ -180,12 +170,7 @@ export default function App() {
         );
       case AppScreen.TEMPLATES:
         return (
-          <TemplateCenter
-            templates={templates}
-            onAddTemplate={handleAddTemplate}
-            onUpdateTemplate={handleUpdateTemplate}
-            setScreen={setCurrentScreen}
-          />
+          <TemplateCenter setScreen={setCurrentScreen} />
         );
       case AppScreen.ASSETS:
         return (
@@ -248,7 +233,6 @@ export default function App() {
       <div className="h-screen w-screen overflow-hidden bg-white">
         <CreateImageTask
           products={products}
-          templates={templates}
           onAddTask={handleAddTask}
           setScreen={setCurrentScreen}
           openTransit={() => setIsTransitOpen(true)}
@@ -275,7 +259,6 @@ export default function App() {
       <div className="h-screen w-screen overflow-hidden bg-white">
         <CreateVideoTask
           products={products}
-          templates={templates}
           onAddTask={handleAddTask}
           setScreen={setCurrentScreen}
           openTransit={() => setIsTransitOpen(true)}

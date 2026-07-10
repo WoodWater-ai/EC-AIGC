@@ -240,3 +240,46 @@ HTTP 层错误：拦截器统一 toast "网络错误"
 - [ ] `npm run dev` 手工点一遍功能
 - [ ] 主动构造一次失败（如网络断开 / 故意改错密码）看 toast 在顶部居中
 - [ ] 登录态失效场景：清 localStorage 后访问受保护接口，看是否跳 `/login`（占位路由，目前会 404）
+
+---
+
+## 智能模板中心 · 模板模块对接
+
+### 端点
+
+| 操作 | 端点 | 备注 |
+|------|------|------|
+| 分页查询 | `POST /v1/admin/prompt-template/page` | `templateKind` 必填(5 类之一) |
+| 详情 | `POST /v1/admin/prompt-template/detail` | 单条 |
+| 创建 | `POST /v1/admin/prompt-template/add` | 返回新模板 ID(string) |
+| 更新 | `POST /v1/admin/prompt-template/update` | 完整字段覆盖 |
+| 删除(软) | `POST /v1/admin/prompt-template/delete` | |
+| 批量停用 | `POST /v1/admin/prompt-template/batch-update-status` | 单次请求,免循环 |
+| 版本创建 | `POST /v1/admin/prompt-template/version/create` | |
+| 版本列表 | `POST /v1/admin/prompt-template/version/list` | |
+
+### 鉴权
+
+admin 域 Sa-Token。token 走 `Authorization: <token>` header(无 `Bearer ` 前缀)。
+
+### DTO 镜像
+
+详见 `src/api/modules/template.ts`,所有字段严格对齐后端 `PromptTemplateResponse`。Long 字段前端用 `string` 接收(后端 `@JsonSerialize(ToStringSerializer)` 防 JS 精度丢失)。
+
+### 5 类差异化
+
+`templateKind` 5 类:`IMAGE_TASK` / `STYLE_SCENE` / `VIDEO_PROMPT` / `PLATFORM_SPEC` / `NEGATIVE_CONSTRAINT`。每类对应一组差异字段,详见 `TemplateDTO` interface。
+
+### 数据流
+
+```
+TemplateCenter.tsx
+  └─ useServiceQuery(() => templateApi.page({ templateKind: activeTab }))
+       └─ http.post('/v1/admin/prompt-template/page', q)
+            └─ Vite proxy /api → :8090
+                 └─ AdminPromptTemplateController
+```
+
+### 状态映射
+
+后端 `status` 是 `NORMAL` / `DISABLED`,前端直接使用这两个值(无映射层,以后端为权威源)。

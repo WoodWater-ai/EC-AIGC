@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, type DependencyList } from 'react';
+import { useCallback, useEffect, useRef, useState, type DependencyList } from 'react';
 import { ApiError } from '../error';
 
 export interface QueryState<T> {
   data: T | null;
   loading: boolean;
   error: ApiError | null;
+  /** 手动触发重新拉取(用于保存/删除后的 invalidate 模式) */
+  refetch: () => void;
 }
 
 /**
@@ -12,9 +14,11 @@ export interface QueryState<T> {
  *
  * 当前限制（CLAUDE.md TODO 列 TanStack Query 引入时升级）：
  * - 无缓存
- * - 无 refetch
  * - 无 retry
  * - 无 staleTime
+ *
+ * 已有能力:
+ * - refetch —— 业务组件在 save/delete 后手动 invalidate
  *
  * 未来引入 TanStack Query 时：
  * - 业务组件代码不动（QueryState 形状不变）
@@ -24,11 +28,13 @@ export function useServiceQuery<T>(
   fetcher: () => Promise<T>,
   deps: DependencyList = []
 ): QueryState<T> {
-  const [state, setState] = useState<QueryState<T>>({
+  const [state, setState] = useState<Omit<QueryState<T>, 'refetch'>>({
     data: null,
     loading: true,
     error: null,
   });
+  // trigger counter 累加,每次 refetch 触发 useEffect 重跑 fetcher
+  const [trigger, setTrigger] = useState(0);
   const aliveRef = useRef(true);
 
   useEffect(() => {
@@ -51,7 +57,11 @@ export function useServiceQuery<T>(
       aliveRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [...deps, trigger]);
 
-  return state;
+  const refetch = useCallback(() => {
+    setTrigger((t) => t + 1);
+  }, []);
+
+  return { ...state, refetch };
 }
