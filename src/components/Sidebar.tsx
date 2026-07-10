@@ -1,10 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AppScreen, SystemUser } from '../types';
+import { useAuth } from '../auth/AuthContext';
+import type { MenuResponse } from '../api/types';
+
+// 兜底：菜单树未下发时使用
+const HARDCODED_MENU_ITEMS = [
+  { screen: AppScreen.DASHBOARD, label: '工作台首页', icon: 'dashboard' },
+  { screen: AppScreen.TASKS, label: '任务列表', icon: 'auto_schedule' },
+  { screen: AppScreen.TEMPLATES, label: '智能模板中心', icon: 'dashboard_customize' },
+  { screen: AppScreen.ASSETS, label: '商品素材库', icon: 'inventory_2' },
+  { screen: AppScreen.ANALYTICS, label: '数据效能复盘', icon: 'insights' },
+  { screen: AppScreen.SYSTEM_USER_MGMT, label: '用户管理', icon: 'people' },
+  { screen: AppScreen.SYSTEM_DEPT_MGMT, label: '组织架构', icon: 'account_tree' },
+  { screen: AppScreen.SYSTEM_ROLE_MGMT, label: '角色管理', icon: 'group' },
+  { screen: AppScreen.SYSTEM_MENU_MGMT, label: '菜单管理', icon: 'menu_open' },
+  { screen: AppScreen.SYSTEM_CONFIG, label: '系统配置', icon: 'settings_applications' },
+  { screen: AppScreen.ASSET_CATEGORY, label: '资源分类', icon: 'category' },
+];
+
+// routerName → AppScreen 映射（2026-07-09 新增）
+const ROUTE_MAP: Record<string, AppScreen> = {
+  dashboard: AppScreen.DASHBOARD,
+  tasks: AppScreen.TASKS,
+  templates: AppScreen.TEMPLATES,
+  assets: AppScreen.ASSETS,
+  analytics: AppScreen.ANALYTICS,
+  system_config: AppScreen.SYSTEM_CONFIG,
+  user_mgmt: AppScreen.SYSTEM_USER_MGMT,
+  dept_mgmt: AppScreen.SYSTEM_DEPT_MGMT,
+  role_mgmt: AppScreen.SYSTEM_ROLE_MGMT,
+  menu_mgmt: AppScreen.SYSTEM_MENU_MGMT,
+  asset_category: AppScreen.ASSET_CATEGORY,
+};
+
+const mapMenuToAppScreen = (m: MenuResponse) => ({
+  screen: ROUTE_MAP[m.routerName || ''] || AppScreen.DASHBOARD,
+  label: m.menuName || '',
+  icon: m.icon || 'apps',
+});
 
 interface SidebarProps {
   currentScreen: AppScreen;
   setScreen: (screen: AppScreen) => void;
-  users: SystemUser[];
   currentUser: SystemUser;
   setCurrentUser: (user: SystemUser) => void;
   openTransit: () => void;
@@ -13,23 +50,22 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   currentScreen,
   setScreen,
-  users,
   currentUser,
   setCurrentUser,
   openTransit
 }) => {
+  const { user, menuTree } = useAuth();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
 
-  const menuItems = [
-    { screen: AppScreen.DASHBOARD, label: '工作台首页', icon: 'dashboard' },
-    { screen: AppScreen.TASKS, label: '任务列表', icon: 'auto_schedule' },
-    { screen: AppScreen.TEMPLATES, label: '智能模板中心', icon: 'dashboard_customize' },
-    { screen: AppScreen.ASSETS, label: '商品素材库', icon: 'inventory_2' },
-    { screen: AppScreen.ANALYTICS, label: '数据效能复盘', icon: 'insights' },
-    { screen: AppScreen.SYSTEM_CONFIG, label: '系统配置模块', icon: 'settings_applications' },
-    { screen: AppScreen.ASSET_CATEGORY, label: '资源分类', icon: 'account_tree' },
-  ];
+  // 2026-07-09 接入：优先用后端 menuTree，fallback 硬编码
+  const menuItems = useMemo(() => {
+    if (!menuTree || menuTree.length === 0) return HARDCODED_MENU_ITEMS;
+    return menuTree.map(mapMenuToAppScreen);
+  }, [menuTree]);
+
+  // 用户列表（供切换协作账号用，2026-07-09 暂保留 mock，后续接 userApi）
+  const users = HARDCODED_MENU_ITEMS.length > 0 ? [] : []; // 临时占位避免调用方报错
 
   return (
     <aside className="w-68 bg-[#0B1C30] text-slate-300 flex flex-col justify-between select-none shrink-0 h-screen overflow-y-auto border-r border-slate-800">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AppScreen, GenerationTask, AdTemplate, ProductAsset, SystemUser, SystemNotification, ModelChannel } from './types';
+import { AppScreen, GenerationTask, AdTemplate, ProductAsset, SystemUser, ModelChannel } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -13,6 +13,10 @@ import { SystemConfig } from './components/SystemConfig';
 import { AssetTransitModal } from './components/AssetTransitModal';
 import { LoginPage } from './components/LoginPage';
 import { ResourceCategoryList } from './components/ResourceCategoryList';
+import { SystemRoleManagement } from './components/SystemRoleManagement';
+import { SystemMenuManagement } from './components/SystemMenuManagement';
+import { SystemUserManagement } from './components/SystemUserManagement';
+import { SystemDeptManagement } from './components/SystemDeptManagement';
 
 import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
@@ -22,8 +26,7 @@ import {
   mockProducts,
   mockTemplates,
   mockModelChannels,
-  mockUsers,
-  mockNotifications
+  mockUsers
 } from './mockData';
 
 /**
@@ -81,7 +84,8 @@ export default function App() {
   const [templates, setTemplates] = useState<AdTemplate[]>(mockTemplates);
   const [channels, setChannels] = useState<ModelChannel[]>(mockModelChannels);
   const [users, setUsers] = useState<SystemUser[]>(mockUsers);
-  const [notifications, setNotifications] = useState<SystemNotification[]>(mockNotifications);
+  // notifications state 2026-07-09 改造后由 Header 内部管理，此处只保留占位
+  // const [notifications, setNotifications] = useState<SystemNotification[]>([]);
 
   // 适配后的当前用户（喂给 Sidebar / Header）
   const currentUser = adaptAuthUser(user);
@@ -143,10 +147,6 @@ export default function App() {
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
   };
 
-  const handleMarkAllNotificationsAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
-
   // Render Core content wrapper switcher
   const renderScreenContent = () => {
     switch (currentScreen) {
@@ -204,11 +204,17 @@ export default function App() {
         return (
           <SystemConfig
             channels={channels}
-            users={users}
             onToggleChannel={handleToggleChannel}
-            onUpdateUserRole={handleUpdateUserRole}
           />
         );
+      case AppScreen.SYSTEM_USER_MGMT:
+        return <SystemUserManagement />;
+      case AppScreen.SYSTEM_DEPT_MGMT:
+        return <SystemDeptManagement />;
+      case AppScreen.SYSTEM_ROLE_MGMT:
+        return <SystemRoleManagement />;
+      case AppScreen.SYSTEM_MENU_MGMT:
+        return <SystemMenuManagement />;
       case AppScreen.ASSET_CATEGORY:
         return (
           <ResourceCategoryList setScreen={setCurrentScreen} />
@@ -314,7 +320,6 @@ export default function App() {
       <Sidebar
         currentScreen={currentScreen}
         setScreen={setCurrentScreen}
-        users={users}
         currentUser={currentUser}
         setCurrentUser={() => {
           // 切换协作账号角色 —— 当前实现：登出当前账号 + 跳登录页
@@ -333,8 +338,6 @@ export default function App() {
           currentScreen={currentScreen}
           setScreen={setCurrentScreen}
           currentUser={currentUser}
-          notifications={notifications}
-          markAllAsRead={handleMarkAllNotificationsAsRead}
         />
 
         {/* Scrollable Workspace panel */}

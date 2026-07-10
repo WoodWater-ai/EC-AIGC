@@ -84,3 +84,187 @@ export interface RoleInfoResponse {
   roleName?: string;
   roleCode?: string;
 }
+
+// ========== 系统配置模块 DTO（2026-07-09 新增） ==========
+
+/** POST /v1/admin/user/list 响应项 */
+export interface UserResponse {
+  id?: number;
+  userName?: string;
+  name?: string;
+  phone?: string;
+  code?: string;
+  headUrl?: string;
+  firstLoginTime?: number;
+  lastLoginTime?: number;
+  // 2026-07-09 P1 扩展字段(后端 UserDO 暂无对应列,值可能为 null)
+  deptId?: number | null;
+  status?: string | null;
+  isAdmin?: boolean | null;
+  email?: string | null;
+}
+
+export interface UserListRequest {
+  pageNum: number;
+  pageSize: number;
+  orderBy?: string;
+  userName?: string;
+  phone?: string;
+  name?: string;
+  status?: 'Y' | 'N';
+  isAdmin?: 'Y' | 'N';
+  level?: string;
+  isSubOrganization?: boolean;
+  deptId?: number;
+}
+
+export interface UserAddRequest {
+  userName: string;
+  phone: string;
+  name: string;
+  code?: string;
+  password: string;
+  headUrl?: string;
+  isAdmin?: 'Y' | 'N';
+  roleIds: number[];
+}
+
+export interface UserUpdateRequest {
+  id: number;
+  userName?: string;
+  code?: string;
+  name?: string;
+  headUrl?: string;
+  isAdmin?: 'Y' | 'N';
+  roleIds?: number[];
+}
+
+/** POST /v1/admin/department/list 响应项 */
+export interface DepartmentResponse {
+  id?: number;
+  pid?: number;
+  deptName?: string;
+  deptCode?: string;
+  sort?: number;
+  status?: 'ENABLE' | 'DISABLE' | string;
+  description?: string;
+  managerName?: string;
+  createTime?: string;
+  updateTime?: string;
+}
+
+/** 部门树节点（GET /v1/admin/department/tree 响应） */
+export interface DepartmentTreeNode extends DepartmentResponse {
+  children?: DepartmentTreeNode[];
+}
+
+export interface DepartmentAddRequest {
+  pid: number;
+  deptName: string;
+  deptCode: string;
+  sort?: number;
+  status: 'ENABLE' | 'DISABLE';
+}
+
+export interface DepartmentUserAssignRequest {
+  deptId: number;
+  userIdList: number[];
+  mainUserId?: number;
+}
+
+export interface DepartmentUserResponse {
+  id?: number;
+  deptId?: number;
+  userId?: number;
+  userName?: string;
+  phone?: string;
+  isMain?: 'Y' | 'N' | string;
+}
+
+/** 权限码（POST /v1/admin/rights/list 响应） */
+export interface RightsResponse {
+  id?: number;
+  rightsCode?: string;
+  rightsName?: string;
+  module?: string;
+  description?: string;
+}
+
+/** POST /v1/admin/notification/my-page 响应项 */
+export interface NotificationResponse {
+  id?: number;
+  title?: string;
+  content?: string;
+  type?: 'success' | 'warning' | 'error' | 'info';
+  time?: string;
+  read?: boolean;
+}
+
+/** 角色（POST /v1/admin/role/list 响应项） */
+export interface RoleResponse {
+  id?: number;
+  roleName?: string;
+  roleCode?: string;
+  description?: string;
+  sort?: number;
+  sysRole?: boolean;
+  scope?: 'CURRENT_DOMAIN' | 'SUB_DOMAIN' | 'EMPTY' | string;
+  status?: 'ENABLED' | 'DISABLED' | 'NORMAL' | 'EMPTY' | string;
+  menuList?: MenuResponse[];
+  createTime?: string;
+  updateTime?: string;
+}
+
+export interface RoleAddRequest {
+  roleName: string;
+  roleCode: string;
+  pid?: number;
+  description?: string;
+  sort?: number;
+  scope: 'CURRENT_DOMAIN' | 'SUB_DOMAIN';
+  status: 'ENABLED' | 'DISABLED';
+  menuIds: number[];
+}
+
+export interface RoleUpdateRequest extends RoleAddRequest {
+  id: number;
+}
+
+export interface AssignMenusRequest {
+  roleId: number;
+  menuIds: number[];
+}
+
+/** 菜单新增请求 */
+export interface MenuAddRequest {
+  menuName: string;
+  menuPath?: string;
+  routerName?: string;
+  comPath?: string;
+  icon?: string;
+  sort?: number;
+  pid: number;
+  type: 'CATALOG' | 'MENU' | 'BUTTON' | 'PAGE';
+  permission?: string;
+  applicationScope: 'ALL' | 'ADMIN' | 'CHANNEL' | 'TENANT';
+}
+
+export interface MenuUpdateRequest extends MenuAddRequest {
+  id: number;
+}
+
+export interface MenuQueryRequest {
+  pageNum: number;
+  pageSize: number;
+  orderBy?: string;
+  menuName?: string;
+}
+
+/** 通用分页结果（PageHelper 风格） */
+export interface PageInfo<T> {
+  list: T[];
+  total: number;
+  pageNum: number;
+  pageSize: number;
+  pages: number;
+}
