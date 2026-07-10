@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './auth/AuthContext';
+import { ConfirmProvider } from './components/common/ConfirmProvider';
 import App from './App.tsx';
 import './index.css';
 
@@ -23,7 +24,9 @@ import '@fontsource/material-symbols/400.css';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
-      <App />
+      <ConfirmProvider>
+        <App />
+      </ConfirmProvider>
     </AuthProvider>
     <Toaster
       position="top-center"

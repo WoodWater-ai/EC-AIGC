@@ -204,3 +204,42 @@ export interface SystemNotification {
   time: string;
   read: boolean;
 }
+
+// ===== 权限点 / 菜单 / Drawer 类型(rbac 改造新增) =====
+
+export interface PermissionPoint {
+  id: string;
+  code: string;
+  name: string;
+  module: string;
+  pid: string;
+  sort?: number;
+  description?: string;
+  clientType?: string;
+  createTime?: number;
+}
+
+export type MenuNodeType = 'CATALOG' | 'MENU' | 'BUTTON';
+
+export interface MenuNode {
+  id: string;
+  pid: string;
+  menuName: string;
+  permission?: string;
+  icon?: string;
+  clientType?: 'PC' | 'IPAD';
+  applicationScope?: 'ALL' | 'CHANNEL' | 'TENANT' | 'ADMIN' | 'EMPTY';
+  sort?: number;
+  description?: string;
+  type: MenuNodeType;
+  children?: MenuNode[];
+}
+
+export type DrawerMode = 'create' | 'edit';
+
+export interface Page<T> {
+  list: T[];
+  total: number;
+  pageNum: number;
+  pageSize: number;
+}

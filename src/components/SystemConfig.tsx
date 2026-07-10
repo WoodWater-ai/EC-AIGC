@@ -38,6 +38,8 @@ import {
   Activity,
   CheckSquare
 } from 'lucide-react';
+import { MenuConfigTab } from './systemConfig/MenuConfigTab';
+import RoleManageTab from './systemConfig/RoleManageTab';
 
 export interface Department {
   id: string;
@@ -67,14 +69,6 @@ interface OperationLog {
   status: 'success' | 'failed';
 }
 
-// Granular permission point structure
-interface PermissionPoint {
-  code: string;
-  name: string;
-  module: string;
-  description: string;
-}
-
 export const SystemConfig: React.FC<SystemConfigProps> = ({
   channels,
   users,
@@ -85,7 +79,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<'users' | 'org' | 'channels' | 'logs'>('users');
   
   // 2. User management sub-tabs
-  const [activeUserSubTab, setActiveUserSubTab] = useState<'accounts' | 'roles' | 'permissions'>('accounts');
+  const [activeUserSubTab, setActiveUserSubTab] = useState<'accounts' | 'roles' | 'menu'>('accounts');
 
   // 3. Search and department filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -227,15 +221,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   // Notification success toasts
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // 6. RBAC Role Custom Permissions Assignment state
-  const [selectedRoleForPerms, setSelectedRoleForPerms] = useState<string | null>(null);
-  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({
-    '管理员': ['user:create', 'user:edit', 'user:status', 'role:config', 'channel:toggle', 'channel:limit', 'task:create', 'task:audit', 'template:manage'],
-    '高级设计师': ['task:create', 'template:manage', 'channel:toggle'],
-    '运营策划': ['task:create', 'task:audit'],
-    '协同客户': ['task:audit']
-  });
-
   // Pre-populated Operation logs for high fidelity
   const [logs, setLogs] = useState<OperationLog[]>([
     { id: 'l1', operatorName: '陆永奇', operatorRole: '管理员', actionType: '账号管理', actionDetail: '新建员工账号 zhangsf@company.com 并赋予超级管理员角色', ipAddress: '192.168.1.14', timestamp: '2026-07-06 10:15', status: 'success' },
@@ -245,19 +230,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     { id: 'l5', operatorName: '陆永奇', operatorRole: '管理员', actionType: '安全配置', actionDetail: '尝试修改超级管理员内置角色权限组 - 拒绝操作', ipAddress: '192.168.1.14', timestamp: '2026-07-04 16:40', status: 'failed' },
     { id: 'l6', operatorName: '系统自动', operatorRole: '系统账号', actionType: '任务监控', actionDetail: '批次任务 T-1003 内存不足抛出 CUDA 异常，发送系统警告通知', ipAddress: '127.0.0.1', timestamp: '2026-07-03 16:11', status: 'success' }
   ]);
-
-  // Pre-populated Granular Permission Points
-  const permissionPoints: PermissionPoint[] = [
-    { code: 'user:create', name: '新建协作账号', module: '用户与组织', description: '拥有在企业配置中新增协同员工的权限' },
-    { code: 'user:edit', name: '编辑/修改账号', module: '用户与组织', description: '修改已有账号的姓名、部门、分配角色' },
-    { code: 'user:status', name: '启用/停用员工', module: '用户与组织', description: '冻结或恢复员工系统的登录以及权限范围' },
-    { code: 'role:config', name: '配置角色权限', module: '权限与RBAC', description: '定义角色包含的具体功能与算力操作边界' },
-    { code: 'channel:toggle', name: '通道一键启停', module: '模型通道统管', description: '全局打开或切断第三方AI生成服务的接口代理' },
-    { code: 'channel:limit', name: '修改通道限额', module: '模型通道统管', description: '调整各算法模型通道每日消耗的最大算力值' },
-    { code: 'task:create', name: '创意任务生成', module: '创意生成引擎', description: '发起图片或视频智能生成的提交与队列排号' },
-    { code: 'task:audit', name: '素材审核评价', module: '品质控制中心', description: '对模型生成的图片、视频结果进行评级、批注和最终通过归档' },
-    { code: 'template:manage', name: '排版模板管理', module: '模板配置中心', description: '新建、编辑发布商品智能排版模板及负面避坑条件' }
-  ];
 
   // Map system role to department dynamically
   const getDeptForUser = (user: SystemUser) => {
@@ -765,42 +737,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     );
   };
 
-  // Toggle individual permission point in the matrix
-  const handleToggleRolePermission = (role: string, permCode: string) => {
-    setRolePermissions(prev => {
-      const current = prev[role] || [];
-      const updated = current.includes(permCode)
-        ? current.filter(code => code !== permCode)
-        : [...current, permCode];
-      
-      return {
-        ...prev,
-        [role]: updated
-      };
-    });
-  };
-
-  // Save changes to RBAC permissions matrix
-  const handleSaveRolePermissions = () => {
-    if (!selectedRoleForPerms) return;
-
-    // Log the event
-    const newLog: OperationLog = {
-      id: `log-${Date.now()}`,
-      operatorName: '陆永奇',
-      operatorRole: '管理员',
-      actionType: '权限变更',
-      actionDetail: `重新配置了角色「${selectedRoleForPerms}」的 RBAC 细分权限点`,
-      ipAddress: '192.168.1.14',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      status: 'success'
-    };
-    setLogs(prev => [newLog, ...prev]);
-
-    triggerToast(`角色「${selectedRoleForPerms}」的 RBAC 权限授权方案已保存并实时生效！`);
-    setSelectedRoleForPerms(null);
-  };
-
   // Recursive function to render a single department and its descendants
   const renderDepartmentNode = (dept: Department, depth: number) => {
     const children = departments.filter(d => d.parentId === dept.id);
@@ -985,12 +921,12 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               角色管理
             </button>
             <button
-              onClick={() => setActiveUserSubTab('permissions')}
+              onClick={() => setActiveUserSubTab('menu')}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-all ${
-                activeUserSubTab === 'permissions' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                activeUserSubTab === 'menu' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              权限点配置
+              菜单配置
             </button>
           </div>
         )}
@@ -1156,102 +1092,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           )}
 
           {/* Inner Tab 2: 角色管理 (RBAC Role configuration matrices) */}
-          {activeUserSubTab === 'roles' && (
-            <div className="space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-start gap-3">
-                <Shield className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800">RBAC 角色权限模型说明</h4>
-                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                    系统采用标准基于角色的权限控制模型(RBAC)。每个员工账号通过分配系统角色，自动继承对应的功能细分权限。请选择下方角色进行“配置授权权限矩阵”。
-                  </p>
-                </div>
-              </div>
+          {activeUserSubTab === 'roles' && <RoleManageTab />}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {(['管理员', '高级设计师', '运营策划', '协同客户'] as const).map((role) => {
-                  const roleKeys: Record<string, string> = { '管理员': 'admin', '高级设计师': 'designer', '运营策划': 'operator', '协同客户': 'client' };
-                  const roleDescriptions: Record<string, string> = {
-                    '管理员': '最高管理角色。拥有全局账号维护、一键模型启停、算力限额控制等核心运维操作权限。',
-                    '高级设计师': '内容设计组主导角色。拥有批量生成任务调度、商品素材提报、模板及负面避坑中心配置权。',
-                    '运营策划': '运营业务端发起人。主要负责生产任务排号启动、基础素材评分、审核，及全量数据统计分析。',
-                    '协同客户': '跨部门或企业外部协同账号。拥有查看分享生成的成品、在线提出审核与对生图结果批注的权限。'
-                  };
-
-                  const count = localUsers.filter(u => u.role === role).length;
-                  const permsCount = rolePermissions[role]?.length || 0;
-
-                  return (
-                    <div key={role} className="bg-white rounded-xl border border-slate-200/60 p-5 shadow-xs flex flex-col justify-between space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-mono block">Key: {roleKeys[role]}</span>
-                            <h4 className="text-sm font-bold text-slate-800 mt-0.5">{role}</h4>
-                          </div>
-                          <span className="bg-blue-50 text-blue-600 font-mono text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-100">
-                            {count}个成员
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 leading-relaxed text-justify">
-                          {roleDescriptions[role]}
-                        </p>
-                      </div>
-
-                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
-                          <Lock className="w-3 h-3 text-slate-400" />
-                          已绑定 {permsCount} 个功能权限点
-                        </span>
-                        <button
-                          onClick={() => setSelectedRoleForPerms(role)}
-                          className="px-2.5 py-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors cursor-pointer"
-                        >
-                          配置权限
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Inner Tab 3: 权限点配置 (Granular system capability points) */}
-          {activeUserSubTab === 'permissions' && (
-            <div className="bg-white rounded-xl border border-slate-200/60 overflow-hidden shadow-xs">
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                <span className="text-xs font-bold text-slate-700">系统全局功能权限点清单</span>
-                <span className="text-[10px] text-slate-400 font-semibold font-mono">DaVinci System Nodes: {permissionPoints.length}</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                      <th className="py-3 px-5 w-48">权限点编码</th>
-                      <th className="py-3 px-5 w-40">权限点名称</th>
-                      <th className="py-3 px-5 w-40">归属模块</th>
-                      <th className="py-3 px-5">权限描述</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium text-slate-600">
-                    {permissionPoints.map((point) => (
-                      <tr key={point.code} className="hover:bg-slate-50/20">
-                        <td className="py-3.5 px-5 font-mono text-blue-600 font-bold">{point.code}</td>
-                        <td className="py-3.5 px-5 font-bold text-slate-800">{point.name}</td>
-                        <td className="py-3.5 px-5">
-                          <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px]">
-                            {point.module}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-5 text-slate-400">{point.description}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          {/* Inner Tab 3: 菜单配置 (Menu configuration) */}
+          {activeUserSubTab === 'menu' && <MenuConfigTab />}
 
         </div>
       )}
@@ -2141,85 +1985,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
               >
                 {channelDrawerMode === 'create' ? '确认创建' : '保存修改'}
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* RBAC PERMISSIONS SELECTION MODAL */}
-      {selectedRoleForPerms && (
-        <div className="fixed inset-0 bg-[#0B1C30]/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl border border-slate-200 max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">RBAC 功能授权配置矩阵</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">定制专属角色 「{selectedRoleForPerms}」 的全套功能授权</p>
-              </div>
-              <button
-                onClick={() => setSelectedRoleForPerms(null)}
-                className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body Scrollable matrix checkboxes */}
-            <div className="p-5 overflow-y-auto space-y-4">
-              <div className="bg-blue-50/60 p-3 rounded-lg text-[11px] text-slate-500 leading-relaxed border border-blue-100/30">
-                勾选或取消勾选对应的权限点。保存设置后，隶属于「{selectedRoleForPerms}」角色的所有协作账号其拥有的后台方法都会立即根据 RBAC 映射表重载，并同步记录入系统的审计操作日志。
-              </div>
-
-              <div className="space-y-3.5 pt-2">
-                {permissionPoints.map((point) => {
-                  const isChecked = (rolePermissions[selectedRoleForPerms] || []).includes(point.code);
-                  return (
-                    <div
-                      key={point.code}
-                      onClick={() => handleToggleRolePermission(selectedRoleForPerms, point.code)}
-                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer select-none transition-colors ${
-                        isChecked ? 'bg-blue-50/30 border-blue-200' : 'bg-slate-50/50 border-slate-150'
-                      }`}
-                    >
-                      <div className="pt-0.5 shrink-0">
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                          isChecked ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
-                        }`}>
-                          {isChecked && <Check className="w-2.5 h-2.5 stroke-[3px]" />}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-800">{point.name}</span>
-                          <span className="font-mono text-[9px] text-slate-400 font-semibold bg-slate-100 px-1.5 py-0.5 rounded">
-                            {point.code}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                          {point.description}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Modal Footer Actions */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50/80 flex justify-end gap-3 shrink-0">
-              <button
-                onClick={() => setSelectedRoleForPerms(null)}
-                className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-lg cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSaveRolePermissions}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow-sm cursor-pointer"
-              >
-                保存授权方案
               </button>
             </div>
 

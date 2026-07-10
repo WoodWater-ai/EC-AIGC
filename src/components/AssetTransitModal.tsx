@@ -6,6 +6,7 @@ import { assetApi, type AssetResourceItem, type AssetResourceQueryRequest } from
 import { assetCategoryApi, type AssetCategoryNode } from '../api/modules/assetCategory';
 import { useAuth } from '../auth/AuthContext';
 import { useFileUpload } from '../hooks/useFileUpload';
+import { useConfirm } from './common/ConfirmProvider';
 import { AssetImage } from './AssetImage';
 
 /**
@@ -85,6 +86,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
   // ============ 真后端数据 ============
   const { user } = useAuth();
+  const confirm = useConfirm();
   const currentUserId = user?.userId as number | undefined;
 
   // 视图分类 → 后端 query 参数映射
@@ -288,7 +290,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
   /**
    * 批量删除选中的资源
-   * - window.confirm 确认(避免误删)
+   * - useConfirm 弹窗确认(避免误删)
    * - 调 assetApi.deleteBatch(ids)
    * - 后端:删除 asset_resource,若 file_resource 引用归 0,自动物理删除 COS 文件
    * - 成功后清空选中 + 刷新列表
@@ -296,8 +298,13 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const handleDeleteSelected = async () => {
     if (selectedAssetIds.length === 0) return;
     const count = selectedAssetIds.length;
-    const confirmed = window.confirm(`确认要删除选择的 ${count} 个资源吗?`);
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: '删除资源',
+      message: `确认要删除选择的 ${count} 个资源吗?`,
+      confirmText: '删除',
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       const successCount = await assetApi.deleteBatch([...selectedAssetIds]);

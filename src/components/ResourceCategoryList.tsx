@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
+import { useConfirm } from './common/ConfirmProvider';
 import {
   Info,
   Plus,
@@ -433,6 +434,8 @@ const CategoryDrawer: React.FC<CategoryDrawerProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [showError, setShowError] = useState(false);
 
+  const confirm = useConfirm();
+
   // 进入 Drawer 时初始化表单
   useEffect(() => {
     if (!open) return;
@@ -463,10 +466,15 @@ const CategoryDrawer: React.FC<CategoryDrawerProps> = ({
   };
 
   // 关闭前脏检测
-  const handleClose = () => {
+  const handleClose = async () => {
     if (dirty) {
-      const confirmed = window.confirm('有未保存的修改,确认关闭?');
-      if (!confirmed) return;
+      const ok = await confirm({
+        title: '放弃修改',
+        message: '有未保存的修改,确认关闭?',
+        confirmText: '放弃',
+        danger: true,
+      });
+      if (!ok) return;
     }
     onClose();
   };
@@ -748,6 +756,7 @@ const CategoryDrawer: React.FC<CategoryDrawerProps> = ({
 export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
   setScreen: _setScreen,
 }) => {
+  const confirm = useConfirm();
   // ---------- state ----------
   const [tree, setTree] = useState<AssetCategoryNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -850,10 +859,13 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
   };
 
   const handleDelete = async (node: AssetCategoryNode) => {
-    const confirmed = window.confirm(
-      `确认要删除分类「${node.categoryName}」吗?此操作不可恢复。`,
-    );
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: '删除分类',
+      message: `确认要删除分类「${node.categoryName}」吗?此操作不可恢复。`,
+      confirmText: '删除',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await assetCategoryApi.delete(node.id);
       toast.success(`分类「${node.categoryName}」已删除`);
