@@ -31,10 +31,12 @@ export async function getRoleList(q: Partial<RoleInfo> & { pageNum?: number; pag
   return http.post<Page<RoleInfo>>('/v1/admin/role/list', q);
 }
 
+/** 查某用户已分配角色(任意 userId) */
 export async function getUserRoles(userId: string): Promise<RoleInfo[]> {
-  return http.post<RoleInfo[]>('/v1/admin/user/roles', null, { params: { userId } });
+  return http.get<RoleInfo[]>('/v1/admin/user/roles', { params: { userId } });
 }
 
+/** 覆盖式改某用户角色 */
 export async function assignUserRoles(userId: string, roleIds: string[]): Promise<void> {
   return http.post<void>('/v1/admin/user/roles', { userId, roleIds });
 }

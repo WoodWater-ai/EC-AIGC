@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ModelChannel, SystemUser } from '../types';
 import {
   Search,
@@ -40,21 +40,19 @@ import {
 } from 'lucide-react';
 import { MenuConfigTab } from './systemConfig/MenuConfigTab';
 import RoleManageTab from './systemConfig/RoleManageTab';
-
-export interface Department {
-  id: string;
-  name: string;
-  code: string;
-  parentId: string | null;
-  description: string;
-  managerName: string;
-}
+import { OrgStructureTab, type OrgStructureTabRef } from './systemConfig/OrgStructureTab';
+import { useRef } from 'react';
+import { departmentApi, type DepartmentDTO } from '../api/modules/department';
+import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import { userApi, type UserDTO } from '../api/modules/user';
+import { toast } from 'sonner';
+import { getRoleList, type RoleInfo } from '../api/roleMenu';
+import { useConfirm } from './common/ConfirmProvider';
 
 interface SystemConfigProps {
   channels: ModelChannel[];
-  users: SystemUser[];
   onToggleChannel: (id: string) => void;
-  onUpdateUserRole: (id: string, role: any) => void;
+  onUpdateUserRole: (id: string, role: any, deptId?: string) => void;
 }
 
 // Activity Log definition
@@ -71,7 +69,6 @@ interface OperationLog {
 
 export const SystemConfig: React.FC<SystemConfigProps> = ({
   channels,
-  users,
   onToggleChannel,
   onUpdateUserRole
 }) => {
@@ -85,12 +82,47 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('全部部门');
 
-  // 4. Local state for interactive users list
-  const [localUsers, setLocalUsers] = useState<SystemUser[]>(users);
+  // 4. 真接用户列表(Phase 1.5) ——
+  // localUsers 由 useServiceQuery(userApi.listAll) 派生,不再接收 prop users。
+  // 这里走 useEffect + setLocalUsers 同步派生(SystemUser 字段含 isAdmin/status 转换,非纯函数映射)。
+  // 注意:useServiceQuery 内部 data 初始为 null,ES6 解构 `= []` 只对 undefined 生效,所以用 ?? [] 显式 nullish
+  const userListQuery = useServiceQuery<UserDTO[]>(
+    () => userApi.listAll(),
+    []
+  );
+
+  // Dynamic role list (from backend, replaces hardcoded 4 roles)
+  const { data: roleList = [] } = useServiceQuery<RoleInfo[]>(
+    async () => (await getRoleList({ pageNum: 1, pageSize: 50 })).list ?? [],
+    []
+  );
+  // Department list (direct backend query, decoupled from OrgStructureTab ref timing)
+  const { data: deptList = [] } = useServiceQuery<DepartmentDTO[]>(
+    () => departmentApi.list({ pageNum: 1, pageSize: 1000 }),
+    []
+  );
+  const allDepartments = deptList ?? [];
+  const realUsers = userListQuery.data ?? [];
+  const [localUsers, setLocalUsers] = useState<SystemUser[]>([]);
+  useEffect(() => {
+    setLocalUsers(realUsers.map(u => ({
+      id: u.id,
+      name: u.name || u.userName || u.phone || '(未命名)',
+      avatar: u.headUrl || '',
+      role: u.isAdmin ? '管理员' : '运营策划',  // P1 TODO:从 roleIds 查角色名
+      email: u.email || u.phone || '',
+      status: (u.status as 'NORMAL' | 'DISABLED') ?? 'NORMAL',  // 2026-07-11:对齐项目惯例 NORMAL/DISABLED(同 template/dict/role)
+      joinedDate: '',  // UserResponse 无此字段
+      deptId: u.deptId || undefined,
+    })));
+  }, [realUsers]);
   
   // Local state for model channels
   const [localChannels, setLocalChannels] = useState<ModelChannel[]>(channels);
   const [channelFilter, setChannelFilter] = useState<'all' | 'cloud' | 'local' | 'transit' | 'disabled'>('all');
+
+  // Ref to OrgStructureTab (for user→dept reverse lookup & department select data source)
+  const orgTabRef = useRef<OrgStructureTabRef>(null);
 
   // Channel modal/drawer states
   const [isChannelDrawerOpen, setIsChannelDrawerOpen] = useState(false);
@@ -110,116 +142,27 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [channelFormCostRatio, setChannelFormCostRatio] = useState(0.015);
   const [channelFormCapabilities, setChannelFormCapabilities] = useState<string[]>(['主图生成', '细节放大', '背景重构']);
 
-  // Departments List State
-  const [departments, setDepartments] = useState<Department[]>([
-    {
-      id: 'dep-1',
-      name: '达芬奇AI创意总部',
-      code: 'DAVINCI-HQ',
-      parentId: null,
-      description: '达芬奇智能内容创意生态集团总部，统管全局业务与技术研发。',
-      managerName: '陆永奇'
-    },
-    {
-      id: 'dep-2',
-      name: '内容运营部',
-      code: 'OPER-DEPT',
-      parentId: 'dep-1',
-      description: '负责AI生图/生视频的提报、运营部署、线上活动推广与数据复盘。',
-      managerName: '张思豪'
-    },
-    {
-      id: 'dep-3',
-      name: '设计中心',
-      code: 'DESIGN-CTR',
-      parentId: 'dep-1',
-      description: '负责核心AI生成排版模板库配置、创意风格研究以及负面避坑规则设计。',
-      managerName: '陈美晴'
-    },
-    {
-      id: 'dep-4',
-      name: '系统架构部',
-      code: 'ARCH-DEPT',
-      parentId: 'dep-1',
-      description: '负责多卡算力网关的高并发调度、模型通道限额管理与企业安全策略。',
-      managerName: '陆永奇'
-    },
-    {
-      id: 'dep-5',
-      name: '内容运营一组 (电商方向)',
-      code: 'OPER-G1',
-      parentId: 'dep-2',
-      description: '主攻跨境及主流电商（女装、美妆等）的日常商品场景图快速生成和提报。',
-      managerName: '王小芬'
-    },
-    {
-      id: 'dep-6',
-      name: '内容运营二组 (视频方向)',
-      code: 'OPER-G2',
-      parentId: 'dep-2',
-      description: '负责Kling及Runway短视频推广素材、动态海报创意脚本的调度生产。',
-      managerName: '李大壮'
-    },
-    {
-      id: 'dep-7',
-      name: '视觉设计组',
-      code: 'DSN-VISUAL',
-      parentId: 'dep-3',
-      description: '专注于生图模型微调、高审美排版图层设计以及人工精细化后置合成。',
-      managerName: '陈美晴'
-    },
-    {
-      id: 'dep-8',
-      name: '外部协同客户组',
-      code: 'CLIENT-COOP',
-      parentId: 'dep-1',
-      description: '对接外部协作商、供应链代表，在线提供生图成品的审阅和反馈评价。',
-      managerName: '协同客户代表'
-    }
-  ]);
-
-  // Mapping of user IDs to dynamic department IDs
-  const [userDeptMap, setUserDeptMap] = useState<Record<string, string>>({
-    'u-1': 'dep-4', // Admin
-    'u-2': 'dep-3', // Senior Designer
-    'u-3': 'dep-2', // Operator
-    'u-4': 'dep-8'  // Client
-  });
-
-  // Department expand/collapse states
-  const [expandedDepts, setExpandedDepts] = useState<Record<string, boolean>>({
-    'dep-1': true,
-    'dep-2': true,
-    'dep-3': true,
-    'dep-4': true
-  });
-
-  // Department modal/drawer states
-  const [isDeptDrawerOpen, setIsDeptDrawerOpen] = useState(false);
-  const [deptDrawerMode, setDeptDrawerMode] = useState<'create' | 'edit'>('create');
-  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
-
-  // Department form states
-  const [deptFormName, setDeptFormName] = useState('');
-  const [deptFormCode, setDeptFormCode] = useState('');
-  const [deptFormParentId, setDeptFormParentId] = useState<string | null>(null);
-  const [deptFormManager, setDeptFormManager] = useState('');
-  const [deptFormDescription, setDeptFormDescription] = useState('');
-
   // 5. Drawer state for adding / editing user
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   // Drawer Form fields
+  const [formUserName, setFormUserName] = useState('');
+  const [formPhone, setFormPhone] = useState('');
   const [formName, setFormName] = useState('');
-  const [formEmail, setFormEmail] = useState('');
-  const [formDeptId, setFormDeptId] = useState('dep-2');
-  const [formRole, setFormRole] = useState<SystemUser['role']>('运营策划');
-  const [formStatus, setFormStatus] = useState<'online' | 'offline'>('online');
+  const [formPassword, setFormPassword] = useState('');
+  const [formCode, setFormCode] = useState('');
+  const [formDeptId, setFormDeptId] = useState('');
+  const [formRoleIds, setFormRoleIds] = useState<string[]>([]);
+  const [formStatus, setFormStatus] = useState<'NORMAL' | 'DISABLED'>('NORMAL');
 
   // Notification success toasts
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Reset password modal state
+  const [resetPwdFor, setResetPwdFor] = useState<SystemUser | null>(null);
+  const [resetPwdNew, setResetPwdNew] = useState('');
 
   // Pre-populated Operation logs for high fidelity
   const [logs, setLogs] = useState<OperationLog[]>([
@@ -231,31 +174,28 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     { id: 'l6', operatorName: '系统自动', operatorRole: '系统账号', actionType: '任务监控', actionDetail: '批次任务 T-1003 内存不足抛出 CUDA 异常，发送系统警告通知', ipAddress: '127.0.0.1', timestamp: '2026-07-03 16:11', status: 'success' }
   ]);
 
-  // Map system role to department dynamically
-  const getDeptForUser = (user: SystemUser) => {
-    const deptId = userDeptMap[user.id];
-    if (deptId) {
-      return departments.find(d => d.id === deptId)?.name || '未分配';
-    }
-    if (user.role === '管理员') return '系统架构部';
-    if (user.role === '高级设计师') return '设计中心';
-    if (user.role === '运营策划') return '内容运营部';
-    return '外部协同客户组';
+  const confirm = useConfirm();
+
+  // Map system role to department dynamically (via allDepartments,不再依赖 OrgStructureTab ref)
+  const userDeptName = (u: SystemUser): string => {
+    return allDepartments.find(d => d.id === u.deptId)?.deptName ?? '未分配';
   };
 
   // Filtered employee users
   const filteredUsers = useMemo(() => {
     return localUsers.filter(u => {
-      const matchSearch = searchQuery === '' || 
-        u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      const matchSearch = searchQuery === '' ||
+        u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         u.email.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const userDept = getDeptForUser(u);
+
+      const userDept = userDeptName(u);
       const matchDept = selectedDept === '全部部门' || userDept === selectedDept;
 
       return matchSearch && matchDept;
     });
-  }, [localUsers, searchQuery, selectedDept, userDeptMap, departments]);
+    // orgTabRef.current is stable across renders (useImperativeHandle cache), no need to add as dep
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localUsers, searchQuery, selectedDept]);
 
   // Computed filteredChannels array based on the category sub-tabs
   const filteredChannels = useMemo(() => {
@@ -287,280 +227,162 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     }, 3000);
   };
 
-  // Helper: check if parentCandidate is a descendant of child
-  const isDescendant = (parentCandidateId: string, childId: string): boolean => {
-    let current = departments.find(d => d.id === parentCandidateId);
-    while (current && current.parentId) {
-      if (current.parentId === childId) {
-        return true;
+  // Helper: assign user to department (calls department API + syncs local state + notifies App)
+  const handleAssignUser = async (userId: string, deptId: string) => {
+    const user = localUsers.find(u => u.id === userId);
+    const oldDeptId = user?.deptId;
+    try {
+      if (oldDeptId && oldDeptId !== deptId) {
+        await departmentApi.unassignUser(oldDeptId, [userId]);
       }
-      current = departments.find(d => d.id === current.parentId);
-    }
-    return false;
-  };
-
-  // Open Department Drawer for creating new department
-  const handleOpenCreateDeptDrawer = (initialParentId: string | null = null) => {
-    setDeptDrawerMode('create');
-    setDeptFormName('');
-    setDeptFormCode('');
-    setDeptFormParentId(initialParentId);
-    setDeptFormManager('');
-    setDeptFormDescription('');
-    setSelectedDeptId(null);
-    setIsDeptDrawerOpen(true);
-  };
-
-  // Open Department Drawer for editing department
-  const handleOpenEditDeptDrawer = (dept: Department) => {
-    setDeptDrawerMode('edit');
-    setDeptFormName(dept.name);
-    setDeptFormCode(dept.code);
-    setDeptFormParentId(dept.parentId);
-    setDeptFormManager(dept.managerName);
-    setDeptFormDescription(dept.description);
-    setSelectedDeptId(dept.id);
-    setIsDeptDrawerOpen(true);
-  };
-
-  // Save department drawer form
-  const handleSaveDepartment = () => {
-    if (!deptFormName.trim() || !deptFormCode.trim()) {
-      alert('请填写完整的部门名称和唯一编码！');
-      return;
-    }
-
-    const codeUpper = deptFormCode.toUpperCase().trim();
-
-    // Check code duplication excluding current edit target
-    const isCodeDup = departments.some(d => d.code === codeUpper && d.id !== selectedDeptId);
-    if (isCodeDup) {
-      alert(`部门编码「${codeUpper}」已存在，请使用唯一的编码！`);
-      return;
-    }
-
-    if (deptDrawerMode === 'create') {
-      const newDeptId = `dep-${Date.now()}`;
-      const newDept: Department = {
-        id: newDeptId,
-        name: deptFormName,
-        code: codeUpper,
-        parentId: deptFormParentId,
-        description: deptFormDescription,
-        managerName: deptFormManager || '未指定'
-      };
-
-      setDepartments(prev => [...prev, newDept]);
-      setExpandedDepts(prev => ({ ...prev, [newDeptId]: true }));
-
-      // Add operation log
-      const newLog: OperationLog = {
-        id: `log-${Date.now()}`,
-        operatorName: '陆永奇',
-        operatorRole: '管理员',
-        actionType: '组织架构',
-        actionDetail: `成功创建了部门 「${deptFormName}」 (${codeUpper})`,
-        ipAddress: '192.168.1.14',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        status: 'success'
-      };
-      setLogs(prev => [newLog, ...prev]);
-
-      triggerToast(`部门「${deptFormName}」已成功创建！`);
-    } else if (deptDrawerMode === 'edit' && selectedDeptId) {
-      if (deptFormParentId === selectedDeptId) {
-        alert('无法将部门自身选为上级部门！');
-        return;
+      if (deptId) {
+        await departmentApi.assignUser(deptId, [userId], userId);
       }
-      if (deptFormParentId && isDescendant(deptFormParentId, selectedDeptId)) {
-        alert('上级部门不能设为当前部门的下属子部门，这会导致无限循环！');
-        return;
-      }
-
-      setDepartments(prev => prev.map(d => d.id === selectedDeptId ? {
-        ...d,
-        name: deptFormName,
-        code: codeUpper,
-        parentId: deptFormParentId,
-        description: deptFormDescription,
-        managerName: deptFormManager || '未指定'
-      } : d));
-
-      // Add operation log
-      const newLog: OperationLog = {
-        id: `log-${Date.now()}`,
-        operatorName: '陆永奇',
-        operatorRole: '管理员',
-        actionType: '组织架构',
-        actionDetail: `成功更新了部门 「${deptFormName}」 的基本架构与配置信息`,
-        ipAddress: '192.168.1.14',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        status: 'success'
-      };
-      setLogs(prev => [newLog, ...prev]);
-
-      triggerToast(`部门「${deptFormName}」信息已成功保存！`);
+      // Sync localUsers
+      setLocalUsers(prev => prev.map(u => u.id === userId
+        ? { ...u, deptId: deptId || undefined }
+        : u
+      ));
+      // Notify App.tsx to persist deptId at the top level
+      onUpdateUserRole(userId, user?.role || '运营策划', deptId || undefined);
+    } catch {
+      // HTTP interceptor already toasts
     }
-
-    setIsDeptDrawerOpen(false);
-  };
-
-  // Delete department with checks
-  const handleDeleteDepartment = (deptId: string) => {
-    // Check if department has child departments
-    const hasChildren = departments.some(d => d.parentId === deptId);
-    if (hasChildren) {
-      alert('无法删除该部门：当前部门仍包含下属部门，请先调整下属部门的上级归属！');
-      return;
-    }
-
-    // Check if department has active employees
-    const deptMembers = localUsers.filter(u => userDeptMap[u.id] === deptId);
-    if (deptMembers.length > 0) {
-      const memberNames = deptMembers.map(m => m.name).join('、');
-      alert(`无法删除该部门：当前部门下仍有绑定的员工账号（${memberNames}）。请先在员工列表中将他们调整至其他部门！`);
-      return;
-    }
-
-    const dept = departments.find(d => d.id === deptId);
-    setDepartments(prev => prev.filter(d => d.id !== deptId));
-
-    // Add operation log
-    const newLog: OperationLog = {
-      id: `log-${Date.now()}`,
-      operatorName: '陆永奇',
-      operatorRole: '管理员',
-      actionType: '组织架构',
-      actionDetail: `成功删除了空置部门 「${dept?.name || deptId}」`,
-      ipAddress: '192.168.1.14',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      status: 'success'
-    };
-    setLogs(prev => [newLog, ...prev]);
-
-    triggerToast(`部门「${dept?.name}」已成功移除！`);
   };
 
   // Open Drawer for creating new user
   const handleOpenCreateDrawer = () => {
     setDrawerMode('create');
+    setFormUserName('');
+    setFormPhone('');
     setFormName('');
-    setFormEmail('');
-    setFormDeptId('dep-2'); // Set default department ID (内容运营部)
-    setFormRole('运营策划');
-    setFormStatus('online');
+    setFormPassword('');
+    setFormCode('');
+    setFormDeptId('');
+    setFormRoleIds([]);
+    setFormStatus('NORMAL');
     setSelectedUserId(null);
     setIsDrawerOpen(true);
   };
 
   // Open Drawer for editing user
-  const handleOpenEditDrawer = (user: SystemUser) => {
+  const handleOpenEditDrawer = async (user: SystemUser) => {
     setDrawerMode('edit');
-    setFormName(user.name);
-    // strip out the suffix for simple prefill
-    const emailPrefix = user.email.split('@')[0];
-    setFormEmail(emailPrefix);
-    setFormDeptId(userDeptMap[user.id] || 'dep-2');
-    setFormRole(user.role);
-    setFormStatus(user.status);
     setSelectedUserId(user.id);
+    try {
+      // 详情走 userApi.detail(已修 GET)
+      const detail = await userApi.detail(user.id);
+      setFormUserName(detail.userName ?? '');
+      setFormPhone(detail.phone ?? '');
+      setFormName(detail.name ?? '');
+      setFormCode(detail.code ?? '');
+      setFormPassword('');  // 编辑时密码字段留空
+      setFormDeptId(user.deptId || '');
+      setFormRoleIds(detail.roleIds ?? []);
+      setFormStatus((detail.status as 'NORMAL' | 'DISABLED') ?? 'NORMAL');
+      // 注:formIsAdmin 已去除(2026-07-11 用户决定),后端 UserAddRequest.isAdmin 默认 'N'
+    } catch {
+      // toast 由 http 拦截器统一处理
+      return;
+    }
     setIsDrawerOpen(true);
   };
 
   // Save drawer form
-  const handleSaveUser = () => {
-    if (!formName.trim() || !formEmail.trim()) {
-      alert('请填写完整的姓名与邮箱！');
+  const handleSaveUser = async () => {
+    if (!formUserName.trim() || !formName.trim()) {
+      toast.error('请填写账号和姓名');
       return;
     }
-
-    const fullEmail = formEmail.includes('@') ? formEmail : `${formEmail}@davinci.ai`;
-
-    if (drawerMode === 'create') {
-      const newUserId = `u-${Date.now()}`;
-      const newUser: SystemUser = {
-        id: newUserId,
-        name: formName,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-        role: formRole,
-        email: fullEmail,
-        status: formStatus,
-        joinedDate: new Date().toISOString().split('T')[0]
-      };
-
-      setLocalUsers(prev => [...prev, newUser]);
-      setUserDeptMap(prev => ({ ...prev, [newUserId]: formDeptId }));
-      // Sync to parent list
-      onUpdateUserRole(newUser.id, newUser.role);
-      
-      // Add log
-      const newLog: OperationLog = {
-        id: `log-${Date.now()}`,
-        operatorName: '陆永奇',
-        operatorRole: '管理员',
-        actionType: '账号管理',
-        actionDetail: `成功创建了账号 ${newUser.name} (${fullEmail}) 并赋予了 ${newUser.role} 角色`,
-        ipAddress: '192.168.1.14',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        status: 'success'
-      };
-      setLogs(prev => [newLog, ...prev]);
-      
-      triggerToast(`账号「${formName}」已成功创建！`);
-    } else if (drawerMode === 'edit' && selectedUserId) {
-      setLocalUsers(prev => prev.map(u => u.id === selectedUserId ? {
-        ...u,
-        name: formName,
-        email: fullEmail,
-        role: formRole,
-        status: formStatus
-      } : u));
-      setUserDeptMap(prev => ({ ...prev, [selectedUserId]: formDeptId }));
-
-      // Invoke parent hook
-      onUpdateUserRole(selectedUserId, formRole);
-
-      // Add log
-      const newLog: OperationLog = {
-        id: `log-${Date.now()}`,
-        operatorName: '陆永奇',
-        operatorRole: '管理员',
-        actionType: '账号管理',
-        actionDetail: `成功修改了账号 ${formName} 的配置以及部门归属`,
-        ipAddress: '192.168.1.14',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        status: 'success'
-      };
-      setLogs(prev => [newLog, ...prev]);
-
-      triggerToast(`账号「${formName}」配置修改已成功保存！`);
+    if (drawerMode === 'create' && !formPassword.trim()) {
+      toast.error('请填写初始密码');
+      return;
     }
-
-    setIsDrawerOpen(false);
+    if (formRoleIds.length === 0) {
+      toast.error('请至少选择 1 个角色');
+      return;
+    }
+    try {
+      if (drawerMode === 'create') {
+        await userApi.add({
+          userName: formUserName,
+          phone: formPhone || undefined,
+          name: formName,
+          code: formCode || undefined,
+          password: formPassword,
+          // 注:isAdmin 已去除(2026-07-11 用户决定),不传,后端 schema 默认 'N'
+          roleIds: formRoleIds,  // 直接发 string[] 防 Long 精度丢失(后端 @JsonSerialize 对齐)
+        });
+        toast.success(`账号「${formName}」创建成功`);
+      } else if (drawerMode === 'edit' && selectedUserId) {
+        await userApi.update({
+          id: selectedUserId,
+          userName: formUserName,
+          // ★ phone / password 后端 UserUpdateRequest 暂不支持,本次不传
+          name: formName,
+          code: formCode || undefined,
+          roleIds: formRoleIds,  // 直接发 string[] 防 Long 精度丢失(后端 @JsonSerialize 对齐)
+        });
+        // 部门变更:如果 formDeptId 跟当前不同
+        const current = localUsers.find(u => u.id === selectedUserId);
+        if (current && current.deptId !== formDeptId) {
+          if (current.deptId) await departmentApi.unassignUser(current.deptId, [selectedUserId]);
+          if (formDeptId) await departmentApi.assignUser(formDeptId, [selectedUserId], selectedUserId);
+        }
+        toast.success(`账号「${formName}」修改成功`);
+      }
+      await userListQuery.refetch();
+      setIsDrawerOpen(false);
+    } catch {
+      // toast 由 http 拦截器统一处理
+    }
   };
 
-  // Toggle user active status (online/offline simulates enable/disable)
-  const handleToggleUserStatus = (userId: string, currentStatus: 'online' | 'offline') => {
-    const nextStatus = currentStatus === 'online' ? 'offline' : 'online';
-    const updatedUsers = localUsers.map(u => u.id === userId ? { ...u, status: nextStatus } : u);
-    setLocalUsers(updatedUsers);
-    
-    const targetUser = localUsers.find(u => u.id === userId);
-    const logAction = nextStatus === 'online' ? '启用' : '禁用';
+  // Toggle user active status (NORMAL ↔ DISABLED)
+  const handleToggleUserStatus = async (userId: string, currentStatus: 'NORMAL' | 'DISABLED') => {
+    const nextStatus = currentStatus === 'NORMAL' ? 'DISABLED' : 'NORMAL';
+    const target = localUsers.find(u => u.id === userId);
+    try {
+      await userApi.status({ id: userId, status: nextStatus });
+      await userListQuery.refetch();
+      toast.success(`账号「${target?.name || userId}」已${nextStatus === 'NORMAL' ? '启用' : '停用'}`);
+    } catch {
+      // toast 由 http 拦截器统一处理
+    }
+  };
 
-    const newLog: OperationLog = {
-      id: `log-${Date.now()}`,
-      operatorName: '陆永奇',
-      operatorRole: '管理员',
-      actionType: '权限配置',
-      actionDetail: `将账号 ${targetUser?.name || userId} 的状态更改为：${logAction}`,
-      ipAddress: '192.168.1.14',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      status: 'success'
-    };
-    setLogs(prev => [newLog, ...prev]);
+  // Delete user (with confirm)
+  const handleDeleteUser = async (user: SystemUser) => {
+    const ok = await confirm({
+      title: '删除账号',
+      message: `将删除「${user.name}」,该操作不可恢复,请确认。`,
+      confirmText: '删除',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await userApi.remove(user.id);
+      await userListQuery.refetch();
+      toast.success(`账号「${user.name}」已删除`);
+    } catch {
+      // toast 由 http 拦截器统一处理
+    }
+  };
 
-    triggerToast(`账号「${targetUser?.name}」已成功${logAction}！`);
+  // Reset password (opens modal)
+  const handleResetPassword = async () => {
+    if (!resetPwdFor || !resetPwdNew.trim()) {
+      toast.error('请输入新密码');
+      return;
+    }
+    try {
+      await userApi.resetPassword(resetPwdFor.id, resetPwdNew);
+      toast.success(`已为「${resetPwdFor.name}」重置密码`);
+      setResetPwdFor(null);
+      setResetPwdNew('');
+    } catch {
+      // toast 由 http 拦截器统一处理
+    }
   };
 
   // Toggle Model Channel Status locally
@@ -737,119 +559,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     );
   };
 
-  // Recursive function to render a single department and its descendants
-  const renderDepartmentNode = (dept: Department, depth: number) => {
-    const children = departments.filter(d => d.parentId === dept.id);
-    const isExpanded = !!expandedDepts[dept.id];
-    const hasChildren = children.length > 0;
-    
-    // Count direct and indirect employees
-    const getEmployeeCount = (dId: string): number => {
-      let count = localUsers.filter(u => userDeptMap[u.id] === dId).length;
-      // Also sum children
-      const childDepts = departments.filter(d => d.parentId === dId);
-      childDepts.forEach(cd => {
-        count += getEmployeeCount(cd.id);
-      });
-      return count;
-    };
-
-    const directMembers = localUsers.filter(u => userDeptMap[u.id] === dept.id);
-    const totalMembers = getEmployeeCount(dept.id);
-
-    const toggleExpand = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setExpandedDepts(prev => ({ ...prev, [dept.id]: !prev[dept.id] }));
-    };
-
-    return (
-      <div key={dept.id} className="space-y-2 select-none" style={{ marginLeft: depth > 0 ? `${depth * 16}px` : '0px' }}>
-        {/* Department Card */}
-        <div className="group bg-white rounded-xl border border-slate-200/60 p-4 hover:border-blue-300 hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 relative">
-          
-          {/* Left info */}
-          <div className="flex items-start gap-3">
-            <button
-              onClick={toggleExpand}
-              className={`p-1 mt-0.5 rounded-md hover:bg-slate-100 transition-colors cursor-pointer text-slate-400 hover:text-slate-600 ${
-                !hasChildren ? 'opacity-30 pointer-events-none' : ''
-              }`}
-            >
-              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            </button>
-
-            <div className="p-2.5 bg-blue-50/60 text-blue-600 rounded-xl border border-blue-100/40">
-              <Building2 className="w-5 h-5 shrink-0" />
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold text-slate-800">{dept.name}</span>
-                <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 text-slate-500 font-mono rounded font-bold uppercase border border-slate-200/40">
-                  {dept.code}
-                </span>
-                {dept.managerName && (
-                  <span className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200/50 px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-slate-400" />
-                    负责人: {dept.managerName}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-400 leading-normal max-w-xl">
-                {dept.description || '暂无部门业务范围详细说明。'}
-              </p>
-            </div>
-          </div>
-
-          {/* Right meta and actions */}
-          <div className="flex items-center gap-4 self-end md:self-auto">
-            {/* Direct / Total Staff Badges */}
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-slate-400 bg-slate-100/80 px-2 py-1 rounded-lg font-semibold">
-                直属员工: <strong className="text-slate-700 font-bold font-mono">{directMembers.length}</strong>
-              </span>
-              <span className="text-[10px] text-blue-500 bg-blue-50/70 px-2 py-1 rounded-lg font-semibold">
-                总人数: <strong className="text-blue-600 font-bold font-mono">{totalMembers}</strong>
-              </span>
-            </div>
-
-            {/* Quick action buttons (Visible on card hover) */}
-            <div className="flex items-center gap-1.5 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={() => handleOpenCreateDeptDrawer(dept.id)}
-                title="添加子部门"
-                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleOpenEditDeptDrawer(dept)}
-                title="编辑配置"
-                className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-              >
-                <Edit className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleDeleteDepartment(dept.id)}
-                title="删除空置部门"
-                className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Child level list */}
-        {hasChildren && isExpanded && (
-          <div className="relative pl-3 border-l-2 border-slate-100 ml-4 space-y-2.5">
-            {children.map(child => renderDepartmentNode(child, 0))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6 relative" id="system-config-container">
       
@@ -971,8 +680,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                       className="bg-slate-50 border border-slate-200 text-xs px-3 py-2 rounded-lg text-slate-700 outline-none"
                     >
                       <option value="全部部门">全部部门</option>
-                      {departments.map(d => (
-                        <option key={d.id} value={d.name}>{d.name}</option>
+                      {allDepartments.map(d => (
+                        <option key={d.id} value={d.deptName}>{d.deptName}</option>
                       ))}
                     </select>
                   </div>
@@ -1010,8 +719,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                       ) : (
                         filteredUsers.map((user) => {
                           const initials = user.name.charAt(0);
-                          const userDept = getDeptForUser(user);
-                          const isOnline = user.status === 'online';
+                          const userDept = userDeptName(user);
+                          const isEnabled = user.status === 'NORMAL';
 
                           return (
                             <tr key={user.id} className="hover:bg-slate-50/40 transition-colors group">
@@ -1038,10 +747,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                               </td>
                               <td className="py-3.5 px-5">
                                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                                  isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'
+                                  isEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'
                                 }`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                                  {isOnline ? '启用' : '停用'}
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                  {isEnabled ? '启用' : '停用'}
                                 </span>
                               </td>
                               <td className="py-3.5 px-5 font-mono text-slate-400">{user.joinedDate}</td>
@@ -1057,10 +766,24 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                                   <button
                                     onClick={() => handleToggleUserStatus(user.id, user.status)}
                                     className={`flex items-center gap-0.5 cursor-pointer ${
-                                      isOnline ? 'text-rose-500 hover:text-rose-700' : 'text-emerald-500 hover:text-emerald-700'
+                                      isEnabled ? 'text-rose-500 hover:text-rose-700' : 'text-emerald-500 hover:text-emerald-700'
                                     }`}
                                   >
-                                    {isOnline ? '停用' : '启用'}
+                                    {isEnabled ? '停用' : '启用'}
+                                  </button>
+                                  <button
+                                    onClick={() => { setResetPwdFor(user); setResetPwdNew(''); }}
+                                    className="text-amber-600 hover:text-amber-800 flex items-center gap-0.5 cursor-pointer"
+                                  >
+                                    <Key className="w-3.5 h-3.5" />
+                                    重置密码
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteUser(user)}
+                                    className="text-rose-500 hover:text-rose-700 flex items-center gap-0.5 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    删除
                                   </button>
                                 </div>
                               </td>
@@ -1102,75 +825,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
       {/* MAIN VIEW: 组织架构 (Organization Structure Management) */}
       {activeMainTab === 'org' && (
-        <div className="space-y-6">
-          {/* Top Info Banner */}
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3 shadow-xs">
-            <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-            <div>
-              <h4 className="text-xs font-bold text-slate-800">组织架构功能提示</h4>
-              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed font-semibold">
-                本面板支持创建与管理多级归属部门，建立层级化的业务关联。
-                你可以通过将子部门绑定到上级，直观地呈现企业多层树状组织脉络。鼠标悬停在对应部门卡片上可以快速 <strong>“新增子部门”</strong>、<strong>“编辑配置”</strong> 或 <strong>“删除空置部门”</strong>。
-              </p>
-            </div>
-          </div>
-
-          {/* Org KPI Summary Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs">
-              <span className="text-[10px] font-mono text-slate-400 block uppercase font-bold">Total Departments</span>
-              <span className="text-xl font-bold text-slate-800 block mt-1">{departments.length} 个</span>
-              <span className="text-[10px] text-emerald-500 font-semibold block mt-1">已建立三级层级结构</span>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs">
-              <span className="text-[10px] font-mono text-slate-400 block uppercase font-bold">Active Staff Mapped</span>
-              <span className="text-xl font-bold text-slate-800 block mt-1">{localUsers.length} 人</span>
-              <span className="text-[10px] text-slate-400 font-semibold block mt-1">全量绑定到所属部门</span>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs">
-              <span className="text-[10px] font-mono text-slate-400 block uppercase font-bold">Primary Departments</span>
-              <span className="text-xl font-bold text-slate-800 block mt-1">
-                {departments.filter(d => d.parentId === null).length} 个
-              </span>
-              <span className="text-[10px] text-blue-500 font-semibold block mt-1">含总部核心支柱业务</span>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs">
-              <span className="text-[10px] font-mono text-slate-400 block uppercase font-bold">Unassigned</span>
-              <span className="text-xl font-bold text-slate-800 block mt-1">0 人</span>
-              <span className="text-[10px] text-slate-400 font-semibold block mt-1">新入职员工自动绑定</span>
-            </div>
-          </div>
-
-          {/* Org Tree Card Panel */}
-          <div className="bg-white rounded-xl border border-slate-200/60 overflow-hidden shadow-xs flex flex-col">
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Network className="w-4 h-4 text-blue-600" />
-                企业多级组织部门树状图
-              </span>
-              <button
-                onClick={() => handleOpenCreateDeptDrawer(null)}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                新增一级部门
-              </button>
-            </div>
-
-            <div className="p-5 md:p-6 space-y-3.5 bg-slate-50/30">
-              {/* Root branches rendering */}
-              {departments.filter(d => d.parentId === null).length === 0 ? (
-                <div className="text-center py-12 text-slate-400 font-semibold">
-                  暂无一级根部门，请先点击右上角新增一级部门！
-                </div>
-              ) : (
-                departments
-                  .filter(d => d.parentId === null)
-                  .map(rootDept => renderDepartmentNode(rootDept, 0))
-              )}
-            </div>
-          </div>
-        </div>
+        <OrgStructureTab
+          ref={orgTabRef}
+          users={localUsers}
+          onAssignUser={handleAssignUser}
+        />
       )}
 
       {/* MAIN VIEW B: 模型通道统管 (Model Channels Management) */}
@@ -1479,24 +1138,65 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   />
                 </div>
 
-                {/* Corporate email prefix */}
+                {/* Account (login name) */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
-                    企业邮箱账号 <span className="text-rose-500 font-bold">*</span>
+                    账号(登录名) <span className="text-rose-500 font-bold">*</span>
                   </label>
-                  <div className="relative flex items-center">
-                    <input
-                      type="text"
-                      value={formEmail}
-                      onChange={(e) => setFormEmail(e.target.value)}
-                      placeholder="例如: username"
-                      className="w-full pl-3 pr-24 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono font-bold"
-                    />
-                    <span className="absolute right-3 text-[11px] text-slate-400 font-mono font-bold select-none bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      @daVinci.ai
-                    </span>
-                  </div>
+                  <input
+                    type="text"
+                    value={formUserName}
+                    onChange={(e) => setFormUserName(e.target.value)}
+                    placeholder="请输入登录账号"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono font-bold"
+                  />
                 </div>
+
+                {/* Password (only required for create) */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    密码 {drawerMode === 'create' && <span className="text-rose-500 font-bold">*</span>}
+                    {drawerMode === 'edit' && <span className="text-slate-400 font-normal ml-1">(编辑不改,留空)</span>}
+                  </label>
+                  <input
+                    type="text"
+                    autoComplete="new-password"
+                    value={formPassword}
+                    onChange={(e) => setFormPassword(e.target.value)}
+                    placeholder={drawerMode === 'create' ? '请输入初始密码(明文,后端加密存储)' : '编辑模式不改密码,留空'}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono"
+                  />
+                </div>
+
+                {/* Phone (optional) */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    手机号 <span className="text-slate-400 font-normal">(可选)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formPhone}
+                    onChange={(e) => setFormPhone(e.target.value)}
+                    placeholder="请输入手机号(选填)"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono"
+                  />
+                </div>
+
+                {/* Job number (optional) */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    工号 <span className="text-slate-400 font-normal">(可选)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formCode}
+                    onChange={(e) => setFormCode(e.target.value)}
+                    placeholder="请输入工号(选填)"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono"
+                  />
+                </div>
+
+                {/* 注:是否超管 toggle 已去除(2026-07-11 用户决定),后端 UserAddRequest.isAdmin 默认 'N' */}
 
                 {/* Department Selector */}
                 <div className="space-y-1.5">
@@ -1508,52 +1208,63 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     onChange={(e) => setFormDeptId(e.target.value)}
                     className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none text-slate-700 font-semibold"
                   >
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
+                    <option value="">(未分配)</option>
+                    {allDepartments.map(d => (
+                      <option key={d.id} value={d.id}>{d.deptName}</option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              {/* SECTION 2: Role assigning cards */}
+              {/* SECTION 2: 角色分配(动态多选) */}
               <div className="space-y-4">
                 <h4 className="text-xs font-bold text-blue-600 border-l-4 border-blue-600 pl-2">
-                  角色分配与授权范围
+                  角色分配(可多选)
                 </h4>
 
-                <div className="grid grid-cols-1 gap-3">
-                  {[
-                    { roleVal: '运营策划', title: '运营专员 (Operator)', desc: '负责批次素材的日常提交、在线筛选评分以及基础运营效能复盘。' },
-                    { roleVal: '高级设计师', title: '设计师 (Designer)', desc: '负责设计模板创作、维护负面规则，拥有核心创意控制权。' },
-                    { roleVal: '管理员', title: '系统管理员 (Admin)', desc: '最高运维控制级。负责员工协作分配，一键断电模型接口等操作。' },
-                    { roleVal: '协同客户', title: '外部协同人 (Client)', desc: '仅预览协作权限，拥有成品阅览、在线评论与标记反馈等协作属性。' }
-                  ].map((card) => {
-                    const isChecked = formRole === card.roleVal;
-                    return (
-                      <div
-                        key={card.roleVal}
-                        onClick={() => setFormRole(card.roleVal as any)}
-                        className={`p-3 rounded-lg border cursor-pointer transition-all select-none flex flex-col space-y-1.5 ${
-                          isChecked
-                            ? 'border-blue-500 bg-blue-50/40 ring-1 ring-blue-500/20'
-                            : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-slate-800">{card.title}</span>
-                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                            isChecked ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
-                          }`}>
-                            {isChecked && <Check className="w-2.5 h-2.5 stroke-[3px]" />}
+                {roleList.length === 0 ? (
+                  <div className="text-xs text-slate-400">角色加载中...</div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {roleList.map((r) => {
+                      const checked = formRoleIds.includes(String(r.id));
+                      return (
+                        <div
+                          key={r.id}
+                          onClick={() => setFormRoleIds(prev =>
+                            checked
+                              ? prev.filter(x => x !== String(r.id))
+                              : [...prev, String(r.id)]
+                          )}
+                          className={`p-3 rounded-lg border cursor-pointer transition-all select-none flex flex-col space-y-1.5 ${
+                            checked
+                              ? 'border-blue-500 bg-blue-50/40 ring-1 ring-blue-500/20'
+                              : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                              {r.roleName}
+                              {r.sysRole && (
+                                <span className="text-[9px] px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded font-bold">
+                                  内置
+                                </span>
+                              )}
+                            </span>
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                              checked ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
+                            }`}>
+                              {checked && <Check className="w-2.5 h-2.5 stroke-[3px]" />}
+                            </div>
                           </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            {r.description || '—'}
+                          </p>
                         </div>
-                        <p className="text-[10px] text-slate-400 leading-relaxed">
-                          {card.desc}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Tips footer block */}
@@ -1582,144 +1293,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </button>
             </div>
 
-          </div>
-        </div>
-      )}
-
-      {/* OVERLAY PANEL DRAWER: 新建 / 编辑部门 */}
-      {isDeptDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex" id="new-dept-drawer">
-          <div
-            className="absolute inset-0 bg-[#0B1C30]/40 backdrop-blur-xs transition-opacity cursor-pointer"
-            onClick={() => setIsDeptDrawerOpen(false)}
-          />
-
-          <div className="absolute right-0 top-0 h-full w-[480px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300 z-50 animate-slide-in-right">
-            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                <Network className="w-5 h-5 text-blue-600" />
-                {deptDrawerMode === 'create' ? '新建组织部门' : '编辑部门配置'}
-              </h3>
-              <button
-                onClick={() => setIsDeptDrawerOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-blue-600 border-l-4 border-blue-600 pl-2">
-                  基本信息
-                </h4>
-
-                {/* Name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    部门名称 <span className="text-rose-500 font-bold">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={deptFormName}
-                    onChange={(e) => setDeptFormName(e.target.value)}
-                    placeholder="例如: 智能创意二组"
-                    className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-semibold"
-                  />
-                </div>
-
-                {/* Unique Code */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    部门唯一编码 <span className="text-rose-500 font-bold">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={deptFormCode}
-                    onChange={(e) => setDeptFormCode(e.target.value)}
-                    placeholder="例如: DESIGN-G2"
-                    disabled={deptDrawerMode === 'edit'}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono uppercase font-bold disabled:opacity-60"
-                  />
-                  <p className="text-[10px] text-slate-400 leading-normal">
-                    创建后编码不可修改，用于API映射或系统后台日志定位。
-                  </p>
-                </div>
-
-                {/* Parent Department Selector */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    上级归属部门
-                  </label>
-                  <select
-                    value={deptFormParentId || ''}
-                    onChange={(e) => setDeptFormParentId(e.target.value || null)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none text-slate-700 font-semibold"
-                  >
-                    <option value="">(无上级部门 - 设为一级部门)</option>
-                    {departments
-                      .filter(d => d.id !== selectedDeptId && (!selectedDeptId || !isDescendant(d.id, selectedDeptId)))
-                      .map(d => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                  </select>
-                </div>
-
-                {/* Manager Name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    部门负责人 / 领队
-                  </label>
-                  <select
-                    value={deptFormManager}
-                    onChange={(e) => setDeptFormManager(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none text-slate-700 font-semibold"
-                  >
-                    <option value="">请选择负责人</option>
-                    {localUsers.map(u => (
-                      <option key={u.id} value={u.name}>{u.name} ({u.role})</option>
-                    ))}
-                    <option value="协同客户代表">协同客户代表</option>
-                  </select>
-                </div>
-
-                {/* Description */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    部门简要描述
-                  </label>
-                  <textarea
-                    value={deptFormDescription}
-                    onChange={(e) => setDeptFormDescription(e.target.value)}
-                    placeholder="请输入部门的核心业务简介，限100字以内..."
-                    rows={3}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-semibold resize-none"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 flex items-start gap-2.5">
-                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-slate-400 leading-normal">
-                  组织架构调整后将实时影响「员工账号」以及「模型通道分配」的归属范围，并且相关变更会自动记录在操作日志中。
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 shrink-0">
-              <button
-                onClick={() => setIsDeptDrawerOpen(false)}
-                className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-lg transition-colors cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSaveDepartment}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
-              >
-                {deptDrawerMode === 'create' ? '确认创建' : '保存修改'}
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -1988,6 +1561,58 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* RESET PASSWORD MODAL */}
+      {resetPwdFor && (
+        <div className="fixed inset-0 z-50 flex" id="reset-pwd-modal">
+          <div
+            className="absolute inset-0 bg-[#0B1C30]/40 backdrop-blur-xs cursor-pointer"
+            onClick={() => setResetPwdFor(null)}
+          />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] bg-white shadow-2xl rounded-2xl flex flex-col z-50">
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Key className="w-4 h-4 text-amber-500" />
+                为「{resetPwdFor.name}」重置密码
+              </h3>
+              <button
+                onClick={() => setResetPwdFor(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <label className="text-xs font-bold text-slate-700">新密码(明文,后端加密存储)</label>
+              <input
+                type="text"
+                autoComplete="new-password"
+                value={resetPwdNew}
+                onChange={(e) => setResetPwdNew(e.target.value)}
+                placeholder="建议 8 位以上,字母+数字组合"
+                className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+              />
+              <p className="text-[10px] text-slate-400 leading-relaxed">
+                重置后请通过安全渠道告知员工,旧密码立即失效。
+              </p>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setResetPwdFor(null)}
+                className="px-4 py-2 border border-slate-200 bg-white text-slate-700 text-xs font-semibold rounded-lg"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleResetPassword}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg"
+              >
+                确认重置
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -96,6 +96,8 @@ export interface TemplateCreateRequest {
   variables?: string;
   defaultCount?: number;
   defaultModelChannelId?: string;
+  defaultAspectRatio?: string; // legacy(V3)
+  defaultRatio?: string; // V11 业务主字段
 
   // IMAGE_TASK / STYLE_SCENE
   defaultStyle?: string;

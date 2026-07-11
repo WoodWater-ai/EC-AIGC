@@ -16,12 +16,13 @@ import { ResourceCategoryList } from './components/ResourceCategoryList';
 
 import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
+import { useServiceQuery } from './api/hooks/useServiceQuery';
+import { userApi, type UserDTO } from './api/modules/user';
 
 import {
   mockTasks,
   mockProducts,
   mockModelChannels,
-  mockUsers,
   mockNotifications
 } from './mockData';
 
@@ -78,8 +79,28 @@ export default function App() {
   const [tasks, setTasks] = useState<GenerationTask[]>(mockTasks);
   const [products, setProducts] = useState<ProductAsset[]>(mockProducts);
   const [channels, setChannels] = useState<ModelChannel[]>(mockModelChannels);
-  const [users, setUsers] = useState<SystemUser[]>(mockUsers);
   const [notifications, setNotifications] = useState<SystemNotification[]>(mockNotifications);
+
+  // 用户列表(Phase 1.5) —— 从真接口 /v1/admin/user/list 拉,SystemUser 映射供 Sidebar 切换协作账号下拉用
+  // 注意:useServiceQuery 内部 data 初始为 null,ES6 解构 `= []` 只对 undefined 生效,所以用 ?? [] 显式 nullish
+  const userListQuery = useServiceQuery<UserDTO[]>(
+    () => userApi.listAll(),
+    []
+  );
+  const realUsers = userListQuery.data ?? [];
+  const [users, setUsers] = useState<SystemUser[]>([]);
+  useEffect(() => {
+    setUsers(realUsers.map(u => ({
+      id: u.id,
+      name: u.name || u.userName || u.phone || '(未命名)',
+      avatar: u.headUrl || '',
+      role: u.isAdmin ? '管理员' : '运营策划',  // P1 TODO:从 roleIds 查角色名
+      email: u.email || u.phone || '',
+      status: u.status === 'DISABLED' ? 'offline' : 'online',
+      joinedDate: '',  // UserResponse 无此字段
+      deptId: u.deptId || undefined,
+    })));
+  }, [realUsers]);
 
   // 适配后的当前用户（喂给 Sidebar / Header）
   const currentUser = adaptAuthUser(user);
@@ -129,8 +150,11 @@ export default function App() {
     }));
   };
 
-  const handleUpdateUserRole = (userId: string, newRole: any) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+  const handleUpdateUserRole = (userId: string, newRole: any, newDeptId?: string) => {
+    setUsers(prev => prev.map(u => u.id === userId
+      ? { ...u, role: newRole, ...(newDeptId !== undefined ? { deptId: newDeptId } : {}) }
+      : u
+    ));
   };
 
   const handleMarkAllNotificationsAsRead = () => {
@@ -189,7 +213,6 @@ export default function App() {
         return (
           <SystemConfig
             channels={channels}
-            users={users}
             onToggleChannel={handleToggleChannel}
             onUpdateUserRole={handleUpdateUserRole}
           />

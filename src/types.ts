@@ -128,6 +128,8 @@ export interface SystemUser {
   email: string;
   status: 'online' | 'offline';
   joinedDate: string;
+  // 后端 UserResponse.deptId 映射,前端"员工账号"Tab 反查部门用
+  deptId?: string;
 }
 
 export interface SystemNotification {

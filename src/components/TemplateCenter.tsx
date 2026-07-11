@@ -7,10 +7,12 @@
  * 子组件已删除:原版是单文件内联 JSX,本任务不需要 TemplateDrawer/Table/Toolbar.
  * 字段映射见 docs/superpowers/specs/2026-07-10-template-mock-to-real-design.md §4.
  */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Info } from 'lucide-react';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import { useDictOptions } from '../api/hooks/useDict';
+import { type DictOption } from '../api/modules/dict';
 import {
   templateApi,
   type TemplateDTO,
@@ -50,47 +52,6 @@ interface DrawerState {
   data: Partial<TemplateDTO>;
 }
 
-/**
- * 后端没有的「字典硬编码」——原版 1466 行里这些是 mock 期写死的中文选项,
- * 后端 dict 数据缺失,本次先保留原值(后续 PR 接 dictApi).
- */
-const IMAGE_TASK_TYPE_OPTIONS = ['主图', '场景图', '细节图', '上身三视图', '通用'];
-const STYLE_DIMENSION_OPTIONS = ['风格', '场景', '动作姿势', '组合预设'];
-const VIDEO_MODE_OPTIONS: { value: string; label: string }[] = [
-  { value: 'img2video', label: 'Image-to-Video (纯静图流体转换)' },
-  { value: 'reference2video', label: 'Reference-to-Video (垫图特征追踪)' },
-];
-const VIDEO_DURATION_OPTIONS = [
-  { value: '5', label: '5 秒快速渲染' },
-  { value: '8', label: '8 秒标准渲染' },
-  { value: '15', label: '15 秒深度精绘' },
-];
-const VIDEO_MOTION_OPTIONS = [
-  { value: 'small', label: '小幅度 (高保真防抖)' },
-  { value: 'medium', label: '中等幅度 (兼顾张力与平滑)' },
-  { value: 'large', label: '大幅度 (强镜头环绕运动)' },
-];
-const PLATFORM_USAGE_OPTIONS = ['商品主图', '详情页场景图', '短视频素材', '通用'];
-const PLATFORM_FORMAT_OPTIONS = ['jpg', 'png', 'webp', 'mp4', 'gif'];
-const NC_ASSET_SCOPE_OPTIONS = ['通用', '图片', '视频'];
-const NC_SEVERITY_OPTIONS = [
-  { value: 'P0', label: 'P0 强力阻断 (任何时候都将注入底层约束)' },
-  { value: 'P1', label: 'P1 预警拦截 (超出安全阈值时拦截渲染)' },
-  { value: 'P2', label: 'P2 软性防变形 (提示并持续优化纠偏)' },
-];
-const NC_CATEGORY_OPTIONS = ['商品保真', '人物人体', '画面质量', '视频稳定性'];
-
-/**
- * 任务类型按模板分类第一性原理映射(原版 1466 行硬编码,保留).
- */
-const TAB_TO_TASK_TYPE: Record<TabKey, string> = {
-  image_task: '商品生图',
-  style_scene: '场景融合',
-  video_prompt: '视频脚本',
-  platform_spec: '规格排版',
-  negative_constraint: '负面提示',
-};
-
 export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('image_task');
   const [searchTerm, setSearchTerm] = useState('');
@@ -114,6 +75,39 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   );
 
   const templates: TemplateDTO[] = data?.list ?? [];
+
+  // ===== 字典数据(从后端 dict 拉取) =====
+  const { options: imageTaskTypeOptions } = useDictOptions('IMAGE_TASK_TYPE');
+  const { options: styleDimensionOptions } = useDictOptions('STYLE_DIMENSION');
+  const { options: videoModeOptions } = useDictOptions('VIDEO_MODE');
+  const { options: videoDurationOptions } = useDictOptions('VIDEO_DURATION');
+  const { options: videoMotionOptions } = useDictOptions('VIDEO_MOTION');
+  const { options: platformUsageOptions } = useDictOptions('TASK_TYPE'); // 复用现有 TASK_TYPE
+  const { options: platformFormatOptions } = useDictOptions('PLATFORM_FORMAT');
+  const { options: ncAssetScopeOptions } = useDictOptions('NC_ASSET_SCOPE');
+  const { options: ncSeverityOptions } = useDictOptions('NC_SEVERITY');
+  const { options: ncCategoryOptions } = useDictOptions('NC_CATEGORY');
+  const { options: templateTaskTypeOptions } = useDictOptions('TEMPLATE_TASK_TYPE');
+
+  /**
+   * TAB → 任务类型(itemCode)映射,从 templateTaskTypeOptions 动态构建.
+   * 任务类型的 itemCode 与 TabKey 的对应关系由后端 dict 数据决定,
+   * 当前约定:商品生图/场景融合/视频脚本/规格排版/负面提示 五个 itemCode
+   * 对应 image_task / style_scene / video_prompt / platform_spec / negative_constraint 五个 Tab.
+   */
+  // 用 opt.label (itemName 中文) 而非 opt.value (itemCode 英文),保持原版行为:
+  // 后端 applicableTaskTypes 字段存"商品生图"等中文展示文本,前端列表/抽屉直接显示中文
+  const TAB_TO_TASK_TYPE: Record<TabKey, string> = useMemo(() => {
+    const byValue = (v: string): DictOption | undefined =>
+      templateTaskTypeOptions.find((opt) => opt.value === v);
+    return {
+      image_task: byValue('PRODUCT_IMAGE')?.label ?? '',
+      style_scene: byValue('SCENE_BLEND')?.label ?? '',
+      video_prompt: byValue('VIDEO_SCRIPT')?.label ?? '',
+      platform_spec: byValue('SPEC_LAYOUT')?.label ?? '',
+      negative_constraint: byValue('NEGATIVE_PROMPT')?.label ?? '',
+    };
+  }, [templateTaskTypeOptions]);
 
   // ===== 工具函数 =====
 
@@ -157,12 +151,12 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
       applicableTaskTypes: d.applicableTaskTypes,
       promptBody: d.promptBody ?? '',
       negativePrompt: d.negativePrompt,
-      variables:
-        Array.isArray((d as { _variablesArr?: string[] })._variablesArr)
-          ? JSON.stringify((d as { _variablesArr?: string[] })._variablesArr)
-          : d.variables,
+      // 统一从 _variablesArr 强制 JSON 序列化(避免 undefined 字段被省略)
+      variables: JSON.stringify((d as { _variablesArr?: string[] })._variablesArr ?? []),
       defaultCount: toNum(d.defaultCount),
       defaultModelChannelId: d.defaultModelChannelId,
+      defaultAspectRatio: d.defaultAspectRatio, // legacy
+      defaultRatio: d.defaultRatio, // V11 业务主字段
       defaultStyle: d.defaultStyle,
       defaultScene: d.defaultScene,
       defaultPose: d.defaultPose,
@@ -184,10 +178,11 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
       ncDefaultEnabled: d.ncDefaultEnabled,
       ncConflictRules: d.ncConflictRules,
     };
+    // create 模式也带 status(handleNew 已预设 'NORMAL'),edit 模式带 id + 覆盖 status
     if (state.mode === 'edit' && d.id) {
       return { ...payload, id: d.id, status: d.status };
     }
-    return payload;
+    return { ...payload, status: d.status };
   };
 
   // ===== 事件处理 =====
@@ -261,6 +256,18 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
         templateName: '',
         templateKind: TAB_TO_KIND[activeTab],
         status: 'NORMAL',
+        // 预设默认值,避免受控组件 value={d.field ?? '默认'} 但 state 实际是 undefined
+        // 导致 buildSavePayload JSON 序列化时省略字段,后端 @NotBlank / 业务字段为空
+        defaultCount: 4,
+        defaultStyle: '白底',
+        // IMAGE_TASK 类字段(只在 IMAGE_TASK tab 合理,其它 tab 用户填 platformRecommendedRatio 等)
+        ...(activeTab === 'image_task' ? { defaultRatio: '3:4' } : {}),
+        applicableCategories: '通用',
+        imageTaskType: 'MAIN',
+        _variablesArr: [], // 配合 buildSavePayload 强制发 '[]'
+        // 当前 tab 的任务类型(中文,如"商品生图"),避免用户首次进入抽屉时该字段为空
+        // 后续切换 tab 会通过 onTabChange 覆盖
+        applicableTaskTypes: TAB_TO_TASK_TYPE[activeTab],
       },
     });
   };
@@ -451,16 +458,16 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
           setDrawer={setDrawer}
           onClose={handleCloseDrawer}
           onSave={handleSave}
-          imageTaskTypeOptions={IMAGE_TASK_TYPE_OPTIONS}
-          styleDimensionOptions={STYLE_DIMENSION_OPTIONS}
-          videoModeOptions={VIDEO_MODE_OPTIONS}
-          videoDurationOptions={VIDEO_DURATION_OPTIONS}
-          videoMotionOptions={VIDEO_MOTION_OPTIONS}
-          platformUsageOptions={PLATFORM_USAGE_OPTIONS}
-          platformFormatOptions={PLATFORM_FORMAT_OPTIONS}
-          ncAssetScopeOptions={NC_ASSET_SCOPE_OPTIONS}
-          ncSeverityOptions={NC_SEVERITY_OPTIONS}
-          ncCategoryOptions={NC_CATEGORY_OPTIONS}
+          imageTaskTypeOptions={imageTaskTypeOptions}
+          styleDimensionOptions={styleDimensionOptions}
+          videoModeOptions={videoModeOptions}
+          videoDurationOptions={videoDurationOptions}
+          videoMotionOptions={videoMotionOptions}
+          platformUsageOptions={platformUsageOptions}
+          platformFormatOptions={platformFormatOptions}
+          ncAssetScopeOptions={ncAssetScopeOptions}
+          ncSeverityOptions={ncSeverityOptions}
+          ncCategoryOptions={ncCategoryOptions}
           tabToTaskType={TAB_TO_TASK_TYPE}
           extractVariables={extractVariables}
         />
@@ -912,16 +919,16 @@ interface TemplateDrawerInlineProps {
   setDrawer: React.Dispatch<React.SetStateAction<DrawerState | null>>;
   onClose: () => void;
   onSave: (e: React.FormEvent) => void;
-  imageTaskTypeOptions: string[];
-  styleDimensionOptions: string[];
-  videoModeOptions: { value: string; label: string }[];
-  videoDurationOptions: { value: string; label: string }[];
-  videoMotionOptions: { value: string; label: string }[];
-  platformUsageOptions: string[];
-  platformFormatOptions: string[];
-  ncAssetScopeOptions: string[];
-  ncSeverityOptions: { value: string; label: string }[];
-  ncCategoryOptions: string[];
+  imageTaskTypeOptions: DictOption[];
+  styleDimensionOptions: DictOption[];
+  videoModeOptions: DictOption[];
+  videoDurationOptions: DictOption[];
+  videoMotionOptions: DictOption[];
+  platformUsageOptions: DictOption[];
+  platformFormatOptions: DictOption[];
+  ncAssetScopeOptions: DictOption[];
+  ncSeverityOptions: DictOption[];
+  ncCategoryOptions: DictOption[];
   tabToTaskType: Record<TabKey, string>;
   extractVariables: (prompt: string) => string[];
 }
@@ -1133,8 +1140,8 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                         onChange={(e) => update({ imageTaskType: e.target.value })}
                       >
                         {imageTaskTypeOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
+                          <option key={opt.id} value={opt.value}>
+                            {opt.label}
                           </option>
                         ))}
                       </select>
@@ -1211,8 +1218,8 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                         onChange={(e) => update({ defaultStyle: e.target.value })}
                       >
                         {styleDimensionOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
+                          <option key={opt.id} value={opt.value}>
+                            {opt.label}
                           </option>
                         ))}
                       </select>
@@ -1244,9 +1251,9 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                       <label className="font-bold text-slate-700">画布输出比例</label>
                       <input
                         type="text"
-                        className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg outline-none text-slate-800 focus:border-blue-600 font-mono text-center"
-                        value={d.defaultRatio ?? ''}
-                        onChange={(e) => update({ defaultRatio: e.target.value })}
+                        className="mt-1 w-full h-9 px-3 bg-white border border-slate-200 rounded-lg outline-none text-slate-800 focus:border-blue-600 font-mono text-center"
+                        value={d.platformRecommendedRatio ?? ''}
+                        onChange={(e) => update({ platformRecommendedRatio: e.target.value })}
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -1306,7 +1313,7 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                         onChange={(e) => update({ videoDefaultMotion: e.target.value })}
                       >
                         {videoModeOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
+                          <option key={opt.id} value={opt.value}>
                             {opt.label}
                           </option>
                         ))}
@@ -1332,7 +1339,7 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                         onChange={(e) => update({ videoDefaultDurationSec: Number(e.target.value) })}
                       >
                         {videoDurationOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
+                          <option key={opt.id} value={opt.value}>
                             {opt.label}
                           </option>
                         ))}
@@ -1346,7 +1353,7 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                         onChange={(e) => update({ videoDefaultMotion: e.target.value })}
                       >
                         {videoMotionOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
+                          <option key={opt.id} value={opt.value}>
                             {opt.label}
                           </option>
                         ))}
@@ -1427,8 +1434,8 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                         onChange={(e) => update({ platformUsage: e.target.value })}
                       >
                         {platformUsageOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
+                          <option key={opt.id} value={opt.value}>
+                            {opt.label}
                           </option>
                         ))}
                       </select>
@@ -1472,8 +1479,8 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                         onChange={(e) => update({ platformUsage: e.target.value })}
                       >
                         {platformFormatOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt.toUpperCase()}
+                          <option key={opt.id} value={opt.value}>
+                            {opt.value.toUpperCase()}
                           </option>
                         ))}
                       </select>
@@ -1527,8 +1534,8 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                         onChange={(e) => update({ ncAssetKindScope: e.target.value })}
                       >
                         {ncAssetScopeOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
+                          <option key={opt.id} value={opt.value}>
+                            {opt.label}
                           </option>
                         ))}
                       </select>
@@ -1541,7 +1548,7 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                         onChange={(e) => update({ ncSeverity: e.target.value })}
                       >
                         {ncSeverityOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
+                          <option key={opt.id} value={opt.value}>
                             {opt.label}
                           </option>
                         ))}
@@ -1557,8 +1564,8 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                         readOnly
                       >
                         {ncCategoryOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
+                          <option key={opt.id} value={opt.value}>
+                            {opt.label}
                           </option>
                         ))}
                       </select>
