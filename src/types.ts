@@ -175,7 +175,9 @@ export type ChannelType =
   | 'DOUBAO'
   | 'DEEPSEEK'
   /** [v1.2 2026-07-11] Vidu 接入(生数科技) */
-  | 'VIDU';
+  | 'VIDU'
+  /** [v1.5 2026-07-12] Agnes AI 接入(Sapiens AI 旗下,文本/图像/视频 3 大能力) */
+  | 'AGNES_AI';
 
 /** ChannelType UI 标签(中文/品牌名,跟后端 EnumChannelType.describe 一致) */
 export const CHANNEL_TYPE_LABELS: Record<ChannelType, string> = {
@@ -184,11 +186,12 @@ export const CHANNEL_TYPE_LABELS: Record<ChannelType, string> = {
   DOUBAO: '豆包',
   DEEPSEEK: 'DeepSeek',
   VIDU: 'Vidu(生数科技)',
+  AGNES_AI: 'Agnes AI',
 };
 
 /** 卡片筛选分类 */
 export const CHANNEL_CATEGORIES = {
-  CLOUD: ['OPENAI', 'QWEN', 'DOUBAO', 'DEEPSEEK', 'VIDU'] as ChannelType[],
+  CLOUD: ['OPENAI', 'QWEN', 'DOUBAO', 'DEEPSEEK', 'VIDU', 'AGNES_AI'] as ChannelType[],
 } as const;
 
 /** 通道能力选项(中文 label → 后端英文 code) — 数据驱动,改用后端矩阵下放 */
@@ -209,17 +212,32 @@ export const BASE_URL_PLACEHOLDERS: Record<ChannelType, string> = {
   QWEN: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1',
   DOUBAO: 'https://ark.cn-beijing.volces.com/api/v3',
   DEEPSEEK: 'https://api.deepseek.com',
+  // [v1.5 2026-07-12] Vidu + Agnes AI 官方推荐
+  VIDU: 'https://api.vidu.cn/ent/v2',
+  AGNES_AI: 'https://apihub.agnes-ai.com/v1',
 };
 
-/** 默认模型(切换供应商时自动填入) — 矩阵没下发时,前端兜底用 */
-export const DEFAULT_MODEL_PLACEHOLDERS: Record<ChannelType, string> = {
-  OPENAI: 'dall-e-3',
-  QWEN: 'wanx-v1',
-  DOUBAO: 'doubao-pro-32k',
-  DEEPSEEK: 'deepseek-chat',
+/** 默认模型 placeholder(切换供应商时 input 灰色提示,仅 UI 用)
+ *  - 矩阵没下发时,前端兜底用
+ *  - [v1.4 2026-07-12] 改二维 map(channel × group → 提示名),因为 group 不同模型不同
+ *  - 用户可手输任意值,placeholder 仅作提示
+ */
+export const DEFAULT_MODEL_PLACEHOLDERS: Record<ChannelType, Partial<Record<CapabilityGroup, string>>> = {
+  OPENAI:   { TEXT: 'gpt-5 / gpt-4o / o3',           IMAGE: 'gpt-image-1.5 / dall-e-3',         VIDEO: 'sora-2 / sora-2-pro' },
+  QWEN:     { TEXT: 'qwen3-max / qwen-plus',          IMAGE: 'qwen-image / qwen-image-2.0',     VIDEO: 'wan2.6-t2v / wan2.6-i2v' },
+  DOUBAO:   { TEXT: 'doubao-seed-2.0-pro / doubao-1.5-pro', IMAGE: 'seedream-4.0 / doubao-image-3.0', VIDEO: 'seedance-1.5-pro / seedance-1.0-pro' },
+  DEEPSEEK: { TEXT: 'deepseek-chat / deepseek-reasoner' },
+  // [v1.4 2026-07-12] Vidu IMAGE = viduq1/viduq2(reference2image);VIDEO = 6 个模型;SOLUTION 不需要 model
+  VIDU:     { IMAGE: 'viduq2 / viduq1',               VIDEO: 'viduq3-turbo / viduq2-pro / vidu2.0' },
+  // [v1.5 2026-07-12] Agnes AI:3 个官方模型(文本/图像/视频各 1 个,OpenAI 兼容 + 异步视频)
+  AGNES_AI: { TEXT: 'agnes-2.0-flash',                IMAGE: 'agnes-image-2.0-flash',           VIDEO: 'agnes-video-v2.0' },
 };
 
-/** 通道能力矩阵(对齐后端 CapabilityMatrixResponse) */
+/** 通道能力矩阵(对齐后端 CapabilityMatrixResponse)
+ *  [v1.4 2026-07-12] + matrix[channelType].modelRequired 字段(后端单点收口)
+ *  - 决定前端要不要渲染该 group 的 default_model input
+ *  - Vidu × SOLUTION = false(不渲染,因 Vidu 4 解决方案不传 model)
+ */
 export interface CapabilityMatrix {
   capabilities: Array<{
     code: string;
@@ -230,6 +248,8 @@ export interface CapabilityMatrix {
     label: string;
     baseUrlPlaceholder: string;
     supported: string[];   // 后端 EnumCapability 枚举名
+    /** [v1.4] 该 channel 在每个 group 下是否需要 default_model(groupCode → boolean) */
+    modelRequired: Record<CapabilityGroup, boolean>;
   }>;
 }
 
@@ -241,7 +261,7 @@ export interface ModelChannelDTO {
   baseUrl: string | null;
   apiKey: string | null;                   // ★ 明文回显(后端 jasypt 解密后返回,字段名对齐后端 Response.apiKey)
   apiKeyConfigured: 'Y' | 'N';             // 是否已配置 Key
-  defaultModel: string | null;
+  defaultModels: Partial<Record<CapabilityGroup, string | null>> | null;  // [v1.4] group 级默认模型(替代旧 defaultModel 单值)
   capabilityTags: string | null;           // 逗号分隔(后端保留字段)
   capabilities: string[] | null;           // 能力编码列表
   callMode: 'SYNC' | 'ASYNC' | 'POLL' | 'CALLBACK' | null;
@@ -271,7 +291,8 @@ export interface ModelChannelAddRequest {
   channelType: ChannelType;
   baseUrl?: string;
   apiKey?: string;                         // ★ 明文,后端 jasypt 加密存
-  defaultModel?: string;
+  /** [v1.4] group 级默认模型(后端按 EnumChannelCapability.modelRequired 强约束) */
+  defaultModels?: Partial<Record<CapabilityGroup, string>>;
   capabilityTags?: string;
   callMode?: 'SYNC' | 'ASYNC' | 'POLL' | 'CALLBACK';
   concurrency?: number;

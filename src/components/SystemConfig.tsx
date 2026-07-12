@@ -168,7 +168,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [channelFormProvider, setChannelFormProvider] = useState<ChannelType>('OPENAI');
   const [channelFormBaseUrl, setChannelFormBaseUrl] = useState('https://api.openai.com/v1');
   const [channelFormApiKey, setChannelFormApiKey] = useState('');
-  const [channelFormDefaultModel, setChannelFormDefaultModel] = useState('dall-e-3');
+  const [channelFormDefaultModels, setChannelFormDefaultModels] = useState<Partial<Record<CapabilityGroup, string>>>({});
   const [channelFormLimit, setChannelFormLimit] = useState(5000);
   const [channelFormConcurrencyLimit, setChannelFormConcurrencyLimit] = useState(10);
   const [channelFormTimeout, setChannelFormTimeout] = useState(60);
@@ -421,7 +421,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     // 优先用矩阵 placeholder(后端权威),矩阵未拉回时 fallback 到前端常量
     setChannelFormBaseUrl(matrix?.matrix?.OPENAI?.baseUrlPlaceholder ?? BASE_URL_PLACEHOLDERS.OPENAI);
     setChannelFormApiKey('');
-    setChannelFormDefaultModel(DEFAULT_MODEL_PLACEHOLDERS.OPENAI);
+    setChannelFormDefaultModels({});
     setChannelFormLimit(5000);
     setChannelFormConcurrencyLimit(10);
     setChannelFormTimeout(60);
@@ -446,7 +446,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       const placeholder = matrix?.matrix?.[fullCh.channelType]?.baseUrlPlaceholder ?? BASE_URL_PLACEHOLDERS[fullCh.channelType];
       setChannelFormBaseUrl(fullCh.baseUrl ?? placeholder);
       setChannelFormApiKey(fullCh.apiKey ?? '');                        // ★ 明文回显
-      setChannelFormDefaultModel(fullCh.defaultModel ?? DEFAULT_MODEL_PLACEHOLDERS[fullCh.channelType]);
+      setChannelFormDefaultModels(fullCh.defaultModels ?? {});
       setChannelFormLimit(fullCh.monthlyBudget ?? 5000);
       setChannelFormConcurrencyLimit(fullCh.concurrency ?? 10);
       setChannelFormTimeout(fullCh.timeoutSeconds ?? 60);
@@ -490,7 +490,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
         channelType: channelFormProvider,
         baseUrl: channelFormBaseUrl || undefined,
         apiKey: channelFormApiKey || undefined,          // 空字符串不传,后端保持原 apiKey_enc 不变
-        defaultModel: channelFormDefaultModel,
+        defaultModels: channelFormDefaultModels,
         concurrency: channelFormConcurrencyLimit,
         monthlyBudget: channelFormLimit,
         timeoutSeconds: channelFormTimeout,
@@ -1339,7 +1339,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                       // 优先用矩阵 placeholder(后端权威),fallback 到前端常量
                       const placeholder = matrix?.matrix?.[prov]?.baseUrlPlaceholder ?? BASE_URL_PLACEHOLDERS[prov];
                       setChannelFormBaseUrl(placeholder);
-                      setChannelFormDefaultModel(DEFAULT_MODEL_PLACEHOLDERS[prov]);
+                      setChannelFormDefaultModels({});
                       // ★ 切 channelType 时清空 capabilities(防御旧 state 残留,避免非法组合提交)
                       setChannelFormCapabilities([]);
                     }}
@@ -1412,19 +1412,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   />
                 </div>
 
-                {/* Default Model */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    主调用模型名称 (Default Model ID)
-                  </label>
-                  <input
-                    type="text"
-                    value={channelFormDefaultModel}
-                    onChange={(e) => setChannelFormDefaultModel(e.target.value)}
-                    placeholder="davinci-v3.5"
-                    className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono font-bold"
-                  />
-                </div>
+                {/* Default Model [v1.4 2026-07-12] 整段移除,改到下方"能力边界"按 group 折叠面板渲染 */}
               </div>
 
               {/* Part 3: Cap & Limit */}
@@ -1581,6 +1569,90 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <p className="text-[10px] text-slate-400 mt-1">
                     提交到后端为英文编码(数组形式),不传将清空该通道的所有能力
                   </p>
+                </div>
+
+                {/* [v1.4 2026-07-12] group 级默认模型 — 跟能力边界绑定,按 group 折叠面板
+                  *  - 矩阵下发 modelRequired:true 的 group → 渲染 input
+                  *  - modelRequired:false 的 group(Vidu × SOLUTION 之类)→ 不渲染,Vidu 后端自动选
+                  *  - 后端强约束:modelRequired=true 的 group 选中了 capability 但未填 model → 报错
+                  */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700">
+                    默认模型(按能力大类分组)
+                  </label>
+                  <p className="text-[10px] text-slate-400 -mt-1">
+                    自由输入,可填任意模型名(占位灰字仅为提示)。下方折叠面板仅展示该通道需要配模型的 group。
+                  </p>
+                  {([
+                    { key: 'TEXT' as CapabilityGroup,     label: '文本类',     icon: '💬' },
+                    { key: 'IMAGE' as CapabilityGroup,    label: '图像类',     icon: '🖼️' },
+                    { key: 'VIDEO' as CapabilityGroup,    label: '视频类',     icon: '🎬' },
+                    { key: 'SOLUTION' as CapabilityGroup, label: '解决方案',   icon: '🧩' },
+                  ]).map((group) => {
+                    // ★ 后端单点收口:matrix 下发决定要不要渲染
+                    const modelRequired = matrix?.matrix?.[channelFormProvider]?.modelRequired?.[group.key] ?? false;
+                    if (!modelRequired) return null;
+                    // 当前 group 是否有被勾选 capability(没勾选就不需要展示)
+                    const groupCapsCount = channelFormCapabilities.filter((c) => {
+                      const cap = (matrix?.capabilities ?? []).find((x) => x.code === c);
+                      return cap?.group === group.key;
+                    }).length;
+                    if (groupCapsCount === 0) return null;
+                    const hasValue = !!(channelFormDefaultModels[group.key] ?? '').trim();
+                    return (
+                      <details
+                        key={group.key}
+                        open={hasValue}
+                        className="group rounded-lg border border-slate-200 bg-white"
+                      >
+                        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-bold text-slate-700 flex items-center justify-between hover:bg-slate-50 transition-colors list-none">
+                          <span className="flex items-center gap-2">
+                            <span>{group.icon}</span>
+                            <span>{group.label} 默认模型</span>
+                            <span className="text-rose-500">*</span>
+                            {hasValue && (
+                              <span className="text-[10px] font-mono font-bold text-blue-600 ml-1">
+                                {channelFormDefaultModels[group.key]}
+                              </span>
+                            )}
+                          </span>
+                          <svg viewBox="0 0 12 12" className="w-3 h-3 text-slate-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M2 4l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </summary>
+                        <div className="px-3 pb-3 pt-1 space-y-1.5">
+                          <input
+                            type="text"
+                            value={channelFormDefaultModels[group.key] ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setChannelFormDefaultModels((prev) => {
+                                const next = { ...prev };
+                                if (v) next[group.key] = v; else delete next[group.key];
+                                return next;
+                              });
+                            }}
+                            placeholder={DEFAULT_MODEL_PLACEHOLDERS[channelFormProvider]?.[group.key] ?? '请输入模型名称'}
+                            className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono font-bold"
+                          />
+                          <p className="text-[10px] text-slate-400">
+                            提示:{DEFAULT_MODEL_PLACEHOLDERS[channelFormProvider]?.[group.key] ?? '—'}(仅 UI 提示,可填任意模型名)
+                          </p>
+                        </div>
+                      </details>
+                    );
+                  })}
+                  {/* 兜底:所有 group 都没勾选能力时,显示空提示 */}
+                  {(['TEXT', 'IMAGE', 'VIDEO', 'SOLUTION'] as CapabilityGroup[]).every((g) =>
+                    !channelFormCapabilities.some((c) => {
+                      const cap = (matrix?.capabilities ?? []).find((x) => x.code === c);
+                      return cap?.group === g;
+                    })
+                  ) && (
+                    <p className="text-[10px] text-slate-400 italic px-2 py-1">
+                      请先勾选上方能力,选中后才需要配置对应 group 的默认模型
+                    </p>
+                  )}
                 </div>
               </div>
 
