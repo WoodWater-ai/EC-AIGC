@@ -1,4 +1,4 @@
-import { GenerationTask, ProductAsset, ModelChannel, SystemUser, SystemNotification } from './types';
+import { GenerationTask, ProductAsset, SystemUser, SystemNotification } from './types';
 
 export const mockUsers: SystemUser[] = [
   { id: 'u1', name: '陆永奇', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80', role: '管理员', email: 'lu.yq@davinci.ai', status: 'online', joinedDate: '2025-01-15' },
@@ -12,14 +12,6 @@ export const mockNotifications: SystemNotification[] = [
   { id: 'n2', title: '算力额度预警', content: '本月企业算力点数已使用 78.4%，建议及时补充以免影响批次任务。', type: 'warning', time: '1 小时前', read: false },
   { id: 'n3', title: '任务生成失败', content: '「极地防寒羽绒服_动态飞雪场景短视频」由于底图复杂度过高导致渲染超时（Error Code: 504）。', type: 'error', time: '2 小时前', read: true },
   { id: 'n4', title: '新模板审核提醒', content: '设计师 陈美晴 提交了「3D极简展示模板」待审核发布。', type: 'info', time: '1 天前', read: true }
-];
-
-export const mockModelChannels: ModelChannel[] = [
-  { id: 'm1', name: 'DaVinci Vision v3.5 (自研推荐)', provider: 'DaVinci Core', status: 'active', todayUsage: 1420, limit: 5000, latency: '1.2s' },
-  { id: 'm2', name: 'Midjourney v6.1 High-Res Proxy', provider: 'Midjourney', status: 'active', todayUsage: 890, limit: 2000, latency: '4.5s' },
-  { id: 'm3', name: 'Stable Diffusion 3.5 Large Inpaint', provider: 'Stable Diffusion', status: 'active', todayUsage: 350, limit: 3000, latency: '1.8s' },
-  { id: 'm4', name: 'Runway Gen-3 Alpha Video API', provider: 'Runway', status: 'active', todayUsage: 120, limit: 500, latency: '8.2s' },
-  { id: 'm5', name: 'Kling AI 1.5 Pro Video Engine', provider: 'Kling AI', status: 'inactive', todayUsage: 0, limit: 500, latency: 'N/A' }
 ];
 
 export const mockProducts: ProductAsset[] = [

@@ -283,3 +283,83 @@ TemplateCenter.tsx
 ### 状态映射
 
 后端 `status` 是 `NORMAL` / `DISABLED`,前端直接使用这两个值(无映射层,以后端为权威源)。
+
+---
+
+## 模型通道 (model-channel)
+
+> **对接日期**：2026-07-11（PR-1 后端 + PR-2 前端）
+> **后端 controller**：`com.dafenqi.ai.web.controller.admin.channel.AdminModelChannelController`
+> **前端 API client**：`src/api/modules/channel.ts` → `channelApi`
+> **前端 DTO 类型**：`src/types.ts` → `ModelChannelDTO` / `ModelChannelAddRequest` / `ModelChannelUpdateRequest`
+> **前端组件**：`src/components/SystemConfig.tsx` "模型通道统管" tab
+
+### 端点清单（全部 POST）
+
+| 端点 | 用途 | 前端调用 |
+|---|---|---|
+| `/v1/admin/model-channel/page` | 分页查询 | `channelApi.page({ pageNum, pageSize, status?, channelType?, keyword? })` |
+| `/v1/admin/model-channel/detail` | 详情 | `channelApi.detail(id)` |
+| `/v1/admin/model-channel/add` | 新增 | `channelApi.add(req)` |
+| `/v1/admin/model-channel/update` | 更新（含启停用 status） | `channelApi.update(req)` |
+| `/v1/admin/model-channel/delete` | 删除（软删除） | `channelApi.delete(id)` |
+| `/v1/admin/model-channel/list-available` | 按能力列出可用（任务选用） | `channelApi.listAvailable(capabilityCode?)` |
+| `/v1/admin/model-channel/health-check` | 手动触发健康检查 | `channelApi.healthCheck()` |
+| `/v1/admin/model-channel/test-connection` | 本地模型测试连接 | `channelApi.testConnection(channelId)` |
+
+### 字段对齐
+
+- 前端 `channelType` 严格对齐后端 `EnumChannelType`，9 个值：`OPENAI / AZURE_OPENAI / QWEN / WENXIN / DOUBAO / DEEPSEEK / STABLE_DIFFUSION / MIDJOURNEY / CUSTOM`
+- UI 中文标签用 `CHANNEL_TYPE_LABELS` 映射（数据源：后端 `EnumChannelType.describe`）
+- 后端 `id` 字段（Long）经 `@JsonSerialize` 转 string，前端 `ModelChannelDTO.id: string`
+- 后端 `monthlyBudget` / `costRate`（BigDecimal）→ 前端 `number`（JS 数值精度可接受，因为是元为单位，不需要 Long 那种 String 防护）
+
+### API Key 明文回显
+
+- 后端 `ModelChannelResponse.apiKeyEnc` 字段直接返回 jasypt 解密后的明文
+- 前端表单加载时 `setChannelFormApiKey(ch.apiKeyEnc ?? '')` 直接展示
+- 提交时如果 `apiKey` 为空字符串，前端不传该字段（后端保持原 `apiKeyEnc` 不变）
+- 提交时如果 `apiKey` 非空，后端 jasypt 加密覆盖 `apiKeyEnc`
+- 卡片不展示明文，只展示 `apiKeyConfigured: 'Y' | 'N'` 角标（"Key 已设置/未设置"）
+- **安全 tradeoff**：仅 admin 域可见（`@SaCheckLogin` + `@SaCheckPermission("channel:manage")`）；运维工具偏好"明文回显"，参考 alert `robotSecret` 设计
+
+### 通道分类（卡片筛选 tab）
+
+```ts
+CHANNEL_CATEGORIES = {
+  CLOUD:   ['OPENAI', 'AZURE_OPENAI', 'QWEN', 'WENXIN', 'DOUBAO', 'DEEPSEEK', 'CUSTOM'],
+  LOCAL:   ['STABLE_DIFFUSION'],
+  TRANSIT: ['MIDJOURNEY'],
+};
+```
+
+卡片筛选 tab 严格按上表分类，无其他散落硬编码 provider 字符串。
+
+### 豆包（DOUBAO）接入说明
+
+- 走 OpenAI Chat Completions 协议（火山方舟 `/api/v3/chat/completions`）
+- **复用 `OpenAiCompatibleInvoker`**，**不新建独立 Invoker**
+- 本期仅支持 chat 能力，**不支持**文生图/视频（火山方舟 images 端点路径不同，二期再补）
+- 豆包通道 baseUrl 默认值：`https://ark.cn-beijing.volces.com/api/v3`（由前端表单输入，后端不写死）
+- 豆包默认模型名：`doubao-pro-32k`（本期硬编码，二期枚举化到 `EnumLlmModel`）
+
+### 数据流
+
+```
+SystemConfig.tsx (模型通道统管 tab)
+  ├─ useServiceQuery<PageInfo<ModelChannelDTO>>(() => channelApi.page({ pageNum: 1, pageSize: 1000 }))
+  │    └─ http.post('/v1/admin/model-channel/page', q)
+  │         └─ Vite proxy /api → :8090
+  │              └─ AdminModelChannelController
+  │
+  ├─ handleSaveChannel → channelApi.add / channelApi.update → 后端 jasypt 加密 apiKey_enc
+  ├─ handleDeleteChannel → channelApi.delete → 后端软删除
+  └─ handleToggleChannelStatus → channelApi.update({ id, status: 'NORMAL' | 'DISABLED' })
+```
+
+### 已知缺口（二期）
+
+- `cosStsWebClient` 被 model channel 复用——命名不准确但行为无差异，二期拆 `modelChannelWebClient`
+- 云端通道（豆包/DeepSeek/千问）无前端"测试连接"按钮——靠后端 `health-check` 轮询兜底
+- 健康状态机 UI（`healthStatus` 字段渲染）—— 本期不展示
+- 卡片分页 UI（当前 `pageSize=1000` 全量拉）

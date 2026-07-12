@@ -5,7 +5,7 @@
   "type": "module",
   "description": "达芬奇密码 AI 素材工作台 - 前端 SPA(React 19 + Vite 6 + Tailwind 4)",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite --port=3001 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AppScreen, GenerationTask, ProductAsset, SystemUser, SystemNotification, ModelChannel } from './types';
+import { AppScreen, GenerationTask, ProductAsset, SystemUser, SystemNotification } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -13,6 +13,7 @@ import { SystemConfig } from './components/SystemConfig';
 import { AssetTransitModal } from './components/AssetTransitModal';
 import { LoginPage } from './components/LoginPage';
 import { ResourceCategoryList } from './components/ResourceCategoryList';
+import { AsyncTaskList } from './components/AsyncTaskList';
 
 import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
@@ -22,7 +23,6 @@ import { userApi, type UserDTO } from './api/modules/user';
 import {
   mockTasks,
   mockProducts,
-  mockModelChannels,
   mockNotifications
 } from './mockData';
 
@@ -78,19 +78,19 @@ export default function App() {
   // Core local states
   const [tasks, setTasks] = useState<GenerationTask[]>(mockTasks);
   const [products, setProducts] = useState<ProductAsset[]>(mockProducts);
-  const [channels, setChannels] = useState<ModelChannel[]>(mockModelChannels);
   const [notifications, setNotifications] = useState<SystemNotification[]>(mockNotifications);
 
   // 用户列表(Phase 1.5) —— 从真接口 /v1/admin/user/list 拉,SystemUser 映射供 Sidebar 切换协作账号下拉用
-  // 注意:useServiceQuery 内部 data 初始为 null,ES6 解构 `= []` 只对 undefined 生效,所以用 ?? [] 显式 nullish
+  // 注意:useServiceQuery.data 初始为 null,如果用 `data ?? []` 作为 useEffect 依赖,每次渲染会创建新 [] 引用,触发死循环。
+  // 修法:用 `data` 本身做依赖(引用稳定),内部 null 短路退出
   const userListQuery = useServiceQuery<UserDTO[]>(
     () => userApi.listAll(),
     []
   );
-  const realUsers = userListQuery.data ?? [];
   const [users, setUsers] = useState<SystemUser[]>([]);
   useEffect(() => {
-    setUsers(realUsers.map(u => ({
+    if (!userListQuery.data) return;
+    setUsers(userListQuery.data.map(u => ({
       id: u.id,
       name: u.name || u.userName || u.phone || '(未命名)',
       avatar: u.headUrl || '',
@@ -100,7 +100,7 @@ export default function App() {
       joinedDate: '',  // UserResponse 无此字段
       deptId: u.deptId || undefined,
     })));
-  }, [realUsers]);
+  }, [userListQuery.data]);
 
   // 适配后的当前用户（喂给 Sidebar / Header）
   const currentUser = adaptAuthUser(user);
@@ -141,13 +141,6 @@ export default function App() {
 
   const handleUpdateTask = (updatedTask: GenerationTask) => {
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
-  };
-
-  const handleToggleChannel = (id: string) => {
-    setChannels(prev => prev.map(ch => {
-      if (ch.id !== id) return ch;
-      return { ...ch, status: ch.status === 'active' ? 'inactive' : 'active' };
-    }));
   };
 
   const handleUpdateUserRole = (userId: string, newRole: any, newDeptId?: string) => {
@@ -212,8 +205,6 @@ export default function App() {
       case AppScreen.SYSTEM_CONFIG:
         return (
           <SystemConfig
-            channels={channels}
-            onToggleChannel={handleToggleChannel}
             onUpdateUserRole={handleUpdateUserRole}
           />
         );
@@ -221,6 +212,8 @@ export default function App() {
         return (
           <ResourceCategoryList setScreen={setCurrentScreen} />
         );
+      case AppScreen.ASYNC_TASKS:
+        return <AsyncTaskList />;
       default:
         return (
           <div className="flex flex-col items-center justify-center p-12 text-slate-400">

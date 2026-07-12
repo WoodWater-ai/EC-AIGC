@@ -1,5 +1,18 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ModelChannel, SystemUser } from '../types';
+import { SystemUser } from '../types';
+import { channelApi } from '../api/modules/channel';
+import {
+  type ModelChannelDTO,
+  type ModelChannelAddRequest,
+  type ModelChannelUpdateRequest,
+  type ChannelType,
+  type CapabilityMatrix,
+  type CapabilityGroup,
+  CHANNEL_TYPE_LABELS,
+  CHANNEL_CATEGORIES,
+  BASE_URL_PLACEHOLDERS,
+  DEFAULT_MODEL_PLACEHOLDERS,
+} from '../types';
 import {
   Search,
   Plus,
@@ -44,14 +57,13 @@ import { OrgStructureTab, type OrgStructureTabRef } from './systemConfig/OrgStru
 import { useRef } from 'react';
 import { departmentApi, type DepartmentDTO } from '../api/modules/department';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import type { PageInfo } from '../api/service-result';
 import { userApi, type UserDTO } from '../api/modules/user';
 import { toast } from 'sonner';
 import { getRoleList, type RoleInfo } from '../api/roleMenu';
 import { useConfirm } from './common/ConfirmProvider';
 
 interface SystemConfigProps {
-  channels: ModelChannel[];
-  onToggleChannel: (id: string) => void;
   onUpdateUserRole: (id: string, role: any, deptId?: string) => void;
 }
 
@@ -68,8 +80,6 @@ interface OperationLog {
 }
 
 export const SystemConfig: React.FC<SystemConfigProps> = ({
-  channels,
-  onToggleChannel,
   onUpdateUserRole
 }) => {
   // 1. High level main tabs
@@ -102,6 +112,13 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     []
   );
   const allDepartments = deptList ?? [];
+
+  // 通道能力矩阵(后端下发,驱动 chip 渲染 + baseUrl placeholder)
+  const matrixQuery = useServiceQuery<CapabilityMatrix>(
+    () => channelApi.getCapabilityMatrix(),
+    []
+  );
+  const matrix = matrixQuery.data ?? null;
   const realUsers = userListQuery.data ?? [];
   const [localUsers, setLocalUsers] = useState<SystemUser[]>([]);
   useEffect(() => {
@@ -117,9 +134,26 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     })));
   }, [realUsers]);
   
-  // Local state for model channels
-  const [localChannels, setLocalChannels] = useState<ModelChannel[]>(channels);
-  const [channelFilter, setChannelFilter] = useState<'all' | 'cloud' | 'local' | 'transit' | 'disabled'>('all');
+  // 通道列表(直接走后端 page 接口,pageSize=1000 简化为全量拉,二期做分页 UI)
+  // 通道列表:后端驱动筛选(channelFilter 变化时重新拉 page,避免通道多了前端卡)
+  const [channelFilter, setChannelFilter] = useState<'all' | 'cloud' | 'disabled'>('all');
+  const channelListQuery = useServiceQuery<PageInfo<ModelChannelDTO>>(
+    () => {
+      // 按 tab 拼后端筛选条件
+      const req: ModelChannelQueryRequest = { pageNum: 1, pageSize: 1000 };
+      if (channelFilter === 'cloud') {
+        // 云端 API:按 4 家云端 channelType 过滤(不过滤 status,NORMAL + DISABLED 都展示)
+        req.channelTypes = ['OPENAI', 'QWEN', 'DOUBAO', 'DEEPSEEK'];
+      } else if (channelFilter === 'disabled') {
+        // 停用通道:按 status 过滤(不限 channelType)
+        req.status = 'DISABLED';
+      }
+      // 'all' 不传任何过滤
+      return channelApi.page(req);
+    },
+    [channelFilter]
+  );
+  const channels: ModelChannelDTO[] = channelListQuery.data?.list ?? [];
 
   // Ref to OrgStructureTab (for user→dept reverse lookup & department select data source)
   const orgTabRef = useRef<OrgStructureTabRef>(null);
@@ -131,16 +165,16 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Channel Form states
   const [channelFormName, setChannelFormName] = useState('');
-  const [channelFormProvider, setChannelFormProvider] = useState<ModelChannel['provider']>('DaVinci Core');
-  const [channelFormBaseUrl, setChannelFormBaseUrl] = useState('');
+  const [channelFormProvider, setChannelFormProvider] = useState<ChannelType>('OPENAI');
+  const [channelFormBaseUrl, setChannelFormBaseUrl] = useState('https://api.openai.com/v1');
   const [channelFormApiKey, setChannelFormApiKey] = useState('');
-  const [channelFormDefaultModel, setChannelFormDefaultModel] = useState('davinci-v3.5');
+  const [channelFormDefaultModel, setChannelFormDefaultModel] = useState('dall-e-3');
   const [channelFormLimit, setChannelFormLimit] = useState(5000);
   const [channelFormConcurrencyLimit, setChannelFormConcurrencyLimit] = useState(10);
   const [channelFormTimeout, setChannelFormTimeout] = useState(60);
   const [channelFormRetryPolicy, setChannelFormRetryPolicy] = useState<'exponential' | 'linear' | 'none'>('exponential');
   const [channelFormCostRatio, setChannelFormCostRatio] = useState(0.015);
-  const [channelFormCapabilities, setChannelFormCapabilities] = useState<string[]>(['主图生成', '细节放大', '背景重构']);
+  const [channelFormCapabilities, setChannelFormCapabilities] = useState<string[]>(['MAIN_IMAGE', 'DETAIL_ENHANCE', 'BG_RECONSTRUCT']);
 
   // 5. Drawer state for adding / editing user
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -197,27 +231,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localUsers, searchQuery, selectedDept]);
 
-  // Computed filteredChannels array based on the category sub-tabs
-  const filteredChannels = useMemo(() => {
-    return localChannels.filter(ch => {
-      if (channelFilter === 'disabled') {
-        return ch.status === 'inactive';
-      }
-      
-      // Filter by type:
-      if (channelFilter === 'cloud') {
-        return ch.status === 'active' && (ch.provider === 'DaVinci Core' || ch.provider === 'Runway');
-      }
-      if (channelFilter === 'transit') {
-        return ch.status === 'active' && (ch.provider === 'Midjourney' || ch.provider === 'Kling AI');
-      }
-      if (channelFilter === 'local') {
-        return ch.status === 'active' && ch.provider === 'Stable Diffusion';
-      }
-
-      return true; // 'all' displays both active & inactive
-    });
-  }, [localChannels, channelFilter]);
+  // 删前端 filteredChannels useMemo —— 筛选已下沉到后端 page 接口(channelFilter 变化触发 refetch)
 
   // Show a temporary success toast message
   const triggerToast = (msg: string) => {
@@ -385,178 +399,142 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     }
   };
 
-  // Toggle Model Channel Status locally
-  const handleToggleChannelLocal = (channelId: string) => {
-    const target = localChannels.find(ch => ch.id === channelId);
+  // Toggle Model Channel Status (走 channelApi.updateStatus 专用端点,不走 update 全量流程)
+  const handleToggleChannelStatus = async (channelId: string) => {
+    const target = channels.find(ch => ch.id === channelId);
     if (!target) return;
-
-    onToggleChannel(channelId);
-    const updatedChannels = localChannels.map(ch => 
-      ch.id === channelId ? { ...ch, status: ch.status === 'active' ? 'inactive' : 'active' as const } : ch
-    );
-    setLocalChannels(updatedChannels);
-
-    const isNowActive = target.status !== 'active';
-    const actionDesc = isNowActive ? '启用' : '停用';
-
-    // Add activity log
-    const newLog: OperationLog = {
-      id: `log-${Date.now()}`,
-      operatorName: '陆永奇',
-      operatorRole: '管理员',
-      actionType: '通道控制',
-      actionDetail: `${actionDesc}算法模型通道「${target.name}」`,
-      ipAddress: '192.168.1.14',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      status: 'success'
-    };
-    setLogs(prev => [newLog, ...prev]);
-
-    triggerToast(`通道「${target.name}」已成功${actionDesc}！`);
+    const nextStatus = target.status === 'NORMAL' ? 'DISABLED' : 'NORMAL';
+    try {
+      await channelApi.updateStatus(channelId, nextStatus);
+      await channelListQuery.refetch();
+      toast.success(`通道「${target.channelName}」已${nextStatus === 'NORMAL' ? '启用' : '停用'}!`);
+    } catch {
+      // toast 由 http 拦截器统一处理
+    }
   };
 
   // Open create channel drawer
   const handleOpenCreateChannelDrawer = () => {
     setChannelDrawerMode('create');
     setChannelFormName('');
-    setChannelFormProvider('DaVinci Core');
-    setChannelFormBaseUrl('https://api.davinci-ai.com/v1');
+    setChannelFormProvider('OPENAI');
+    // 优先用矩阵 placeholder(后端权威),矩阵未拉回时 fallback 到前端常量
+    setChannelFormBaseUrl(matrix?.matrix?.OPENAI?.baseUrlPlaceholder ?? BASE_URL_PLACEHOLDERS.OPENAI);
     setChannelFormApiKey('');
-    setChannelFormDefaultModel('davinci-v3.5');
+    setChannelFormDefaultModel(DEFAULT_MODEL_PLACEHOLDERS.OPENAI);
     setChannelFormLimit(5000);
     setChannelFormConcurrencyLimit(10);
     setChannelFormTimeout(60);
     setChannelFormRetryPolicy('exponential');
     setChannelFormCostRatio(0.015);
-    setChannelFormCapabilities(['主图生成', '细节放大', '背景重构']);
+    setChannelFormCapabilities(['MAIN_IMAGE', 'DETAIL_ENHANCE', 'BG_RECONSTRUCT']);
     setSelectedChannelId(null);
     setIsChannelDrawerOpen(true);
   };
 
-  // Open edit channel drawer
-  const handleOpenEditChannelDrawer = (ch: ModelChannel) => {
+  // Open edit channel drawer — 必须先调 detail 接口拿完整数据(含 capabilities)
+  // page 接口 toResponse 不查 capability 关联表,只有 detail 查;list 拿的 ch.capabilities 永远是 null
+  const handleOpenEditChannelDrawer = async (ch: ModelChannelDTO) => {
     setChannelDrawerMode('edit');
-    setChannelFormName(ch.name);
-    setChannelFormProvider(ch.provider);
-    setChannelFormBaseUrl(ch.baseUrl || 'https://api.davinci-ai.com/v1');
-    setChannelFormApiKey(ch.apiKey || '••••••••••••••••••••••••••••••••');
-    setChannelFormDefaultModel(ch.defaultModel || 'davinci-v3.5');
-    setChannelFormLimit(ch.limit || 5000);
-    setChannelFormConcurrencyLimit(ch.concurrencyLimit || 10);
-    setChannelFormTimeout(ch.timeoutSeconds || 60);
-    setChannelFormRetryPolicy(ch.retryPolicy || 'exponential');
-    setChannelFormCostRatio(ch.costRatio || 0.015);
-    setChannelFormCapabilities(ch.capabilities || ['主图生成', '细节放大', '背景重构']);
     setSelectedChannelId(ch.id);
     setIsChannelDrawerOpen(true);
+    try {
+      // 调 detail 拿完整 ch(含 capabilities / apiKey 明文)
+      const fullCh = await channelApi.detail(ch.id);
+      setChannelFormName(fullCh.channelName);
+      setChannelFormProvider(fullCh.channelType);
+      const placeholder = matrix?.matrix?.[fullCh.channelType]?.baseUrlPlaceholder ?? BASE_URL_PLACEHOLDERS[fullCh.channelType];
+      setChannelFormBaseUrl(fullCh.baseUrl ?? placeholder);
+      setChannelFormApiKey(fullCh.apiKey ?? '');                        // ★ 明文回显
+      setChannelFormDefaultModel(fullCh.defaultModel ?? DEFAULT_MODEL_PLACEHOLDERS[fullCh.channelType]);
+      setChannelFormLimit(fullCh.monthlyBudget ?? 5000);
+      setChannelFormConcurrencyLimit(fullCh.concurrency ?? 10);
+      setChannelFormTimeout(fullCh.timeoutSeconds ?? 60);
+      setChannelFormRetryPolicy((fullCh.retryStrategy as any) ?? 'exponential');
+      setChannelFormCostRatio(fullCh.costRate ?? 0.015);
+      // 用矩阵过滤(防御历史脏数据 + 兼容矩阵变更)
+      const supportedSet = new Set(matrix?.matrix?.[fullCh.channelType]?.supported ?? []);
+      const filteredCaps = (fullCh.capabilities ?? []).filter((c) => supportedSet.has(c));
+      setChannelFormCapabilities(filteredCaps);
+    } catch (err: any) {
+      toast.error('加载通道详情失败: ' + (err?.message ?? '未知错误'));
+      setIsChannelDrawerOpen(false);
+    }
   };
 
-  // Save channel (create or edit)
-  const handleSaveChannel = () => {
+  // Save channel (create or edit) - 走 channelApi
+  const handleSaveChannel = async () => {
     if (!channelFormName.trim()) {
-      alert('请填写通道名称！');
+      toast.error('请填写通道名称!');
       return;
     }
-
-    if (channelDrawerMode === 'create') {
-      const newChannel: ModelChannel = {
-        id: `m-${Date.now()}`,
-        name: channelFormName,
-        provider: channelFormProvider,
-        status: 'active',
-        todayUsage: 0,
-        limit: channelFormLimit,
-        latency: '1.5s', // mocked latency for initial
-        baseUrl: channelFormBaseUrl,
-        apiKey: channelFormApiKey,
-        defaultModel: channelFormDefaultModel,
-        concurrencyLimit: channelFormConcurrencyLimit,
-        timeoutSeconds: channelFormTimeout,
-        retryPolicy: channelFormRetryPolicy,
-        costRatio: channelFormCostRatio,
-        capabilities: channelFormCapabilities
-      };
-
-      setLocalChannels(prev => [...prev, newChannel]);
-
-      // Add operation log
-      const newLog: OperationLog = {
-        id: `log-${Date.now()}`,
-        operatorName: '陆永奇',
-        operatorRole: '管理员',
-        actionType: '渠道配置',
-        actionDetail: `成功创建了模型生成通道 「${channelFormName}」 (${channelFormProvider})`,
-        ipAddress: '192.168.1.14',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        status: 'success'
-      };
-      setLogs(prev => [newLog, ...prev]);
-
-      triggerToast(`通道「${channelFormName}」已成功创建！`);
-    } else if (channelDrawerMode === 'edit' && selectedChannelId) {
-      setLocalChannels(prev => prev.map(ch => ch.id === selectedChannelId ? {
-        ...ch,
-        name: channelFormName,
-        provider: channelFormProvider,
-        limit: channelFormLimit,
-        baseUrl: channelFormBaseUrl,
-        apiKey: channelFormApiKey,
-        defaultModel: channelFormDefaultModel,
-        concurrencyLimit: channelFormConcurrencyLimit,
-        timeoutSeconds: channelFormTimeout,
-        retryPolicy: channelFormRetryPolicy,
-        costRatio: channelFormCostRatio,
-        capabilities: channelFormCapabilities
-      } : ch));
-
-      // Add operation log
-      const newLog: OperationLog = {
-        id: `log-${Date.now()}`,
-        operatorName: '陆永奇',
-        operatorRole: '管理员',
-        actionType: '渠道配置',
-        actionDetail: `成功更新了模型通道 「${channelFormName}」 的接口与配额配置`,
-        ipAddress: '192.168.1.14',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        status: 'success'
-      };
-      setLogs(prev => [newLog, ...prev]);
-
-      triggerToast(`通道「${channelFormName}」配置已成功更新！`);
+    // 校验 baseUrl(强制填写 + 百炼不可含 {WorkspaceId} 占位符)
+    if (!channelFormBaseUrl.trim()) {
+      toast.error('请填写 Base URL!');
+      return;
     }
+    if (channelFormBaseUrl.includes('{') || channelFormBaseUrl.includes('}')) {
+      toast.error('Base URL 不可含 {WorkspaceId} 占位符,请在阿里百炼控制台"业务空间详情"查 WorkspaceId 后填入完整域名');
+      return;
+    }
+    // ★ 二次防御:过滤掉当前 channelType 不支持的能力(防止切 channelType 后 state 残留,虽然 onChange 已清空)
+    const supportedSet = new Set(matrix?.matrix?.[channelFormProvider]?.supported ?? []);
+    const validCapabilities = channelFormCapabilities.filter((c) => supportedSet.has(c));
+    if (validCapabilities.length !== channelFormCapabilities.length) {
+      toast.warning('已自动过滤当前供应商不支持的能力,清空后请重新勾选');
+      setChannelFormCapabilities(validCapabilities);
+    }
+    try {
+      const req: ModelChannelAddRequest = {
+        channelName: channelFormName,
+        channelType: channelFormProvider,
+        baseUrl: channelFormBaseUrl || undefined,
+        apiKey: channelFormApiKey || undefined,          // 空字符串不传,后端保持原 apiKey_enc 不变
+        defaultModel: channelFormDefaultModel,
+        concurrency: channelFormConcurrencyLimit,
+        monthlyBudget: channelFormLimit,
+        timeoutSeconds: channelFormTimeout,
+        retryStrategy: channelFormRetryPolicy,
+        costRate: channelFormCostRatio,
+        capabilities: validCapabilities,
+      };
 
-    setIsChannelDrawerOpen(false);
+      if (channelDrawerMode === 'create') {
+        await channelApi.add(req);
+        toast.success(`通道「${channelFormName}」已成功创建!`);
+      } else if (channelDrawerMode === 'edit' && selectedChannelId) {
+        await channelApi.update({
+          ...req,
+          id: selectedChannelId,
+        } as ModelChannelUpdateRequest);
+        toast.success(`通道「${channelFormName}」配置已成功更新!`);
+      }
+
+      await channelListQuery.refetch();
+      setIsChannelDrawerOpen(false);
+    } catch {
+      // toast 由 http 拦截器统一处理
+    }
   };
 
-  // Delete channel
-  const handleDeleteChannel = (channelId: string) => {
-    const ch = localChannels.find(c => c.id === channelId);
+  // Delete channel - 走 channelApi.delete
+  const handleDeleteChannel = async (channelId: string) => {
+    const ch = channels.find(c => c.id === channelId);
     if (!ch) return;
-
-    if (confirm(`确定要彻底删除模型通道「${ch.name}」吗？`)) {
-      setLocalChannels(prev => prev.filter(c => c.id !== channelId));
-
-      // Add operation log
-      const newLog: OperationLog = {
-        id: `log-${Date.now()}`,
-        operatorName: '陆永奇',
-        operatorRole: '管理员',
-        actionType: '渠道配置',
-        actionDetail: `删除了模型通道 「${ch.name}」`,
-        ipAddress: '192.168.1.14',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        status: 'success'
-      };
-      setLogs(prev => [newLog, ...prev]);
-
-      triggerToast(`通道「${ch.name}」已成功删除！`);
+    const ok = await confirm({
+      title: '删除通道',
+      message: `将删除「${ch.channelName}」,该操作不可恢复,请确认。`,
+      confirmText: '删除',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await channelApi.delete(channelId);
+      await channelListQuery.refetch();
+      toast.success(`通道「${ch.channelName}」已成功删除!`);
+    } catch {
+      // toast 由 http 拦截器统一处理
     }
-  };
-
-  const handleToggleCapability = (cap: string) => {
-    setChannelFormCapabilities(prev =>
-      prev.includes(cap) ? prev.filter(c => c !== cap) : [...prev, cap]
-    );
   };
 
   return (
@@ -872,8 +850,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
             {[
               { id: 'all', label: '全部通道' },
               { id: 'cloud', label: '云端 API' },
-              { id: 'local', label: '本地模型' },
-              { id: 'transit', label: '中转站' },
               { id: 'disabled', label: '停用通道' }
             ].map((tab) => (
               <button
@@ -891,33 +867,37 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           </div>
 
           {/* Channels Cards Grid */}
-          {filteredChannels.length === 0 ? (
-            <div className="text-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 font-bold">
-              暂无匹配此分类的模型通道，你可以点击右上角新建一个通道！
+          {channels.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-slate-400 text-sm">
+              暂无通道配置
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredChannels.map((ch) => {
-                const isActive = ch.status === 'active';
-                
-                // Dynamic icons depending on provider
+              {channels.map((ch) => {
+                const isActive = ch.status === 'NORMAL';
+
+                // Dynamic icons depending on channelType(对齐 4 家精简版)
                 const getProviderIcon = () => {
-                  if (ch.provider === 'DaVinci Core') return <Cloud className="w-5 h-5 text-blue-600" />;
-                  if (ch.provider === 'Midjourney') return <Cpu className="w-5 h-5 text-emerald-600" />;
-                  if (ch.provider === 'Stable Diffusion') return <Database className="w-5 h-5 text-indigo-600" />;
-                  if (ch.provider === 'Runway') return <Film className="w-5 h-5 text-pink-600" />;
-                  return <Layers className="w-5 h-5 text-amber-600" />;
+                  switch (ch.channelType) {
+                    case 'OPENAI': return <Cloud className="w-5 h-5 text-blue-600" />;
+                    case 'QWEN':
+                    case 'DOUBAO':
+                    case 'DEEPSEEK': return <Cpu className="w-5 h-5 text-emerald-600" />;
+                    default: return <Layers className="w-5 h-5 text-amber-600" />;
+                  }
                 };
 
-                // Type sub-badge text
+                // Type sub-badge text(对齐 4 家精简版,本期仅云端 API 一类)
                 const getTypeBadge = () => {
-                  if (ch.provider === 'DaVinci Core' || ch.provider === 'Runway') return '云端 API';
-                  if (ch.provider === 'Stable Diffusion') return '本地模型 (HTTP)';
-                  return '中转站';
+                  if (CHANNEL_CATEGORIES.CLOUD.includes(ch.channelType)) return '云端 API';
+                  return '其他';
                 };
 
-                // Mapped capabilities
-                const caps = ch.capabilities || ['主图生成', '细节放大', '背景重构'];
+                // Mapped capabilities(后端能力编码,可能为 null)
+                const caps = ch.capabilities || [];
+
+                // 今日消耗(后端 todayCost,单位元)
+                const todayCost = ch.todayCost ?? 0;
 
                 return (
                   <div
@@ -934,17 +914,26 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                         </div>
                         <div>
                           <h4 className="text-xs font-extrabold text-slate-800 leading-tight group-hover:text-blue-600 transition-colors">
-                            {ch.name}
+                            {ch.channelName}
                           </h4>
-                          <span className="inline-block mt-1 text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
-                            {getTypeBadge()}
-                          </span>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="inline-block text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
+                              {getTypeBadge()}
+                            </span>
+                            <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                              ch.apiKeyConfigured === 'Y'
+                                ? 'text-emerald-600 bg-emerald-50 border border-emerald-100'
+                                : 'text-slate-400 bg-slate-50 border border-slate-100'
+                            }`}>
+                              Key {ch.apiKeyConfigured === 'Y' ? '已设置' : '未设置'}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
                       {/* Switch Toggle */}
                       <button
-                        onClick={() => handleToggleChannelLocal(ch.id)}
+                        onClick={() => handleToggleChannelStatus(ch.id)}
                         className={`p-0.5 rounded-full w-9 h-5.5 transition-all focus:outline-none cursor-pointer flex items-center ${
                           isActive ? 'bg-blue-600 justify-end' : 'bg-slate-300 justify-start'
                         }`}
@@ -953,62 +942,71 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                       </button>
                     </div>
 
-                    {/* Capabilities range */}
+                    {/* Channel type label */}
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold block mb-1.5">能力范围</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {caps.map((cap) => (
-                          <span
-                            key={cap}
-                            className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200/55 px-2 py-0.5 rounded"
-                          >
-                            {cap}
-                          </span>
-                        ))}
-                      </div>
+                      <span className="text-[10px] text-slate-400 font-bold block mb-1.5">供应商</span>
+                      <span className="text-xs font-bold text-slate-700">
+                        {CHANNEL_TYPE_LABELS[ch.channelType] ?? ch.channelType}
+                      </span>
                     </div>
+
+                    {/* Capabilities range */}
+                    {caps.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold block mb-1.5">能力范围</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {caps.map((cap) => (
+                            <span
+                              key={cap}
+                              className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200/55 px-2 py-0.5 rounded"
+                            >
+                              {cap}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Stats details mapping */}
                     <div className="pt-4 border-t border-slate-100">
                       {isActive ? (
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <span className="text-[10px] text-slate-400 font-bold block leading-none mb-1">今日消耗预估</span>
+                            <span className="text-[10px] text-slate-400 font-bold block leading-none mb-1">今日消耗</span>
                             <span className="text-xs font-black text-slate-800">
-                              ¥ {(ch.todayUsage * 1.5).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ¥ {todayCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] text-slate-400 font-bold block leading-none mb-1">异常率 (1h内)</span>
-                            <span className={`text-xs font-black flex items-center gap-0.5 ${ch.todayUsage > 1000 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                              {ch.todayUsage > 1000 ? '1.45%' : '0.02%'}
-                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            <span className="text-[10px] text-slate-400 font-bold block leading-none mb-1">今日调用</span>
+                            <span className="text-xs font-black text-slate-800">
+                              {ch.todayCallCount ?? 0} 次
                             </span>
                           </div>
                         </div>
                       ) : (
                         <div className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5 justify-center py-2 bg-slate-100 rounded-xl">
                           <Lock className="w-3.5 h-3.5 text-slate-400" />
-                          此通道已停用，将拒绝前台提交请求
+                          此通道已停用,将拒绝前台提交请求
                         </div>
                       )}
                     </div>
 
-                    {/* Action buttons overlays shown on group hover */}
-                    <div className="absolute top-4 right-4 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 backdrop-blur-xs p-1 rounded-lg border border-slate-100 shadow-sm">
+                    {/* Footer Action Row — 永远显示,放卡片底部(跟 stats 平级),与 Switch 完全分离不遮挡 */}
+                    <div className="pt-3 mt-1 border-t border-slate-100 flex items-center gap-1.5">
                       <button
                         onClick={() => handleOpenEditChannelDrawer(ch)}
-                        className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded-md transition-colors cursor-pointer"
-                        title="编辑配置"
+                        className="px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer flex items-center gap-1"
                       >
-                        <Edit className="w-3.5 h-3.5" />
+                        <Edit className="w-3 h-3" />
+                        编辑
                       </button>
                       <button
                         onClick={() => handleDeleteChannel(ch.id)}
-                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-50 rounded-md transition-colors cursor-pointer"
-                        title="删除通道"
+                        className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer flex items-center gap-1"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3 h-3" />
+                        删除
                       </button>
                     </div>
 
@@ -1327,7 +1325,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   1. 算法厂商与基本信息
                 </h4>
 
-                {/* Provider Select */}
+                {/* Channel Type Select (对齐后端 EnumChannelType) */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
                     供应商厂商 <span className="text-rose-500 font-bold">*</span>
@@ -1335,33 +1333,21 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <select
                     value={channelFormProvider}
                     onChange={(e) => {
-                      const prov = e.target.value as ModelChannel['provider'];
+                      const prov = e.target.value as ChannelType;
                       setChannelFormProvider(prov);
-                      // Auto populate defaults
-                      if (prov === 'DaVinci Core') {
-                        setChannelFormBaseUrl('https://api.davinci-ai.com/v1');
-                        setChannelFormDefaultModel('davinci-v3.5');
-                      } else if (prov === 'Midjourney') {
-                        setChannelFormBaseUrl('https://api.midjourney.com/v2');
-                        setChannelFormDefaultModel('mj-v6.0');
-                      } else if (prov === 'Stable Diffusion') {
-                        setChannelFormBaseUrl('http://127.0.0.1:7860/sdapi/v1');
-                        setChannelFormDefaultModel('sd-xl-base-1.0');
-                      } else if (prov === 'Runway') {
-                        setChannelFormBaseUrl('https://api.runwayml.com/v1');
-                        setChannelFormDefaultModel('gen-2');
-                      } else if (prov === 'Kling AI') {
-                        setChannelFormBaseUrl('https://api.klingai.com/v1');
-                        setChannelFormDefaultModel('kling-v1.5');
-                      }
+                      // Auto populate baseUrl + defaultModel based on channelType
+                      // 优先用矩阵 placeholder(后端权威),fallback 到前端常量
+                      const placeholder = matrix?.matrix?.[prov]?.baseUrlPlaceholder ?? BASE_URL_PLACEHOLDERS[prov];
+                      setChannelFormBaseUrl(placeholder);
+                      setChannelFormDefaultModel(DEFAULT_MODEL_PLACEHOLDERS[prov]);
+                      // ★ 切 channelType 时清空 capabilities(防御旧 state 残留,避免非法组合提交)
+                      setChannelFormCapabilities([]);
                     }}
                     className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none text-slate-700 font-bold"
                   >
-                    <option value="DaVinci Core">DaVinci Core (自研星火核心)</option>
-                    <option value="Midjourney">Midjourney (写实美学中转)</option>
-                    <option value="Stable Diffusion">Stable Diffusion (本地私有部署)</option>
-                    <option value="Runway">Runway (高表现力视频流)</option>
-                    <option value="Kling AI">Kling AI (快手可灵视频)</option>
+                    {(Object.keys(CHANNEL_TYPE_LABELS) as ChannelType[]).map((ct) => (
+                      <option key={ct} value={ct}>{CHANNEL_TYPE_LABELS[ct]}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -1389,27 +1375,39 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 {/* Base URL */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
-                    API 基础代理网关 (Base URL)
+                    API 基础代理网关 (Base URL) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
                     value={channelFormBaseUrl}
                     onChange={(e) => setChannelFormBaseUrl(e.target.value)}
-                    placeholder="https://api.davinci-ai.com/v1"
+                    placeholder={matrix?.matrix?.[channelFormProvider]?.baseUrlPlaceholder ?? BASE_URL_PLACEHOLDERS[channelFormProvider]}
                     className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                    {channelFormProvider === 'QWEN' ? (
+                      <>
+                        阿里百炼官方推荐使用<strong>业务空间专属域名</strong>(性能/稳定性更佳),旧域名 <code className="text-[9px] bg-slate-100 px-1 rounded">https://dashscope.aliyuncs.com/compatible-mode/v1</code> 仍可用。
+                        <br />
+                        新域名格式: <code className="text-[9px] bg-slate-100 px-1 rounded">https://{'{WorkspaceId}'}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1</code>,需在百炼控制台「业务空间详情」查 WorkspaceId 后替换。
+                      </>
+                    ) : (
+                      <>官方推荐域名(可在供应商控制台自定义,留空使用默认值)。</>
+                    )}
+                  </p>
                 </div>
 
-                {/* API Key */}
+                {/* API Key (明文回显,运维工具偏好) */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
-                    API 密钥私钥凭证 (Secret Key)
+                    API 密钥私钥凭证 (Secret Key) — 明文
                   </label>
                   <input
-                    type="password"
+                    type="text"
+                    autoComplete="off"
                     value={channelFormApiKey}
                     onChange={(e) => setChannelFormApiKey(e.target.value)}
-                    placeholder="请输入服务商提供的 API-Key (保存后将高强度脱敏)"
+                    placeholder="请输入服务商提供的 API-Key (后端 jasypt 加密存储,前端明文回显)"
                     className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono"
                   />
                 </div>
@@ -1514,32 +1512,75 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   </div>
                 </div>
 
-                {/* Capabilities check grid */}
-                <div className="space-y-2">
+                {/* 赋能能力边界范围(中文 label 多选,内部存英文 code) */}
+                <div className="space-y-3">
                   <label className="text-xs font-bold text-slate-700">
                     赋能能力边界范围
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['主图生成', '细节放大', '背景重构', '局部重绘', '智能排版', '场景融合'].map((cap) => {
-                      const isChecked = channelFormCapabilities.includes(cap);
-                      return (
-                        <div
-                          key={cap}
-                          onClick={() => handleToggleCapability(cap)}
-                          className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all select-none ${
-                            isChecked ? 'bg-blue-50/20 border-blue-200' : 'bg-slate-50/50 border-slate-150'
-                          }`}
-                        >
-                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
-                            isChecked ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
-                          }`}>
-                            {isChecked && <Check className="w-2.5 h-2.5 stroke-[3px]" />}
-                          </div>
-                          <span className="text-[10px] font-bold text-slate-700">{cap}</span>
+                  {/* 矩阵提示行:显示当前供应商支持的能力(后端下发,前端不可勾选不支持的) */}
+                  {matrix?.matrix?.[channelFormProvider] && (
+                    <p className="text-[10px] text-slate-500">
+                      当前供应商 <strong>{matrix.matrix[channelFormProvider].label}</strong> 官方支持
+                      <strong className="text-blue-600 mx-1">{matrix.matrix[channelFormProvider].supported.length}</strong>
+                      个能力,仅可勾选其中项。
+                    </p>
+                  )}
+                  {([
+                    { key: 'TEXT',  label: '文本类' },
+                    { key: 'IMAGE', label: '图像类' },
+                    { key: 'VIDEO', label: '视频类' },
+                    { key: 'SOLUTION', label: '解决方案' },
+                  ] as const).map((group) => {
+                    // 从矩阵动态生成:本组的能力 × 当前供应商支持的交集
+                    const supportedSet = new Set(matrix?.matrix?.[channelFormProvider]?.supported ?? []);
+                    const groupOpts = (matrix?.capabilities ?? [])
+                      .filter((c) => c.group === group.key && supportedSet.has(c.code));
+                    if (groupOpts.length === 0) return null;
+                    return (
+                      <div key={group.key} className="space-y-1.5">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          {group.label}
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {groupOpts.map((opt) => {
+                            const isChecked = channelFormCapabilities.includes(opt.code);
+                            return (
+                              <button
+                                key={opt.code}
+                                type="button"
+                                onClick={() => {
+                                  setChannelFormCapabilities((prev) =>
+                                    prev.includes(opt.code)
+                                      ? prev.filter((c) => c !== opt.code)
+                                      : [...prev, opt.code]
+                                  );
+                                }}
+                                className={`flex items-center justify-start gap-1.5 py-2 px-2 rounded-lg border text-[11px] font-bold transition-all cursor-pointer select-none ${
+                                  isChecked
+                                    ? 'bg-blue-50 border-blue-500 text-blue-600'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                }`}
+                              >
+                                <span className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
+                                  isChecked ? 'bg-blue-500 border-blue-500' : 'border-slate-300'
+                                }`}>
+                                  {isChecked && (
+                                    <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M2 6l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  )}
+                                </span>
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    提交到后端为英文编码(数组形式),不传将清空该通道的所有能力
+                  </p>
                 </div>
               </div>
 
