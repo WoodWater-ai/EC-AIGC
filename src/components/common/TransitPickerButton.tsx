@@ -39,6 +39,7 @@ export function toSlotRef(item: AssetResourceItem): SlotRef {
   return {
     fileResourceId: item.fileResourceId!,
     thumbnailUrl: item.thumbnailUrl ?? item.originalUrl,
+    originalUrl: item.originalUrl,
     name: item.name,
   };
 }

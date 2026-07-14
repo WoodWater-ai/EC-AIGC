@@ -7,6 +7,10 @@ import { TaskParamsPanel } from './createTask/TaskParamsPanel';
 import { buildSubmitPayload } from './createTask/buildSubmitPayload';
 import { submitTask } from '../api/modules/task';
 import { type SlotKey, type SlotRef } from './createTask/slots';
+import { mergeImagesHorizontal } from '../utils/mergeImages';
+import { useFileUpload } from '../hooks/useFileUpload';
+import { assetApi } from '../api/modules/asset';
+import { toast } from 'sonner';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
@@ -120,18 +124,113 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     }
   };
 
-  const handleCompositePreview = () => {
+  // ===== 合成预览状态机 =====
+  // 合成预览结果(blob 用于上传, dataUrl 用于 <img> 预览)
+  const [compositePreview, setCompositePreview] = useState<
+    { blob: Blob; dataUrl: string; width: number; height: number } | null
+  >(null);
+  const [isComposing, setIsComposing] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  // useFileUpload: 上传合并后的 PNG
+  const {
+    upload,
+    loading: uploadLoading,
+    progress: uploadProgress,
+    error: uploadError,
+  } = useFileUpload({
+    purpose: 'UP_DOWN_MERGE',
+    productId: selectedProduct?.id ? Number(selectedProduct.id) : undefined,
+  });
+
+  const handleCompositePreview = async () => {
     if (!slotRefs.top || !slotRefs.bottom) {
-      alert('请先添加上衣和下装素材后再进行合成！');
+      toast.warning('请先添加上衣和下装素材后再进行合成');
       return;
     }
-    setHasCompositePreviewed(true);
-    alert('合成预览成功！已自动将“上下装合成套图”入库并设为主体图。');
-    setSelectedProduct({
-      ...selectedProduct,
-      name: '智能拼合秋季潮流女装套组',
-      thumbnail: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=500&q=80',
-    });
+    const topUrl = slotRefs.top.originalUrl ?? slotRefs.top.thumbnailUrl;
+    const bottomUrl = slotRefs.bottom.originalUrl ?? slotRefs.bottom.thumbnailUrl;
+    if (!topUrl || !bottomUrl) {
+      toast.error('所选资源缺少原图 URL,无法合成');
+      return;
+    }
+
+    setIsComposing(true);
+    setCompositePreview(null);
+    try {
+      const result = await mergeImagesHorizontal(topUrl, bottomUrl, {
+        crossOrigin: true,
+        mimeType: 'image/png',
+      });
+      const dataUrl = URL.createObjectURL(result.blob);
+      setCompositePreview({
+        blob: result.blob,
+        dataUrl,
+        width: result.width,
+        height: result.height,
+      });
+      setHasCompositePreviewed(true);
+      toast.success(`合成预览完成(尺寸 ${result.width}×${result.height})`);
+    } catch (err) {
+      toast.error(`合成失败: ${(err as Error).message}`);
+    } finally {
+      setIsComposing(false);
+    }
+  };
+
+  /**
+   * 应用合成图为主图:
+   * 1. blob → File
+   * 2. useFileUpload 上传(走 COS)
+   * 3. assetApi.create 创建业务资源(PRODUCT_ORIGINAL)
+   * 4. setSelectedProduct 换缩略图 + name
+   * 5. setSlotRef('main', ...) 把合成图写入主 slot
+   * 6. 清理 compositePreview
+   */
+  const handleApplyComposite = async () => {
+    if (!compositePreview) {
+      toast.warning('请先生成合成预览');
+      return;
+    }
+    setIsApplying(true);
+    try {
+      const file = new File(
+        [compositePreview.blob],
+        `composite-${Date.now()}.png`,
+        { type: compositePreview.blob.type || 'image/png' },
+      );
+      const { fileResourceId, accessUrl } = await upload(file);
+      // 创建业务资源
+      await assetApi.create({
+        fileResourceId,
+        name: file.name,
+        productId: selectedProduct?.id ? Number(selectedProduct.id) : undefined,
+        assetKind: 'IMAGE',
+        assetType: 'PRODUCT_ORIGINAL',
+      });
+      // 替换商品主图
+      setSelectedProduct({
+        ...selectedProduct,
+        name: '智能合成套图',
+        thumbnail: accessUrl,
+      });
+      // 主 slot 写为合成图
+      setSlotRef('main', {
+        fileResourceId,
+        originalUrl: accessUrl,
+        thumbnailUrl: accessUrl,
+        name: '智能合成套图',
+      });
+      toast.success('合成图已应用为主图');
+      // 清理预览
+      if (compositePreview.dataUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(compositePreview.dataUrl);
+      }
+      setCompositePreview(null);
+    } catch (err) {
+      toast.error(`应用失败: ${(err as Error).message}`);
+    } finally {
+      setIsApplying(false);
+    }
   };
 
   const handleSubmitTask = async () => {
@@ -171,12 +270,12 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
 
   return (
     <div className="h-screen flex flex-col bg-white overflow-hidden text-slate-800" id="create-image-task-container">
-      
+
       {/* 1. Top Navigation Bar */}
       <header className="bg-white h-16 border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-10" id="create-task-header">
         {/* Left: Back Button & Title */}
         <div className="flex items-center space-x-4">
-          <button 
+          <button
             onClick={() => setScreen(AppScreen.TASKS)}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
           >
@@ -230,10 +329,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
 
       {/* 2. Main Content Area (Three Columns) */}
       <main className="flex-1 flex overflow-hidden bg-white" id="create-task-main-view">
-        
+
         {/* Column 1: 素材上传 (Left Column) */}
         <div className="w-[300px] lg:w-[350px] shrink-0 border-r border-slate-200 flex flex-col bg-white overflow-y-auto" id="col-upload-assets">
-          
+
           {/* Header sticky */}
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
             <h2 className="text-sm lg:text-base font-bold text-slate-800">素材上传</h2>
@@ -245,7 +344,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
 
           {/* Main Upload Area */}
           <div className="p-5 space-y-6">
-            
+
             {/* Primary Image Upload Box */}
             <div className="relative border-2 border-dashed border-blue-250 rounded-xl p-5 bg-blue-50/50 flex flex-col items-center justify-center text-center hover:bg-blue-50 transition-colors group">
               <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center mb-2.5 shadow-xs group-hover:shadow text-blue-500 transition-shadow">
@@ -276,7 +375,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
               <div className="p-4 flex flex-col items-center">
                 <div className="text-[10px] lg:text-xs text-slate-400 mb-3 font-medium">合成后将作为主任务图像输入</div>
                 <div className="flex items-center space-x-3 w-full justify-center mb-4">
-                  
+
                   {/* Top slot */}
                   <TransitPickerButton
                     slot="top"
@@ -301,13 +400,52 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
 
                 </div>
 
-                <button 
+                <button
                   onClick={handleCompositePreview}
-                  className="w-full py-2 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center cursor-pointer"
+                  disabled={isComposing}
+                  className="w-full py-2 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="material-symbols-outlined text-sm mr-1">preview</span>
-                  合成预览并入库
+                  {isComposing ? '合成中...' : '合成预览'}
                 </button>
+
+                {/* 合成预览结果:图片 + 上传应用按钮 */}
+                {compositePreview && (
+                  <div className="mt-3 flex flex-col items-center">
+                    <div className="w-full max-w-[280px] border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
+                      <img
+                        src={compositePreview.dataUrl}
+                        alt="合成预览"
+                        className="w-full h-auto"
+                      />
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1 font-mono">
+                      {compositePreview.width} × {compositePreview.height}
+                    </div>
+                    {isApplying && uploadProgress > 0 && (
+                      <div className="w-full max-w-[280px] mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-600 transition-all duration-200"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    )}
+                    <button
+                      onClick={handleApplyComposite}
+                      disabled={isApplying || uploadLoading}
+                      className="w-full max-w-[280px] mt-2 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-sm mr-1">upload</span>
+                      {isApplying ? `上传中 ${uploadProgress}%` : '上传并应用主图'}
+                    </button>
+                  </div>
+                )}
+
+                {uploadError && (
+                  <div className="mt-2 text-[10px] text-red-500 font-medium">
+                    上传失败: {uploadError.message}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -317,9 +455,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
               <div className="text-[10px] lg:text-xs text-slate-400 mb-3 leading-normal font-medium">
                 用于影响生成的细节、风格、场景、姿势，不直接替代主体
               </div>
-              
+
               <div className="grid grid-cols-4 gap-2">
-                
+
                 {/* Slot 1: Details */}
                 <div className="flex flex-col items-center">
                   <TransitPickerButton
@@ -378,10 +516,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
         {/* Column 2: 商品信息 (Middle Column - Wide) */}
         <div className="flex-1 flex flex-col bg-[#F9FAFB] overflow-y-auto" id="col-product-info">
           <div className="p-6 max-w-2xl lg:max-w-3xl mx-auto w-full">
-            
+
             {/* Main Form Card */}
             <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
-              
+
               {/* Card Header */}
               <div className="px-6 py-4 border-b border-slate-100 flex items-center bg-white">
                 <span className="material-symbols-outlined text-blue-600 mr-2 text-xl font-bold">info</span>
@@ -390,7 +528,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
 
               {/* Form Content */}
               <div className="p-6 space-y-6">
-                
+
                 {/* 1. 商品主体图 View */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -404,8 +542,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                     {/* Preview Thumbnail */}
                     <div className="w-16 h-16 lg:w-20 lg:h-20 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center text-slate-300 relative group overflow-hidden shrink-0">
                       {selectedProduct.thumbnail ? (
-                        <img 
-                          src={selectedProduct.thumbnail} 
+                        <img
+                          src={selectedProduct.thumbnail}
                           alt={selectedProduct.name}
                           className="w-full h-full object-contain"
                           referrerPolicy="no-referrer"
@@ -413,7 +551,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                       ) : (
                         <span className="material-symbols-outlined text-2xl">image</span>
                       )}
-                      
+
                       {/* Hover eye action */}
                       <div className="absolute inset-0 bg-black/40 hidden group-hover:flex items-center justify-center text-white transition-opacity">
                         <span className="material-symbols-outlined text-sm cursor-pointer hover:text-blue-300">visibility</span>
@@ -447,7 +585,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                       AI 已识别
                     </span>
                   </div>
-                  <input 
+                  <input
                     className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-medium outline-none transition-shadow"
                     id="product_name"
                     type="text"
@@ -466,7 +604,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                       AI 已识别
                     </span>
                   </div>
-                  <textarea 
+                  <textarea
                     className="w-full p-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-medium outline-none resize-y"
                     id="selling_points"
                     rows={3}
@@ -486,7 +624,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                     </span>
                   </div>
                   <div className="relative">
-                    <select 
+                    <select
                       className="block w-full h-10 pl-3 pr-10 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none font-bold cursor-pointer"
                       id="category"
                       value={productCategory}
@@ -513,7 +651,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                         AI 已识别
                       </span>
                     </div>
-                    <input 
+                    <input
                       className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium"
                       type="text"
                       value={colorPattern}
@@ -528,7 +666,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                         需人工确认
                       </span>
                     </div>
-                    <input 
+                    <input
                       className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium"
                       type="text"
                       value={fitStructure}
@@ -546,7 +684,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                         AI 已识别
                       </span>
                     </div>
-                    <input 
+                    <input
                       className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium"
                       type="text"
                       value={fabricTexture}
@@ -561,7 +699,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                         需人工确认
                       </span>
                     </div>
-                    <input 
+                    <input
                       className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium"
                       type="text"
                       value={keyDetails}
@@ -584,8 +722,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
 
                   <div className="flex flex-wrap gap-3">
                     <label className="inline-flex items-center bg-white border border-slate-200 px-3 py-2 rounded-lg shadow-xs cursor-pointer hover:bg-slate-50 select-none">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={constrainColor}
                         onChange={(e) => setConstrainColor(e.target.checked)}
                         className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
@@ -594,8 +732,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                     </label>
 
                     <label className="inline-flex items-center bg-white border border-slate-200 px-3 py-2 rounded-lg shadow-xs cursor-pointer hover:bg-slate-50 select-none">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={constrainPattern}
                         onChange={(e) => setConstrainPattern(e.target.checked)}
                         className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
@@ -604,8 +742,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                     </label>
 
                     <label className="inline-flex items-center bg-white border border-slate-200 px-3 py-2 rounded-lg shadow-xs cursor-pointer hover:bg-slate-50 select-none">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={constrainLogo}
                         onChange={(e) => setConstrainLogo(e.target.checked)}
                         className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
@@ -614,8 +752,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                     </label>
 
                     <label className="inline-flex items-center bg-white border border-slate-200 px-3 py-2 rounded-lg shadow-xs cursor-pointer hover:bg-slate-50 select-none">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={constrainFit}
                         onChange={(e) => setConstrainFit(e.target.checked)}
                         className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
@@ -672,13 +810,13 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
           已自动保存于 10:42
         </div>
         <div className="flex space-x-3">
-          <button 
+          <button
             onClick={() => setScreen(AppScreen.TASKS)}
             className="px-5 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-lg shadow-xs hover:bg-slate-50 focus:outline-none transition-colors text-xs lg:text-sm cursor-pointer"
           >
             保存草稿
           </button>
-          <button 
+          <button
             onClick={handleSubmitTask}
             className="px-5 py-2 bg-blue-600 border border-transparent text-white font-bold rounded-lg shadow-xs hover:bg-blue-700 focus:outline-none transition-colors flex items-center text-xs lg:text-sm cursor-pointer active:scale-98"
           >

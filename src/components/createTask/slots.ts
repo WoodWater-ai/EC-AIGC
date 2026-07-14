@@ -17,6 +17,8 @@ export interface SlotRef {
   fileResourceId: number;
   /** 缩略图 URL —— UI 预览用 */
   thumbnailUrl?: string;
+  /** 原图 URL —— 合成/COS 处理等需要原图质量的场景用 */
+  originalUrl?: string;
   /** 资源名 —— slot 已选态标签 */
   name?: string;
 }
