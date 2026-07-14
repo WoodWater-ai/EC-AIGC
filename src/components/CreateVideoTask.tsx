@@ -4,6 +4,22 @@ import { AssetTransitModal } from './AssetTransitModal';
 import { assetApi } from '../api/modules/asset';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { templateApi, type TemplateDTO } from '../api/modules/template';
+import { TaskParamsPanel } from './createTask/TaskParamsPanel';
+import { buildSubmitPayload } from './createTask/buildSubmitPayload';
+import { submitTask } from '../api/modules/task';
+
+/** 从 sessionStorage 读模版 prefill(容错,失败返 null) */
+function readPrefill(): import('./createTask/useTaskParams').PrefillState | null {
+  try {
+    const raw = sessionStorage.getItem('beta.template.prefill');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as import('./createTask/useTaskParams').PrefillState | null;
+    if (!parsed || !parsed.templateId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 interface CreateVideoTaskProps {
   products: ProductAsset[];
@@ -62,33 +78,44 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   // Mode Switch tab
   const [activeTab, setActiveTab] = useState<'ref' | 'first'>('ref');
 
-  // Prompts config state
+  // Prompts config state (middle column JSX 仍引用)
   const [promptTemplate, setPromptTemplate] = useState('上身展示视频模板');
   const [shot03, setShot03] = useState('');
   const [shot39, setShot39] = useState('');
   const [shot915, setShot915] = useState('');
 
-  // Negative constraints
+  // Negative constraints (middle column JSX 仍引用)
   const [negativeTags, setNegativeTags] = useState<string[]>(['商品漂移', '面料闪烁', '多余手指']);
   const [newNegativeInput, setNewNegativeInput] = useState('');
   const [customNegativeText, setCustomNegativeText] = useState('');
 
-  // Video parameters
-  const [duration, setDuration] = useState<number>(15);
-  const [aspectRatio, setAspectRatio] = useState<string>('9:16');
-  const [motion, setMotion] = useState<number>(2); // 1 = subtle, 2 = moderate, 3 = dynamic
-  const [resolution, setResolution] = useState('1080p (高品质)');
-  const [modelEngine, setModelEngine] = useState('云端 API (速度快)');
-  const [modelVersion, setModelVersion] = useState('V2.1 (最新稳定版)');
+  // Task parameters in Right Column
+  const [aspectRatio, setAspectRatio] = useState('9:16');
+  const [count, setCount] = useState(1);
+  const [negativePrompt, setNegativePrompt] = useState('');
+  const [promptText, setPromptText] = useState('');
+  const [taskParams, setTaskParams] = useState<{ channelId: string | null; channelType: string | null; capability: string | null; modelId: string | null; schemaParams: Record<string, any> }>({ channelId: null, channelType: null, capability: null, modelId: null, schemaParams: {} });
+  const [videoPrefill] = useState<import('./createTask/useTaskParams').PrefillState | null>(() => {
+    try { const raw = sessionStorage.getItem('beta.template.prefill'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
+  // [2026-07-13] VIDEO / SOLUTION 双模式;prefill.group='SOLUTION' 时默认 SOLUTION
+  const [videoMode, setVideoMode] = useState<'VIDEO' | 'SOLUTION'>(() => {
+    const p = readPrefill();
+    return p?.group === 'SOLUTION' ? 'SOLUTION' : 'VIDEO';
+  });
 
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(true);
+  const switchVideoMode = (mode: 'VIDEO' | 'SOLUTION') => {
+    setVideoMode(mode);
+    // 切 group 时清空 ①②③ 选择(实例/能力/模型都跟 group 强相关)
+    setTaskParams({ channelId: null, channelType: null, capability: null, modelId: null, schemaParams: {} });
+  };
 
   // Toggle selection on source images
   const handleToggleImage = (id: string) => {
     setSourceImages(prev => prev.map(img => img.id === id ? { ...img, selected: !img.selected } : img));
   };
 
-  // Add tag constraint
+  // Add tag constraint (middle column JSX 仍引用)
   const handleAddTag = () => {
     const val = newNegativeInput.trim();
     if (val && !negativeTags.includes(val)) {
@@ -97,7 +124,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     }
   };
 
-  // Delete tag constraint
+  // Delete tag constraint (middle column JSX 仍引用)
   const handleDeleteTag = (tagToDelete: string) => {
     setNegativeTags(prev => prev.filter(t => t !== tagToDelete));
   };
@@ -131,52 +158,40 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   // Selection counts
   const selectedCount = sourceImages.filter(img => img.selected).length;
 
-  const handleSubmit = () => {
-    const activeSelected = sourceImages.find(img => img.selected) || sourceImages[0];
-    const taskName = `视频渲染任务_${activeSelected?.name || '未知'}_${new Date().getMonth() + 1}${new Date().getDate()}`;
-    
-    const newTask: GenerationTask = {
-      id: `V-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${Math.floor(100 + Math.random() * 900)}`,
-      name: taskName,
-      type: 'video',
-      status: 'running',
-      progress: 0,
-      productName: activeSelected?.name || selectedProduct.name,
-      productImg: activeSelected?.url || selectedProduct.thumbnail,
-      templateName: promptTemplate,
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      creator: '陆永奇',
-      modelChannel: modelEngine,
-      params: {
-        ratio: aspectRatio,
-        steps: 40,
-        guidance: motion === 1 ? 3 : motion === 2 ? 6.5 : 9.5,
-        prompt: `0-3s: ${shot03 || '主视觉建立'} | 3-9s: ${shot39 || '氛围与动作'} | 9-15s: ${shot915 || '细节收尾'} | Negatives: ${negativeTags.join(',')}, ${customNegativeText}`
-      }
-    };
-
-    onAddTask(newTask);
-    setScreen(AppScreen.TASKS);
-
-    // Simulate render progress
-    let progressValue = 0;
-    const interval = setInterval(() => {
-      progressValue += 10;
-      if (progressValue >= 100) {
-        clearInterval(interval);
-        onAddTask({
-          ...newTask,
-          status: 'completed',
-          progress: 100,
-          resultUrl: activeSelected?.url || selectedProduct.thumbnail
-        });
-      } else {
-        onAddTask({
-          ...newTask,
-          progress: progressValue
-        });
-      }
-    }, 1200);
+  const handleSubmitTask = async () => {
+    if (!taskParams.channelType || !taskParams.capability) {
+      alert('请先在右侧选择通道和能力');
+      return;
+    }
+    if (!taskParams.channelId) {
+      alert('请先在右侧选择通道实例');
+      return;
+    }
+    const selectedIds = sourceImages.filter((s) => s.selected).map((s) => s.id).join(',');
+    const payload = buildSubmitPayload({
+      title: `视频生成任务_${selectedProduct.name}`,
+      productId: String(selectedProduct.id),
+      taskType: videoMode === 'SOLUTION' ? 'SOLUTION' : 'VIDEO',
+      channelType: taskParams.channelType,
+      capability: taskParams.capability,
+      modelId: taskParams.modelId ?? undefined,
+      modelChannelId: String(taskParams.channelId),
+      aspectRatio,
+      count,
+      prompt: promptText,
+      negativePrompt,
+      inputImageIds: selectedIds,
+      schemaParams: taskParams.schemaParams,
+      templateId: videoPrefill?.templateId,
+      templateVersionId: videoPrefill?.templateVersionId,
+    });
+    try {
+      await submitTask(payload);
+      sessionStorage.removeItem('beta.template.prefill');
+      setScreen(AppScreen.TASKS);
+    } catch {
+      // http 拦截器已 toast 错误
+    }
   };
 
   return (
@@ -223,6 +238,33 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
           <span className="text-[#424655] text-xs font-medium">草稿已自动保存于 10:42</span>
         </div>
       </header>
+
+      {/* 任务模式 tab — VIDEO(视频能力) / SOLUTION(Vidu 解决方案) */}
+      <div className="flex items-center gap-2 px-6 py-3 border-b border-slate-100 bg-white">
+        <span className="text-xs text-slate-500">任务模式</span>
+        <button
+          type="button"
+          onClick={() => switchVideoMode('VIDEO')}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium border ${
+            videoMode === 'VIDEO'
+              ? 'bg-emerald-600 text-white border-emerald-600'
+              : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400'
+          }`}
+        >
+          视频能力
+        </button>
+        <button
+          type="button"
+          onClick={() => switchVideoMode('SOLUTION')}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium border ${
+            videoMode === 'SOLUTION'
+              ? 'bg-emerald-600 text-white border-emerald-600'
+              : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400'
+          }`}
+        >
+          解决方案
+        </button>
+      </div>
 
       {/* Main Column Layout */}
       <main className="flex-1 flex overflow-hidden">
@@ -468,186 +510,27 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
           </div>
         </section>
 
-        {/* Column 3: Video parameters configuration (Right column / Width 25%) */}
-        <section className="w-1/4 min-w-[280px] max-w-[340px] bg-white border-l border-[#c2c6d8] flex flex-col h-full shadow-[-2px_0px_8px_rgba(0,0,0,0.02)] shrink-0">
-          <div className="p-5 border-b border-[#c2c6d8] shrink-0">
-            <h2 className="text-base font-extrabold text-[#0b1c30]">视频参数</h2>
+        {/* Column 3: 任务参数 (Right Column) */}
+        <div className="w-[310px] lg:w-[350px] shrink-0 border-l border-slate-200 flex flex-col bg-[#F9FAFB] overflow-y-auto" id="col-video-params">
+          <TaskParamsPanel
+            group={videoMode}
+            prefill={videoPrefill}
+            unified={{ productName: selectedProduct.name }}
+            aspectRatio={aspectRatio}
+            count={count}
+            onAspectRatioChange={setAspectRatio}
+            onCountChange={setCount}
+            prompt={promptText}
+            onPromptChange={setPromptText}
+            negativePrompt={negativePrompt}
+            onNegativePromptChange={setNegativePrompt}
+            onParamsChange={setTaskParams}
+          />
+          <div className="mt-auto p-4 border-t border-slate-100 flex gap-2">
+            <button onClick={() => setScreen(AppScreen.TASKS)} className="flex-1 py-2 text-sm border border-slate-200 rounded-md">取消</button>
+            <button onClick={handleSubmitTask} className="flex-1 py-2 text-sm text-white rounded-md bg-blue-600">提交任务</button>
           </div>
-
-          <div className="flex-1 overflow-y-auto p-5 space-y-6">
-            
-            {/* Duration select */}
-            <div>
-              <label className="block text-xs font-extrabold text-[#0b1c30] mb-2.5">时长 (Duration)</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[5, 8, 15].map((sec) => (
-                  <button
-                    key={sec}
-                    onClick={() => setDuration(sec)}
-                    className={`py-2 text-center border rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      duration === sec
-                        ? 'border-[#0054cd] bg-[#eff4ff] text-[#0054cd]'
-                        : 'border-[#c2c6d8] text-[#424655] hover:bg-slate-50'
-                    }`}
-                  >
-                    {sec}s
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Aspect Ratio select with beautiful icons */}
-            <div>
-              <label className="block text-xs font-extrabold text-[#0b1c30] mb-2.5">比例 (Aspect Ratio)</label>
-              <div className="grid grid-cols-3 gap-2">
-                
-                {/* 9:16 */}
-                <button
-                  onClick={() => setAspectRatio('9:16')}
-                  className={`flex flex-col items-center justify-center py-2.5 border rounded-lg h-16 transition-all cursor-pointer ${
-                    aspectRatio === '9:16'
-                      ? 'border-[#0054cd] bg-[#eff4ff] text-[#0054cd]'
-                      : 'border-[#c2c6d8] text-[#424655] hover:bg-slate-50'
-                  }`}
-                >
-                  <div className={`w-3.5 h-6 border-2 rounded-sm mb-1 ${aspectRatio === '9:16' ? 'border-[#0054cd]' : 'border-[#727787]'}`} />
-                  <span className="text-[10px] font-bold">9:16</span>
-                </button>
-
-                {/* 16:9 */}
-                <button
-                  onClick={() => setAspectRatio('16:9')}
-                  className={`flex flex-col items-center justify-center py-2.5 border rounded-lg h-16 transition-all cursor-pointer ${
-                    aspectRatio === '16:9'
-                      ? 'border-[#0054cd] bg-[#eff4ff] text-[#0054cd]'
-                      : 'border-[#c2c6d8] text-[#424655] hover:bg-slate-50'
-                  }`}
-                >
-                  <div className={`w-6 h-3.5 border-2 rounded-sm mb-1 ${aspectRatio === '16:9' ? 'border-[#0054cd]' : 'border-[#727787]'}`} />
-                  <span className="text-[10px] font-bold">16:9</span>
-                </button>
-
-                {/* 1:1 */}
-                <button
-                  onClick={() => setAspectRatio('1:1')}
-                  className={`flex flex-col items-center justify-center py-2.5 border rounded-lg h-16 transition-all cursor-pointer ${
-                    aspectRatio === '1:1'
-                      ? 'border-[#0054cd] bg-[#eff4ff] text-[#0054cd]'
-                      : 'border-[#c2c6d8] text-[#424655] hover:bg-slate-50'
-                  }`}
-                >
-                  <div className={`w-4 h-4 border-2 rounded-sm mb-1 ${aspectRatio === '1:1' ? 'border-[#0054cd]' : 'border-[#727787]'}`} />
-                  <span className="text-[10px] font-bold">1:1</span>
-                </button>
-
-              </div>
-            </div>
-
-            {/* Motion Intensity Slider */}
-            <div>
-              <label className="block text-xs font-extrabold text-[#0b1c30] mb-2.5">运动幅度 (Motion)</label>
-              <input 
-                type="range"
-                min="1"
-                max="3"
-                step="1"
-                value={motion}
-                onChange={(e) => setMotion(parseInt(e.target.value))}
-                className="w-full accent-[#0054cd] h-1 bg-[#c2c6d8] rounded-lg appearance-none cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] font-bold text-[#424655] mt-1.5">
-                <span className={motion === 1 ? 'text-[#0054cd]' : ''}>小 (Subtle)</span>
-                <span className={motion === 2 ? 'text-[#0054cd]' : ''}>中 (Moderate)</span>
-                <span className={motion === 3 ? 'text-[#0054cd]' : ''}>大 (Dynamic)</span>
-              </div>
-            </div>
-
-            {/* Advanced Settings Accordion strictly matched */}
-            <div className="pt-4 border-t border-slate-100 space-y-4">
-              <button 
-                onClick={() => setIsAdvancedOpen(prev => !prev)}
-                className="w-full flex items-center justify-between text-left cursor-pointer focus:outline-none"
-              >
-                <span className="text-xs font-extrabold text-[#0b1c30]">高级设置</span>
-                <span className="material-symbols-outlined text-[#424655] text-lg">
-                  {isAdvancedOpen ? 'expand_less' : 'expand_more'}
-                </span>
-              </button>
-
-              {isAdvancedOpen && (
-                <div className="space-y-4 animate-fadeIn">
-                  
-                  {/* Resolution */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-[#424655]">分辨率 (Resolution)</label>
-                    <select
-                      value={resolution}
-                      onChange={(e) => setResolution(e.target.value)}
-                      className="w-full h-9 bg-white border border-[#c2c6d8] rounded-lg text-xs font-bold px-3 text-[#0b1c30] outline-none cursor-pointer"
-                    >
-                      <option value="1080p (高品质)">1080p (高品质)</option>
-                      <option value="720p (快速预览)">720p (快速预览)</option>
-                    </select>
-                  </div>
-
-                  {/* Model Engine */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-[#424655]">模型通道 (Model Engine)</label>
-                    <select
-                      value={modelEngine}
-                      onChange={(e) => setModelEngine(e.target.value)}
-                      className="w-full h-9 bg-white border border-[#c2c6d8] rounded-lg text-xs font-bold px-3 text-[#0b1c30] outline-none cursor-pointer"
-                    >
-                      <option value="云端 API (速度快)">云端 API (速度快)</option>
-                      <option value="本地模型 (免算力费)">本地模型 (免算力费)</option>
-                    </select>
-                  </div>
-
-                  {/* Model Version */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-extrabold text-[#424655]">模型版本 (Model Version)</label>
-                    <select
-                      value={modelVersion}
-                      onChange={(e) => setModelVersion(e.target.value)}
-                      className="w-full h-9 bg-white border border-[#c2c6d8] rounded-lg text-xs font-bold px-3 text-[#0b1c30] outline-none cursor-pointer"
-                    >
-                      <option value="V2.1 (最新稳定版)">V2.1 (最新稳定版)</option>
-                      <option value="V2.0 (经典版)">V2.0 (经典版)</option>
-                      <option value="V1.5 (极速版)">V1.5 (极速版)</option>
-                    </select>
-                    <p className="text-[9px] font-bold text-[#0054cd] mt-1">* 已根据所选通道自动匹配可用版本</p>
-                  </div>
-
-                </div>
-              )}
-            </div>
-
-          </div>
-
-          {/* Action Cost Footer strictly matches design */}
-          <div className="p-4 bg-white border-t border-[#c2c6d8] mt-auto shrink-0 space-y-3 shadow-[0_-2px_10px_rgba(0,0,0,0.02)]">
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-[#424655] font-bold">预估成本:</span>
-              <span className="text-[#0b1c30] font-extrabold text-lg">¥ 1.50</span>
-            </div>
-            
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setScreen(AppScreen.TASKS)}
-                className="flex-1 border border-[#0054cd] text-[#0054cd] rounded-lg py-2 text-xs font-extrabold hover:bg-blue-50/50 transition-colors cursor-pointer"
-              >
-                保存草稿
-              </button>
-              <button 
-                onClick={handleSubmit}
-                className="flex-1 bg-gradient-to-r from-[#0054cd] to-[#00687b] text-white rounded-lg py-2 text-xs font-extrabold shadow-md hover:opacity-95 transition-opacity flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-base">movie</span>
-                提交生成
-              </button>
-            </div>
-          </div>
-        </section>
+        </div>
 
       </main>
 

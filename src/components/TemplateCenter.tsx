@@ -20,7 +20,23 @@ import {
   type TemplateCreateRequest,
   type TemplateUpdateRequest,
 } from '../api/modules/template';
+import { recommendParamsApi } from '../api/modules/templateRecommend';
 import { AppScreen } from '../types';
+
+/** 从 templateKind 派生 group,决定建任务页 group */
+function deriveGroup(templateKind: string | undefined): 'IMAGE' | 'VIDEO' | 'SOLUTION' {
+  if (!templateKind) return 'IMAGE';
+  if (templateKind === 'VIDEO_PROMPT') return 'VIDEO';
+  if (templateKind.startsWith('SOLUTION_')) return 'SOLUTION';
+  return 'IMAGE';
+}
+
+/** 从 templateKind 决定跳哪个建任务页 */
+function deriveTargetScreen(templateKind: string | undefined): AppScreen {
+  if (templateKind === 'VIDEO_PROMPT') return AppScreen.CREATE_VIDEO_TASK;
+  if (templateKind && templateKind.startsWith('SOLUTION_')) return AppScreen.CREATE_VIDEO_TASK;
+  return AppScreen.CREATE_IMAGE_TASK;
+}
 
 type TabKey = 'image_task' | 'style_scene' | 'video_prompt' | 'platform_spec' | 'negative_constraint';
 
@@ -43,7 +59,7 @@ const TAB_LABELS: Record<TabKey, string> = {
 const TABS: TabKey[] = ['image_task', 'style_scene', 'video_prompt', 'platform_spec', 'negative_constraint'];
 
 interface TemplateCenterProps {
-  setScreen?: (screen: AppScreen) => void;
+  setScreen: (screen: AppScreen) => void;
 }
 
 interface DrawerState {
@@ -315,6 +331,49 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
     return 0;
   };
 
+  const launchWithTemplate = async (tpl: TemplateDTO) => {
+    // 1. 写 prefill 基础字段
+    const group = deriveGroup(tpl.templateKind);
+    const prefill: {
+      templateId: string;
+      templateVersionId: string;
+      group: 'IMAGE' | 'VIDEO' | 'SOLUTION';
+      channelType: string | null;
+      capability: string | null;
+      model: string | null;
+    } = {
+      templateId: tpl.id,
+      templateVersionId: tpl.currentVersion ?? '',
+      group,
+      channelType: null,
+      capability: null,
+      model: null,
+    };
+    // 2. 异步拉推荐行,拿第一行作为锁 + 回填的基准(失败/返空降级)
+    try {
+      const page = await recommendParamsApi.page({
+        templateId: tpl.id,
+        templateVersionId: tpl.currentVersion ?? undefined,
+      });
+      const firstRow = page?.list?.[0];
+      if (firstRow) {
+        prefill.channelType = firstRow.channelType;
+        prefill.capability = firstRow.capabilityCode;
+        prefill.model = firstRow.model ?? null;
+      }
+    } catch (e) {
+      console.warn('[TemplateCenter] 拉推荐参数失败,降级到不锁', e);
+    }
+    // 3. 写 sessionStorage
+    try {
+      sessionStorage.setItem('beta.template.prefill', JSON.stringify(prefill));
+    } catch (e) {
+      console.warn('[TemplateCenter] sessionStorage 写失败', e);
+    }
+    // 4. 跳页面
+    setScreen(deriveTargetScreen(tpl.templateKind));
+  };
+
   // ===== 渲染 =====
 
   return (
@@ -428,7 +487,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
             onSelectRow={handleSelectRow}
             onRowClick={handleRowClick}
             onCopy={handleCopyPrompt}
-            onLaunch={setScreen}
+            launchWithTemplate={launchWithTemplate}
           />
         )}
 
@@ -488,11 +547,11 @@ interface TemplateTableAreaProps {
   onSelectRow: (id: string, checked: boolean) => void;
   onRowClick: (tpl: TemplateDTO) => void;
   onCopy: (tpl: TemplateDTO) => void;
-  onLaunch?: (screen: AppScreen) => void;
+  launchWithTemplate: (tpl: TemplateDTO) => Promise<void>;
 }
 
 function TemplateTableArea(props: TemplateTableAreaProps) {
-  const { templates, activeTab, selectedIds, onSelectAll, onSelectRow, onRowClick, onCopy, onLaunch } = props;
+  const { templates, activeTab, selectedIds, onSelectAll, onSelectRow, onRowClick, onCopy, launchWithTemplate } = props;
   if (templates.length === 0) {
     return (
       <div className="py-16 text-center text-slate-400 font-medium">
@@ -631,11 +690,7 @@ function TemplateTableArea(props: TemplateTableAreaProps) {
                       <span className="material-symbols-outlined text-sm font-bold">edit</span>
                     </button>
                     <button
-                      onClick={() =>
-                        onLaunch?.(
-                          tpl.templateKind === 'VIDEO_PROMPT' ? AppScreen.CREATE_VIDEO_TASK : AppScreen.CREATE_IMAGE_TASK,
-                        )
-                      }
+                      onClick={() => launchWithTemplate(tpl)}
                       title="以此规则发布新任务"
                       className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                     >

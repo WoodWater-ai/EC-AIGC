@@ -14,6 +14,12 @@ import { AssetTransitModal } from './components/AssetTransitModal';
 import { LoginPage } from './components/LoginPage';
 import { ResourceCategoryList } from './components/ResourceCategoryList';
 import { AsyncTaskList } from './components/AsyncTaskList';
+import { BetaPlaceholder } from './components/BetaPlaceholder';
+import { TemplateCenterNew } from './components/beta/TemplateCenterNew';
+import { CreateTaskNew } from './components/beta/CreateTaskNew';
+import { TaskListNew } from './components/beta/TaskListNew';
+import { PromptAssistNew } from './components/beta/PromptAssistNew';
+import { RecommendParamsManageNew } from './components/beta/RecommendParamsManageNew';
 
 import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
@@ -214,6 +220,14 @@ export default function App() {
         );
       case AppScreen.ASYNC_TASKS:
         return <AsyncTaskList />;
+      // ===== [v2.0 2026-07-13 F2 落地] 智能模版中心-新 真实页面 =====
+      // D3 模版绑 channelType+capability+model,D5 推荐参数 Tab,D7 用此模版按钮
+      case AppScreen.TEMPLATE_CENTER_NEW:
+        return <TemplateCenterNew setScreen={setCurrentScreen} />;
+      case AppScreen.TASK_LIST_NEW:
+        return <TaskListNew />;
+      case AppScreen.RECOMMEND_PARAMS_MANAGE_NEW:
+        return <RecommendParamsManageNew />;
       default:
         return (
           <div className="flex flex-col items-center justify-center p-12 text-slate-400">
@@ -292,6 +306,27 @@ export default function App() {
             onClose={() => setIsTransitOpen(false)}
           />
         )}
+      </div>
+    );
+  }
+
+  // ===== [v2.0 2026-07-13 F2 落地] 新建任务-新 真实页面 =====
+  // D1 B v2 方案:统一 CreateTask · 3 group(去 TEXT)· 5 步能力驱动流程
+  // [F3 集成] 传 setScreen 给 AI 帮我写 prompt-新 跳转
+  if (currentScreen === AppScreen.CREATE_TASK_NEW) {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-white">
+        <CreateTaskNew setScreen={setCurrentScreen} />
+      </div>
+    );
+  }
+
+  // ===== [v2.0 2026-07-13 F3 落地] AI 帮我写 prompt-新 全屏独立页 =====
+  // D6 TEXT 能力独立功能
+  if (currentScreen === AppScreen.PROMPT_ASSIST_NEW) {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-white">
+        <PromptAssistNew onBack={() => setCurrentScreen(AppScreen.CREATE_TASK_NEW)} />
       </div>
     );
   }

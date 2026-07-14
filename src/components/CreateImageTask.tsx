@@ -3,6 +3,9 @@ import { ProductAsset, GenerationTask, AppScreen } from '../types';
 import { AssetTransitModal } from './AssetTransitModal';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { templateApi, type TemplateDTO } from '../api/modules/template';
+import { TaskParamsPanel } from './createTask/TaskParamsPanel';
+import { buildSubmitPayload } from './createTask/buildSubmitPayload';
+import { submitTask } from '../api/modules/task';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
@@ -91,13 +94,13 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   const [constrainFit, setConstrainFit] = useState(false);
 
   // Task parameters in Right Column
-  const [generationType, setGenerationType] = useState<'main' | 'fitting' | 'detail' | 'triple'>('main');
-  const [stylePreset, setStylePreset] = useState('甜美网红风 (Sweet Influencer)');
   const [aspectRatio, setAspectRatio] = useState<'3:4' | '1:1' | '16:9'>('3:4');
-  const [batchCount, setBatchCount] = useState<number>(4);
-  const [sceneOption, setSceneOption] = useState('室内影棚');
-  const [poseOption, setPoseOption] = useState('站姿正面');
-  const [modelChannel, setModelChannel] = useState<'runway' | 'vidu'>('runway');
+  const [count, setCount] = useState(4);
+  const [negativePrompt, setNegativePrompt] = useState('blurry, bad quality, distorted');
+  const [taskParams, setTaskParams] = useState<{ channelId: string | null; channelType: string | null; capability: string | null; modelId: string | null; schemaParams: Record<string, any> }>({ channelId: null, channelType: null, capability: null, modelId: null, schemaParams: {} });
+  const [imagePrefill] = useState<import('./createTask/useTaskParams').PrefillState | null>(() => {
+    try { const raw = sessionStorage.getItem('beta.template.prefill'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
 
   // Assembled Prompt state
   const [promptText, setPromptText] = useState('');
@@ -124,59 +127,17 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     setFabricTexture(selectedProduct.specs.material || '细腻针织纹理');
   }, [selectedProduct]);
 
-  // Handle Dynamic Prompt Assembly
-  const assemblePrompt = () => {
-    const activeConstraints: string[] = [];
-    if (constrainColor) activeConstraints.push('颜色');
-    if (constrainPattern) activeConstraints.push('图案');
-    if (constrainLogo) activeConstraints.push('Logo');
-    if (constrainFit) activeConstraints.push('版型');
-
-    const constraintString = activeConstraints.length > 0 
-      ? ` [保护特征: ${activeConstraints.join('、')}]` 
-      : '';
-
-    return `3D High-fidelity product photoshoot of "${productName}". Style: ${stylePreset}. Scene: ${sceneOption}, Pose: ${poseOption}. Aspect ratio: ${aspectRatio}. Product attributes: ${fabricTexture}, ${colorPattern}, ${fitStructure}. Selling points highlights: ${sellingPoints}. ${keyDetails}.${constraintString} --v 6.1 --ar ${aspectRatio}`;
-  };
-
-  // Re-assemble prompt when inputs change
-  useEffect(() => {
-    setPromptText(assemblePrompt());
-  }, [
-    productName,
-    sellingPoints,
-    productCategory,
-    colorPattern,
-    fitStructure,
-    fabricTexture,
-    keyDetails,
-    constrainColor,
-    constrainPattern,
-    constrainLogo,
-    constrainFit,
-    stylePreset,
-    aspectRatio,
-    sceneOption,
-    poseOption
-  ]);
-
   // Reset to Global Template
   const handleResetToTemplate = () => {
-    setStylePreset('甜美网红风 (Sweet Influencer)');
+    setProductName(selectedProduct.name);
+    setSellingPoints(selectedProduct.specs.sellingPoints.join('，'));
+    setColorPattern(selectedProduct.specs.color[0] || '米白色');
+    setFabricTexture(selectedProduct.specs.material || '细腻针织纹理');
     setAspectRatio('3:4');
-    setSceneOption('室内影棚');
-    setPoseOption('站姿正面');
     setConstrainColor(true);
     setConstrainPattern(true);
     setConstrainLogo(false);
     setConstrainFit(false);
-  };
-
-  // Apply AI optimization to current prompt
-  const handleAIOptimize = () => {
-    setPromptText(prev => {
-      return `(Cinematic backlight, photorealistic studio render) ` + prev.replace(' --v 6.1', ', raytracing reflections, cinematic color grading, warm ambient glow --v 6.1');
-    });
   };
 
   const handleMockUploadMain = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -220,50 +181,38 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     });
   };
 
-  const handleSubmitTask = () => {
-    const newTask: GenerationTask = {
-      id: `T-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${Math.floor(100 + Math.random() * 900)}`,
-      name: `图片生成任务_${productName.split(' ')[0]}_${new Date().getMonth() + 1}${new Date().getDate()}`,
-      type: 'image',
-      status: 'running',
-      progress: 0,
-      productName: productName,
-      productImg: selectedProduct.thumbnail,
-      templateName: stylePreset,
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      creator: '陆永奇',
-      modelChannel: modelChannel === 'runway' ? 'Runway Gen-V' : 'Vidu 极速版',
-      params: {
-        ratio: aspectRatio,
-        steps: 35,
-        guidance: 7.5,
-        prompt: promptText,
-        negativePrompt: 'blurry, bad quality, distorted'
-      }
-    };
-
-    onAddTask(newTask);
-    setScreen(AppScreen.TASKS);
-
-    // Simulate render progress in background
-    let progressValue = 0;
-    const interval = setInterval(() => {
-      progressValue += 20;
-      if (progressValue >= 100) {
-        clearInterval(interval);
-        onAddTask({
-          ...newTask,
-          status: 'completed',
-          progress: 100,
-          resultUrl: selectedProduct.thumbnail
-        });
-      } else {
-        onAddTask({
-          ...newTask,
-          progress: progressValue
-        });
-      }
-    }, 1000);
+  const handleSubmitTask = async () => {
+    if (!taskParams.channelType || !taskParams.capability) {
+      alert('请先在右侧选择通道和能力');
+      return;
+    }
+    if (!taskParams.channelId) {
+      alert('请先在右侧选择通道实例');
+      return;
+    }
+    const payload = buildSubmitPayload({
+      title: `图片生成任务_${productName}`,
+      productId: String(selectedProduct.id),
+      taskType: 'PRODUCT_MAIN',
+      channelType: taskParams.channelType,
+      capability: taskParams.capability,
+      modelId: taskParams.modelId ?? undefined,
+      modelChannelId: String(taskParams.channelId),
+      aspectRatio,
+      count,
+      prompt: promptText,
+      negativePrompt,
+      schemaParams: taskParams.schemaParams,
+      templateId: imagePrefill?.templateId,
+      templateVersionId: imagePrefill?.templateVersionId,
+    });
+    try {
+      await submitTask(payload);
+      sessionStorage.removeItem('beta.template.prefill');
+      setScreen(AppScreen.TASKS);
+    } catch {
+      // http 拦截器已 toast 错误
+    }
   };
 
   return (
@@ -779,256 +728,33 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
 
         {/* Column 3: 任务参数 (Right Column) */}
         <div className="w-[310px] lg:w-[350px] shrink-0 border-l border-slate-200 flex flex-col bg-[#F9FAFB] overflow-y-auto" id="col-generation-params">
-          
-          {/* Params Header sticky */}
-          <div className="px-5 py-4 flex items-center bg-white border-b border-slate-200 sticky top-0 z-10">
-            <span className="material-symbols-outlined text-blue-600 mr-2 text-xl font-bold">settings</span>
-            <h2 className="text-sm lg:text-base font-bold text-slate-800">任务参数</h2>
-          </div>
-
-          <div className="p-5 space-y-5">
-            
-            {/* 1. 生成类型 */}
-            <div>
-              <label className="block text-xs lg:text-sm font-bold text-slate-700 mb-2">生成类型</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button 
-                  onClick={() => setGenerationType('main')}
-                  className={`flex items-center justify-center py-2 px-2.5 border rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                    generationType === 'main'
-                      ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-xs'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-sm mr-1">image</span>
-                  主图/场景
-                </button>
-                <button 
-                  onClick={() => setGenerationType('fitting')}
-                  className={`flex items-center justify-center py-2 px-2.5 border rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                    generationType === 'fitting'
-                      ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-xs'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-sm mr-1">accessibility</span>
-                  上身试衣
-                </button>
-                <button 
-                  onClick={() => setGenerationType('detail')}
-                  className={`flex items-center justify-center py-2 px-2.5 border rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                    generationType === 'detail'
-                      ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-xs'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-sm mr-1">zoom_in</span>
-                  细节特写
-                </button>
-                <button 
-                  onClick={() => setGenerationType('triple')}
-                  className={`flex items-center justify-center py-2 px-2.5 border rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                    generationType === 'triple'
-                      ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-xs'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-sm mr-1">360</span>
-                  三视图
-                </button>
-              </div>
-            </div>
-
-            {/* 2. 风格预设 */}
-            <div>
-              <label className="block text-xs lg:text-sm font-bold text-slate-700 mb-2">风格预设</label>
-              <div className="relative">
-                <select 
-                  className="block w-full h-10 pl-3 pr-10 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none font-bold cursor-pointer"
-                  value={stylePreset}
-                  onChange={(e) => setStylePreset(e.target.value)}
-                >
-                  <option value="甜美网红风 (Sweet Influencer)">甜美网红风 (Sweet Influencer)</option>
-                  <option value="极简北欧风 (Minimalist Nordic)">极简北欧风 (Minimalist Nordic)</option>
-                  <option value="科技赛博风 (Cyberpunk Cyber)">科技赛博风 (Cyberpunk Cyber)</option>
-                  <option value="金秋自然风 (Autumn Natural)">金秋自然风 (Autumn Natural)</option>
-                  <option value="奢华丝绸风 (Elegant Silk Satin)">奢华丝绸风 (Elegant Silk Satin)</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
-                  <span className="material-symbols-outlined text-sm font-bold">expand_more</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 3. 比例 & 张数 */}
-            <div className="flex space-x-4">
-              <div className="flex-1">
-                <label className="block text-xs lg:text-sm font-bold text-slate-700 mb-2">比例</label>
-                <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
-                  {(['3:4', '1:1', '16:9'] as const).map((ratio) => (
-                    <button
-                      key={ratio}
-                      onClick={() => setAspectRatio(ratio)}
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                        aspectRatio === ratio
-                          ? 'bg-white shadow-xs text-blue-600'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      {ratio}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="w-20 lg:w-24">
-                <label className="block text-xs lg:text-sm font-bold text-slate-700 mb-2">张数</label>
-                <input 
-                  className="block w-full h-10 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 text-center font-bold focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  max="10"
-                  min="1"
-                  type="number"
-                  value={batchCount}
-                  onChange={(e) => setBatchCount(parseInt(e.target.value) || 1)}
-                />
-              </div>
-            </div>
-
-            {/* 4. 场景 & 动作 */}
-            <div className="flex space-x-4">
-              <div className="flex-1">
-                <label className="block text-xs lg:text-sm font-bold text-slate-700 mb-2">场景</label>
-                <div className="relative">
-                  <select 
-                    className="block w-full h-10 pl-3 pr-8 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none font-bold cursor-pointer"
-                    value={sceneOption}
-                    onChange={(e) => setSceneOption(e.target.value)}
-                  >
-                    <option value="室内影棚">室内影棚</option>
-                    <option value="海边礁石">海边礁石</option>
-                    <option value="大理石展台">大理石展台</option>
-                    <option value="赛博网格">赛博网格</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                    <span className="material-symbols-outlined text-sm font-bold">expand_more</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex-1">
-                <label className="block text-xs lg:text-sm font-bold text-slate-700 mb-2">动作/姿势</label>
-                <div className="relative">
-                  <select 
-                    className="block w-full h-10 pl-3 pr-8 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none font-bold cursor-pointer"
-                    value={poseOption}
-                    onChange={(e) => setPoseOption(e.target.value)}
-                  >
-                    <option value="站姿正面">站姿正面</option>
-                    <option value="侧身侧视">侧身侧视</option>
-                    <option value="优雅俯坐">优雅俯坐</option>
-                    <option value="动态慢行">动态慢行</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                    <span className="material-symbols-outlined text-sm font-bold">expand_more</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 5. 底层模型通道 */}
-            <div>
-              <label className="block text-xs lg:text-sm font-bold text-slate-700 mb-2">底层模型通道</label>
-              <div className="space-y-3">
-                {/* Model 1 (Selected) */}
-                <label 
-                  onClick={() => setModelChannel('runway')}
-                  className={`flex items-start p-3 border rounded-xl cursor-pointer relative transition-all ${
-                    modelChannel === 'runway' ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center h-5">
-                    <input 
-                      checked={modelChannel === 'runway'}
-                      onChange={() => setModelChannel('runway')}
-                      className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300"
-                      name="model"
-                      type="radio"
-                    />
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <div className="flex justify-between items-center mb-0.5">
-                      <span className="text-xs lg:text-sm font-bold text-slate-900">Runway Gen-V</span>
-                      <span className="bg-blue-500 text-white text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md font-bold">推荐</span>
-                    </div>
-                    <p className="text-[10px] lg:text-xs text-slate-400 font-medium">高保真，适合质感服饰</p>
-                  </div>
-                </label>
-
-                {/* Model 2 */}
-                <label 
-                  onClick={() => setModelChannel('vidu')}
-                  className={`flex items-start p-3 border rounded-xl cursor-pointer transition-all ${
-                    modelChannel === 'vidu' ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center h-5">
-                    <input 
-                      checked={modelChannel === 'vidu'}
-                      onChange={() => setModelChannel('vidu')}
-                      className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300"
-                      name="model"
-                      type="radio"
-                    />
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <span className="block text-xs lg:text-sm font-bold text-slate-900 mb-0.5">Vidu 极速版</span>
-                    <p className="text-[10px] lg:text-xs text-slate-400 font-medium">生成快，适合网红风格</p>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Spacer */}
-            <div className="flex-1 min-h-[20px]" />
-
-            {/* 6. Prompt 编辑器 Widget */}
-            <div className="border border-slate-200 bg-white rounded-xl overflow-hidden shadow-xs">
-              <div className="p-4 bg-slate-50/80 border-b border-slate-100">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center">
-                    <span className="material-symbols-outlined text-slate-500 mr-1.5 text-lg font-bold">integration_instructions</span>
-                    <div>
-                      <h3 className="text-xs lg:text-sm font-bold text-slate-800">Prompt 编辑器</h3>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end space-y-1.5">
-                    <button 
-                      onClick={handleAIOptimize}
-                      className="bg-blue-600 text-white hover:bg-blue-700 text-[10px] px-2.5 py-1 rounded-md font-bold flex items-center shadow-xs cursor-pointer transition-all active:scale-97"
-                    >
-                      <span className="material-symbols-outlined text-[11px] mr-1 font-bold">auto_awesome</span>
-                      AI 建议
-                    </button>
-                    <button 
-                      onClick={handleResetToTemplate}
-                      className="text-blue-600 text-[10px] hover:underline font-bold bg-transparent border-0 cursor-pointer"
-                    >
-                      重新套用全局模板
-                    </button>
-                  </div>
-                </div>
-                <div className="text-[9px] lg:text-[10px] text-slate-400 mt-2 font-mono">
-                  全局模板版本: v2.1 | 任务级 Prompt 副本
-                </div>
-              </div>
-              <div className="p-3">
-                <textarea 
-                  value={promptText}
-                  onChange={(e) => setPromptText(e.target.value)}
-                  className="w-full text-[11px] font-mono leading-relaxed text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200 outline-none resize-none min-h-[120px] focus:bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20"
-                />
-              </div>
-            </div>
-
+          <TaskParamsPanel
+            group="IMAGE"
+            prefill={imagePrefill}
+            unified={{
+              productName,
+              sellingPoints,
+              keyDetails,
+              constraints: [
+                constrainColor ? '颜色' : '',
+                constrainPattern ? '图案' : '',
+                constrainLogo ? 'Logo' : '',
+                constrainFit ? '版型' : '',
+              ].filter(Boolean),
+            }}
+            aspectRatio={aspectRatio}
+            count={count}
+            onAspectRatioChange={setAspectRatio}
+            onCountChange={setCount}
+            prompt={promptText}
+            onPromptChange={setPromptText}
+            negativePrompt={negativePrompt}
+            onNegativePromptChange={setNegativePrompt}
+            onParamsChange={setTaskParams}
+          />
+          <div className="mt-auto p-4 border-t border-slate-100 flex gap-2">
+            <button onClick={() => setScreen(AppScreen.TASKS)} className="flex-1 py-2 text-sm border border-slate-200 rounded-md">取消</button>
+            <button onClick={handleSubmitTask} className="flex-1 py-2 text-sm text-white rounded-md bg-blue-600">提交任务</button>
           </div>
         </div>
 
