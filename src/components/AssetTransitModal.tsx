@@ -44,8 +44,16 @@ interface AssetTransitModalProps {
   onClose: () => void;
   onSelectProduct?: (product: ProductAsset) => void;
   selectedProduct?: ProductAsset;
-  /** 选中确认回调 —— 接收 fileResourceId 数组(真实业务标识) */
-  onConfirmSelection?: (selectedFileResourceIds: number[]) => void;
+  /** 选中确认回调 —— 接收完整 AssetResourceItem 列表(避免父组件二次反查丢失) */
+  onConfirmSelection?: (selected: AssetResourceItem[]) => void;
+  /** 是否允许多选(默认 false);true 时累加,false 时点击替换 */
+  multiSelect?: boolean;
+  /**
+   * 模式:
+   * - 'picker' (默认):业务型,从 task slot 弹出的资源选择
+   * - 'manager':管理型,从菜单资源中心入口直接打开,强制多选,确认选择置灰
+   */
+  mode?: 'picker' | 'manager';
   /** 上传用途:AVATAR / PRODUCT / OTHER —— 默认 OTHER */
   purpose?: 'AVATAR' | 'PRODUCT' | 'OTHER';
   /** 关联商品 ID —— purpose=PRODUCT 时必填 */
@@ -62,7 +70,9 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   onConfirmSelection,
   purpose = 'OTHER',
   productId,
-  targetSlot = 'main'
+  targetSlot = 'main',
+  multiSelect = false,
+  mode = 'picker',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   /** 分类树折叠状态 —— 存被折叠的节点 id,默认空 = 全部展开 */
@@ -169,11 +179,18 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   // Filter logic —— 服务端 query 已处理 keyword/categoryId,客户端不兜底过滤
   const filteredAssets = assets;
 
+  // mode='manager' 强制多选;picker 模式尊重调用方的 multiSelect
+  const effectiveMultiSelect = mode === 'manager' ? true : multiSelect;
+
   const handleCardClick = (id: number) => {
-    if (selectedAssetIds.includes(id)) {
-      setSelectedAssetIds(prev => prev.filter(x => x !== id));
+    if (effectiveMultiSelect) {
+      // 多选:toggle 累加
+      setSelectedAssetIds(prev =>
+        prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
+      );
     } else {
-      setSelectedAssetIds(prev => [...prev, id]);
+      // 单选:替换(单选场景下选别的就覆盖,不需要 toggle)
+      setSelectedAssetIds([id]);
     }
   };
 
@@ -318,20 +335,25 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
   const handleConfirmSelection = () => {
     if (selectedAssetIds.length === 0) {
-      alert('请至少选择一个资源！');
+      toast.warning('请至少选择一个资源');
       return;
     }
 
     if (onConfirmSelection) {
-      // 真后端协议:传 fileResourceId[] 给父组件
-      const fileResIds = selectedAssetIds
-        .map((id) => {
-          const item = assets.find((a) => a.id === id);
-          return item?.fileResourceId ?? null;
-        })
-        .filter((x): x is number => x !== null);
+      // 真后端协议:把当前页 assets 中选中的 item 完整透传给父组件
+      // 父组件按需取 fileResourceId / thumbnailUrl / name
+      const items = selectedAssetIds
+        .map((id) => assets.find((a) => a.id === id))
+        .filter((x): x is AssetResourceItem => x !== undefined);
 
-      onConfirmSelection(fileResIds);
+      // 校验 fileResourceId:任一缺失则不允许确认(数据异常)
+      const missing = items.filter((it) => it.fileResourceId == null);
+      if (missing.length > 0) {
+        toast.error('所选资源缺少文件标识,请重新选择');
+        return;
+      }
+
+      onConfirmSelection(items);
     } else if (onSelectProduct && products && products.length > 0) {
       // 兼容老 onSelectProduct 行为(若父组件没用 onConfirmSelection)
       const firstItem = assets.find((a) => a.id === selectedAssetIds[0]);
@@ -972,7 +994,15 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                 </button>
                 <button
                   onClick={handleConfirmSelection}
-                  className="px-8 py-2 bg-blue-600 text-white rounded-lg text-xs font-extrabold hover:bg-blue-700 hover:shadow-md transition-all cursor-pointer"
+                  disabled={mode === 'manager' || selectedAssetIds.length === 0}
+                  title={
+                    mode === 'manager'
+                      ? '管理型入口,不需要选择资源'
+                      : selectedAssetIds.length === 0
+                        ? '请先选择资源'
+                        : undefined
+                  }
+                  className="px-8 py-2 bg-blue-600 text-white rounded-lg text-xs font-extrabold hover:bg-blue-700 hover:shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   确认选择
                 </button>

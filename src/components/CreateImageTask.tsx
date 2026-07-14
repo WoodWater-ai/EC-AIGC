@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ProductAsset, GenerationTask, AppScreen } from '../types';
-import { AssetTransitModal } from './AssetTransitModal';
+import { TransitPickerButton } from './common/TransitPickerButton';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { templateApi, type TemplateDTO } from '../api/modules/template';
 import { TaskParamsPanel } from './createTask/TaskParamsPanel';
 import { buildSubmitPayload } from './createTask/buildSubmitPayload';
 import { submitTask } from '../api/modules/task';
+import { type SlotKey, type SlotRef } from './createTask/slots';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
@@ -28,55 +29,14 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     templateApi.page({ pageSize: 200, status: 'NORMAL' }),
   );
   const templates: TemplateDTO[] = data?.list ?? [];
-  // Internal Asset Transit Modal states for Image Task
-  const [isInternalTransitOpen, setIsInternalTransitOpen] = useState(false);
-  const [transitTargetSlot, setTransitTargetSlot] = useState<'main' | 'top' | 'bottom' | 'detail' | 'style' | 'scene' | 'pose'>('main');
-
-  // 7 个 slot 的 fileResourceId(真实业务标识,后续任务创建请求用)
-  const [mainFileResId, setMainFileResId] = useState<number | null>(null);
-  const [topClothingFileResId, setTopClothingFileResId] = useState<number | null>(null);
-  const [bottomClothingFileResId, setBottomClothingFileResId] = useState<number | null>(null);
-  const [detailFileResId, setDetailFileResId] = useState<number | null>(null);
-  const [styleFileResId, setStyleFileResId] = useState<number | null>(null);
-  const [sceneFileResId, setSceneFileResId] = useState<number | null>(null);
-  const [poseFileResId, setPoseFileResId] = useState<number | null>(null);
-
-  const handleTransitConfirmSelection = (selectedFileResourceIds: number[]) => {
-    if (selectedFileResourceIds.length === 0) return;
-    const firstId = selectedFileResourceIds[0];
-
-    switch (transitTargetSlot) {
-      case 'main':
-        // 主图:暂存 fileResourceId;UI 上保留 thumbnail 显示(由现有 selectedProduct.thumbnail)
-        setMainFileResId(firstId);
-        break;
-      case 'top':
-        setTopClothingFileResId(firstId);
-        setTopClothingUploaded(true);
-        break;
-      case 'bottom':
-        setBottomClothingFileResId(firstId);
-        setBottomClothingUploaded(true);
-        break;
-      case 'detail':
-        setDetailFileResId(firstId);
-        setDetailRefUploaded(true);
-        break;
-      case 'style':
-        setStyleFileResId(firstId);
-        setStyleRefParsed(true);
-        break;
-      case 'scene':
-        setSceneFileResId(firstId);
-        setSceneRefUploaded(true);
-        break;
-      case 'pose':
-        setPoseFileResId(firstId);
-        setPoseRefUploaded(true);
-        break;
-    }
-    setIsInternalTransitOpen(false);
-  };
+  // 7 个 slot 的资源引用(统一 Record,替代原 13 个独立 state)
+  const [slotRefs, setSlotRefs] = useState<Record<SlotKey, SlotRef | null>>({
+    main: null, top: null, bottom: null, detail: null,
+    style: null, scene: null, pose: null,
+  });
+  const setSlotRef = useCallback((slot: SlotKey, ref: SlotRef | null) => {
+    setSlotRefs((prev) => ({ ...prev, [slot]: ref }));
+  }, []);
 
   // Input fields in Middle Column
   const [productName, setProductName] = useState(selectedProduct.name);
@@ -105,15 +65,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   // Assembled Prompt state
   const [promptText, setPromptText] = useState('');
 
-  // Local state for composite setup and mock reference images upload
-  const [topClothingUploaded, setTopClothingUploaded] = useState(false);
-  const [bottomClothingUploaded, setBottomClothingUploaded] = useState(false);
+  // Local state for composite setup
   const [hasCompositePreviewed, setHasCompositePreviewed] = useState(false);
-
-  const [detailRefUploaded, setDetailRefUploaded] = useState(false);
-  const [styleRefParsed, setStyleRefParsed] = useState(true);
-  const [sceneRefUploaded, setSceneRefUploaded] = useState(false);
-  const [poseRefUploaded, setPoseRefUploaded] = useState(false);
 
   // Mock Upload state for main asset
   const [isUploading, setIsUploading] = useState(false);
@@ -168,7 +121,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   };
 
   const handleCompositePreview = () => {
-    if (!topClothingUploaded || !bottomClothingUploaded) {
+    if (!slotRefs.top || !slotRefs.bottom) {
       alert('请先添加上衣和下装素材后再进行合成！');
       return;
     }
@@ -205,6 +158,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
       schemaParams: taskParams.schemaParams,
       templateId: imagePrefill?.templateId,
       templateVersionId: imagePrefill?.templateVersionId,
+      slotRefs,
     });
     try {
       await submitTask(payload);
@@ -293,20 +247,19 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
           <div className="p-5 space-y-6">
             
             {/* Primary Image Upload Box */}
-            <div 
-              onClick={() => {
-                setTransitTargetSlot('main');
-                setIsInternalTransitOpen(true);
-              }}
-              className="relative border-2 border-dashed border-blue-250 rounded-xl p-5 bg-blue-50/50 flex flex-col items-center justify-center text-center hover:bg-blue-50 transition-colors cursor-pointer group"
-            >
+            <div className="relative border-2 border-dashed border-blue-250 rounded-xl p-5 bg-blue-50/50 flex flex-col items-center justify-center text-center hover:bg-blue-50 transition-colors group">
               <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center mb-2.5 shadow-xs group-hover:shadow text-blue-500 transition-shadow">
                 <span className="material-symbols-outlined text-xl">cloud_upload</span>
               </div>
-              <div className="text-blue-600 font-bold text-xs lg:text-sm mb-1">
-                点击上传图片打开资源中心
-              </div>
-              <div className="text-[10px] lg:text-xs text-slate-400 leading-relaxed max-w-[240px]">
+              <TransitPickerButton
+                slot="main"
+                value={slotRefs.main}
+                onChange={(next) => setSlotRef('main', next)}
+                size="lg"
+                variant="primary"
+                placeholder="点击上传图片打开资源中心"
+              />
+              <div className="text-[10px] lg:text-xs text-slate-400 leading-relaxed max-w-[240px] mt-2">
                 所有资源选择都要打开资源中心，支持本地上传与目录扫描，可多选及勾选上传。
               </div>
               <div className="text-[9px] lg:text-[10px] text-slate-400 mt-2 font-mono">
@@ -325,52 +278,26 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                 <div className="flex items-center space-x-3 w-full justify-center mb-4">
                   
                   {/* Top slot */}
-                  <div 
-                    onClick={() => {
-                      setTransitTargetSlot('top');
-                      setIsInternalTransitOpen(true);
-                    }}
-                    className={`w-20 h-24 lg:w-24 lg:h-28 border border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors ${
-                      topClothingUploaded ? 'border-blue-400 bg-blue-50/50 text-blue-600' : 'border-slate-200 bg-slate-50 text-slate-400 hover:bg-slate-100'
-                    }`}
-                  >
-                    {topClothingUploaded ? (
-                      <>
-                        <span className="material-symbols-outlined text-xl mb-1 text-blue-500">check_circle</span>
-                        <span className="text-[9px] lg:text-[10px] font-bold">已添加上衣</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="material-symbols-outlined text-xl mb-1">checkroom</span>
-                        <span className="text-[9px] lg:text-[10px]">添加上衣</span>
-                      </>
-                    )}
-                  </div>
+                  <TransitPickerButton
+                    slot="top"
+                    value={slotRefs.top}
+                    onChange={(next) => setSlotRef('top', next)}
+                    size="md"
+                    placeholder="添加上衣"
+                    icon="checkroom"
+                  />
 
                   <div className="text-slate-300 text-lg font-bold">+</div>
 
                   {/* Bottom slot */}
-                  <div 
-                    onClick={() => {
-                      setTransitTargetSlot('bottom');
-                      setIsInternalTransitOpen(true);
-                    }}
-                    className={`w-20 h-24 lg:w-24 lg:h-28 border border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors ${
-                      bottomClothingUploaded ? 'border-blue-400 bg-blue-50/50 text-blue-600' : 'border-slate-200 bg-slate-50 text-slate-400 hover:bg-slate-100'
-                    }`}
-                  >
-                    {bottomClothingUploaded ? (
-                      <>
-                        <span className="material-symbols-outlined text-xl mb-1 text-blue-500">check_circle</span>
-                        <span className="text-[9px] lg:text-[10px] font-bold">已添加下装</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="material-symbols-outlined text-xl mb-1">accessibility_new</span>
-                        <span className="text-[9px] lg:text-[10px]">添加下装</span>
-                      </>
-                    )}
-                  </div>
+                  <TransitPickerButton
+                    slot="bottom"
+                    value={slotRefs.bottom}
+                    onChange={(next) => setSlotRef('bottom', next)}
+                    size="md"
+                    placeholder="添加下装"
+                    icon="accessibility_new"
+                  />
 
                 </div>
 
@@ -395,73 +322,51 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                 
                 {/* Slot 1: Details */}
                 <div className="flex flex-col items-center">
-                  <button 
-                    onClick={() => {
-                      setTransitTargetSlot('detail');
-                      setIsInternalTransitOpen(true);
-                    }}
-                    className={`w-full aspect-square border border-dashed rounded-lg flex items-center justify-center cursor-pointer mb-1 transition-all ${
-                      detailRefUploaded ? 'border-blue-500 bg-blue-50 text-blue-500' : 'border-slate-300 bg-slate-50 text-slate-400 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-lg">{detailRefUploaded ? 'check' : '+'}</span>
-                  </button>
-                  <span className={`text-[10px] font-medium ${detailRefUploaded ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>细节</span>
+                  <TransitPickerButton
+                    slot="detail"
+                    value={slotRefs.detail}
+                    onChange={(next) => setSlotRef('detail', next)}
+                    size="sm"
+                    placeholder="细节"
+                  />
+                  <span className={`text-[10px] font-medium mt-1 ${slotRefs.detail ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>细节</span>
                 </div>
 
                 {/* Slot 2: Style */}
                 <div className="flex flex-col items-center">
-                  <button 
-                    onClick={() => {
-                      setTransitTargetSlot('style');
-                      setIsInternalTransitOpen(true);
-                    }}
-                    className={`w-full aspect-square border rounded-lg flex flex-col relative overflow-hidden cursor-pointer mb-1 shadow-xs transition-all ${
-                      styleRefParsed ? 'border-blue-400 bg-blue-50' : 'border-slate-300 bg-slate-50'
-                    }`}
-                  >
-                    <div className={`flex-1 flex items-center justify-center ${styleRefParsed ? 'text-blue-500' : 'text-slate-400'}`}>
-                      <span className="material-symbols-outlined text-xl">palette</span>
-                    </div>
-                    {styleRefParsed && (
-                      <div className="bg-blue-500 text-white text-[8px] text-center py-[2px] absolute bottom-0 w-full font-bold">
-                        已解析
-                      </div>
-                    )}
-                  </button>
-                  <span className={`text-[10px] font-medium ${styleRefParsed ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>风格</span>
+                  <TransitPickerButton
+                    slot="style"
+                    value={slotRefs.style}
+                    onChange={(next) => setSlotRef('style', next)}
+                    size="sm"
+                    placeholder="风格"
+                    icon="palette"
+                  />
+                  <span className={`text-[10px] font-medium mt-1 ${slotRefs.style ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>风格</span>
                 </div>
 
                 {/* Slot 3: Scene */}
                 <div className="flex flex-col items-center">
-                  <button 
-                    onClick={() => {
-                      setTransitTargetSlot('scene');
-                      setIsInternalTransitOpen(true);
-                    }}
-                    className={`w-full aspect-square border border-dashed rounded-lg flex items-center justify-center cursor-pointer mb-1 transition-all ${
-                      sceneRefUploaded ? 'border-blue-500 bg-blue-50 text-blue-500' : 'border-slate-300 bg-slate-50 text-slate-400 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-lg">{sceneRefUploaded ? 'check' : '+'}</span>
-                  </button>
-                  <span className={`text-[10px] font-medium ${sceneRefUploaded ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>场景</span>
+                  <TransitPickerButton
+                    slot="scene"
+                    value={slotRefs.scene}
+                    onChange={(next) => setSlotRef('scene', next)}
+                    size="sm"
+                    placeholder="场景"
+                  />
+                  <span className={`text-[10px] font-medium mt-1 ${slotRefs.scene ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>场景</span>
                 </div>
 
                 {/* Slot 4: Pose */}
                 <div className="flex flex-col items-center">
-                  <button 
-                    onClick={() => {
-                      setTransitTargetSlot('pose');
-                      setIsInternalTransitOpen(true);
-                    }}
-                    className={`w-full aspect-square border border-dashed rounded-lg flex items-center justify-center cursor-pointer mb-1 transition-all ${
-                      poseRefUploaded ? 'border-blue-500 bg-blue-50 text-blue-500' : 'border-slate-300 bg-slate-50 text-slate-400 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-lg">{poseRefUploaded ? 'check' : '+'}</span>
-                  </button>
-                  <span className={`text-[10px] font-medium ${poseRefUploaded ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>姿势</span>
+                  <TransitPickerButton
+                    slot="pose"
+                    value={slotRefs.pose}
+                    onChange={(next) => setSlotRef('pose', next)}
+                    size="sm"
+                    placeholder="姿势"
+                  />
+                  <span className={`text-[10px] font-medium mt-1 ${slotRefs.pose ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>姿势</span>
                 </div>
 
               </div>
@@ -782,16 +687,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
           </button>
         </div>
       </footer>
-
-      {isInternalTransitOpen && (
-        <AssetTransitModal
-          purpose="PRODUCT"
-          productId={selectedProduct?.id ? Number(selectedProduct.id) : undefined}
-          onClose={() => setIsInternalTransitOpen(false)}
-          onConfirmSelection={handleTransitConfirmSelection}
-          targetSlot={transitTargetSlot}
-        />
-      )}
 
     </div>
   );
