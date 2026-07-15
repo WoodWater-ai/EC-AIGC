@@ -19,8 +19,14 @@ export interface SlotRef {
   thumbnailUrl?: string;
   /** 原图 URL —— 合成/COS 处理等需要原图质量的场景用 */
   originalUrl?: string;
-  /** 资源名 —— slot 已选态标签 */
+  /** 资源名 —— slot 已选态标签 + 同步给商品主体图区 */
   name?: string;
+  /** 文件大小(字节) —— 商品主体图区显示用 */
+  fileSize?: number;
+  /** 图片原始宽度(px) —— 商品主体图区显示用 */
+  width?: number;
+  /** 图片原始高度(px) —— 商品主体图区显示用 */
+  height?: number;
 }
 
 export interface SlotMeta {

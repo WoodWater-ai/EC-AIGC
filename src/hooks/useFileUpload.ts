@@ -20,7 +20,7 @@ import { fileApi } from '../api/modules/file';
  *   - COS 上传失败    → throw Error(COS 返回的错误码 + message)
  *   - upload-complete 失败 → throw Error(message)
  */
-export type FileUploadPurpose = 'AVATAR' | 'PRODUCT' | 'OTHER';
+export type FileUploadPurpose = 'AVATAR' | 'PRODUCT' | 'OTHER' | 'UP_DOWN_MERGE';
 
 export interface UseFileUploadOptions {
   purpose: FileUploadPurpose;
@@ -53,6 +53,69 @@ function getCos(tmpSecretId: string, tmpSecretKey: string, sessionToken: string)
   return cachedCos;
 }
 
+/** 媒体元数据 —— 上传 complete 时回传给后端 */
+export interface MediaMeta {
+  width?: number;
+  height?: number;
+  durationSec?: number;
+}
+
+/**
+ * 本地读取文件媒体元数据(图片读宽高,视频读时长)
+ * - 图片:走 createImageBitmap 异步 API(无需 DOM)
+ * - 视频:用 <video> 元素 + loadedmetadata 事件
+ * - 失败返回空对象(不会阻塞上传)
+ */
+export async function readMediaMeta(file: File): Promise<MediaMeta> {
+  const mime = file.type || '';
+  const isImage = mime.startsWith('image/');
+  const isVideo = mime.startsWith('video/');
+
+  if (!isImage && !isVideo) return {};
+
+  if (isImage) {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const meta = { width: bitmap.width, height: bitmap.height };
+      bitmap.close?.();
+      return meta;
+    } catch {
+      return {};
+    }
+  }
+
+  // 视频:用 <video> 元素
+  return new Promise<MediaMeta>((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    let settled = false;
+    const cleanup = () => {
+      URL.revokeObjectURL(video.src);
+      video.removeAttribute('src');
+      video.load();
+    };
+    const finish = (meta: MediaMeta) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(meta);
+    };
+    video.onloadedmetadata = () => {
+      finish({
+        width: video.videoWidth || undefined,
+        height: video.videoHeight || undefined,
+        durationSec: Number.isFinite(video.duration) ? Math.round(video.duration) : undefined,
+      });
+    };
+    video.onerror = () => finish({});
+    video.src = URL.createObjectURL(file);
+    // 安全超时:3s 后强制返回
+    setTimeout(() => finish({}), 3000);
+  });
+}
+
 export function useFileUpload(options: UseFileUploadOptions) {
   const { purpose, productId, onProgress } = options;
 
@@ -78,6 +141,10 @@ export function useFileUpload(options: UseFileUploadOptions) {
         if (!info || !info.fileKey || !info.bucket || !info.region) {
           throw new Error('上传凭证不完整(缺少 fileKey/bucket/region)');
         }
+
+        // Step 1.5: 本地读取媒体元数据(宽高 / 时长)
+        // 失败不阻塞上传;后端可选地用这些字段入库
+        const mediaMeta = await readMediaMeta(file);
 
         // Step 2: 用 COS SDK 上传
         const cos = getCos(
@@ -120,10 +187,14 @@ export function useFileUpload(options: UseFileUploadOptions) {
         );
 
         // Step 3: 上传完成回调(只调 complete,create 由调用方决定,assetType 由业务上下文决定)
+        // 携带本地读取的 width/height/durationSec,后端入库用
         const completeResp = await fileApi.uploadComplete({
           fileKey: cosResult.Key,
           fileSize: file.size,
           mimeType: file.type || 'application/octet-stream',
+          width: mediaMeta.width,
+          height: mediaMeta.height,
+          durationSec: mediaMeta.durationSec,
         });
 
         const out: FileUploadResult = {
