@@ -40,6 +40,11 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   });
   const setSlotRef = useCallback((slot: SlotKey, ref: SlotRef | null) => {
     setSlotRefs((prev) => ({ ...prev, [slot]: ref }));
+    // 主图 slot 选中时,同步商品名称(取文件名去后缀)—— 与 setSlotRefs 同步触发,避免 useEffect 延迟
+    if (slot === 'main' && ref?.name) {
+      const nameNoExt = ref.name.replace(/\.[^./\\]+$/, '');
+      setProductName(nameNoExt);
+    }
   }, []);
 
   // Input fields in Middle Column
@@ -85,15 +90,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   }, [selectedProduct]);
 
   // 主图 slot 选中时,同步商品名称(取文件名去后缀)
-  // 缩略图不在这里同步:商品主体图区直接读 slotRefs.main,避免 useEffect 延迟
-  useEffect(() => {
-    const main = slotRefs.main;
-    if (!main) return;
-    if (main.name) {
-      const nameNoExt = main.name.replace(/\.[^./\\]+$/, '');
-      setProductName(nameNoExt);
-    }
-  }, [slotRefs.main?.fileResourceId]);  // 仅当 fileResourceId 变化时触发(避免循环)
+// 注意:不再用 useEffect,而是在 setSlotRef 内部直接 setProductName,避免 1 个 render 周期延迟
+// (历史上用 useEffect 时有延迟问题,后改用同步写法)
+
+// (保留占位 —— 之前 useEffect 实现的版本在这里;已移除以消除延迟)
 
   /** 字节数格式化为 KB/MB 显示串 */
   function formatFileSize(bytes: number): string {
@@ -545,14 +545,15 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                   <div className="border border-slate-200 rounded-xl p-3 flex items-start space-x-4 bg-slate-50/50">
                     {/* Preview Thumbnail —— 直接读 slotRefs.main,避免 useEffect 延迟 */}
                     <div className="w-16 h-16 lg:w-20 lg:h-20 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center text-slate-300 relative group overflow-hidden shrink-0">
-                      {(slotRefs.main?.thumbnailUrl ?? slotRefs.main?.originalUrl ?? selectedProduct.thumbnail) ? (
+                      {slotRefs.main ? (
                         <img
-                          src={slotRefs.main?.thumbnailUrl ?? slotRefs.main?.originalUrl ?? selectedProduct.thumbnail ?? ''}
-                          alt={selectedProduct.name}
+                          src={slotRefs.main.thumbnailUrl ?? slotRefs.main.originalUrl ?? ''}
+                          alt={slotRefs.main.name ?? ''}
                           className="w-full h-full object-contain"
                           referrerPolicy="no-referrer"
                         />
                       ) : (
+                        // 未选主图:在缩略图占位区显示提示
                         <span className="material-symbols-outlined text-2xl">image</span>
                       )}
 
@@ -564,26 +565,41 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
 
                     {/* Metadata details */}
                     <div className="flex-1 min-w-0 pt-1">
-                      <div className="flex items-center mb-1.5 flex-wrap gap-2">
-                        <span className="bg-slate-100 text-slate-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-slate-200 font-bold">
-                          商品原图
-                        </span>
-                        <span className="text-xs lg:text-sm font-bold text-slate-800 truncate">
-                          {slotRefs.main?.name ?? (selectedProduct.thumbnail ? 'uploaded_arrival_asset.jpg' : 'new_arrival_01.jpg')}
-                        </span>
-                      </div>
-                      <div className="text-[10px] lg:text-xs text-slate-400 font-mono">
-                        {(() => {
-                          const w = slotRefs.main?.width;
-                          const h = slotRefs.main?.height;
-                          const size = slotRefs.main?.fileSize;
-                          const sizeStr = size != null ? formatFileSize(size) : null;
-                          if (w && h) {
-                            return `尺寸: ${w}×${h}${sizeStr ? ` | 大小: ${sizeStr}` : ''}`;
-                          }
-                          return sizeStr ? `大小: ${sizeStr}` : '尺寸: 1024x1024 | 大小: 2.4 MB';
-                        })()}
-                      </div>
+                      {!slotRefs.main ? (
+                        // 未选主图:显示提示文字
+                        <div className="flex items-center mb-1.5 flex-wrap gap-2">
+                          <span className="bg-amber-50 text-amber-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-amber-200 font-bold">
+                            待选择
+                          </span>
+                          <span className="text-xs lg:text-sm font-bold text-amber-700 truncate">
+                            请选择主图
+                          </span>
+                        </div>
+                      ) : (
+                        // 已选:显示文件名 + 尺寸/大小
+                        <>
+                          <div className="flex items-center mb-1.5 flex-wrap gap-2">
+                            <span className="bg-slate-100 text-slate-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-slate-200 font-bold">
+                              商品原图
+                            </span>
+                            <span className="text-xs lg:text-sm font-bold text-slate-800 truncate">
+                              {slotRefs.main.name ?? '未命名'}
+                            </span>
+                          </div>
+                          <div className="text-[10px] lg:text-xs text-slate-400 font-mono">
+                            {(() => {
+                              const w = slotRefs.main.width;
+                              const h = slotRefs.main.height;
+                              const size = slotRefs.main.fileSize;
+                              const sizeStr = size != null ? formatFileSize(size) : null;
+                              if (w && h) {
+                                return `尺寸: ${w}×${h}${sizeStr ? ` | 大小: ${sizeStr}` : ''}`;
+                              }
+                              return sizeStr ? `大小: ${sizeStr}` : '尺寸未知';
+                            })()}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -594,16 +610,25 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                     <label className="text-xs lg:text-sm font-bold text-slate-700" htmlFor="product_name">
                       商品名称 <span className="text-red-500">*</span>
                     </label>
-                    <span className="bg-blue-50 text-blue-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-blue-100 font-bold">
-                      AI 已识别
+                    <span className={`text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border font-bold ${
+                      productName.trim()
+                        ? 'bg-blue-50 text-blue-600 border-blue-100'
+                        : 'bg-amber-50 text-amber-600 border-amber-200'
+                    }`}>
+                      {productName.trim() ? 'AI 已识别' : '待填写'}
                     </span>
                   </div>
                   <input
-                    className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-medium outline-none transition-shadow"
+                    className={`w-full h-10 px-3 border rounded-lg text-xs lg:text-sm font-medium outline-none transition-shadow ${
+                      productName.trim()
+                        ? 'text-slate-800 bg-white border-slate-200 focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
+                        : 'text-amber-700 bg-amber-50/30 border-amber-200 focus:ring-1 focus:ring-amber-400 focus:border-amber-400'
+                    }`}
                     id="product_name"
                     type="text"
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
+                    placeholder="将自动读取商品主图名称,也可手动输入"
                   />
                 </div>
 
