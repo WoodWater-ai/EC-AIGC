@@ -84,6 +84,24 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     setFabricTexture(selectedProduct.specs.material || '细腻针织纹理');
   }, [selectedProduct]);
 
+  // 主图 slot 选中时,同步商品名称(取文件名去后缀)
+  // 缩略图不在这里同步:商品主体图区直接读 slotRefs.main,避免 useEffect 延迟
+  useEffect(() => {
+    const main = slotRefs.main;
+    if (!main) return;
+    if (main.name) {
+      const nameNoExt = main.name.replace(/\.[^./\\]+$/, '');
+      setProductName(nameNoExt);
+    }
+  }, [slotRefs.main?.fileResourceId]);  // 仅当 fileResourceId 变化时触发(避免循环)
+
+  /** 字节数格式化为 KB/MB 显示串 */
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
   // Reset to Global Template
   const handleResetToTemplate = () => {
     setProductName(selectedProduct.name);
@@ -330,40 +348,26 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
       {/* 2. Main Content Area (Three Columns) */}
       <main className="flex-1 flex overflow-hidden bg-white" id="create-task-main-view">
 
-        {/* Column 1: 素材上传 (Left Column) */}
+        {/* Column 1: 素材选择 (Left Column) */}
         <div className="w-[300px] lg:w-[350px] shrink-0 border-r border-slate-200 flex flex-col bg-white overflow-y-auto" id="col-upload-assets">
 
           {/* Header sticky */}
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-            <h2 className="text-sm lg:text-base font-bold text-slate-800">素材上传</h2>
-          </div>
-
-          <div className="px-5 py-2 text-[10px] lg:text-xs text-slate-400 border-b border-slate-100 bg-slate-50 font-medium">
-            上传后进入暂存抽屉，需手动分类
+            <h2 className="text-sm lg:text-base font-bold text-slate-800">素材选择</h2>
           </div>
 
           {/* Main Upload Area */}
           <div className="p-5 space-y-6">
 
             {/* Primary Image Upload Box */}
-            <div className="relative border-2 border-dashed border-blue-250 rounded-xl p-5 bg-blue-50/50 flex flex-col items-center justify-center text-center hover:bg-blue-50 transition-colors group">
-              <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center mb-2.5 shadow-xs group-hover:shadow text-blue-500 transition-shadow">
-                <span className="material-symbols-outlined text-xl">cloud_upload</span>
-              </div>
+            <div className="flex flex-col items-center">
               <TransitPickerButton
                 slot="main"
                 value={slotRefs.main}
                 onChange={(next) => setSlotRef('main', next)}
                 size="lg"
-                variant="primary"
-                placeholder="点击上传图片打开资源中心"
+                placeholder="选择产品主图"
               />
-              <div className="text-[10px] lg:text-xs text-slate-400 leading-relaxed max-w-[240px] mt-2">
-                所有资源选择都要打开资源中心，支持本地上传与目录扫描，可多选及勾选上传。
-              </div>
-              <div className="text-[9px] lg:text-[10px] text-slate-400 mt-2 font-mono">
-                通过资源中心统一管理和添加主体素材
-              </div>
             </div>
 
             {/* Composite Setup: 上下装合成套图 */}
@@ -539,11 +543,11 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                   </div>
 
                   <div className="border border-slate-200 rounded-xl p-3 flex items-start space-x-4 bg-slate-50/50">
-                    {/* Preview Thumbnail */}
+                    {/* Preview Thumbnail —— 直接读 slotRefs.main,避免 useEffect 延迟 */}
                     <div className="w-16 h-16 lg:w-20 lg:h-20 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center text-slate-300 relative group overflow-hidden shrink-0">
-                      {selectedProduct.thumbnail ? (
+                      {(slotRefs.main?.thumbnailUrl ?? slotRefs.main?.originalUrl ?? selectedProduct.thumbnail) ? (
                         <img
-                          src={selectedProduct.thumbnail}
+                          src={slotRefs.main?.thumbnailUrl ?? slotRefs.main?.originalUrl ?? selectedProduct.thumbnail ?? ''}
                           alt={selectedProduct.name}
                           className="w-full h-full object-contain"
                           referrerPolicy="no-referrer"
@@ -565,11 +569,20 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                           商品原图
                         </span>
                         <span className="text-xs lg:text-sm font-bold text-slate-800 truncate">
-                          {selectedProduct.thumbnail ? 'uploaded_arrival_asset.jpg' : 'new_arrival_01.jpg'}
+                          {slotRefs.main?.name ?? (selectedProduct.thumbnail ? 'uploaded_arrival_asset.jpg' : 'new_arrival_01.jpg')}
                         </span>
                       </div>
                       <div className="text-[10px] lg:text-xs text-slate-400 font-mono">
-                        尺寸: 1024x1024 | 大小: 2.4 MB
+                        {(() => {
+                          const w = slotRefs.main?.width;
+                          const h = slotRefs.main?.height;
+                          const size = slotRefs.main?.fileSize;
+                          const sizeStr = size != null ? formatFileSize(size) : null;
+                          if (w && h) {
+                            return `尺寸: ${w}×${h}${sizeStr ? ` | 大小: ${sizeStr}` : ''}`;
+                          }
+                          return sizeStr ? `大小: ${sizeStr}` : '尺寸: 1024x1024 | 大小: 2.4 MB';
+                        })()}
                       </div>
                     </div>
                   </div>
