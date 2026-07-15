@@ -11,7 +11,17 @@ export enum AppScreen {
   ASSET_CATEGORY = 'ASSET_CATEGORY',
   /** [v1.2 2026-07-11] Vidu 接入 — 通道异步任务列表 */
   ASYNC_TASKS = 'ASYNC_TASKS',
-  MODEL_LIBRARY = 'MODEL_LIBRARY'
+  MODEL_LIBRARY = 'MODEL_LIBRARY',
+  /** 智能模板中心新流程 */
+  TEMPLATE_CENTER_NEW = 'TEMPLATE_CENTER_NEW',
+  /** 新建任务新流程 */
+  CREATE_TASK_NEW = 'CREATE_TASK_NEW',
+  /** 任务列表新流程 */
+  TASK_LIST_NEW = 'TASK_LIST_NEW',
+  /** AI Prompt 辅助新流程 */
+  PROMPT_ASSIST_NEW = 'PROMPT_ASSIST_NEW',
+  /** 推荐参数管理新流程 */
+  RECOMMEND_PARAMS_MANAGE_NEW = 'RECOMMEND_PARAMS_MANAGE_NEW'
 }
 
 export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'on_model';

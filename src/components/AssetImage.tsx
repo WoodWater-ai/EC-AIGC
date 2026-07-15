@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ImageOff } from 'lucide-react';
+import { withCosThumbnail } from '../utils/cosImage';
 
 interface AssetImageProps {
   /** URL 数组,按顺序尝试加载;任一加载成功就停在当前 src,全部失败显示缺损图 */
@@ -11,6 +12,12 @@ interface AssetImageProps {
   fallback?: React.ReactNode;
   /** 资源类型:视频用 <video> 元素,图片用 <img> */
   assetKind?: 'IMAGE' | 'VIDEO';
+  /**
+   * 图片最大宽度(px)。仅对 IMAGE 类型生效,VIDEO 不适用。
+   * 给 URL 追加 COS imageMogr2 thumbnail 参数,服务端按宽度等比缩放,避免原图流量浪费。
+   * 默认 400。传 0 或负数禁用(不添加参数)。
+   */
+  maxWidth?: number;
 }
 
 /**
@@ -33,9 +40,19 @@ export const AssetImage: React.FC<AssetImageProps> = ({
   aspectRatio = 'square',
   fallback,
   assetKind,
+  maxWidth = 400,
 }) => {
   // 过滤掉空值,记录当前尝试到第几个
   const validUrls = urls.filter((u): u is string => !!u);
+  // COS thumbnail 应用于所有"图片用途"URL:
+  //   - IMAGE 类型的 src(主用途)
+  //   - VIDEO 类型的 poster(避免 thumbnailUrl 是大图)
+  // VIDEO 类型的 src(视频本体)保持原 URL —— 它走 preload="metadata",只下头部几 KB
+  // maxWidth <= 0 时不应用(留作"禁用"开关)
+  const processedUrls =
+    maxWidth > 0
+      ? validUrls.map((u) => withCosThumbnail(u, maxWidth) ?? u)
+      : validUrls;
   const [urlIndex, setUrlIndex] = useState(0);
 
   const aspectClass =
@@ -50,7 +67,7 @@ export const AssetImage: React.FC<AssetImageProps> = ({
   };
 
   // 全部失败:显示 fallback 或默认缺损图
-  if (urlIndex >= validUrls.length) {
+  if (urlIndex >= processedUrls.length) {
     if (fallback === null || fallback === false) return null;
     if (fallback) return <>{fallback}</>;
     return (
@@ -67,6 +84,10 @@ export const AssetImage: React.FC<AssetImageProps> = ({
 
   // 视频:用 <video> 元素,preload="metadata" 只下载头部(几 KB),显示首帧
   if (assetKind === 'VIDEO') {
+    // poster 也走 COS imageMogr2:thumbnailUrl 可能是大尺寸原图,需服务端压缩
+    const processedPoster = validUrls[1]
+      ? (processedUrls[1] ?? validUrls[1])
+      : undefined;
     return (
       <div
         className={`relative overflow-hidden bg-slate-900 ${aspectClass} ${className ?? ''}`}
@@ -74,7 +95,7 @@ export const AssetImage: React.FC<AssetImageProps> = ({
         <video
           src={validUrls[urlIndex]}
           // 第二个 URL(thumbnailUrl)作为 poster 海报
-          poster={validUrls[1] || undefined}
+          poster={processedPoster}
           preload="metadata"
           muted
           playsInline
@@ -102,7 +123,7 @@ export const AssetImage: React.FC<AssetImageProps> = ({
       className={`relative overflow-hidden bg-slate-50 ${aspectClass} ${className ?? ''}`}
     >
       <img
-        src={validUrls[urlIndex]}
+        src={processedUrls[urlIndex]}
         alt={alt}
         referrerPolicy="no-referrer"
         onError={handleError}

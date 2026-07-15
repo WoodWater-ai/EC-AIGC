@@ -54,6 +54,15 @@ export const channelApi = {
     });
   },
 
+  /** 按能力分组列可用通道实例(对齐 POST /v1/admin/model-channel/list-available-by-group) — 用于建任务第一级 */
+  listAvailableByGroup(group: string) {
+    return http.post<ModelChannelDTO[]>(
+      '/v1/admin/model-channel/list-available-by-group',
+      null,
+      { params: { group } },
+    );
+  },
+
   /** 手动触发健康检查(对齐 POST /v1/admin/model-channel/health-check) */
   healthCheck() {
     return http.post<void>('/v1/admin/model-channel/health-check');
@@ -74,3 +83,16 @@ export const channelApi = {
     return http.post<void>('/v1/admin/model-channel/status', null, { params: { id, status } });
   },
 };
+
+export interface ChannelGroupModel {
+  group: string;
+  model: string;
+}
+
+/** 列某通道各 group 默认模型(建任务模型下拉) */
+export async function fetchChannelGroupModels(channelId: string): Promise<ChannelGroupModel[]> {
+  return http.post<ChannelGroupModel[]>(
+    `/v1/admin/model-channel/list-group-models?channelId=${encodeURIComponent(channelId)}`,
+    {},
+  );
+}
