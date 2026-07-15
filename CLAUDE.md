@@ -82,11 +82,14 @@ const renderScreenContent = () => { switch (currentScreen) { ... } }
 
 ## 与后端对接
 
+- 产品行为以 `docs/product/PRD-V2.3.md` 为准。
+- API 路径、DTO、错误码与调用顺序以 `docs/product/API-CONTRACT-V2.3.md` 为准。
+- 后端内部数据模型、事务和 Provider 接入见 `docs/product/BACKEND-TECHNICAL-SPEC-V2.3.md`。
 - 后端工程:`../dafenqi-ai/`(Spring Boot,端口 8090)
 - Vite dev proxy(已配,见 `vite.config.ts`):
   - 前端请求 `/api/**` → 实际 `http://localhost:8090/api/**`
   - 环境变量:`VITE_API_BASE_URL=/api`、`VITE_API_TARGET=http://localhost:8090`
-- 后端 API 路径规范见 `../dafenqi-ai/CLAUDE.md` 与 `../dafenqi-ai/docs/单体项目开发规范.md`
+- 后端仓库规范只约束后端实现方式，不覆盖本仓库的正式 API 契约
 - **当前状态**:全部数据来自 `src/mockData.ts`,真实 API 接入 TODO
 
 ## 环境变量

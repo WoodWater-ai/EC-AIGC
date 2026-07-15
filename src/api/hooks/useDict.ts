@@ -10,6 +10,8 @@
  */
 import { useServiceQuery } from './useServiceQuery';
 import { dictApi, toDictOptions, type DictItem, type DictOption } from '../modules/dict';
+import { isMockRuntime } from '../../config/runtime';
+import { mockTemplateDicts } from '../../mockData';
 
 export interface UseDictResult {
   items: DictItem[];
@@ -21,7 +23,10 @@ export interface UseDictResult {
 
 export function useDict(categoryCode: string | null | undefined): UseDictResult {
   const { data, loading, error, refetch } = useServiceQuery<DictItem[]>(
-    () => (categoryCode ? dictApi.listItemsByCode(categoryCode) : Promise.resolve([])),
+    () => {
+      if (!categoryCode) return Promise.resolve([]);
+      return isMockRuntime ? Promise.resolve(mockTemplateDicts[categoryCode] ?? []) : dictApi.listItemsByCode(categoryCode);
+    },
     [categoryCode],
   );
   return {

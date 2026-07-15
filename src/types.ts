@@ -10,14 +10,96 @@ export enum AppScreen {
   SYSTEM_CONFIG = 'SYSTEM_CONFIG',
   ASSET_CATEGORY = 'ASSET_CATEGORY',
   /** [v1.2 2026-07-11] Vidu 接入 — 通道异步任务列表 */
-  ASYNC_TASKS = 'ASYNC_TASKS'
+  ASYNC_TASKS = 'ASYNC_TASKS',
+  MODEL_LIBRARY = 'MODEL_LIBRARY'
+}
+
+export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'on_model';
+
+export const IMAGE_GENERATION_TYPE_LABELS: Record<ImageGenerationType, string> = {
+  product_main: '商品主图',
+  scene_detail: '详情/场景图',
+  detail_closeup: '细节图',
+  on_model: '上身/三视图',
+};
+
+export type TaskStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'rejected'
+  | 'candidate'
+  | 'aesthetic_review'
+  | 'listing_review'
+  | 'archived'
+  | 'cancelled';
+
+export type ResultReviewStage = 'candidate' | 'aesthetic_review' | 'listing_review' | 'approved' | 'rejected' | 'unavailable';
+
+export interface ResultReview {
+  reviewer: string;
+  timestamp: string;
+  rating?: number;
+  tags: string[];
+  comment: string;
+  decision?: 'approved' | 'rejected' | 'unavailable' | 'pending';
+}
+
+export interface GeneratedImageResult {
+  id: string;
+  url: string;
+  version: number;
+  reviewStage: ResultReviewStage;
+  parentImageId?: string;
+  editInstruction?: string;
+  maskDataUrl?: string;
+  aestheticReview?: ResultReview;
+  listingReview?: ResultReview;
+}
+
+/** 视频工作台的进入方式。只有审核通过图片入口可以预填素材。 */
+export type VideoTaskEntryContext =
+  | { kind: 'blank' }
+  | { kind: 'approved-image'; sourceTask: GenerationTask; sourceResult: GeneratedImageResult };
+
+export type VideoTaskMode = 'img2video' | 'reference2video' | 'trending_replicate';
+export type VideoAssetRole = 'first_frame' | 'style' | 'action' | 'scene' | 'product' | 'model';
+
+export interface VideoInputAsset {
+  id: string;
+  name: string;
+  url: string;
+  source: string;
+  role: VideoAssetRole;
+}
+
+export interface TrendingReplicateAnalysis {
+  keyframes: Array<{ id: string; label: string; url: string }>;
+  shots: Array<{ time: string; scene: string; action: string; camera: string }>;
+  sellingLogic: string[];
+  replacementPlan: string[];
+  risks: string[];
+  generatedPrompt: string;
+}
+
+export interface TaskModelSnapshot {
+  accessType: 'cloud' | 'local' | 'relay';
+  channelId: string;
+  channelName: string;
+  modelId: string;
+  modelName: string;
+  supportedRatios: string[];
+  maxCount: number;
+  supportedResolutions: string[];
+  estimatedCost: number;
 }
 
 export interface GenerationTask {
   id: string;
   name: string;
   type: 'image' | 'video';
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'rejected';
+  status: TaskStatus;
   progress: number; // 0 to 100
   productName: string;
   productImg: string;
@@ -36,6 +118,16 @@ export interface GenerationTask {
     prompt?: string;
     negativePrompt?: string;
   };
+  groupId?: string;
+  imageType?: ImageGenerationType;
+  parentResultId?: string;
+  editInstruction?: string;
+  maskDataUrl?: string;
+  taskPrompt?: string;
+  negativePrompt?: string;
+  reviewStrategy?: { aesthetic: boolean; listing: boolean };
+  modelSnapshot?: TaskModelSnapshot;
+  results?: GeneratedImageResult[];
   rating?: number; // 1 to 5 stars
   reviews?: {
     id: string;
@@ -58,6 +150,42 @@ export interface GenerationTask {
     upscaler: number;
     bandwidth: number;
   };
+}
+
+export interface MockModelCapability {
+  ratios: string[];
+  maxCount: number;
+  resolutions: string[];
+  durations?: number[];
+  motions?: Array<'轻微' | '适中' | '强烈'>;
+  maxReferenceImages: number;
+}
+
+export interface MockModelDefinition {
+  id: string;
+  name: string;
+  description: string;
+  capability: MockModelCapability;
+  cost: number;
+}
+
+export interface MockModelChannel {
+  id: string;
+  accessType: 'cloud' | 'local' | 'relay';
+  name: string;
+  health: 'healthy' | 'quota_low' | 'maintenance';
+  quotaText: string;
+  models: MockModelDefinition[];
+}
+
+export interface ModelProfile {
+  id: string;
+  name: string;
+  image: string;
+  source: '虚拟模特' | '授权参考' | '内部素材';
+  tags: string[];
+  suitableFor: ImageGenerationType[];
+  reason: string;
 }
 
 // 模板类型已迁移到 src/api/modules/template.ts 的 TemplateDTO
@@ -379,4 +507,3 @@ export const ASYNC_TASK_STATUS_STYLES: Record<AsyncTaskStatus, { bg: string; tex
   FAILED:         { bg: 'bg-amber-50',  text: 'text-amber-700', label: '失败(可重试)' },
   DEAD_LETTER:    { bg: 'bg-rose-50',   text: 'text-rose-700',  label: '死信' },
 };
-

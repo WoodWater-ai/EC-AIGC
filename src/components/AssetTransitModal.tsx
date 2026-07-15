@@ -8,6 +8,8 @@ import { useAuth } from '../auth/AuthContext';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { useConfirm } from './common/ConfirmProvider';
 import { AssetImage } from './AssetImage';
+import { isMockRuntime } from '../config/runtime';
+import { mockAssetCategories, mockAssetResources } from '../mockData';
 
 /**
  * 左侧仅"分类导航"(调用真实分类树接口),无快捷视图。
@@ -37,6 +39,30 @@ interface ScannedFile {
 
 /** TransitAsset 直接 alias 到后端 AssetResourceItem —— 单一数据源 */
 type TransitAsset = AssetResourceItem;
+
+const SLOT_TAGS: Record<string, string | undefined> = {
+  main: '商品原图',
+  upper: '上衣',
+  lower: '下装',
+  'reference-detail': '细节参考图',
+  'reference-style': '风格参考',
+  'reference-scene': '场景参考',
+  'reference-pose': '姿势参考',
+  'video-reference': '参考',
+  model: '模特',
+};
+
+const SLOT_LABELS: Record<string, string> = {
+  main: '主体素材',
+  upper: '上衣图',
+  lower: '下装图',
+  'reference-detail': '细节参考图',
+  'reference-style': '风格参考图',
+  'reference-scene': '场景参考图',
+  'reference-pose': '姿势参考图',
+  'video-reference': '视频参考图',
+  model: '模特素材',
+};
 
 interface AssetTransitModalProps {
   /** 已废弃:父组件传 onConfirmSelection 后不再消费 products */
@@ -110,6 +136,18 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const refetch = async () => {
     setLoading(true);
     setQueryError(null);
+    if (isMockRuntime) {
+      const keyword = searchQuery.trim().toLowerCase();
+      const slotTag = SLOT_TAGS[targetSlot];
+      setAssets(mockAssetResources.filter((asset) => {
+        const matchesKeyword = !keyword || `${asset.name} ${asset.tags ?? ''}`.toLowerCase().includes(keyword);
+        const matchesCategory = selectedCategoryId === null || asset.categoryIds.includes(selectedCategoryId);
+        const matchesSlot = !slotTag || asset.tags?.includes(slotTag);
+        return matchesKeyword && matchesCategory && matchesSlot;
+      }));
+      setLoading(false);
+      return;
+    }
     try {
       const query = { ...buildQuery(), keyword: searchQuery || undefined };
       const page = await assetApi.page(query);
@@ -126,13 +164,22 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   useEffect(() => {
     refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, currentUserId, productId, selectedCategoryId]);
+  }, [searchQuery, currentUserId, productId, selectedCategoryId, targetSlot]);
+
+  useEffect(() => {
+    setSelectedAssetIds([]);
+  }, [targetSlot]);
 
   /**
    * 加载真实分类树(用户打开 modal 时一次性加载)
    * 失败时只提示,不阻塞主流程(顶部 4 个视图按钮仍可用)
    */
   useEffect(() => {
+    if (isMockRuntime) {
+      setCategoryTree(mockAssetCategories);
+      setCategoryTreeError(null);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -827,6 +874,13 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   <span>目录扫描</span>
                 </button>
               </div>
+
+              {SLOT_LABELS[targetSlot] && (
+                <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-blue-50 text-[11px] font-bold text-blue-700">
+                  <span className="material-symbols-outlined text-sm">filter_alt</span>
+                  仅显示{SLOT_LABELS[targetSlot]}标签资源
+                </div>
+              )}
 
               {/* Filters search */}
               <div className="flex items-center gap-3 flex-1 max-w-lg">

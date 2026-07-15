@@ -1,1066 +1,127 @@
-import React, { useState, useEffect } from 'react';
-import { GenerationTask, ProductAsset, AppScreen } from '../types';
+import React, { useEffect, useRef, useState } from 'react';
+import { GeneratedImageResult, GenerationTask, ProductAsset, ResultReviewStage, VideoTaskEntryContext } from '../types';
 
 interface TaskDetailsDrawerProps {
   task: GenerationTask;
   products: ProductAsset[];
   onClose: () => void;
   onUpdateTask: (task: GenerationTask) => void;
+  onAddTask: (task: GenerationTask) => void;
+  onCreateVideo: (context: VideoTaskEntryContext | GenerationTask) => void;
   initialTab?: 'overview' | 'inputs' | 'results' | 'reviews' | 'costs';
 }
 
-export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
-  task,
-  products,
-  onClose,
-  onUpdateTask,
-  initialTab
-}) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'inputs' | 'results' | 'reviews' | 'costs'>('overview');
+const stageLabel: Record<ResultReviewStage, string> = {
+  candidate: '待评分审核', aesthetic_review: '待评分审核', listing_review: '待评分审核', approved: '审核通过', rejected: '已打回', unavailable: '不可用',
+};
+const stageStyle: Record<ResultReviewStage, string> = {
+  candidate: 'bg-slate-100 text-slate-600', aesthetic_review: 'bg-slate-100 text-slate-600', listing_review: 'bg-slate-100 text-slate-600', approved: 'bg-emerald-50 text-emerald-700', rejected: 'bg-red-50 text-red-700', unavailable: 'bg-slate-200 text-slate-500',
+};
 
-  useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [initialTab, task]);
-  
-  // Find associated product
-  const associatedProduct = products.find(p => p.name === task.productName) || products[0];
+const resolveResults = (task: GenerationTask): GeneratedImageResult[] => task.results?.length
+  ? task.results
+  : task.resultUrl || task.status === 'candidate' || task.status === 'completed'
+    ? [{ id: `${task.id}-result-1`, url: task.resultUrl ?? task.productImg, version: 1, reviewStage: 'candidate' }]
+    : [];
 
-  // Local state for generated images with ratings
-  const [generatedImages, setGeneratedImages] = useState<any[]>([]);
-  // Local state for review history
-  const [reviews, setReviews] = useState<any[]>([]);
-  // Copy feedback state
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
+export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({ task, products, onClose, onUpdateTask, onAddTask, onCreateVideo, initialTab = 'overview' }) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'inputs' | 'results' | 'reviews' | 'costs'>(initialTab);
+  const [results, setResults] = useState<GeneratedImageResult[]>(() => resolveResults(task));
+  const [editTarget, setEditTarget] = useState<GeneratedImageResult | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<GeneratedImageResult | null>(null);
+  const [rating, setRating] = useState(4);
+  const [comment, setComment] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const product = products.find((item) => item.name === task.productName);
 
-  // Active image being rated/reviewed
-  const [activeReviewImgId, setActiveReviewImgId] = useState<string | null>(null);
-  const [reviewStatus, setReviewStatus] = useState<'approved' | 'rejected'>('approved');
-  const [reviewRating, setReviewRating] = useState<number>(5);
-  const [reviewComment, setReviewComment] = useState<string>('');
+  useEffect(() => { setResults(resolveResults(task)); }, [task]);
+  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
 
-  // Refined scoring sub-dimensions
-  const [reviewAccuracy, setReviewAccuracy] = useState<number>(4.0);
-  const [reviewConsistency, setReviewConsistency] = useState<number>(4.0);
-  const [reviewComposition, setReviewComposition] = useState<number>(4.0);
-  const [reviewTexture, setReviewTexture] = useState<number>(4.0);
-  const [selectedReviewTags, setSelectedReviewTags] = useState<string[]>([]);
-  const [availableReviewTags, setAvailableReviewTags] = useState<string[]>([
-    '主体漂移', '色彩失真', '布料闪烁', '人物扭曲', '视频水印'
-  ]);
-  const [showCustomTagInput, setShowCustomTagInput] = useState<boolean>(false);
-  const [newCustomTag, setNewCustomTag] = useState<string>('');
-
-  // Automatically calculate the overall rating based on sub-dimensions
-  useEffect(() => {
-    if (activeReviewImgId) {
-      const avg = (reviewAccuracy + reviewConsistency + reviewComposition + reviewTexture) / 4;
-      setReviewRating(parseFloat(avg.toFixed(1)));
-    }
-  }, [reviewAccuracy, reviewConsistency, reviewComposition, reviewTexture, activeReviewImgId]);
-
-  // Timeline / Quick review states
-  const [quickComment, setQuickComment] = useState('');
-  const [quickRating, setQuickRating] = useState(5);
-  const [quickStatus, setQuickStatus] = useState<'approved' | 'rejected'>('approved');
-
-  // Initialize data once drawer opens
-  useEffect(() => {
-    // 1. Generate mockup images for completed tasks
-    if (task.status === 'completed' || task.status === 'rejected') {
-      const imagesList = task.generatedImages && task.generatedImages.length > 0 
-        ? task.generatedImages 
-        : [
-            { id: 'img-1', url: task.resultUrl || task.productImg, rating: task.rating || 5, status: task.status === 'rejected' ? 'rejected' : 'approved', comment: '商品主体保真度高，边缘合成良好。' },
-            { id: 'img-2', url: associatedProduct?.files[1]?.url || task.productImg, rating: 4, status: 'approved', comment: '材质纹理细腻，符合极简冷淡风。' },
-            { id: 'img-3', url: associatedProduct?.files[2]?.url || task.productImg, rating: 5, status: 'approved', comment: '整体高奢，背景光影效果拉满。' },
-            { id: 'img-4', url: associatedProduct?.thumbnail || task.productImg, rating: 3, status: 'pending', comment: '脚部透视有轻微偏差，需微调。' }
-          ];
-      setGeneratedImages(imagesList);
-    } else {
-      setGeneratedImages([]);
-    }
-
-    // 2. Generate default reviews
-    const defaultReviews = task.reviews && task.reviews.length > 0 
-      ? task.reviews 
-      : [
-          {
-            id: 'rev-1',
-            reviewer: '陈美晴',
-            rating: 4,
-            status: 'approved',
-            comment: '一审通过。光效融合度良好，商品无漂移，白鸭绒外壳质感表达完美。',
-            timestamp: '2026-07-03 15:42'
-          },
-          ...(task.status === 'rejected' ? [{
-            id: 'rev-2',
-            reviewer: '林若云 (客户)',
-            rating: 2,
-            status: 'rejected',
-            comment: task.feedback || '高光部分有些许过曝，拉低了整体的高级感，建议降低参数重新运行。',
-            timestamp: '2026-07-03 16:15'
-          }] : [])
-        ];
-    setReviews(defaultReviews);
-  }, [task, associatedProduct]);
-
-  // Copy prompt helper
-  const handleCopyPrompt = () => {
-    const promptText = task.params?.prompt || `A premium studio product photography of ${task.productName}, clean marble stone display, morning shadow play, minimal aesthetics, highly detailed textures, 8k render.`;
-    navigator.clipboard.writeText(promptText);
-    setCopiedPrompt(true);
-    setTimeout(() => setCopiedPrompt(false), 2000);
+  const sync = (next: GeneratedImageResult[]) => {
+    setResults(next);
+    const nextStatus = next.some((item) => item.reviewStage === 'approved') ? 'archived'
+      : next.some((item) => item.reviewStage === 'rejected') ? 'rejected'
+      : 'candidate';
+    onUpdateTask({ ...task, status: nextStatus, progress: 100, results: next, resultUrl: next[0]?.url ?? task.resultUrl });
   };
 
-  // Submit rating for an individual image
-  const handleSubmitImageReview = (imgId: string) => {
-    const updated = generatedImages.map(img => {
-      if (img.id === imgId) {
-        return {
-          ...img,
-          status: reviewStatus,
-          rating: reviewRating,
-          accuracyRating: reviewAccuracy,
-          consistencyRating: reviewConsistency,
-          compositionRating: reviewComposition,
-          textureRating: reviewTexture,
-          problemTags: selectedReviewTags,
-          comment: reviewComment || (reviewStatus === 'approved' ? '审核通过，效果极佳。' : '审核不通过，建议重绘。')
-        };
-      }
-      return img;
-    });
+  const submitReview = (decision: 'approved' | 'rejected') => {
+    if (!reviewTarget) return;
+    const next = results.map((item) => item.id === reviewTarget.id ? {
+      ...item,
+      reviewStage: decision,
+      aestheticReview: {
+        reviewer: '陈美晴 · 设计/美工',
+        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        rating,
+        tags,
+        comment: comment || (decision === 'approved' ? '评分审核通过，可进入视频生成。' : '评分审核打回，请根据意见修改。'),
+        decision,
+      },
+    } : item);
+    sync(next);
+    setReviewTarget(null); setComment(''); setTags([]);
+  };
 
-    setGeneratedImages(updated);
-
-    // Append to timeline reviews
-    const newReview = {
-      id: `rev-gen-${Date.now()}`,
-      reviewer: '陆永奇 (当前用户)',
-      rating: reviewRating,
-      status: reviewStatus,
-      comment: `针对生成图 #${imgId.split('-')[1]} 的单评: ${reviewComment || (reviewStatus === 'approved' ? '审核通过' : '审核退回')}`,
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16)
-    };
-
-    const newReviewsList = [...reviews, newReview];
-    setReviews(newReviewsList);
-
-    // Sync back to main parent task state
-    onUpdateTask({
+  const createEditTask = (target: GeneratedImageResult, instruction: string, maskDataUrl: string) => {
+    const version = Math.max(...results.map((item) => item.version), 0) + 1;
+    const newResult: GeneratedImageResult = { id: `${task.id}-result-${version}`, url: target.url, version, reviewStage: 'candidate', parentImageId: target.id, editInstruction: instruction, maskDataUrl };
+    const childTask: GenerationTask = {
       ...task,
-      rating: Math.round(newReviewsList.reduce((acc, r) => acc + r.rating, 0) / newReviewsList.length),
-      generatedImages: updated,
-      reviews: newReviewsList
-    });
-
-    // Reset review form
-    setActiveReviewImgId(null);
-    setReviewComment('');
-  };
-
-  // Submit quick review timeline record
-  const handleAddQuickReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickComment.trim()) return;
-
-    const newReview = {
-      id: `rev-quick-${Date.now()}`,
-      reviewer: '陆永奇 (当前用户)',
-      rating: quickRating,
-      status: quickStatus,
-      comment: quickComment,
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16)
+      id: `E-${Date.now()}`,
+      name: `二次编辑 v${version} · ${task.name}`,
+      status: 'running', progress: 0,
+      parentResultId: target.id, editInstruction: instruction, maskDataUrl,
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      results: [newResult], resultUrl: undefined,
     };
-
-    const newReviewsList = [...reviews, newReview];
-    setReviews(newReviewsList);
-
-    // Update parent task
-    onUpdateTask({
-      ...task,
-      status: quickStatus === 'approved' ? 'completed' : 'rejected',
-      feedback: quickStatus === 'rejected' ? quickComment : undefined,
-      reviews: newReviewsList,
-      rating: Math.round(newReviewsList.reduce((acc, r) => acc + r.rating, 0) / newReviewsList.length)
-    });
-
-    setQuickComment('');
+    onAddTask(childTask);
+    window.setTimeout(() => {
+      onAddTask({ ...childTask, status: 'candidate', progress: 100, resultUrl: target.url });
+      sync([...results, newResult]);
+    }, 850);
   };
 
-  // Cost data calculation matching the task type
-  const cost = task.type === 'video' ? 120 : (task.params?.steps || 30) * 3;
-  const breakdown = task.costBreakdown || {
-    compute: Math.round(cost * 0.55),
-    steps: Math.round(cost * 0.20),
-    upscaler: Math.round(cost * 0.15),
-    bandwidth: Math.round(cost * 0.10)
+  const statusText = task.status === 'running' ? '生成中' : task.status === 'archived' ? '审核通过' : task.status === 'candidate' ? '待评分审核' : task.status === 'rejected' ? '已打回' : task.status;
+  const detailRows = [
+    ['图片类型', task.imageType ? ({ product_main: '商品主图', scene_detail: '详情/场景图', detail_closeup: '细节图', on_model: '上身/三视图' }[task.imageType]) : task.type === 'image' ? '图片任务' : '视频任务'],
+    ['任务模板', task.templateName], ['比例', task.params?.ratio ?? '未设置'], ['模型', task.modelSnapshot?.modelName ?? task.modelChannel ?? '未设置'], ['任务组', task.groupId ?? '单任务'], ['创建时间', task.timestamp],
+  ];
+
+  return <div className="fixed inset-0 z-50 flex justify-end"><button onClick={onClose} className="absolute inset-0 bg-slate-900/35" aria-label="关闭任务详情" /><section className="relative z-10 w-full max-w-5xl h-full bg-[#f5f7fb] shadow-2xl flex flex-col">
+    <header className="bg-white px-6 py-4 border-b border-slate-200 flex items-center justify-between"><div><p className="text-[11px] font-bold text-primary">任务详情 · {task.id}</p><h2 className="text-lg font-black mt-1">{task.name}</h2></div><div className="flex gap-3 items-center"><span className="px-2 py-1 rounded text-[11px] font-bold bg-slate-100 text-slate-600">{statusText}</span><button onClick={onClose} className="material-symbols-outlined text-slate-500">close</button></div></header>
+    <nav className="bg-white px-6 flex gap-5 border-b border-slate-200">{([{ id: 'overview', label: '概览' }, { id: 'inputs', label: '输入素材' }, { id: 'results', label: `生成结果 (${results.length})` }, { id: 'reviews', label: '评分记录' }, { id: 'costs', label: '成本' }] as const).map((tab) => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`py-3 text-xs font-bold border-b-2 ${activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}>{tab.label}</button>)}</nav>
+    <main className="flex-1 overflow-y-auto p-6">
+      {activeTab === 'overview' && <div className="grid lg:grid-cols-[1fr_320px] gap-5"><div className="bg-white rounded-lg border border-slate-200 p-5"><p className="text-[11px] font-bold text-primary">任务级 Prompt 副本</p><p className="mt-3 text-sm leading-7 text-slate-700">{task.taskPrompt ?? task.params?.prompt ?? '尚未生成 Prompt。'}</p>{task.negativePrompt && <p className="mt-4 p-3 rounded bg-slate-50 text-xs text-slate-500"><b className="text-slate-700">负面约束：</b>{task.negativePrompt}</p>}</div><div className="bg-white rounded-lg border border-slate-200 p-5"><h3 className="font-black text-sm">任务配置</h3><div className="mt-4 space-y-3">{detailRows.map(([label, value]) => <div key={label}><p className="text-[10px] text-slate-400">{label}</p><p className="text-xs font-bold mt-1">{value}</p></div>)}</div></div></div>}
+      {activeTab === 'inputs' && <div className="grid md:grid-cols-2 gap-5"><div className="bg-white rounded-lg border border-slate-200 p-5"><h3 className="font-black text-sm">商品主体</h3><img src={task.productImg} alt={task.productName} className="mt-4 w-full max-h-80 object-cover rounded-md" referrerPolicy="no-referrer"/><p className="mt-3 text-xs font-bold">{task.productName}</p></div><div className="bg-white rounded-lg border border-slate-200 p-5"><h3 className="font-black text-sm">商品与参考上下文</h3><div className="mt-4 text-xs leading-7 text-slate-600"><p>商品类目：{product?.category ?? '未识别'}</p><p>核心卖点：{product?.specs.sellingPoints.slice(0, 2).join('、') ?? '未设置'}</p><p>参考图：来源、角色和替换记录保留在本次任务快照中。</p><p>模特：任务创建时的选择仅影响本次 Prompt。</p></div></div></div>}
+      {activeTab === 'results' && <div><div><p className="text-[11px] font-bold text-primary">版本链</p><h3 className="text-base font-black mt-1">先修改，再评分审核</h3><p className="mt-1 text-xs text-slate-500">每个版本可独立修改和评分；原图不会被覆盖。</p></div><div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 mt-5">{results.length ? results.map((result) => <article key={result.id} className="bg-white rounded-lg border border-slate-200 overflow-hidden"><img src={result.url} alt={`版本 ${result.version}`} className="w-full h-52 object-cover" referrerPolicy="no-referrer"/><div className="p-4"><div className="flex justify-between items-center"><b className="text-xs">版本 v{result.version}</b><span className={`px-2 py-1 rounded text-[10px] font-bold ${stageStyle[result.reviewStage]}`}>{stageLabel[result.reviewStage]}</span></div>{result.editInstruction && <p className="mt-2 text-[11px] text-slate-500 line-clamp-2">编辑：{result.editInstruction}</p>}<div className="mt-4 flex flex-wrap gap-2"><button onClick={() => setEditTarget(result)} className="h-8 px-2.5 rounded border border-slate-200 text-xs font-bold">二次编辑</button>{result.reviewStage === 'candidate' || result.reviewStage === 'rejected' ? <button onClick={() => { setReviewTarget(result); setRating(4); setComment(''); setTags([]); }} className="h-8 px-2.5 rounded bg-primary text-white text-xs font-bold">评分与审核</button> : null}{result.reviewStage === 'approved' && task.type === 'image' ? <button onClick={() => onCreateVideo({ ...task, resultUrl: result.url, results: [result] })} className="h-8 px-2.5 rounded bg-emerald-600 text-white text-xs font-bold">创建视频</button> : null}</div></div></article>) : <div className="col-span-full p-12 bg-white rounded-lg border border-dashed border-slate-300 text-center text-slate-400 text-sm">任务尚未生成结果。</div>}</div></div>}
+      {activeTab === 'reviews' && <div className="grid lg:grid-cols-2 gap-5">{results.map((result) => <article key={result.id} className="bg-white border border-slate-200 rounded-lg p-5"><div className="flex justify-between"><h3 className="text-sm font-black">版本 v{result.version}</h3><span className={`px-2 py-1 rounded text-[10px] ${stageStyle[result.reviewStage]}`}>{stageLabel[result.reviewStage]}</span></div>{result.aestheticReview ? <div className="mt-4 p-3 rounded bg-blue-50 text-xs"><b>评分 {result.aestheticReview.rating} / 5 · {result.aestheticReview.decision === 'approved' ? '通过' : '打回'}</b><p className="mt-1">{result.aestheticReview.comment}</p><p className="mt-2 text-[10px] text-slate-500">{result.aestheticReview.tags.join('、') || '未打标签'}</p></div> : <p className="mt-4 text-xs text-slate-400">尚未评分审核</p>}</article>)}</div>}
+      {activeTab === 'costs' && <div className="bg-white rounded-lg border border-slate-200 p-5 max-w-xl"><p className="text-[11px] font-bold text-primary">成本快照</p><h3 className="font-black mt-1">本次任务预估成本</h3><p className="mt-5 text-3xl font-black">{task.modelSnapshot?.estimatedCost?.toFixed(1) ?? '—'} <span className="text-sm text-slate-400">元</span></p><p className="mt-3 text-xs text-slate-500">派生编辑版本会产生独立的模型调用成本。</p></div>}
+    </main>
+    {editTarget && <ImageEditDialog image={editTarget} onClose={() => setEditTarget(null)} onSubmit={(instruction, mask) => { createEditTask(editTarget, instruction, mask); setEditTarget(null); }} />}
+    {reviewTarget && <ReviewDialog target={reviewTarget} rating={rating} setRating={setRating} comment={comment} setComment={setComment} tags={tags} setTags={setTags} onClose={() => setReviewTarget(null)} onSubmit={submitReview} />}
+  </section></div>;
+};
+
+const ImageEditDialog: React.FC<{ image: GeneratedImageResult; onClose: () => void; onSubmit: (instruction: string, maskDataUrl: string) => void }> = ({ image, onClose, onSubmit }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawing = useRef(false);
+  const [brushSize, setBrushSize] = useState(32);
+  const [erasing, setErasing] = useState(false);
+  const [instruction, setInstruction] = useState('请修改局部效果，同时保持商品主体、材质和品牌信息不变。');
+  const point = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current!; const rect = canvas.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height };
   };
+  const draw = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawing.current) return; const canvas = canvasRef.current!; const ctx = canvas.getContext('2d')!; const { x, y } = point(event);
+    ctx.globalCompositeOperation = erasing ? 'destination-out' : 'source-over'; ctx.fillStyle = 'rgba(2,86,255,.52)'; ctx.beginPath(); ctx.arc(x, y, brushSize, 0, Math.PI * 2); ctx.fill();
+  };
+  return <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"><div className="absolute inset-0 bg-slate-950/60" /><div className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-white rounded-lg shadow-2xl p-6"><div className="flex justify-between"><div><p className="text-[11px] font-bold text-primary">图片二次编辑</p><h2 className="font-black mt-1">标记需要修改的区域</h2></div><button onClick={onClose} className="material-symbols-outlined">close</button></div><div className="grid lg:grid-cols-[minmax(0,1fr)_300px] gap-5 mt-5"><div><div className="relative aspect-[4/3] bg-slate-100 rounded-lg overflow-hidden select-none"><img src={image.url} alt="编辑源图片" className="absolute inset-0 w-full h-full object-cover" referrerPolicy="no-referrer"/><canvas ref={canvasRef} width={800} height={600} onPointerDown={(event) => { drawing.current = true; event.currentTarget.setPointerCapture(event.pointerId); draw(event); }} onPointerMove={draw} onPointerUp={() => { drawing.current = false; }} onPointerLeave={() => { drawing.current = false; }} className="absolute inset-0 w-full h-full cursor-crosshair" /></div><p className="mt-2 text-[11px] text-slate-500">蓝色涂抹区域为需要修改的区域；未涂抹区域会作为保真要求传入派生任务。</p></div><aside className="space-y-4"><label className="block text-xs font-bold">修改要求<textarea value={instruction} onChange={(event) => setInstruction(event.target.value)} className="mt-1.5 h-28 w-full border border-slate-200 rounded-md p-2 text-xs font-normal leading-5" /></label><label className="block text-xs font-bold">画笔大小<input type="range" min="8" max="72" value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} className="mt-3 w-full" /></label><button onClick={() => setErasing((value) => !value)} className={`w-full h-9 rounded border text-xs font-bold ${erasing ? 'border-primary bg-blue-50 text-primary' : 'border-slate-200'}`}>{erasing ? '当前：橡皮擦' : '切换为橡皮擦'}</button><button onClick={() => { const canvas = canvasRef.current!; canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height); }} className="w-full h-9 rounded border border-slate-200 text-xs font-bold">清空涂抹</button><button onClick={() => onSubmit(instruction, canvasRef.current?.toDataURL('image/png') ?? '')} className="w-full h-9 rounded bg-primary text-white text-xs font-bold">生成修改版本</button></aside></div></div></div>;
+};
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Background overlay */}
-      <div 
-        onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity duration-300"
-      />
-
-      {/* Slide-out drawer panel */}
-      <div className="relative bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col z-10 animate-slideLeft border-l border-slate-200">
-        
-        {/* Header Section */}
-        <header className="px-6 py-5 border-b border-slate-150 flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-3">
-            <h2 className="text-base lg:text-lg font-black text-slate-800 tracking-tight">#{task.id} 任务详情</h2>
-            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 ${
-              task.status === 'running' ? 'bg-blue-50 text-blue-600 border border-blue-200' :
-              task.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
-              task.status === 'failed' ? 'bg-red-50 text-red-600 border border-red-200' :
-              'bg-amber-50 text-amber-600 border border-amber-200'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                task.status === 'running' ? 'bg-blue-500 animate-pulse' :
-                task.status === 'completed' ? 'bg-emerald-500' :
-                task.status === 'failed' ? 'bg-red-500' : 'bg-amber-500'
-              }`} />
-              {task.status === 'running' ? '生成中' :
-               task.status === 'completed' ? '已完成' :
-               task.status === 'failed' ? '生成失败' : '被退回'}
-            </span>
-          </div>
-          <button 
-            onClick={onClose} 
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined font-bold text-xl">close</span>
-          </button>
-        </header>
-
-        {/* Multi-Tab Navigation Row */}
-        <div className="px-6 border-b border-slate-100 bg-white shrink-0 flex space-x-6 text-sm font-semibold select-none">
-          {[
-            { id: 'overview', label: '概览' },
-            { id: 'inputs', label: '输入素材' },
-            { id: 'results', label: '生成结果' },
-            { id: 'reviews', label: '审核记录' },
-            { id: 'costs', label: '成本明细' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`py-3.5 border-b-2 transition-all cursor-pointer ${
-                activeTab === tab.id 
-                  ? 'border-[#0054cd] text-[#0054cd] font-extrabold' 
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Scrollable Container */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
-          
-          {/* TAB 1: 概览 (Overview) */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              
-              {/* 输入素材 Section */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-3.5 bg-blue-600 rounded-full" />
-                  <h3 className="text-xs lg:text-sm font-extrabold text-slate-800">输入素材</h3>
-                </div>
-                
-                <div className="grid grid-cols-4 gap-3">
-                  {/* Item 1: 原图 */}
-                  <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col justify-between items-center h-[130px] shadow-2xs hover:shadow-xs transition-shadow">
-                    <div className="w-14 h-14 bg-slate-50 rounded-lg overflow-hidden border border-slate-100 flex items-center justify-center">
-                      <img src={task.productImg} alt="原图" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1.5 truncate w-full">原图</span>
-                  </div>
-
-                  {/* Item 2: 风格 */}
-                  <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col justify-between items-center h-[130px] shadow-2xs">
-                    <div className="w-14 h-14 bg-[#eff4ff] rounded-lg border border-blue-100 flex items-center justify-center text-blue-500">
-                      <span className="material-symbols-outlined text-2xl">style</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1.5 truncate w-full">风格参考</span>
-                  </div>
-
-                  {/* Item 3: 场景 */}
-                  <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col justify-between items-center h-[130px] shadow-2xs">
-                    <div className="w-14 h-14 bg-[#f1fcf8] rounded-lg border border-emerald-100 flex items-center justify-center text-emerald-500">
-                      <span className="material-symbols-outlined text-2xl">landscape</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1.5 truncate w-full">场景参考</span>
-                  </div>
-
-                  {/* Item 4: 姿态 */}
-                  <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col justify-between items-center h-[130px] shadow-2xs">
-                    <div className="w-14 h-14 bg-[#fff9eb] rounded-lg border border-amber-100 flex items-center justify-center text-amber-500">
-                      <span className="material-symbols-outlined text-2xl">accessibility</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1.5 truncate w-full">姿态参考</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 商品信息 Section */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-3.5 bg-blue-600 rounded-full" />
-                  <h3 className="text-xs lg:text-sm font-extrabold text-slate-800">商品信息</h3>
-                </div>
-                
-                <div className="bg-blue-50/40 rounded-xl p-5 border border-blue-100/50 space-y-4">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">商品名称</label>
-                    <span className="text-xs lg:text-sm font-extrabold text-slate-800 leading-tight">
-                      {associatedProduct?.name || task.productName}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 pt-1">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">类目</label>
-                      <span className="text-xs font-bold text-slate-700">
-                        {associatedProduct?.category || '户外服饰'}
-                      </span>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">颜色/花色</label>
-                      <span className="text-xs font-bold text-slate-700">
-                        {associatedProduct?.specs?.color?.join('、') || '极美火山灰'}
-                      </span>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">面料</label>
-                      <span className="text-xs font-bold text-slate-700">
-                        {associatedProduct?.specs?.material || '抗撕裂科技纤维面料'}
-                      </span>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">核心卖点</label>
-                      <span className="text-xs font-bold text-slate-700">
-                        {associatedProduct?.specs?.sellingPoints?.slice(0, 2).join('、') || '防风透湿、极轻量设计'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 任务参数 Section */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-3.5 bg-blue-600 rounded-full" />
-                  <h3 className="text-xs lg:text-sm font-extrabold text-slate-800">任务参数</h3>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: '任务类型', value: task.type === 'image' ? '商品主图' : '视频脚本' },
-                    { label: '风格', value: task.type === 'image' ? '甜美网红风' : '爆破粒子风' },
-                    { label: '场景', value: task.type === 'image' ? '北欧极简石室' : '三维炫彩粒子' },
-                    { label: '比例', value: task.params?.ratio || '1:1' },
-                    { label: '生成数量', value: task.type === 'image' ? '24张' : '1个' },
-                    { label: '模型通道', value: task.modelChannel || 'DaVinci Vision v3.5' }
-                  ].map((param, i) => (
-                    <div key={i} className="bg-white p-3.5 rounded-xl border border-slate-200">
-                      <span className="text-[10px] font-bold text-slate-400 block mb-1">{param.label}</span>
-                      <span className="text-xs font-extrabold text-slate-800">{param.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 提示词预览 Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-3.5 bg-blue-600 rounded-full" />
-                    <h3 className="text-xs lg:text-sm font-extrabold text-slate-800">提示词预览</h3>
-                  </div>
-                  <button 
-                    onClick={handleCopyPrompt}
-                    className="text-xs text-blue-600 font-extrabold flex items-center gap-1 hover:text-blue-700 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-sm">{copiedPrompt ? 'check' : 'content_copy'}</span>
-                    {copiedPrompt ? '已复制成功' : '复制提示词'}
-                  </button>
-                </div>
-                
-                <div className="bg-slate-100 rounded-xl p-4 border border-slate-200">
-                  <p className="text-xs font-mono text-slate-600 leading-relaxed font-medium">
-                    {task.params?.prompt || `A premium product photography of ${task.productName}, placed on a minimalist sand plaster block with sharp hard morning sunlight. High dynamic range, soft shadows, 8k commercial quality.`}
-                  </p>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB 2: 输入素材 (Input Assets Details) */}
-          {activeTab === 'inputs' && (
-            <div className="space-y-4">
-              {[
-                { title: '商品主体原图 (Source Main Image)', size: '2.4 MB', resolution: '2048 x 2048', type: 'PNG', status: '解析正常 (提取率 99.8%)', img: task.productImg },
-                { title: '风格特征参考图 (Style Ref)', size: '1.8 MB', resolution: '1024 x 1024', type: 'JPG', status: '已转换为Latent特征向量', icon: 'style', bg: 'bg-[#eff4ff] text-blue-500' },
-                { title: '场景布局参考图 (Scene Ref)', size: '3.1 MB', resolution: '1920 x 1080', type: 'JPG', status: '空间景深及网格已映射', icon: 'landscape', bg: 'bg-[#f1fcf8] text-emerald-500' },
-                { title: '人模姿态参考图 (Pose Ref)', size: '1.2 MB', resolution: '1024 x 1024', type: 'PNG', status: '骨骼关节点检测完成', icon: 'accessibility', bg: 'bg-[#fff9eb] text-amber-500' }
-              ].map((input, idx) => (
-                <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 flex items-center gap-4 hover:shadow-sm transition-shadow">
-                  <div className="w-14 h-14 rounded-lg overflow-hidden border border-slate-100 flex items-center justify-center shrink-0">
-                    {input.img ? (
-                      <img src={input.img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <div className={`w-full h-full flex items-center justify-center ${input.bg}`}>
-                        <span className="material-symbols-outlined text-2xl">{input.icon}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-bold text-slate-800 truncate">{input.title}</h4>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400 mt-1 font-mono">
-                      <span>格式: {input.type}</span>
-                      <span>大小: {input.size}</span>
-                      <span>分辨率: {input.resolution}</span>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[9px] font-bold px-2 py-0.5 rounded-full inline-block">
-                      {input.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* TAB 3: 生成结果 (Generation Results & Interactive Rating / Scoring) */}
-          {activeTab === 'results' && (
-            <div className="space-y-6">
-              
-              {task.status !== 'completed' && task.status !== 'rejected' ? (
-                <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
-                  <span className="material-symbols-outlined text-4xl block mb-2 animate-spin text-slate-300">sync</span>
-                  <span>任务正在努力生成中，完成后即可在此查看高画质结果并去评分审核...</span>
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-between items-center bg-[#eff4ff] border border-blue-200/50 p-3.5 rounded-xl text-xs font-bold text-blue-800">
-                    <span>💡 您可以在下方查看渲染结果，对单张图片点击“审核评分”提出修正或赋予星级。</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {generatedImages.map((img) => (
-                      <div key={img.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-xs transition-shadow">
-                        {/* Image Frame */}
-                        <div className="aspect-square bg-slate-50 relative overflow-hidden group">
-                          <img src={img.url} alt={img.id} className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300" referrerPolicy="no-referrer" />
-                          
-                          {/* Rating and Status Overlay top left */}
-                          <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10">
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border flex items-center gap-1 bg-white/90 backdrop-blur-xs ${
-                              img.status === 'approved' ? 'text-emerald-600 border-emerald-200' :
-                              img.status === 'rejected' ? 'text-red-600 border-red-200' :
-                              'text-amber-600 border-amber-200'
-                            }`}>
-                              <span className={`w-1 h-1 rounded-full ${img.status === 'approved' ? 'bg-emerald-500' : img.status === 'rejected' ? 'bg-red-500' : 'bg-amber-500'}`} />
-                              {img.status === 'approved' ? '已通过' : img.status === 'rejected' ? '被退回' : '未审核'}
-                            </span>
-                            
-                            <span className="bg-white/90 backdrop-blur-xs text-[9px] font-bold px-2 py-0.5 rounded-full border border-slate-200 flex items-center gap-1 text-amber-500">
-                              <span className="material-symbols-outlined text-[10px] font-black">star</span>
-                              {img.rating}分
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Text and Actions panel */}
-                        <div className="p-3 bg-white border-t border-slate-100">
-                          <div className="flex justify-between items-start gap-2 mb-2">
-                            <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                              IMAGE #{img.id.split('-')[1]}
-                            </span>
-                            
-                            <button
-                              onClick={() => {
-                                setActiveReviewImgId(img.id);
-                                setReviewStatus(img.status === 'rejected' ? 'rejected' : 'approved');
-                                setReviewRating(img.rating || 4.0);
-                                setReviewAccuracy(img.accuracyRating || 4.0);
-                                setReviewConsistency(img.consistencyRating || 4.0);
-                                setReviewComposition(img.compositionRating || 4.0);
-                                setReviewTexture(img.textureRating || 4.0);
-                                setSelectedReviewTags(img.problemTags || []);
-                                setReviewComment(img.comment || '');
-                                setShowCustomTagInput(false);
-                                setNewCustomTag('');
-                              }}
-                              className="text-[10px] text-blue-600 font-extrabold hover:text-blue-700 cursor-pointer border border-blue-200 hover:bg-blue-50/50 px-2.5 py-1 rounded-lg"
-                            >
-                              去评分 / 审核
-                            </button>
-                          </div>
-                          
-                          <p className="text-[10px] text-slate-500 italic truncate font-medium">
-                            {img.comment || '暂无评语'}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* Popup Overlay Modal for rating an individual image */}
-              {activeReviewImgId && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-55 p-4 animate-fadeIn">
-                  <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200">
-                    <div className="p-4 border-b border-slate-150 bg-slate-50 flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700">图片单件评分与审核</span>
-                      <button onClick={() => setActiveReviewImgId(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <span className="material-symbols-outlined text-lg">close</span>
-                      </button>
-                    </div>
-
-                    <div className="p-5 space-y-4">
-                      {/* Image Preview thumbnail */}
-                      <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <img 
-                          src={generatedImages.find(img => img.id === activeReviewImgId)?.url} 
-                          alt="preview" 
-                          className="w-12 h-12 object-cover rounded-lg border border-slate-200 shrink-0" 
-                        />
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-bold text-slate-800 truncate">IMAGE #{activeReviewImgId.split('-')[1]}</h4>
-                          <span className="text-[10px] text-slate-400">进行审核决策与评分星级记录</span>
-                        </div>
-                      </div>
-
-                      {/* Score Selection (1-5 Stars) & Sub-dimensions */}
-                      <div className="space-y-4">
-                        {/* Approval Status Toggle - Sleek Segmented Control */}
-                        <div>
-                          <label className="text-[11px] font-extrabold text-slate-500 block mb-1.5 uppercase tracking-wide">审核决策 (Approval Decision)</label>
-                          <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReviewStatus('approved');
-                                // Selecting "Approved" can optionally clear problem tags for clean state
-                                setSelectedReviewTags([]);
-                              }}
-                              className={`flex-1 py-1.5 text-center rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                reviewStatus === 'approved' 
-                                  ? 'bg-emerald-500 text-white shadow-xs' 
-                                  : 'text-slate-500 hover:text-slate-800'
-                              }`}
-                            >
-                              通过 (Pass)
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setReviewStatus('rejected')}
-                              className={`flex-1 py-1.5 text-center rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                reviewStatus === 'rejected' 
-                                  ? 'bg-rose-500 text-white shadow-xs' 
-                                  : 'text-slate-500 hover:text-slate-800'
-                              }`}
-                            >
-                              退回 (Reject)
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Heading for Aesthetic Rating */}
-                        <div className="pt-2 border-t border-slate-100/80">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-1 h-3.5 bg-[#1D6FFF] rounded-full" />
-                            <span className="text-xs font-extrabold text-slate-800">审美评分 (1-5)</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-1.5 mb-4">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <button
-                                key={star}
-                                type="button"
-                                onClick={() => {
-                                  // Quick-set all sub-dimensions to this star value
-                                  setReviewAccuracy(star);
-                                  setReviewConsistency(star);
-                                  setReviewComposition(star);
-                                  setReviewTexture(star);
-                                }}
-                                className={`material-symbols-outlined text-2xl transition-colors cursor-pointer ${
-                                  star <= Math.round(reviewRating) ? 'text-amber-500 fill' : 'text-slate-250 hover:text-amber-400'
-                                }`}
-                                style={{ fontVariationSettings: star <= Math.round(reviewRating) ? "'FILL' 1" : "'FILL' 0" }}
-                              >
-                                star
-                              </button>
-                            ))}
-                            <span className="text-sm font-black text-slate-800 ml-2 font-display">{reviewRating.toFixed(1)}</span>
-                          </div>
-
-                          {/* 4 Fine-grained sliders */}
-                          <div className="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            {/* Accuracy */}
-                            <div className="flex items-center gap-4">
-                              <span className="text-xs font-bold text-slate-600 w-12 shrink-0">准确度</span>
-                              <div className="relative flex-1">
-                                <input
-                                  type="range"
-                                  min="1.0"
-                                  max="5.0"
-                                  step="0.1"
-                                  value={reviewAccuracy}
-                                  onChange={(e) => {
-                                    setReviewAccuracy(parseFloat(e.target.value));
-                                  }}
-                                  className="w-full h-1.5 bg-blue-50 rounded-lg appearance-none cursor-pointer accent-[#1D6FFF]"
-                                  style={{
-                                    background: `linear-gradient(to right, #1D6FFF 0%, #1D6FFF ${((reviewAccuracy - 1) / 4) * 100}%, #eff6ff ${((reviewAccuracy - 1) / 4) * 100}%, #eff6ff 100%)`
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs font-extrabold text-slate-700 w-6 text-right font-mono">{reviewAccuracy.toFixed(1)}</span>
-                            </div>
-
-                            {/* Consistency */}
-                            <div className="flex items-center gap-4">
-                              <span className="text-xs font-bold text-slate-600 w-12 shrink-0">一致性</span>
-                              <div className="relative flex-1">
-                                <input
-                                  type="range"
-                                  min="1.0"
-                                  max="5.0"
-                                  step="0.1"
-                                  value={reviewConsistency}
-                                  onChange={(e) => {
-                                    setReviewConsistency(parseFloat(e.target.value));
-                                  }}
-                                  className="w-full h-1.5 bg-blue-50 rounded-lg appearance-none cursor-pointer accent-[#1D6FFF]"
-                                  style={{
-                                    background: `linear-gradient(to right, #1D6FFF 0%, #1D6FFF ${((reviewConsistency - 1) / 4) * 100}%, #eff6ff ${((reviewConsistency - 1) / 4) * 100}%, #eff6ff 100%)`
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs font-extrabold text-slate-700 w-6 text-right font-mono">{reviewConsistency.toFixed(1)}</span>
-                            </div>
-
-                            {/* Composition */}
-                            <div className="flex items-center gap-4">
-                              <span className="text-xs font-bold text-slate-600 w-12 shrink-0">构图</span>
-                              <div className="relative flex-1">
-                                <input
-                                  type="range"
-                                  min="1.0"
-                                  max="5.0"
-                                  step="0.1"
-                                  value={reviewComposition}
-                                  onChange={(e) => {
-                                    setReviewComposition(parseFloat(e.target.value));
-                                  }}
-                                  className="w-full h-1.5 bg-blue-50 rounded-lg appearance-none cursor-pointer accent-[#1D6FFF]"
-                                  style={{
-                                    background: `linear-gradient(to right, #1D6FFF 0%, #1D6FFF ${((reviewComposition - 1) / 4) * 100}%, #eff6ff ${((reviewComposition - 1) / 4) * 100}%, #eff6ff 100%)`
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs font-extrabold text-slate-700 w-6 text-right font-mono">{reviewComposition.toFixed(1)}</span>
-                            </div>
-
-                            {/* Texture */}
-                            <div className="flex items-center gap-4">
-                              <span className="text-xs font-bold text-slate-600 w-12 shrink-0">质感</span>
-                              <div className="relative flex-1">
-                                <input
-                                  type="range"
-                                  min="1.0"
-                                  max="5.0"
-                                  step="0.1"
-                                  value={reviewTexture}
-                                  onChange={(e) => {
-                                    setReviewTexture(parseFloat(e.target.value));
-                                  }}
-                                  className="w-full h-1.5 bg-blue-50 rounded-lg appearance-none cursor-pointer accent-[#1D6FFF]"
-                                  style={{
-                                    background: `linear-gradient(to right, #1D6FFF 0%, #1D6FFF ${((reviewTexture - 1) / 4) * 100}%, #eff6ff ${((reviewTexture - 1) / 4) * 100}%, #eff6ff 100%)`
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs font-extrabold text-slate-700 w-6 text-right font-mono">{reviewTexture.toFixed(1)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* SECTION: Problem Tagging */}
-                        <div className="pt-2 border-t border-slate-100/80">
-                          <div className="flex items-center gap-2 mb-2.5">
-                            <div className="w-1 h-3.5 bg-[#1D6FFF] rounded-full" />
-                            <span className="text-xs font-extrabold text-slate-800">问题打标 (多选)</span>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            {availableReviewTags.map((tag) => {
-                              const isSelected = selectedReviewTags.includes(tag);
-                              return (
-                                <button
-                                  key={tag}
-                                  type="button"
-                                  onClick={() => {
-                                    if (isSelected) {
-                                      setSelectedReviewTags(prev => prev.filter(t => t !== tag));
-                                    } else {
-                                      setSelectedReviewTags(prev => [...prev, tag]);
-                                      // Auto toggle status to reject if an issue tag is selected
-                                      setReviewStatus('rejected');
-                                    }
-                                  }}
-                                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-blue-50/50 border-blue-500 text-blue-600'
-                                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  {tag}
-                                  {isSelected && (
-                                    <span className="material-symbols-outlined text-[10px] font-extrabold text-blue-500 leading-none">close</span>
-                                  )}
-                                </button>
-                              );
-                            })}
-
-                            {/* Add Custom tag inline control */}
-                            {!showCustomTagInput ? (
-                              <button
-                                type="button"
-                                onClick={() => setShowCustomTagInput(true)}
-                                className="px-3 py-1.5 rounded-full text-xs font-bold border border-slate-200 bg-slate-50/50 text-slate-500 hover:bg-slate-100 cursor-pointer flex items-center gap-0.5"
-                              >
-                                <span>+ 自定义</span>
-                              </button>
-                            ) : (
-                              <div className="flex items-center gap-1">
-                                <input
-                                  type="text"
-                                  value={newCustomTag}
-                                  onChange={(e) => setNewCustomTag(e.target.value)}
-                                  placeholder="标签名"
-                                  className="px-2.5 py-1 text-xs border border-blue-400 rounded-full outline-none w-20 text-slate-700 font-bold"
-                                  autoFocus
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      const trimmed = newCustomTag.trim();
-                                      if (trimmed) {
-                                        if (!availableReviewTags.includes(trimmed)) {
-                                          setAvailableReviewTags(prev => [...prev, trimmed]);
-                                        }
-                                        if (!selectedReviewTags.includes(trimmed)) {
-                                          setSelectedReviewTags(prev => [...prev, trimmed]);
-                                          setReviewStatus('rejected');
-                                        }
-                                      }
-                                      setNewCustomTag('');
-                                      setShowCustomTagInput(false);
-                                    } else if (e.key === 'Escape') {
-                                      setShowCustomTagInput(false);
-                                    }
-                                  }}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const trimmed = newCustomTag.trim();
-                                    if (trimmed) {
-                                      if (!availableReviewTags.includes(trimmed)) {
-                                        setAvailableReviewTags(prev => [...prev, trimmed]);
-                                      }
-                                      if (!selectedReviewTags.includes(trimmed)) {
-                                        setSelectedReviewTags(prev => [...prev, trimmed]);
-                                        setReviewStatus('rejected');
-                                      }
-                                    }
-                                    setNewCustomTag('');
-                                    setShowCustomTagInput(false);
-                                  }}
-                                  className="p-1 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center cursor-pointer"
-                                >
-                                  <span className="material-symbols-outlined text-[10px] font-black">check</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Comment text */}
-                        <div className="pt-2 border-t border-slate-100/80">
-                          <textarea
-                            value={reviewComment}
-                            onChange={(e) => setReviewComment(e.target.value)}
-                            placeholder="添加审核备注说明..."
-                            className="w-full text-xs font-medium border border-slate-200 focus:border-blue-500 rounded-xl p-3 h-20 outline-none resize-none transition-all bg-slate-50/50 focus:bg-white"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2 shrink-0">
-                      <button
-                        onClick={() => setActiveReviewImgId(null)}
-                        className="px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-500 font-bold hover:bg-slate-100 cursor-pointer"
-                      >
-                        取消
-                      </button>
-                      <button
-                        onClick={() => handleSubmitImageReview(activeReviewImgId)}
-                        className="px-5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-sm cursor-pointer"
-                      >
-                        提交决策评分
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* TAB 4: 审核记录 (Review Records History Timeline) */}
-          {activeTab === 'reviews' && (
-            <div className="space-y-6">
-              
-              {/* Audit Timeline List */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5 shadow-2xs">
-                <h4 className="text-xs font-extrabold text-slate-800">审批流程时间轴</h4>
-                
-                <div className="relative border-l border-slate-150 pl-5 ml-2.5 space-y-5">
-                  {reviews.map((rev, idx) => (
-                    <div key={rev.id} className="relative">
-                      {/* Anchor Dot */}
-                      <span className={`absolute -left-[27px] top-1 w-3 h-3 rounded-full border-2 border-white ring-4 ${
-                        rev.status === 'approved' ? 'bg-emerald-500 ring-emerald-50' : 'bg-red-500 ring-red-50'
-                      }`} />
-                      
-                      {/* Review Block Card */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-slate-800">{rev.reviewer}</span>
-                            <span className={`px-1.5 py-0.2 rounded text-[8px] font-black border ${
-                              rev.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
-                            }`}>
-                              {rev.status === 'approved' ? '审核通过' : '审核拒绝'}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-slate-400 font-mono">{rev.timestamp}</span>
-                        </div>
-
-                        {/* Stars row */}
-                        <div className="flex items-center gap-0.5">
-                          {Array.from({ length: 5 }).map((_, s) => (
-                            <span 
-                              key={s} 
-                              className={`material-symbols-outlined text-xs ${s < rev.rating ? 'text-amber-500' : 'text-slate-200'}`}
-                              style={{ fontVariationSettings: "'FILL' 1" }}
-                            >
-                              star
-                            </span>
-                          ))}
-                        </div>
-
-                        <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50 p-2.5 rounded-lg border border-slate-100/50">
-                          {rev.comment}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Form to submit an instant rating/review in the timeline */}
-              <form onSubmit={handleAddQuickReview} className="bg-white rounded-xl border border-[#b2c5ff]/40 p-5 space-y-4 shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-blue-600 text-lg font-bold">rate_review</span>
-                  <h4 className="text-xs font-extrabold text-slate-800">快捷新增批注 / 评分</h4>
-                </div>
-
-                {/* Score slider */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500">综合评分星级</span>
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setQuickRating(star)}
-                        className={`material-symbols-outlined text-xl cursor-pointer ${
-                          star <= quickRating ? 'text-amber-500' : 'text-slate-250'
-                        }`}
-                        style={{ fontVariationSettings: star <= quickRating ? "'FILL' 1" : "'FILL' 0" }}
-                      >
-                        star
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Decision */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500">综合审核决策</span>
-                  <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => setQuickStatus('approved')}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                        quickStatus === 'approved' ? 'bg-white text-emerald-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      通过 (Pass)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuickStatus('rejected')}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                        quickStatus === 'rejected' ? 'bg-white text-red-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      拒绝退回 (Reject)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Comment box */}
-                <div>
-                  <textarea
-                    value={quickComment}
-                    onChange={(e) => setQuickComment(e.target.value)}
-                    placeholder="输入协作评语或拒绝的反馈内容..."
-                    className="w-full text-xs font-medium border border-slate-200 focus:border-blue-500 rounded-xl p-3 h-16 outline-none resize-none transition-all bg-slate-50 focus:bg-white"
-                  />
-                </div>
-
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="submit"
-                    className="bg-[#0054cd] hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-xs font-extrabold cursor-pointer flex items-center gap-1 shadow-sm"
-                  >
-                    <span className="material-symbols-outlined text-sm">gavel</span>
-                    提交当前评分批注
-                  </button>
-                </div>
-              </form>
-
-            </div>
-          )}
-
-          {/* TAB 5: 成本明细 (Cost Breakdown Visualization) */}
-          {activeTab === 'costs' && (
-            <div className="space-y-6">
-              
-              {/* Point Expenditure Summary box */}
-              <div className="bg-gradient-to-r from-slate-800 to-[#1D6FFF] text-white p-5 rounded-xl flex items-center justify-between shadow-md">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-300 tracking-wider uppercase block">预估等额算力成本</span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-black">{cost} Pts</span>
-                    <span className="text-xs font-bold text-slate-200">(等值大约 ¥ {task.type === 'video' ? '1.50' : '0.45'})</span>
-                  </div>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center border border-white/20">
-                  <span className="material-symbols-outlined text-2xl">toll</span>
-                </div>
-              </div>
-
-              {/* Breakdown Bars list */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5 shadow-2xs">
-                <h4 className="text-xs font-extrabold text-slate-800">算力损耗配比结构</h4>
-                
-                <div className="space-y-4">
-                  {/* Compute Core */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-600 flex items-center gap-1">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                        GPU 渲染核心算力
-                      </span>
-                      <span className="text-slate-800 font-mono">{breakdown.compute} Pts</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-blue-500 h-full rounded-full" style={{ width: `${(breakdown.compute / cost) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  {/* Steps fee */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-600 flex items-center gap-1">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                        渲染步数与高去噪增溢费
-                      </span>
-                      <span className="text-slate-800 font-mono">{breakdown.steps} Pts</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${(breakdown.steps / cost) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  {/* HD Upscaler */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-600 flex items-center gap-1">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                        超分像素放大与重构损耗
-                      </span>
-                      <span className="text-slate-800 font-mono">{breakdown.upscaler} Pts</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-amber-500 h-full rounded-full" style={{ width: `${(breakdown.upscaler / cost) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  {/* Storage / CDN */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-600 flex items-center gap-1">
-                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                        高保真存储及云端分发服务
-                      </span>
-                      <span className="text-slate-800 font-mono">{breakdown.bandwidth} Pts</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${(breakdown.bandwidth / cost) * 100}%` }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Resource saving tip */}
-              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200/50 flex gap-3">
-                <span className="material-symbols-outlined text-emerald-600 text-lg font-bold shrink-0">check_circle</span>
-                <div className="space-y-0.5">
-                  <h5 className="text-xs font-extrabold text-emerald-800">算力推荐优化建议</h5>
-                  <p className="text-[10px] text-emerald-600 leading-relaxed font-medium">
-                    您当前已勾选「DaVinci Vision v3.5 (自研推荐)」通道，在保障极佳画质的同时相比传统 Midjourney 通道已节省 35% 算力开销。
-                  </p>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-        </div>
-
-      </div>
-    </div>
-  );
+const ReviewDialog: React.FC<{ target: GeneratedImageResult; rating: number; setRating: (value: number) => void; comment: string; setComment: (value: string) => void; tags: string[]; setTags: (value: string[]) => void; onClose: () => void; onSubmit: (decision: 'approved' | 'rejected') => void }> = ({ target, rating, setRating, comment, setComment, tags, setTags, onClose, onSubmit }) => {
+  const [decision, setDecision] = useState<'approved' | 'rejected'>('approved');
+  const toggleTag = (tag: string) => setTags(tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag]);
+  return <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"><div className="absolute inset-0 bg-slate-950/60" /><div className="relative w-full max-w-xl bg-white rounded-lg shadow-2xl overflow-hidden"><header className="p-5 border-b border-slate-200 flex justify-between"><div><p className="text-[11px] font-bold text-primary">图片单件评分与审核</p><h2 className="font-black mt-1">版本 v{target.version}</h2></div><button onClick={onClose} className="material-symbols-outlined text-slate-400">close</button></header><div className="p-5"><div className="flex gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100"><img src={target.url} alt="待审核图片" className="w-16 h-16 rounded object-cover" referrerPolicy="no-referrer"/><div><p className="text-sm font-black">IMAGE #{target.version}</p><p className="mt-1 text-xs text-slate-400">记录一次审核决策与评分。</p></div></div><div className="mt-5"><p className="text-xs font-black">审核决策</p><div className="grid grid-cols-2 gap-2 mt-2"><button onClick={() => setDecision('approved')} className={`h-10 rounded-md text-xs font-bold ${decision === 'approved' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}>通过</button><button onClick={() => setDecision('rejected')} className={`h-10 rounded-md text-xs font-bold ${decision === 'rejected' ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600'}`}>打回</button></div></div><div className="mt-5"><p className="text-xs font-black">审美评分 {rating} / 5</p><div className="flex gap-1 mt-2">{[1, 2, 3, 4, 5].map((value) => <button key={value} onClick={() => setRating(value)} className={`material-symbols-outlined text-3xl ${value <= rating ? 'text-amber-400' : 'text-slate-300'}`}>star</button>)}</div></div><div className="mt-5"><p className="text-xs font-black">问题打标 <span className="font-normal text-slate-400">(多选)</span></p><div className="flex flex-wrap gap-2 mt-2">{['主体漂移', '色彩失真', '构图问题', '细节质感', '人物扭曲', '商业可用'].map((tag) => <button key={tag} onClick={() => toggleTag(tag)} className={`px-2.5 py-1.5 rounded-full text-[11px] font-bold border ${tags.includes(tag) ? 'bg-blue-50 border-primary text-primary' : 'border-slate-200 text-slate-500'}`}>{tag}</button>)}</div></div><label className="block mt-5 text-xs font-black">审核意见<textarea value={comment} onChange={(event) => setComment(event.target.value)} className="mt-2 h-24 w-full border border-slate-200 rounded-md p-3 text-xs font-normal" placeholder="填写修改意见或通过说明" /></label></div><footer className="p-4 border-t border-slate-200 flex justify-end gap-2"><button onClick={onClose} className="h-9 px-4 rounded border border-slate-200 text-xs font-bold">取消</button><button onClick={() => onSubmit(decision)} className="h-9 px-4 rounded bg-primary text-white text-xs font-bold">提交决策评分</button></footer></div></div>;
 };

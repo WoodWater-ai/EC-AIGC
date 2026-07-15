@@ -21,6 +21,9 @@ import {
   type TemplateUpdateRequest,
 } from '../api/modules/template';
 import { AppScreen } from '../types';
+import type { PageInfo } from '../api/service-result';
+import { isMockRuntime } from '../config/runtime';
+import { mockTemplates } from '../mockData';
 
 type TabKey = 'image_task' | 'style_scene' | 'video_prompt' | 'platform_spec' | 'negative_constraint';
 
@@ -58,20 +61,29 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'NORMAL' | 'DISABLED'>('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
+  const [mockTemplateState, setMockTemplateState] = useState<TemplateDTO[]>(mockTemplates);
 
   const kind = TAB_TO_KIND[activeTab];
 
   // ===== 数据拉取 =====
-  const { data, loading, error, refetch } = useServiceQuery(
-    () =>
-      templateApi.page({
+  const { data, loading, error, refetch } = useServiceQuery<PageInfo<TemplateDTO>>(
+    () => {
+      if (isMockRuntime) {
+        const keyword = searchTerm.trim().toLowerCase();
+        const list = mockTemplateState.filter((item) => item.templateKind === kind
+          && (statusFilter === 'all' || item.status === statusFilter)
+          && (!keyword || `${item.templateName} ${item.promptBody}`.toLowerCase().includes(keyword)));
+        return Promise.resolve({ pageNum: 1, pageSize: 50, size: list.length, total: list.length, pages: 1, list, prePage: 0, nextPage: 0, isFirstPage: true, isLastPage: true, hasPreviousPage: false, hasNextPage: false });
+      }
+      return templateApi.page({
         pageNum: 1,
         pageSize: 50,
         templateKind: kind,
         status: statusFilter === 'all' ? undefined : statusFilter,
         keyword: searchTerm || undefined,
-      }),
-    [activeTab, statusFilter, searchTerm],
+      });
+    },
+    [activeTab, statusFilter, searchTerm, mockTemplateState],
   );
 
   const templates: TemplateDTO[] = data?.list ?? [];
@@ -168,6 +180,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
       videoDefaultMotion: d.videoDefaultMotion,
       videoThreePartStructure: d.videoThreePartStructure,
       platformUsage: d.platformUsage,
+      platformFormat: d.platformFormat,
       platformRecommendedRatio: d.platformRecommendedRatio,
       platformWidth: toNum(d.platformWidth),
       platformHeight: toNum(d.platformHeight),
@@ -219,6 +232,13 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   const handleBatchDeactivate = async () => {
     if (selectedIds.length === 0) {
       toast.info('请先选择要停用的模板！');
+      return;
+    }
+    if (isMockRuntime) {
+      const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+      setMockTemplateState((items) => items.map((item) => selectedIds.includes(item.id) ? { ...item, status: 'DISABLED', updateTime: now } : item));
+      toast.success(`已批量停用 ${selectedIds.length} 个模板资源！`);
+      setSelectedIds([]);
       return;
     }
     try {
@@ -294,6 +314,21 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
     }
     try {
       const payload = buildSavePayload(drawer);
+      if (isMockRuntime) {
+        const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+        if (drawer.mode === 'edit') {
+          const update = payload as TemplateUpdateRequest;
+          setMockTemplateState((items) => items.map((item) => item.id === update.id ? { ...item, ...update, updateTime: now } : item));
+          toast.success(`模板「${drawer.data.templateName}」已成功保存！`);
+        } else {
+          const create = payload as TemplateCreateRequest;
+          setMockTemplateState((items) => [{ ...create, id: `tpl-${Date.now()}`, status: drawer.data.status ?? 'NORMAL', usageCount: 0, passRate: 0, avgCost: 0, avgScore: 0, createTime: now, updateTime: now }, ...items]);
+          toast.success(`自定义模板「${drawer.data.templateName}」创建成功！`);
+        }
+        setDrawer(null);
+        setSelectedIds([]);
+        return;
+      }
       if (drawer.mode === 'edit') {
         await templateApi.update(payload as TemplateUpdateRequest);
         toast.success(`模板「${drawer.data.templateName}」已成功保存并同步！`);
@@ -311,6 +346,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   };
 
   const getTabCount = (tab: TabKey): number => {
+    if (isMockRuntime) return mockTemplateState.filter((item) => item.templateKind === TAB_TO_KIND[tab]).length;
     if (tab === activeTab) return templates.length;
     return 0;
   };
@@ -829,7 +865,7 @@ function PlatformSpecRow({ tpl }: { tpl: TemplateDTO }) {
       <td className="p-4 font-mono text-slate-600 font-bold">
         {tpl.platformWidth ?? 1024} x {tpl.platformHeight ?? 1365}
       </td>
-      <td className="p-4 font-mono text-slate-500 font-semibold">{(tpl.platformUsage ?? 'JPG').toUpperCase()}</td>
+      <td className="p-4 font-mono text-slate-500 font-semibold">{(tpl.platformFormat ?? 'JPG').toUpperCase()}</td>
       <td className="p-4 font-mono text-slate-400 font-semibold">{tpl.platformMaxFileSize ?? '10MB'}</td>
       <td className="p-4">
         <span
@@ -1475,8 +1511,8 @@ function TemplateDrawerInline(props: TemplateDrawerInlineProps) {
                       <label className="font-bold text-slate-700">强制文件格式</label>
                       <select
                         className="w-full h-9 px-1.5 bg-white border border-slate-200 rounded-lg outline-none text-slate-800 focus:border-blue-600 font-mono text-xs"
-                        value={(d.platformUsage ?? 'jpg').toLowerCase()}
-                        onChange={(e) => update({ platformUsage: e.target.value })}
+                        value={(d.platformFormat ?? 'jpg').toLowerCase()}
+                        onChange={(e) => update({ platformFormat: e.target.value })}
                       >
                         {platformFormatOptions.map((opt) => (
                           <option key={opt.id} value={opt.value}>
@@ -1736,4 +1772,3 @@ function toNumLocal(v: string): number | undefined {
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
 }
-

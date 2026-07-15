@@ -4,7 +4,7 @@ React 19 + Vite 6 + TypeScript 5.8 + Tailwind 4 单页应用。对接 `../dafenq
 
 ## 项目定位
 
-达芬奇密码 AI 素材工作台的**前端工程**。完整产品需求见 `../PRD-V2-html-share/`。
+达芬奇密码 AI 素材工作台的**前端工程**。正式产品需求见 `docs/product/PRD-V2.3.md`。
 
 ## 命令
 
@@ -27,7 +27,7 @@ dev 模式通过 Vite proxy 自动转发:
 后端   → http://localhost:8090/api/xxx
 ```
 
-详见 `.env.example` 和 `vite.config.ts`。后端规范见 `../dafenqi-ai/CLAUDE.md`。
+详见 `.env.example` 和 `vite.config.ts`。接口路径、DTO 和调用顺序见 `docs/product/API-CONTRACT-V2.3.md`。
 
 ## 目录结构
 
@@ -40,6 +40,9 @@ EC-AIGC/
 ├── .env.example
 ├── CLAUDE.md                      # 前端项目约定
 ├── AGENTS.md                      # 前端项目 AI 协作入口
+├── docs/
+│   ├── product/                   # 三份正式产品与技术文档
+│   └── implementation/            # 两份内部执行文档
 └── src/
     ├── main.tsx
     ├── App.tsx
@@ -64,7 +67,11 @@ VITE_API_TARGET=http://localhost:8090
 - **`CLAUDE.md`** — 技术栈、目录约定、Tailwind 主题、API 对接、安全、已知 TODO
 - **`AGENTS.md`** — 业务模块状态、协作入口、何时直接改 vs 路由
 - **`../AGENTS.md`** — 工作区级协作原则
-- **`../PRD-V2-html-share/`** — 产品需求
+- **`docs/product/PRD-V2.3.md`** — 产品范围、工作流、页面、状态、Skills 与验收唯一依据
+- **`docs/product/API-CONTRACT-V2.3.md`** — 前后端接口唯一依据
+- **`docs/product/BACKEND-TECHNICAL-SPEC-V2.3.md`** — 后端开发交付规范
+- **`docs/implementation/FRONTEND-IMPLEMENTATION-V2.3.md`** — 前端改造任务
+- **`docs/implementation/DEVELOPMENT-ROADMAP-V2.3.md`** — 排期、联调和版本管理
 
 ## 维护
 

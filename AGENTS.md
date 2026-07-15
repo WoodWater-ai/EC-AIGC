@@ -10,24 +10,27 @@
 
 | 模块 | 组件 | 当前状态 | 后端对接点 |
 |---|---|---|---|
-| 仪表盘 | `Dashboard.tsx` | mock | `GET /v1/dashboard/summary` (TBD) |
-| 任务列表 | `TaskList.tsx` + `TaskDetailsDrawer.tsx` | mock | `GET/POST /v1/tasks` (TBD) |
-| 创建图片任务 | `CreateImageTask.tsx` | mock | `POST /v1/tasks/image` (TBD) |
-| 创建视频任务 | `CreateVideoTask.tsx` | mock | `POST /v1/tasks/video` (TBD) |
-| 模板中心 | `TemplateCenter.tsx` | mock | `GET/POST /v1/templates` (TBD) |
-| 素材库 | `ProductAssetLibrary.tsx` | mock | `GET /v1/assets` (TBD) |
-| 数据分析 | `DataAnalytics.tsx` | mock | `GET /v1/analytics/...` (TBD) |
-| 系统配置 | `SystemConfig.tsx` | mock | `GET /v1/admin/...` (TBD) |
+| 仪表盘 | `Dashboard.tsx` | mock | `GET /v1/dashboard/summary` |
+| 任务列表 | `TaskList.tsx` + `TaskDetailsDrawer.tsx` | mock | `GET /v1/generation-tasks`、结果与审核接口 |
+| 创建图片任务 | `CreateImageTask.tsx` | mock | `/v1/generation-task-groups/{id}/...` 五步阶段接口 |
+| 创建视频任务 | `CreateVideoTask.tsx` | mock | `/v1/generation-task-groups/{id}/...` 五步阶段接口 |
+| 模板中心 | `TemplateCenter.tsx` | mock | `/v1/prompt-templates` |
+| 素材库 | `ProductAssetLibrary.tsx` | mock | `/v1/assets`、`/v1/product-assets` |
+| 数据分析 | `DataAnalytics.tsx` | mock | `/v1/analytics/tasks` |
+| 系统配置 | `SystemConfig.tsx` | mock | `/v1/admin/...` |
 | 素材中转 | `AssetTransitModal.tsx` | mock | 全局 Modal |
 
-(后端接口路径待与 `dafenqi-ai/` 团队对齐,以 `dafenqi-ai/docs/单体项目开发规范.md` 为准)
+接口路径、DTO 和交互顺序以 `docs/product/API-CONTRACT-V2.3.md` 为准；后端实现规范不能覆盖正式 API 契约。
 
 ## 协作入口
 
 - **本目录约定**:见 `CLAUDE.md`(技术栈、目录结构、Tailwind 主题、API 对接)
 - **工作区级约定**:见 `../AGENTS.md`(协作原则、子项目路由、commit 规范)
-- **产品需求**:见 `../PRD-V2-html-share/达芬奇密码AI素材工作台-内部产品化一阶段完整PRD-V2.html`
-- **后端 API**:见 `../dafenqi-ai/CLAUDE.md` 和 `../dafenqi-ai/docs/单体项目开发规范.md`
+- **正式产品依据**:见 `docs/product/PRD-V2.3.md`
+- **前后端 API**:见 `docs/product/API-CONTRACT-V2.3.md`
+- **后端交付规范**:见 `docs/product/BACKEND-TECHNICAL-SPEC-V2.3.md`
+- **前端实施任务**:见 `docs/implementation/FRONTEND-IMPLEMENTATION-V2.3.md`
+- **排期与版本管理**:见 `docs/implementation/DEVELOPMENT-ROADMAP-V2.3.md`
 
 ## 何时直接改 vs 何时路由
 

@@ -31,6 +31,8 @@ import {
   type AssetCategoryUpdateRequest,
 } from '../api/modules/assetCategory';
 import type { AppScreen } from '../types';
+import { isMockRuntime } from '../config/runtime';
+import { mockAssetCategories } from '../mockData';
 
 interface ResourceCategoryListProps {
   setScreen: (screen: AppScreen) => void;
@@ -780,7 +782,7 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
   const refetch = useCallback(async (selectIdAfter?: number, expandIdAfter?: number) => {
     setLoading(true);
     try {
-      const fresh = await assetCategoryApi.tree();
+      const fresh = isMockRuntime ? mockAssetCategories : await assetCategoryApi.tree();
       setTree(fresh);
       if (selectIdAfter !== undefined) {
         setSelectedId(selectIdAfter);
@@ -866,6 +868,10 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
       danger: true,
     });
     if (!ok) return;
+    if (isMockRuntime) {
+      toast.info('当前为 Demo 数据，资源分类仅供浏览，不保存修改。');
+      return;
+    }
     try {
       await assetCategoryApi.delete(node.id);
       toast.success(`分类「${node.categoryName}」已删除`);
@@ -887,6 +893,11 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
   };
 
   const handleDrawerSubmit = async (form: DrawerFormData): Promise<void> => {
+    if (isMockRuntime) {
+      toast.info('当前为 Demo 数据，资源分类仅供浏览，不保存修改。');
+      handleDrawerClose();
+      return;
+    }
     if (drawerMode === 'create') {
       const req: AssetCategoryCreateRequest = {
         parentId: drawerDefaultParentId,

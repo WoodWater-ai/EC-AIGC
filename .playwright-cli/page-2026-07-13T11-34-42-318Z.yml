@@ -1,0 +1,198 @@
+- generic [ref=f6e2]:
+  - generic [ref=f6e1221]:
+    - banner [ref=f6e1222]:
+      - generic [ref=f6e1223]:
+        - button "arrow_back" [ref=f6e1224]
+        - generic [ref=f6e1226]:
+          - paragraph [ref=f6e1227]: 图片任务工作台
+          - heading "新建多类型图片任务" [level=1] [ref=f6e1228]
+      - generic [ref=f6e1229]:
+        - generic [ref=f6e1230]: 已选择 1 个图片类型，将生成独立任务
+        - button "提交 1 条任务" [ref=f6e1231]
+    - main [ref=f6e1232]:
+      - generic [ref=f6e1233]:
+        - generic [ref=f6e1234]:
+          - generic [ref=f6e1235]:
+            - heading "输入素材" [level=2] [ref=f6e1236]
+            - button "资源中心" [ref=f6e1237]
+          - img "MW Series 7 智联运动手表" [ref=f6e1238]
+          - paragraph [ref=f6e1239]: MW Series 7 智联运动手表
+          - combobox [ref=f6e1240]:
+            - option "MW Series 7 智联运动手表" [selected]
+            - option "Nike Air Max Elite 2026 跑鞋"
+            - option "极致臻颜草本精华保湿乳"
+            - option "超轻便透气抗撕裂防风羽绒服"
+        - generic [ref=f6e1241]:
+          - generic [ref=f6e1242]:
+            - heading "上下装合成套图" [level=2] [ref=f6e1243]
+            - generic [ref=f6e1244]: 可选
+          - button "add_photo_alternate 上衣图 点击模拟添加素材" [ref=f6e1245]:
+            - generic [ref=f6e1246]: add_photo_alternate
+            - generic [ref=f6e1247]:
+              - generic [ref=f6e1248]: 上衣图
+              - text: 点击模拟添加素材
+          - button "add_photo_alternate 下装图 点击模拟添加素材" [ref=f6e1249]:
+            - generic [ref=f6e1250]: add_photo_alternate
+            - generic [ref=f6e1251]:
+              - generic [ref=f6e1252]: 下装图
+              - text: 点击模拟添加素材
+          - button "生成合成预览" [disabled] [ref=f6e1253]
+        - generic [ref=f6e1254]:
+          - generic [ref=f6e1255]:
+            - heading "参考图" [level=2] [ref=f6e1256]
+            - button "从资源中心添加" [ref=f6e1257]
+          - generic [ref=f6e1258]:
+            - generic [ref=f6e1259]:
+              - generic [ref=f6e1260]: image
+              - generic [ref=f6e1261]:
+                - paragraph [ref=f6e1262]: 风格参考
+                - paragraph [ref=f6e1263]: 自然光影棚参考.jpg · 模板资源
+              - button "close" [ref=f6e1264]
+            - generic [ref=f6e1266]:
+              - generic [ref=f6e1267]: image
+              - generic [ref=f6e1268]:
+                - paragraph [ref=f6e1269]: 场景参考
+                - paragraph [ref=f6e1270]: 柔光台面场景.jpg · 商品素材
+              - button "close" [ref=f6e1271]
+      - generic [ref=f6e1273]:
+        - generic [ref=f6e1274]:
+          - generic [ref=f6e1275]:
+            - generic [ref=f6e1276]:
+              - paragraph [ref=f6e1277]: 任务配置
+              - heading "用户希望得到什么结果" [level=2] [ref=f6e1278]
+            - generic [ref=f6e1279]: 规格选项由所选模型提供
+          - generic [ref=f6e1280]: 生成图片类型 可多选
+          - generic [ref=f6e1281]:
+            - button "inventory_2 check 商品主图" [ref=f6e1282]:
+              - generic [ref=f6e1283]:
+                - generic [ref=f6e1284]: inventory_2
+                - generic [ref=f6e1285]: check
+              - paragraph [ref=f6e1287]: 商品主图
+            - button "landscape 详情/场景图" [ref=f6e1288]:
+              - generic [ref=f6e1289]: landscape
+              - paragraph [ref=f6e1292]: 详情/场景图
+            - button "zoom_in 细节图" [ref=f6e1293]:
+              - generic [ref=f6e1294]: zoom_in
+              - paragraph [ref=f6e1297]: 细节图
+            - button "accessibility_new 上身/三视图" [ref=f6e1298]:
+              - generic [ref=f6e1299]: accessibility_new
+              - paragraph [ref=f6e1302]: 上身/三视图
+          - generic [ref=f6e1303]:
+            - generic [ref=f6e1304]:
+              - text: 任务模板
+              - combobox "任务模板" [ref=f6e1305]:
+                - option "商品商业展示模板 v2.1" [selected]
+                - option "服装上身展示模板"
+                - option "细节材质强化模板"
+            - generic [ref=f6e1306]:
+              - text: 风格
+              - combobox "风格" [ref=f6e1307]:
+                - option "甜美网红风 (Sweet Influencer)" [selected]
+                - option "极简北欧风 (Minimalist Nordic)"
+                - option "科技赛博风 (Cyberpunk Cyber)"
+                - option "金秋自然风 (Autumn Natural)"
+                - option "奢华丝绸风 (Elegant Silk Satin)"
+            - generic [ref=f6e1308]:
+              - text: 场景
+              - combobox "场景" [ref=f6e1309]:
+                - option "自然影棚" [selected]
+                - option "城市街景"
+                - option "居家陈列"
+          - generic [ref=f6e1310]:
+            - generic [ref=f6e1311]:
+              - text: 动作/姿势
+              - textbox "动作/姿势" [ref=f6e1312]: 自然正面
+            - generic [ref=f6e1313]:
+              - text: 负面约束
+              - textbox "负面约束" [ref=f6e1314]: 模糊、商品漂移、错误文字、材质失真
+          - generic [ref=f6e1315]:
+            - generic [ref=f6e1316]:
+              - heading "模特选择" [level=3] [ref=f6e1317]
+              - button "不使用模特" [ref=f6e1318]
+            - generic [ref=f6e1319]:
+              - button [ref=f6e1320]:
+                - paragraph [ref=f6e1321]: 林澈 · 清冷通勤
+                - paragraph [ref=f6e1322]: 适合极简通勤和轻奢女装表达。
+              - button [ref=f6e1323]:
+                - paragraph [ref=f6e1324]: 周野 · 运动街头
+                - paragraph [ref=f6e1325]: 适合鞋服和运动配件的动态场景。
+              - button [ref=f6e1326]:
+                - paragraph [ref=f6e1327]: 顾南 · 自然生活
+                - paragraph [ref=f6e1328]: 适合美妆和生活方式类商品。
+        - generic [ref=f6e1329]:
+          - generic [ref=f6e1330]:
+            - generic [ref=f6e1331]:
+              - paragraph [ref=f6e1332]: 任务级 Prompt 副本
+              - heading "每种图片各自编辑" [level=2] [ref=f6e1333]
+            - button "auto_awesome AI 助手" [ref=f6e1334]:
+              - generic [ref=f6e1335]: auto_awesome
+              - text: AI 助手
+          - generic [ref=f6e1337]:
+            - generic [ref=f6e1338]:
+              - generic [ref=f6e1339]: 商品主图
+              - generic [ref=f6e1340]: 来源：商品商业展示模板 v2.1
+            - textbox [ref=f6e1341]: 纯净商业主图，商品主体完整、边缘清晰，保留品牌与材质细节。 商品：MW Series 7 智联运动手表。风格：甜美网红风 (Sweet Influencer)；场景：自然影棚；动作/姿势：自然正面；模特：林澈 · 清冷通勤。负面约束：模糊、商品漂移、错误文字、材质失真。
+      - generic [ref=f6e1342]:
+        - generic [ref=f6e1343]:
+          - paragraph [ref=f6e1344]: 模型通道与模型能力
+          - heading "选择可执行的模型" [level=2] [ref=f6e1345]
+          - generic [ref=f6e1346]:
+            - text: 接入方式
+            - combobox "接入方式" [ref=f6e1347]:
+              - option "云端 API · 云端 API" [selected]
+              - option "中转站 · 中转站"
+              - option "本地模型 · 本地模型"
+          - generic [ref=f6e1348]:
+            - text: 具体模型
+            - combobox "具体模型" [ref=f6e1349]:
+              - option "GPT Image 2 · 保真优先" [selected]
+              - option "Imagen · 稳定出图"
+          - paragraph [ref=f6e1350]: 适合商品主体、局部修改和参考图一致性。
+          - generic [ref=f6e1351]:
+            - generic [ref=f6e1352]:
+              - generic [ref=f6e1353]: 健康状态
+              - text: 运行正常
+            - generic [ref=f6e1354]:
+              - generic [ref=f6e1355]: 预估成本
+              - generic [ref=f6e1356]: 35.2 元
+          - paragraph [ref=f6e1357]: 本月可用额度 68%
+        - generic [ref=f6e1358]:
+          - heading "输出规格" [level=3] [ref=f6e1359]
+          - paragraph [ref=f6e1360]: 仅展示业务需要的选择，范围由模型能力决定。
+          - generic [ref=f6e1361]:
+            - text: 平台规格推荐
+            - generic [ref=f6e1362]:
+              - button "电商主图推荐" [ref=f6e1363]
+              - button "详情页长图" [ref=f6e1364]
+              - button "内容种草竖图" [ref=f6e1365]
+          - generic [ref=f6e1366]:
+            - text: 比例
+            - combobox "比例" [ref=f6e1367]:
+              - option "1:1" [selected]
+              - option "3:4"
+              - option "4:5"
+              - option "9:16"
+              - option "16:9"
+          - generic [ref=f6e1368]:
+            - generic [ref=f6e1369]:
+              - text: 张数
+              - combobox "张数" [ref=f6e1370]:
+                - option "1"
+                - option "2"
+                - option "3"
+                - option "4" [selected]
+            - generic [ref=f6e1371]:
+              - text: 图片尺寸
+              - combobox "图片尺寸" [ref=f6e1372]:
+                - option "1024px"
+                - option "1536px"
+                - option "2048px" [selected]
+        - generic [ref=f6e1373]:
+          - heading "审核策略" [level=3] [ref=f6e1374]
+          - generic [ref=f6e1375]:
+            - text: 启用审美评分
+            - checkbox "启用审美评分" [checked] [ref=f6e1376]
+          - generic [ref=f6e1377]:
+            - text: 启用上架审核
+            - checkbox "启用上架审核" [checked] [ref=f6e1378]
+  - region "Notifications alt+T"

@@ -1,0 +1,281 @@
+- generic [ref=f6e2]:
+  - generic [ref=f6e3]:
+    - complementary [ref=f6e4]:
+      - generic [ref=f6e5]:
+        - generic [ref=f6e7]:
+          - generic [ref=f6e8]: blur_on
+          - generic [ref=f6e10]:
+            - heading "达芬奇密码 AI" [level=1] [ref=f6e11]
+            - text: DaVinci Code v2.0
+        - button "add_circle 开始智能创作 keyboard_arrow_down" [ref=f6e13] [cursor=pointer]:
+          - generic [ref=f6e14]: add_circle
+          - text: 开始智能创作
+          - generic [ref=f6e15]: keyboard_arrow_down
+        - navigation [ref=f6e16]:
+          - generic [ref=f6e17]: 主模块导航
+          - button "dashboard 工作台首页" [ref=f6e18] [cursor=pointer]:
+            - generic [ref=f6e19]:
+              - generic [ref=f6e20]: dashboard
+              - generic [ref=f6e21]: 工作台首页
+          - button "auto_schedule 任务列表" [ref=f6e23] [cursor=pointer]:
+            - generic [ref=f6e24]:
+              - generic [ref=f6e25]: auto_schedule
+              - generic [ref=f6e26]: 任务列表
+          - button "dashboard_customize 智能模板中心" [ref=f6e27] [cursor=pointer]:
+            - generic [ref=f6e28]:
+              - generic [ref=f6e29]: dashboard_customize
+              - generic [ref=f6e30]: 智能模板中心
+          - button "inventory_2 商品素材库" [ref=f6e31] [cursor=pointer]:
+            - generic [ref=f6e32]:
+              - generic [ref=f6e33]: inventory_2
+              - generic [ref=f6e34]: 商品素材库
+          - button "face_3 模特资源库" [ref=f6e35] [cursor=pointer]:
+            - generic [ref=f6e36]:
+              - generic [ref=f6e37]: face_3
+              - generic [ref=f6e38]: 模特资源库
+          - button "insights 数据效能复盘" [ref=f6e39] [cursor=pointer]:
+            - generic [ref=f6e40]:
+              - generic [ref=f6e41]: insights
+              - generic [ref=f6e42]: 数据效能复盘
+          - button "settings_applications 系统配置模块" [ref=f6e43] [cursor=pointer]:
+            - generic [ref=f6e44]:
+              - generic [ref=f6e45]: settings_applications
+              - generic [ref=f6e46]: 系统配置模块
+          - button "sync_alt 通道异步任务" [ref=f6e47] [cursor=pointer]:
+            - generic [ref=f6e48]:
+              - generic [ref=f6e49]: sync_alt
+              - generic [ref=f6e50]: 通道异步任务
+          - button "account_tree 资源分类" [ref=f6e51] [cursor=pointer]:
+            - generic [ref=f6e52]:
+              - generic [ref=f6e53]: account_tree
+              - generic [ref=f6e54]: 资源分类
+        - generic [ref=f6e55]:
+          - generic [ref=f6e56]: 快捷工具箱
+          - button "grid_view 资源中心" [ref=f6e57] [cursor=pointer]:
+            - generic [ref=f6e58]: grid_view
+            - text: 资源中心
+      - generic [ref=f6e61] [cursor=pointer]:
+        - img "陆永奇" [ref=f6e63]
+        - generic [ref=f6e65]:
+          - generic [ref=f6e66]:
+            - paragraph [ref=f6e67]: 陆永奇
+            - generic [ref=f6e68]: unfold_more
+          - paragraph [ref=f6e69]: 管理员
+    - generic [ref=f6e70]:
+      - banner [ref=f6e71]:
+        - generic [ref=f6e72]:
+          - generic [ref=f6e73] [cursor=pointer]: 达芬奇密码 AI
+          - generic [ref=f6e74]: chevron_right
+          - generic [ref=f6e75]: 工作台首页
+        - generic [ref=f6e77]:
+          - button "add 新建任务 keyboard_arrow_down" [ref=f6e79] [cursor=pointer]:
+            - generic [ref=f6e80]: add
+            - generic [ref=f6e81]: 新建任务
+            - generic [ref=f6e82]: keyboard_arrow_down
+          - button "notifications 2" [ref=f6e85] [cursor=pointer]:
+            - generic [ref=f6e86]: notifications
+            - generic [ref=f6e87]: "2"
+          - button "help" [ref=f6e88] [cursor=pointer]
+          - button "logout 退出" [ref=f6e90] [cursor=pointer]:
+            - generic [ref=f6e91]: logout
+            - generic [ref=f6e92]: 退出
+      - main [ref=f6e93]:
+        - generic [ref=f6e94]:
+          - generic [ref=f6e95]:
+            - generic [ref=f6e96]:
+              - heading "monitoring 智能生成多维数据看板" [level=2] [ref=f6e97]:
+                - generic [ref=f6e98]: monitoring
+                - text: 智能生成多维数据看板
+              - paragraph [ref=f6e99]: 根据日、周、月统计口径动态计算图片/视频生成数以及可用折合单价成本，契合财务与效能双重闭环审计。
+            - generic [ref=f6e100]:
+              - button "按日统计" [ref=f6e101] [cursor=pointer]
+              - button "按周统计" [ref=f6e102] [cursor=pointer]
+              - button "按月统计" [ref=f6e103] [cursor=pointer]
+          - generic [ref=f6e104]:
+            - generic [ref=f6e105]:
+              - generic [ref=f6e106]:
+                - generic [ref=f6e107]: 本周图片生成数
+                - heading "312 张" [level=3] [ref=f6e108]
+                - generic [ref=f6e109]:
+                  - generic [ref=f6e110]: trending_up
+                  - text: 较上周 +12%
+                - generic [ref=f6e111]: 达芬奇通道利用率 88%
+              - generic [ref=f6e112]: photo_library
+            - generic [ref=f6e114]:
+              - generic [ref=f6e115]:
+                - generic [ref=f6e116]: 本周视频生成数
+                - heading "84 段" [level=3] [ref=f6e117]
+                - generic [ref=f6e118]:
+                  - generic [ref=f6e119]: trending_up
+                  - text: 较上周 +24%
+                - generic [ref=f6e120]: 算力首帧加速提升
+              - generic [ref=f6e121]: video_library
+            - generic [ref=f6e123]:
+              - generic [ref=f6e124]:
+                - generic [ref=f6e125]: 单图可用成本
+                - heading "￥0.95 /张" [level=3] [ref=f6e126]
+                - generic [ref=f6e127]:
+                  - generic [ref=f6e128]: trending_down
+                  - text: 较上周 -14% (可用效能)
+                - generic [ref=f6e129]: 高复用性模板降低摊销
+              - generic [ref=f6e130]: payments
+            - generic [ref=f6e132]:
+              - generic [ref=f6e133]:
+                - generic [ref=f6e134]: 单条视频可用成本
+                - heading "￥3.80 /条" [level=3] [ref=f6e135]
+                - generic [ref=f6e136]:
+                  - generic [ref=f6e137]: trending_down
+                  - text: 较上周 -8% (算法调优)
+                - generic [ref=f6e138]: 排版脚本复用减少算力
+              - generic [ref=f6e139]: universal_currency_alt
+          - generic [ref=f6e141]:
+            - generic [ref=f6e142]:
+              - generic [ref=f6e143]:
+                - generic [ref=f6e145]:
+                  - generic [ref=f6e146]: DaVinci GPU Core 实时渲染中
+                  - generic [ref=f6e151]: 批次生图进度
+                - generic [ref=f6e152]:
+                  - generic [ref=f6e153]:
+                    - img "Nike Air Max Elite 2026 跑鞋" [ref=f6e154]
+                    - generic [ref=f6e155]: sync
+                  - generic [ref=f6e157]:
+                    - generic [ref=f6e158]:
+                      - generic [ref=f6e159]:
+                        - heading "Nike Air Max _ 3D赛博炫彩展示 (批次#1)" [level=4] [ref=f6e160]
+                        - paragraph [ref=f6e161]:
+                          - generic [ref=f6e162]: "关联产品: Nike Air Max Elite 2026 跑鞋"
+                          - generic [ref=f6e163]: "|"
+                          - generic [ref=f6e164]: "选用模板: 3D 赛博虚拟炫彩展示架"
+                      - generic [ref=f6e165]: 68%
+                    - generic [ref=f6e168]:
+                      - generic [ref=f6e169]: 已用时 12s · 预估剩余 6s
+                      - generic [ref=f6e170]: "线路通道: DaVinci Vision v3.5 (自研推荐)"
+                - generic [ref=f6e171]:
+                  - generic [ref=f6e172]:
+                    - img "MW Series 7 智联运动手表" [ref=f6e173]
+                    - generic [ref=f6e174]: sync
+                  - generic [ref=f6e176]:
+                    - generic [ref=f6e177]:
+                      - generic [ref=f6e178]:
+                        - heading "智能运动手表概念渲染短视频 (批次#2)" [level=4] [ref=f6e179]
+                        - paragraph [ref=f6e180]:
+                          - generic [ref=f6e181]: "关联产品: MW Series 7 智联运动手表"
+                          - generic [ref=f6e182]: "|"
+                          - generic [ref=f6e183]: "选用模板: 动态爆破能量粒子环绕视频"
+                      - generic [ref=f6e184]: 45%
+                    - generic [ref=f6e187]:
+                      - generic [ref=f6e188]: 已用时 12s · 预估剩余 6s
+                      - generic [ref=f6e189]: "线路通道: Runway Gen-3 Alpha Video API"
+              - generic [ref=f6e190]:
+                - generic [ref=f6e191]:
+                  - generic [ref=f6e192]:
+                    - heading "最近产出高保真广告素材" [level=3] [ref=f6e193]
+                    - paragraph [ref=f6e194]: 此处展示已审核通过、并自动完成智能排版的素材。可随时加入资源中心。
+                  - button "查看全部 arrow_forward" [ref=f6e195] [cursor=pointer]:
+                    - text: 查看全部
+                    - generic [ref=f6e196]: arrow_forward
+                - generic [ref=f6e197]:
+                  - generic [ref=f6e198] [cursor=pointer]:
+                    - generic [ref=f6e199]:
+                      - img "MW Series 7 智联运动手表" [ref=f6e200]
+                      - generic [ref=f6e201]: 智能硬件
+                    - generic [ref=f6e202]:
+                      - generic [ref=f6e203]:
+                        - heading "MW Series 7 智联运动手表" [level=4] [ref=f6e204]
+                        - paragraph [ref=f6e205]: "SKU: SKU-MW7-BLK"
+                      - generic [ref=f6e206]:
+                        - generic [ref=f6e207]:
+                          - generic [ref=f6e208]: folder
+                          - text: 12张素材 / 3段视频
+                        - generic [ref=f6e209]:
+                          - text: 详细
+                          - generic [ref=f6e210]: arrow_forward
+                  - generic [ref=f6e211] [cursor=pointer]:
+                    - generic [ref=f6e212]:
+                      - img "Nike Air Max Elite 2026 跑鞋" [ref=f6e213]
+                      - generic [ref=f6e214]: 户外服饰
+                    - generic [ref=f6e215]:
+                      - generic [ref=f6e216]:
+                        - heading "Nike Air Max Elite 2026 跑鞋" [level=4] [ref=f6e217]
+                        - paragraph [ref=f6e218]: "SKU: SKU-NK-AM26-RED"
+                      - generic [ref=f6e219]:
+                        - generic [ref=f6e220]:
+                          - generic [ref=f6e221]: folder
+                          - text: 18张素材 / 5段视频
+                        - generic [ref=f6e222]:
+                          - text: 详细
+                          - generic [ref=f6e223]: arrow_forward
+                  - generic [ref=f6e224] [cursor=pointer]:
+                    - generic [ref=f6e225]:
+                      - img "极致臻颜草本精华保湿乳" [ref=f6e226]
+                      - generic [ref=f6e227]: 美妆护肤
+                    - generic [ref=f6e228]:
+                      - generic [ref=f6e229]:
+                        - heading "极致臻颜草本精华保湿乳" [level=4] [ref=f6e230]
+                        - paragraph [ref=f6e231]: "SKU: SKU-SKN-ESS-100"
+                      - generic [ref=f6e232]:
+                        - generic [ref=f6e233]:
+                          - generic [ref=f6e234]: folder
+                          - text: 8张素材 / 2段视频
+                        - generic [ref=f6e235]:
+                          - text: 详细
+                          - generic [ref=f6e236]: arrow_forward
+                  - generic [ref=f6e237] [cursor=pointer]:
+                    - generic [ref=f6e238]:
+                      - img "超轻便透气抗撕裂防风羽绒服" [ref=f6e239]
+                      - generic [ref=f6e240]: 户外服饰
+                    - generic [ref=f6e241]:
+                      - generic [ref=f6e242]:
+                        - heading "超轻便透气抗撕裂防风羽绒服" [level=4] [ref=f6e243]
+                        - paragraph [ref=f6e244]: "SKU: SKU-OUT-JKT-GRY"
+                      - generic [ref=f6e245]:
+                        - generic [ref=f6e246]:
+                          - generic [ref=f6e247]: folder
+                          - text: 14张素材 / 4段视频
+                        - generic [ref=f6e248]:
+                          - text: 详细
+                          - generic [ref=f6e249]: arrow_forward
+            - generic [ref=f6e250]:
+              - generic [ref=f6e251]:
+                - generic [ref=f6e252]:
+                  - heading "playlist_add_check 协作待办与提案" [level=3] [ref=f6e253]:
+                    - generic [ref=f6e254]: playlist_add_check
+                    - text: 协作待办与提案
+                  - generic [ref=f6e255]: 3 件待处理
+                - generic [ref=f6e256]:
+                  - generic [ref=f6e257]:
+                    - generic [ref=f6e258]:
+                      - generic [ref=f6e259]: gavel
+                      - generic [ref=f6e260]:
+                        - paragraph [ref=f6e261]: 审核“MW Series 7”生成宣传海报
+                        - paragraph [ref=f6e262]: 陈美晴 提交 · 等待二审确认
+                    - generic [ref=f6e263]:
+                      - button "忽略" [ref=f6e264] [cursor=pointer]
+                      - button "立即處理" [ref=f6e265] [cursor=pointer]
+                  - generic [ref=f6e266]:
+                    - generic [ref=f6e267]:
+                      - generic [ref=f6e268]: cloud_upload
+                      - generic [ref=f6e269]:
+                        - paragraph [ref=f6e270]: 补充“轻便防风羽绒服”侧面去背底图
+                        - paragraph [ref=f6e271]: 运营 提报 · 素材分辨率不足
+                    - generic [ref=f6e272]:
+                      - button "忽略" [ref=f6e273] [cursor=pointer]
+                      - button "立即處理" [ref=f6e274] [cursor=pointer]
+                  - generic [ref=f6e275]:
+                    - generic [ref=f6e276]:
+                      - generic [ref=f6e277]: build
+                      - generic [ref=f6e278]:
+                        - paragraph [ref=f6e279]: 复制修复“极地防寒羽绒服_动态飞雪”超时任务
+                        - paragraph [ref=f6e280]: 系统建议 · 调降为中等画质重试
+                    - generic [ref=f6e281]:
+                      - button "忽略" [ref=f6e282] [cursor=pointer]
+                      - button "立即處理" [ref=f6e283] [cursor=pointer]
+              - generic [ref=f6e284]:
+                - heading "lightbulb_circle 达芬奇 AI 灵感库" [level=3] [ref=f6e286]:
+                  - generic [ref=f6e287]: lightbulb_circle
+                  - text: 达芬奇 AI 灵感库
+                - paragraph [ref=f6e288]: 检测到本周“美妆护肤”类别需求大增。系统为您自动推荐“极简北欧冷淡风大理石”模板，点击下方即可一键应用于“臻颜精华乳”。
+                - button "一键采用并开始 chevron_right" [ref=f6e289] [cursor=pointer]:
+                  - text: 一键采用并开始
+                  - generic [ref=f6e290]: chevron_right
+  - region "Notifications alt+T"

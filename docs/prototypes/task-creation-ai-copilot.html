@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>达芬奇密码 - AI 助手创建任务原型</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+
+      :root {
+        --ink: #17201f;
+        --muted: #6d7775;
+        --line: #dce3df;
+        --soft-line: #edf1ef;
+        --paper: #f7f8f6;
+        --panel: #ffffff;
+        --teal: #16776d;
+        --teal-dark: #0f5b53;
+        --teal-soft: #e6f3ef;
+        --amber: #b96b18;
+        --amber-soft: #fff4df;
+        --blue: #2d5f98;
+        --blue-soft: #eaf1fa;
+        --shadow: 0 12px 28px rgba(23, 32, 31, 0.06);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-width: 1180px;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+        font-size: 13px;
+      }
+      button, input { font: inherit; }
+      button { cursor: pointer; }
+      .app-shell { min-height: 100vh; display: grid; grid-template-columns: 220px 1fr; }
+      .sidebar {
+        background: #173b38;
+        color: #d8e7e3;
+        padding: 22px 14px;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid rgba(255,255,255,.08);
+      }
+      .brand { display: flex; align-items: center; gap: 10px; padding: 5px 8px 25px; font-weight: 700; letter-spacing: 0; color: white; }
+      .brand-mark { width: 27px; height: 27px; border: 1.5px solid #9fd2c8; display: grid; place-items: center; color: #9fd2c8; font-family: "DM Mono", monospace; font-size: 12px; }
+      .workspace { color: #9fb8b3; padding: 12px 10px; font-size: 11px; }
+      .nav { display: grid; gap: 3px; }
+      .nav-item { display: flex; gap: 10px; align-items: center; padding: 10px 11px; border: 0; color: #bfd3ce; background: transparent; text-align: left; border-radius: 6px; }
+      .nav-item.active { color: white; background: rgba(172, 223, 211, .13); }
+      .nav-dot { width: 7px; height: 7px; border: 1px solid currentColor; border-radius: 50%; }
+      .side-bottom { margin-top: auto; border-top: 1px solid rgba(255,255,255,.12); padding: 16px 9px 2px; color: #a4bbb6; line-height: 1.7; font-size: 11px; }
+      .side-bottom strong { color: #d9e8e4; font-size: 12px; }
+
+      .main { min-width: 0; padding: 0 28px 100px; }
+      .topbar { height: 72px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+      .crumb { color: var(--muted); }
+      .crumb b { color: var(--ink); margin-left: 7px; }
+      .draft { color: var(--muted); font-size: 12px; }
+      .draft b { color: var(--teal); font-weight: 600; }
+      .workspace-grid { display: grid; grid-template-columns: minmax(205px, .82fr) minmax(510px, 2fr) minmax(288px, 1fr); gap: 18px; padding-top: 20px; max-width: 1600px; margin: auto; }
+      .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; box-shadow: 0 3px 10px rgba(23, 32, 31, 0.025); }
+      .panel-title { display: flex; justify-content: space-between; align-items: center; padding: 15px 16px; border-bottom: 1px solid var(--soft-line); font-weight: 700; }
+      .panel-title small { font-family: "DM Mono", monospace; font-size: 10px; color: var(--muted); font-weight: 500; }
+      .context-body { padding: 14px; }
+      .product { display: grid; grid-template-columns: 66px 1fr; gap: 11px; align-items: center; padding-bottom: 15px; border-bottom: 1px solid var(--soft-line); }
+      .product img { width: 66px; height: 66px; object-fit: cover; border-radius: 5px; background: #e8e4dd; }
+      .product b { display: block; font-size: 14px; margin-bottom: 3px; }
+      .product span { color: var(--muted); font-size: 11px; }
+      .section-label { margin: 17px 0 9px; font-size: 11px; color: var(--muted); letter-spacing: .4px; }
+      .task-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--soft-line); }
+      .task-row:last-child { border-bottom: 0; }
+      .mini-image { width: 31px; height: 31px; object-fit: cover; border-radius: 4px; }
+      .task-row b { display: block; font-size: 12px; }
+      .task-row span { color: var(--muted); font-size: 10px; }
+      .status-list { display: grid; gap: 7px; margin-top: 15px; padding: 12px; background: #f5f8f7; border-radius: 5px; }
+      .check { display: flex; gap: 7px; align-items: center; color: #4e6460; font-size: 11px; }
+      .check i { width: 14px; height: 14px; display: inline-grid; place-items: center; border-radius: 50%; background: var(--teal); color: white; font-style: normal; font-size: 9px; }
+      .check.pending i { background: #ffffff; border: 1px solid #9aa8a4; color: transparent; }
+
+      .assistant-head { padding: 18px 20px; display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--soft-line); }
+      .assistant-id { display: flex; gap: 11px; align-items: center; }
+      .assistant-avatar { width: 32px; height: 32px; background: var(--teal); color: #fff; display: grid; place-items: center; border-radius: 7px; font-family: "DM Mono", monospace; font-size: 13px; }
+      .assistant-id b { display: block; font-size: 15px; }
+      .assistant-id span { display: block; color: var(--muted); margin-top: 2px; font-size: 11px; }
+      .state-pill { color: var(--amber); background: var(--amber-soft); border: 1px solid #f4d6aa; padding: 4px 8px; border-radius: 20px; font-size: 11px; }
+      .conversation { padding: 16px 20px 4px; }
+      .message { display: grid; grid-template-columns: 28px 1fr; gap: 9px; margin-bottom: 14px; }
+      .message-mark { width: 25px; height: 25px; display: grid; place-items: center; background: var(--teal-soft); color: var(--teal); border-radius: 5px; font-weight: 700; font-size: 11px; }
+      .message-content { padding-top: 2px; line-height: 1.7; color: #41514e; }
+      .message-content b { color: var(--ink); }
+      .facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+      .fact { background: #f1f5f3; border: 1px solid #e0e9e5; padding: 4px 7px; border-radius: 4px; color: #4c605c; font-size: 11px; }
+      .fact strong { color: var(--ink); font-weight: 600; }
+      .proposal-heading { display: flex; justify-content: space-between; align-items: center; margin: 19px 0 9px; }
+      .proposal-heading b { font-size: 13px; }
+      .proposal-heading span { color: var(--muted); font-size: 11px; }
+      .prompt-card { border: 1px solid var(--line); border-left: 3px solid #91b7b0; padding: 12px; margin-bottom: 8px; border-radius: 5px; transition: .2s; }
+      .prompt-card.confirmed { border-left-color: var(--teal); background: #fbfdfc; }
+      .prompt-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+      .prompt-name { font-weight: 700; }
+      .version { font-family: "DM Mono", monospace; color: #71817e; font-size: 10px; }
+      .prompt-text { color: #53615f; font-size: 11px; line-height: 1.65; margin: 7px 0 9px; }
+      .prompt-foot { display: flex; justify-content: space-between; align-items: center; }
+      .refs { display: flex; gap: 4px; }
+      .ref { color: #5a6d68; background: #f1f5f3; border: 1px solid #dfe9e5; border-radius: 3px; padding: 3px 5px; font-size: 10px; }
+      .confirm { border: 1px solid #8dbbb2; color: var(--teal-dark); background: white; padding: 5px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+      .confirm:hover { background: var(--teal-soft); }
+      .confirmed .confirm { color: white; background: var(--teal); border-color: var(--teal); }
+      .composer { display: flex; gap: 10px; margin: 15px 20px 20px; padding: 8px; border: 1px solid #cad7d3; border-radius: 6px; background: #fff; }
+      .attach { width: 29px; border: 0; background: #f0f5f3; color: var(--teal); border-radius: 4px; font-size: 16px; }
+      .composer input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); }
+      .composer input::placeholder { color: #9aa5a3; }
+      .send { border: 0; color: white; background: var(--teal); padding: 0 12px; border-radius: 4px; font-size: 11px; }
+
+      .execution { position: sticky; top: 18px; align-self: start; }
+      .locked-note { display: flex; gap: 8px; margin: 13px 14px 4px; padding: 9px; color: #737d7a; background: #f5f7f6; font-size: 11px; line-height: 1.55; border-radius: 5px; }
+      .locked-note i { color: var(--amber); font-style: normal; }
+      .exec-body { padding: 14px; opacity: .6; transition: .25s; }
+      .execution.ready .exec-body { opacity: 1; }
+      .exec-section { padding: 13px 0; border-bottom: 1px solid var(--soft-line); }
+      .exec-section:last-child { border-bottom: 0; }
+      .section-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+      .section-top b { font-size: 12px; }
+      .health { color: var(--teal); font-size: 10px; }
+      .channel { display: flex; gap: 8px; align-items: center; padding: 9px; border: 1px solid #c7dad5; background: #f8fcfa; border-radius: 5px; }
+      .channel-mark { width: 25px; height: 25px; background: #dbeee9; color: var(--teal); border-radius: 4px; display: grid; place-items: center; font-family: "DM Mono", monospace; font-size: 10px; }
+      .channel b, .channel span { display: block; }
+      .channel b { font-size: 11px; }
+      .channel span { font-size: 10px; color: var(--muted); margin-top: 1px; }
+      .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .metric { padding: 9px; background: #f6f8f7; border-radius: 4px; }
+      .metric span { display: block; color: var(--muted); font-size: 10px; }
+      .metric b { display: block; margin-top: 3px; font-size: 15px; }
+      .metric.cost b { color: var(--amber); }
+      .preflight { padding: 10px; background: #f3f7f5; border: 1px dashed #c7d8d2; border-radius: 5px; font-family: "DM Mono", monospace; color: #5c6d69; font-size: 10px; line-height: 1.7; }
+      .preflight span { color: var(--teal); }
+      .fallback { color: #657572; line-height: 1.6; font-size: 11px; }
+      .fallback b { color: var(--ink); }
+
+      .flow-bar { position: fixed; z-index: 5; left: 220px; right: 0; bottom: 0; min-width: 960px; background: rgba(255,255,255,.96); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(23,32,31,.05); display: grid; grid-template-columns: 1fr auto; padding: 12px 28px; align-items: center; }
+      .steps { display: flex; align-items: center; gap: 0; }
+      .step { display: flex; align-items: center; gap: 7px; color: #899492; font-size: 11px; white-space: nowrap; }
+      .step:after { content: ""; width: clamp(26px, 3vw, 62px); height: 1px; background: #d7e0dc; margin: 0 9px; }
+      .step:last-child:after { display: none; }
+      .step-number { width: 19px; height: 19px; display: grid; place-items: center; border: 1px solid #aab6b3; border-radius: 50%; font-family: "DM Mono", monospace; font-size: 10px; }
+      .step.done { color: #527b74; }
+      .step.done .step-number { background: var(--teal); border-color: var(--teal); color: white; }
+      .step.active { color: var(--ink); font-weight: 700; }
+      .step.active .step-number { color: white; border-color: var(--blue); background: var(--blue); }
+      .step.locked .step-number { color: #aeb8b5; border-color: #ccd4d2; }
+      .advance { border: 0; background: var(--blue); color: white; border-radius: 5px; padding: 10px 15px; font-weight: 600; white-space: nowrap; }
+      .advance:disabled { background: #bfc8c6; cursor: not-allowed; }
+      .ready .locked-note { color: #32665d; background: var(--teal-soft); }
+      .ready .locked-note i { color: var(--teal); }
+
+      @media (max-width: 1220px) {
+        body { min-width: 1024px; }
+        .app-shell { grid-template-columns: 170px 1fr; }
+        .workspace-grid { grid-template-columns: 185px minmax(450px, 1.8fr) 250px; gap: 12px; }
+        .sidebar { padding: 18px 9px; }
+        .flow-bar { left: 170px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">D</span>达芬奇密码</div>
+        <div class="workspace">AI 素材工作台</div>
+        <nav class="nav">
+          <button class="nav-item"><span class="nav-dot"></span>工作概览</button>
+          <button class="nav-item active"><span class="nav-dot"></span>新建任务</button>
+          <button class="nav-item"><span class="nav-dot"></span>任务中心</button>
+          <button class="nav-item"><span class="nav-dot"></span>商品与素材</button>
+          <button class="nav-item"><span class="nav-dot"></span>模板中心</button>
+        </nav>
+        <div class="side-bottom"><strong>素材生产组</strong><br />2026.07 / 内部工作区</div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="crumb">图片生成 / <b>新建任务组</b></div>
+          <div class="draft">任务组：<b>未提交草稿</b> · 自动保存于刚刚</div>
+        </header>
+
+        <section class="workspace-grid">
+          <aside class="panel context-panel">
+            <div class="panel-title">商品与任务 <small>GROUP-0248</small></div>
+            <div class="context-body">
+              <div class="product">
+                <img src="https://images.unsplash.com/photo-1603808033192-082d6919d3e1?auto=format&fit=crop&w=240&q=80" alt="夏季凉鞋" />
+                <div><b>夏季凉鞋商品图</b><span>SKU · SS-2407-BE</span></div>
+              </div>
+              <div class="section-label">本组子任务 · 3</div>
+              <div class="task-row"><img class="mini-image" src="https://images.unsplash.com/photo-1603808033192-082d6919d3e1?auto=format&fit=crop&w=100&q=80" alt="主图" /><div><b>主图</b><span>main_image · v2</span></div></div>
+              <div class="task-row"><img class="mini-image" src="https://images.unsplash.com/photo-1603808033192-082d6919d3e1?auto=format&fit=crop&w=100&q=80" alt="场景图" /><div><b>场景图</b><span>scene_image · v2</span></div></div>
+              <div class="task-row"><img class="mini-image" src="https://images.unsplash.com/photo-1603808033192-082d6919d3e1?auto=format&fit=crop&w=100&q=80" alt="细节图" /><div><b>细节图</b><span>detail_image · v2</span></div></div>
+              <div class="section-label">确认状态</div>
+              <div class="status-list">
+                <div class="check"><i>✓</i>来源素材已就绪</div>
+                <div class="check"><i>✓</i>商品事实已确认</div>
+                <div class="check pending"><i>✓</i>Prompt 待全部确认</div>
+                <div class="check pending"><i>✓</i>执行尚未解锁</div>
+              </div>
+            </div>
+          </aside>
+
+          <section class="panel assistant-panel">
+            <div class="assistant-head">
+              <div class="assistant-id"><div class="assistant-avatar">AI</div><div><b>达芬奇 AI 助手</b><span>已读取商品素材与任务 Profile</span></div></div>
+              <span class="state-pill">等待 Prompt 确认</span>
+            </div>
+            <div class="conversation">
+              <div class="message">
+                <div class="message-mark">AI</div>
+                <div class="message-content"><b>我已从来源素材提取商品事实。</b>以下内容将作为本组生成的共同约束；确认后我会分别为三个子任务保留独立 Prompt 快照。
+                  <div class="facts"><span class="fact"><strong>材质</strong> 哑光 PU 皮革</span><span class="fact"><strong>颜色</strong> 浅沙米色</span><span class="fact"><strong>结构</strong> 双带金属扣</span><span class="fact"><strong>避免</strong> 夸张反光、改色</span></div>
+                </div>
+              </div>
+              <div class="proposal-heading"><b>为你准备的 Prompt 方案</b><span>每项确认后生成不可变快照</span></div>
+
+              <article class="prompt-card" data-prompt="main">
+                <div class="prompt-top"><span class="prompt-name">主图 <span class="version">PROMPT v2.3</span></span><span class="version">01 / 03</span></div>
+                <div class="prompt-text">正视角单品棚拍，浅灰背景，完整呈现凉鞋双带结构与沙米色材质，电商主图构图，边缘清晰，无人物。</div>
+                <div class="prompt-foot"><div class="refs"><span class="ref">1 商品正面</span><span class="ref">2 侧面细节</span></div><button class="confirm">确认此 Prompt</button></div>
+              </article>
+              <article class="prompt-card" data-prompt="scene">
+                <div class="prompt-top"><span class="prompt-name">场景图 <span class="version">PROMPT v2.3</span></span><span class="version">02 / 03</span></div>
+                <div class="prompt-text">夏日石灰岩露台的轻度俯视产品场景，暖白自然光，凉鞋位于画面中心，保留商品原始结构和颜色，留出文案空间。</div>
+                <div class="prompt-foot"><div class="refs"><span class="ref">1 商品正面</span><span class="ref">2 场景风格</span><span class="ref">3 侧面细节</span></div><button class="confirm">确认此 Prompt</button></div>
+              </article>
+              <article class="prompt-card" data-prompt="detail">
+                <div class="prompt-top"><span class="prompt-name">细节图 <span class="version">PROMPT v2.3</span></span><span class="version">03 / 03</span></div>
+                <div class="prompt-text">双带与金属扣近景细节，真实皮革纹理，柔和侧光，浅景深但保持扣件与缝线清晰，不改变颜色和五金质感。</div>
+                <div class="prompt-foot"><div class="refs"><span class="ref">1 侧面细节</span><span class="ref">2 商品正面</span></div><button class="confirm">确认此 Prompt</button></div>
+              </article>
+            </div>
+            <div class="composer"><button class="attach" title="添加素材">+</button><input aria-label="补充要求" placeholder="补充你希望保留或避免的画面要求" /><button class="send">发送</button></div>
+          </section>
+
+          <aside class="panel execution" id="execution">
+            <div class="panel-title">执行检查 <small>STEP 4 / 5</small></div>
+            <div class="locked-note" id="lock-note"><i>◌</i><span>请先确认全部 Prompt。确认后才可选择通道、运行 Preflight 与查看成本。</span></div>
+            <div class="exec-body">
+              <div class="exec-section"><div class="section-top"><b>模型通道</b><span class="health">● 健康</span></div><div class="channel"><div class="channel-mark">F</div><div><b>Flux Product Studio</b><span>能力版本 2026.07.3</span></div></div></div>
+              <div class="exec-section"><div class="section-top"><b>预估执行</b><span class="version">3 个子任务</span></div><div class="metrics"><div class="metric cost"><span>预估成本</span><b>¥18.60</b></div><div class="metric"><span>预计耗时</span><b>2–4 分</b></div></div></div>
+              <div class="exec-section"><div class="section-top"><b>Preflight 请求预览</b><span class="version">待运行</span></div><div class="preflight"><span>task_group</span>: GROUP-0248<br /><span>references</span>: ordered[1..3]<br /><span>provider_request</span>: masked<br /><span>validation</span>: pending</div></div>
+              <div class="exec-section"><div class="section-top"><b>兜底策略</b></div><div class="fallback"><b>优先</b> Flux Product Studio<br /><b>失败后</b> 路由至已验证通道，不超出本组预算</div></div>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <footer class="flow-bar">
+      <div class="steps">
+        <div class="step done"><span class="step-number">✓</span>素材与类型</div>
+        <div class="step done"><span class="step-number">✓</span>商品事实</div>
+        <div class="step active"><span class="step-number">3</span>Prompt 确认</div>
+        <div class="step locked"><span class="step-number">4</span>通道与 Preflight</div>
+        <div class="step locked"><span class="step-number">5</span>确认执行</div>
+      </div>
+      <button class="advance" id="advance" disabled>确认全部 Prompt，继续</button>
+    </footer>
+
+    <script>
+      const cards = [...document.querySelectorAll('.prompt-card')];
+      const advance = document.getElementById('advance');
+      const execution = document.getElementById('execution');
+      const lockNote = document.getElementById('lock-note');
+      const pendingChecks = document.querySelectorAll('.check.pending');
+
+      cards.forEach((card) => {
+        const button = card.querySelector('.confirm');
+        button.addEventListener('click', () => {
+          card.classList.toggle('confirmed');
+          button.textContent = card.classList.contains('confirmed') ? '已确认' : '确认此 Prompt';
+          const complete = cards.every((item) => item.classList.contains('confirmed'));
+          advance.disabled = !complete;
+          advance.textContent = complete ? '进入通道与 Preflight' : '确认全部 Prompt，继续';
+          execution.classList.toggle('ready', complete);
+          if (complete) {
+            lockNote.innerHTML = '<i>✓</i><span>全部 Prompt 已确认。现在可进入通道选择与组级 Preflight。</span>';
+            pendingChecks.forEach((item, index) => {
+              if (index === 0) { item.classList.remove('pending'); }
+            });
+          } else {
+            lockNote.innerHTML = '<i>◌</i><span>请先确认全部 Prompt。确认后才可选择通道、运行 Preflight 与查看成本。</span>';
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

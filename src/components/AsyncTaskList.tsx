@@ -22,6 +22,8 @@ import {
 } from '../types';
 import { asyncTaskApi } from '../api/modules/asyncTask';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import { isMockRuntime } from '../config/runtime';
+import { mockChannelAsyncTasks } from '../mockData';
 
 /**
  * 通道异步任务列表(Vidu 异步任务管理)
@@ -46,6 +48,7 @@ export const AsyncTaskList: React.FC = () => {
 
   // 强制刷新(操作后 refetch 用)
   const [refreshKey, setRefreshKey] = useState(0);
+  const [mockTasks, setMockTasks] = useState<ChannelAsyncTask[]>(mockChannelAsyncTasks);
 
   const queryReq: ChannelAsyncTaskQueryRequest = useMemo(() => ({
     page: pageNum,
@@ -57,8 +60,15 @@ export const AsyncTaskList: React.FC = () => {
 
   // useServiceQuery:deps 含 queryReq + refreshKey,操作后改 refreshKey 触发 refetch
   const query = useServiceQuery(
-    () => asyncTaskApi.page(queryReq),
-    [queryReq, refreshKey]
+    () => {
+      if (!isMockRuntime) return asyncTaskApi.page(queryReq);
+      const filtered = mockTasks.filter((task) => (!queryReq.channelType || task.channelType === queryReq.channelType)
+        && (!queryReq.status || task.status === queryReq.status)
+        && (!queryReq.bizId || task.bizId.includes(queryReq.bizId)));
+      const start = (pageNum - 1) * pageSize;
+      return Promise.resolve({ list: filtered.slice(start, start + pageSize), total: filtered.length });
+    },
+    [queryReq, refreshKey, mockTasks]
   );
 
   // 初次进入 / 切换筛选时,数据可能 stale(后端 queryReq 已变但 useServiceQuery 没重跑)
@@ -75,6 +85,10 @@ export const AsyncTaskList: React.FC = () => {
   // 操作
   const handleRetry = async (id: string) => {
     if (!confirm(`确认重试异步任务 #${id}?`)) return;
+    if (isMockRuntime) {
+      setMockTasks((tasks) => tasks.map((task) => task.id === id ? { ...task, status: 'PROCESSING', retryCount: task.retryCount + 1, failReason: null, startedAt: new Date().toISOString() } : task));
+      return;
+    }
     try {
       await asyncTaskApi.retry(id);
       setRefreshKey(k => k + 1);
@@ -85,6 +99,10 @@ export const AsyncTaskList: React.FC = () => {
 
   const handleCancel = async (id: string) => {
     if (!confirm(`确认取消异步任务 #${id}?`)) return;
+    if (isMockRuntime) {
+      setMockTasks((tasks) => tasks.map((task) => task.id === id ? { ...task, status: 'FAILED', failReason: '已由管理员取消。', finishedAt: new Date().toISOString() } : task));
+      return;
+    }
     try {
       await asyncTaskApi.cancel(id);
       setRefreshKey(k => k + 1);

@@ -1,0 +1,387 @@
+- generic [ref=f6e2]:
+  - generic [ref=f6e3]:
+    - generic [ref=f6e533]:
+      - banner [ref=f6e534]:
+        - generic [ref=f6e535]:
+          - button "arrow_back" [ref=f6e536]
+          - generic [ref=f6e538]:
+            - paragraph [ref=f6e539]: 图片任务工作台
+            - heading "新建多类型图片任务" [level=1] [ref=f6e540]
+        - generic [ref=f6e541]:
+          - generic [ref=f6e542]: 已选择 1 个图片类型，将生成独立任务
+          - button "提交 1 条任务" [ref=f6e543]
+      - main [ref=f6e544]:
+        - generic [ref=f6e545]:
+          - generic [ref=f6e546]:
+            - generic [ref=f6e547]:
+              - heading "输入素材" [level=2] [ref=f6e548]
+              - button "资源中心" [active] [ref=f6e549]
+            - img "MW Series 7 智联运动手表" [ref=f6e550]
+            - paragraph [ref=f6e551]: MW Series 7 智联运动手表
+            - combobox [ref=f6e552]:
+              - option "MW Series 7 智联运动手表" [selected]
+              - option "Nike Air Max Elite 2026 跑鞋"
+              - option "极致臻颜草本精华保湿乳"
+              - option "超轻便透气抗撕裂防风羽绒服"
+          - generic [ref=f6e553]:
+            - generic [ref=f6e554]:
+              - heading "上下装合成套图" [level=2] [ref=f6e555]
+              - generic [ref=f6e556]: 可选
+            - button "add_photo_alternate 上衣图 点击模拟添加素材" [ref=f6e557]:
+              - generic [ref=f6e558]: add_photo_alternate
+              - generic [ref=f6e559]:
+                - generic [ref=f6e560]: 上衣图
+                - text: 点击模拟添加素材
+            - button "add_photo_alternate 下装图 点击模拟添加素材" [ref=f6e561]:
+              - generic [ref=f6e562]: add_photo_alternate
+              - generic [ref=f6e563]:
+                - generic [ref=f6e564]: 下装图
+                - text: 点击模拟添加素材
+            - button "生成合成预览" [disabled] [ref=f6e565]
+          - generic [ref=f6e566]:
+            - generic [ref=f6e567]:
+              - heading "参考图" [level=2] [ref=f6e568]
+              - button "从资源中心添加" [ref=f6e569]
+            - generic [ref=f6e570]:
+              - generic [ref=f6e571]:
+                - generic [ref=f6e572]: image
+                - generic [ref=f6e573]:
+                  - paragraph [ref=f6e574]: 风格参考
+                  - paragraph [ref=f6e575]: 自然光影棚参考.jpg · 模板资源
+                - button "close" [ref=f6e576]
+              - generic [ref=f6e578]:
+                - generic [ref=f6e579]: image
+                - generic [ref=f6e580]:
+                  - paragraph [ref=f6e581]: 场景参考
+                  - paragraph [ref=f6e582]: 柔光台面场景.jpg · 商品素材
+                - button "close" [ref=f6e583]
+        - generic [ref=f6e585]:
+          - generic [ref=f6e586]:
+            - generic [ref=f6e587]:
+              - generic [ref=f6e588]:
+                - paragraph [ref=f6e589]: 任务配置
+                - heading "用户希望得到什么结果" [level=2] [ref=f6e590]
+              - generic [ref=f6e591]: 规格选项由所选模型提供
+            - generic [ref=f6e592]: 生成图片类型 可多选
+            - generic [ref=f6e593]:
+              - button "inventory_2 check 商品主图" [ref=f6e594]:
+                - generic [ref=f6e595]:
+                  - generic [ref=f6e596]: inventory_2
+                  - generic [ref=f6e597]: check
+                - paragraph [ref=f6e599]: 商品主图
+              - button "landscape 详情/场景图" [ref=f6e600]:
+                - generic [ref=f6e601]: landscape
+                - paragraph [ref=f6e604]: 详情/场景图
+              - button "zoom_in 细节图" [ref=f6e605]:
+                - generic [ref=f6e606]: zoom_in
+                - paragraph [ref=f6e609]: 细节图
+              - button "accessibility_new 上身/三视图" [ref=f6e610]:
+                - generic [ref=f6e611]: accessibility_new
+                - paragraph [ref=f6e614]: 上身/三视图
+            - generic [ref=f6e615]:
+              - generic [ref=f6e616]:
+                - text: 任务模板
+                - combobox "任务模板" [ref=f6e617]:
+                  - option "商品商业展示模板 v2.1" [selected]
+                  - option "服装上身展示模板"
+                  - option "细节材质强化模板"
+              - generic [ref=f6e618]:
+                - text: 风格
+                - combobox "风格" [ref=f6e619]:
+                  - option "甜美网红风 (Sweet Influencer)" [selected]
+                  - option "极简北欧风 (Minimalist Nordic)"
+                  - option "科技赛博风 (Cyberpunk Cyber)"
+                  - option "金秋自然风 (Autumn Natural)"
+                  - option "奢华丝绸风 (Elegant Silk Satin)"
+              - generic [ref=f6e620]:
+                - text: 场景
+                - combobox "场景" [ref=f6e621]:
+                  - option "自然影棚" [selected]
+                  - option "城市街景"
+                  - option "居家陈列"
+            - generic [ref=f6e622]:
+              - generic [ref=f6e623]:
+                - text: 动作/姿势
+                - textbox "动作/姿势" [ref=f6e624]: 自然正面
+              - generic [ref=f6e625]:
+                - text: 负面约束
+                - textbox "负面约束" [ref=f6e626]: 模糊、商品漂移、错误文字、材质失真
+            - generic [ref=f6e627]:
+              - generic [ref=f6e628]:
+                - heading "模特选择" [level=3] [ref=f6e629]
+                - button "不使用模特" [ref=f6e630]
+              - generic [ref=f6e631]:
+                - button [ref=f6e632]:
+                  - paragraph [ref=f6e633]: 林澈 · 清冷通勤
+                  - paragraph [ref=f6e634]: 适合极简通勤和轻奢女装表达。
+                - button [ref=f6e635]:
+                  - paragraph [ref=f6e636]: 周野 · 运动街头
+                  - paragraph [ref=f6e637]: 适合鞋服和运动配件的动态场景。
+                - button [ref=f6e638]:
+                  - paragraph [ref=f6e639]: 顾南 · 自然生活
+                  - paragraph [ref=f6e640]: 适合美妆和生活方式类商品。
+          - generic [ref=f6e641]:
+            - generic [ref=f6e642]:
+              - generic [ref=f6e643]:
+                - paragraph [ref=f6e644]: 任务级 Prompt 副本
+                - heading "每种图片各自编辑" [level=2] [ref=f6e645]
+              - button "auto_awesome AI 助手" [ref=f6e646]:
+                - generic [ref=f6e647]: auto_awesome
+                - text: AI 助手
+            - generic [ref=f6e649]:
+              - generic [ref=f6e650]:
+                - generic [ref=f6e651]: 商品主图
+                - generic [ref=f6e652]: 来源：商品商业展示模板 v2.1
+              - textbox [ref=f6e653]: 纯净商业主图，商品主体完整、边缘清晰，保留品牌与材质细节。 商品：MW Series 7 智联运动手表。风格：甜美网红风 (Sweet Influencer)；场景：自然影棚；动作/姿势：自然正面；模特：林澈 · 清冷通勤。负面约束：模糊、商品漂移、错误文字、材质失真。
+        - generic [ref=f6e654]:
+          - generic [ref=f6e655]:
+            - paragraph [ref=f6e656]: 模型通道与模型能力
+            - heading "选择可执行的模型" [level=2] [ref=f6e657]
+            - generic [ref=f6e658]:
+              - text: 接入方式
+              - combobox "接入方式" [ref=f6e659]:
+                - option "云端 API · 云端 API" [selected]
+                - option "中转站 · 中转站"
+                - option "本地模型 · 本地模型"
+            - generic [ref=f6e660]:
+              - text: 具体模型
+              - combobox "具体模型" [ref=f6e661]:
+                - option "GPT Image 2 · 保真优先" [selected]
+                - option "Imagen · 稳定出图"
+            - paragraph [ref=f6e662]: 适合商品主体、局部修改和参考图一致性。
+            - generic [ref=f6e663]:
+              - generic [ref=f6e664]:
+                - generic [ref=f6e665]: 健康状态
+                - text: 运行正常
+              - generic [ref=f6e666]:
+                - generic [ref=f6e667]: 预估成本
+                - generic [ref=f6e668]: 35.2 元
+            - paragraph [ref=f6e669]: 本月可用额度 68%
+          - generic [ref=f6e670]:
+            - heading "输出规格" [level=3] [ref=f6e671]
+            - paragraph [ref=f6e672]: 仅展示业务需要的选择，范围由模型能力决定。
+            - generic [ref=f6e673]:
+              - text: 平台规格推荐
+              - generic [ref=f6e674]:
+                - button "电商主图推荐" [ref=f6e675]
+                - button "详情页长图" [ref=f6e676]
+                - button "内容种草竖图" [ref=f6e677]
+            - generic [ref=f6e678]:
+              - text: 比例
+              - combobox "比例" [ref=f6e679]:
+                - option "1:1" [selected]
+                - option "3:4"
+                - option "4:5"
+                - option "9:16"
+                - option "16:9"
+            - generic [ref=f6e680]:
+              - generic [ref=f6e681]:
+                - text: 张数
+                - combobox "张数" [ref=f6e682]:
+                  - option "1"
+                  - option "2"
+                  - option "3"
+                  - option "4" [selected]
+              - generic [ref=f6e683]:
+                - text: 图片尺寸
+                - combobox "图片尺寸" [ref=f6e684]:
+                  - option "1024px"
+                  - option "1536px"
+                  - option "2048px" [selected]
+          - generic [ref=f6e685]:
+            - heading "审核策略" [level=3] [ref=f6e686]
+            - generic [ref=f6e687]:
+              - text: 启用审美评分
+              - checkbox "启用审美评分" [checked] [ref=f6e688]
+            - generic [ref=f6e689]:
+              - text: 启用上架审核
+              - checkbox "启用上架审核" [checked] [ref=f6e690]
+    - generic [ref=f6e692]:
+      - banner [ref=f6e693]:
+        - generic [ref=f6e694]:
+          - generic [ref=f6e695]: dataset
+          - heading "资源中心" [level=1] [ref=f6e697]
+        - button "close" [ref=f6e698] [cursor=pointer]
+      - generic [ref=f6e700]:
+        - complementary [ref=f6e701]:
+          - generic [ref=f6e702]:
+            - paragraph [ref=f6e703]: 我的分类
+            - navigation [ref=f6e704]:
+              - button "label 商品素材 image" [ref=f6e705] [cursor=pointer]:
+                - button "折叠" [ref=f6e706]
+                - generic [ref=f6e709]: label
+                - generic [ref=f6e710]: 商品素材
+                - generic "IMAGE" [ref=f6e711]: image
+              - button "subdirectory_arrow_right 商品主体图 image" [ref=f6e712] [cursor=pointer]:
+                - generic [ref=f6e714]: subdirectory_arrow_right
+                - generic [ref=f6e715]: 商品主体图
+                - generic "IMAGE" [ref=f6e716]: image
+              - button "subdirectory_arrow_right 细节参考图 image" [ref=f6e717] [cursor=pointer]:
+                - generic [ref=f6e719]: subdirectory_arrow_right
+                - generic [ref=f6e720]: 细节参考图
+                - generic "IMAGE" [ref=f6e721]: image
+              - button "label 场景与风格 image" [ref=f6e722] [cursor=pointer]:
+                - generic [ref=f6e724]: label
+                - generic [ref=f6e725]: 场景与风格
+                - generic "IMAGE" [ref=f6e726]: image
+              - button "label 模特素材 image" [ref=f6e727] [cursor=pointer]:
+                - generic [ref=f6e729]: label
+                - generic [ref=f6e730]: 模特素材
+                - generic "IMAGE" [ref=f6e731]: image
+          - generic [ref=f6e732]:
+            - generic [ref=f6e733]:
+              - generic [ref=f6e734]: 存储空间
+              - generic [ref=f6e735]: 82%
+            - paragraph [ref=f6e738]: 已使用 4.1GB / 5.0GB
+        - main [ref=f6e739]:
+          - generic [ref=f6e740]:
+            - generic [ref=f6e741]:
+              - button "cloud_upload 本地上传" [ref=f6e742] [cursor=pointer]:
+                - generic [ref=f6e743]: cloud_upload
+                - generic [ref=f6e744]: 本地上传
+              - button "scan 目录扫描" [ref=f6e745] [cursor=pointer]:
+                - generic [ref=f6e746]: scan
+                - generic [ref=f6e747]: 目录扫描
+            - generic [ref=f6e748]:
+              - generic [ref=f6e749]:
+                - generic [ref=f6e750]: search
+                - textbox "搜索资源文件名" [ref=f6e751]
+              - generic [ref=f6e752]: 左侧选择分类
+          - generic [ref=f6e755]:
+            - generic [ref=f6e756] [cursor=pointer]:
+              - generic [ref=f6e757]: add_photo_alternate
+              - paragraph [ref=f6e758]: 上传资源...
+            - generic [ref=f6e759] [cursor=pointer]:
+              - generic [ref=f6e760]:
+                - img "手表主体_正面免抠.png" [ref=f6e762]
+                - generic "图片": image
+              - generic [ref=f6e765]:
+                - paragraph [ref=f6e766]: 手表主体_正面免抠.png
+                - generic [ref=f6e767]:
+                  - generic [ref=f6e768]: 商品原图
+                  - generic [ref=f6e769]: 2026-07-13
+            - generic [ref=f6e770] [cursor=pointer]:
+              - generic [ref=f6e771]:
+                - img "手表右侧按键微距.png" [ref=f6e773]
+                - generic "图片": image
+              - generic [ref=f6e776]:
+                - paragraph [ref=f6e777]: 手表右侧按键微距.png
+                - generic [ref=f6e778]:
+                  - generic [ref=f6e779]: 细节参考图
+                  - generic [ref=f6e780]: 2026-07-13
+            - generic [ref=f6e781] [cursor=pointer]:
+              - generic [ref=f6e782]:
+                - img "钛金属表盘拉丝质感.png" [ref=f6e784]
+                - generic "图片": image
+              - generic [ref=f6e787]:
+                - paragraph [ref=f6e788]: 钛金属表盘拉丝质感.png
+                - generic [ref=f6e789]:
+                  - generic [ref=f6e790]: 细节参考图
+                  - generic [ref=f6e791]: 2026-07-13
+            - generic [ref=f6e792] [cursor=pointer]:
+              - generic [ref=f6e793]:
+                - generic [ref=f6e794]: play_arrow
+                - generic "视频": videocam
+              - generic [ref=f6e798]:
+                - paragraph [ref=f6e799]: 表带卡扣与人体工学.mov
+                - generic [ref=f6e800]:
+                  - generic [ref=f6e801]: 细节参考图
+                  - generic [ref=f6e802]: 2026-07-13
+            - generic [ref=f6e803] [cursor=pointer]:
+              - generic [ref=f6e804]:
+                - img "跑鞋免抠主图.png" [ref=f6e806]
+                - generic "图片": image
+              - generic [ref=f6e809]:
+                - paragraph [ref=f6e810]: 跑鞋免抠主图.png
+                - generic [ref=f6e811]:
+                  - generic [ref=f6e812]: 商品原图
+                  - generic [ref=f6e813]: 2026-07-13
+            - generic [ref=f6e814] [cursor=pointer]:
+              - generic [ref=f6e815]:
+                - img "气垫避震拉丝微距.png" [ref=f6e817]
+                - generic "图片": image
+              - generic [ref=f6e820]:
+                - paragraph [ref=f6e821]: 气垫避震拉丝微距.png
+                - generic [ref=f6e822]:
+                  - generic [ref=f6e823]: 细节参考图
+                  - generic [ref=f6e824]: 2026-07-13
+            - generic [ref=f6e825] [cursor=pointer]:
+              - generic [ref=f6e826]:
+                - img "编织鞋面特写.png" [ref=f6e828]
+                - generic "图片": image
+              - generic [ref=f6e831]:
+                - paragraph [ref=f6e832]: 编织鞋面特写.png
+                - generic [ref=f6e833]:
+                  - generic [ref=f6e834]: 细节参考图
+                  - generic [ref=f6e835]: 2026-07-13
+            - generic [ref=f6e836] [cursor=pointer]:
+              - generic [ref=f6e837]:
+                - img "精华乳白色去背.png" [ref=f6e839]
+                - generic "图片": image
+              - generic [ref=f6e842]:
+                - paragraph [ref=f6e843]: 精华乳白色去背.png
+                - generic [ref=f6e844]:
+                  - generic [ref=f6e845]: 商品原图
+                  - generic [ref=f6e846]: 2026-07-13
+            - generic [ref=f6e847] [cursor=pointer]:
+              - generic [ref=f6e848]:
+                - img "瓶盖磨砂奢华细节.png" [ref=f6e850]
+                - generic "图片": image
+              - generic [ref=f6e853]:
+                - paragraph [ref=f6e854]: 瓶盖磨砂奢华细节.png
+                - generic [ref=f6e855]:
+                  - generic [ref=f6e856]: 细节参考图
+                  - generic [ref=f6e857]: 2026-07-13
+            - generic [ref=f6e858] [cursor=pointer]:
+              - generic [ref=f6e859]:
+                - img "羽绒服正面模特展示.png" [ref=f6e861]
+                - generic "图片": image
+              - generic [ref=f6e864]:
+                - paragraph [ref=f6e865]: 羽绒服正面模特展示.png
+                - generic [ref=f6e866]:
+                  - generic [ref=f6e867]: 商品原图
+                  - generic [ref=f6e868]: 2026-07-13
+            - generic [ref=f6e869] [cursor=pointer]:
+              - generic [ref=f6e870]:
+                - img "防泼水面料荷叶效应.png" [ref=f6e872]
+                - generic "图片": image
+              - generic [ref=f6e875]:
+                - paragraph [ref=f6e876]: 防泼水面料荷叶效应.png
+                - generic [ref=f6e877]:
+                  - generic [ref=f6e878]: 细节参考图
+                  - generic [ref=f6e879]: 2026-07-13
+            - generic [ref=f6e880] [cursor=pointer]:
+              - generic [ref=f6e881]:
+                - img "林澈 · 清冷通勤 模特参考图" [ref=f6e883]
+                - generic "图片": image
+              - generic [ref=f6e886]:
+                - paragraph [ref=f6e887]: 林澈 · 清冷通勤 模特参考图
+                - generic [ref=f6e888]:
+                  - generic [ref=f6e889]: 模特
+                  - generic [ref=f6e890]: 2026-07-13
+            - generic [ref=f6e891] [cursor=pointer]:
+              - generic [ref=f6e892]:
+                - img "周野 · 运动街头 模特参考图" [ref=f6e894]
+                - generic "图片": image
+              - generic [ref=f6e897]:
+                - paragraph [ref=f6e898]: 周野 · 运动街头 模特参考图
+                - generic [ref=f6e899]:
+                  - generic [ref=f6e900]: 模特
+                  - generic [ref=f6e901]: 2026-07-13
+            - generic [ref=f6e902] [cursor=pointer]:
+              - generic [ref=f6e903]:
+                - img "顾南 · 自然生活 模特参考图" [ref=f6e905]
+                - generic "图片": image
+              - generic [ref=f6e908]:
+                - paragraph [ref=f6e909]: 顾南 · 自然生活 模特参考图
+                - generic [ref=f6e910]:
+                  - generic [ref=f6e911]: 模特
+                  - generic [ref=f6e912]: 2026-07-13
+          - generic [ref=f6e913]:
+            - generic [ref=f6e915]:
+              - generic [ref=f6e916]: check_circle
+              - generic [ref=f6e917]: 已选择 0 个资源
+            - generic [ref=f6e918]:
+              - button "取消" [ref=f6e919] [cursor=pointer]
+              - button "确认选择" [ref=f6e920] [cursor=pointer]
+  - region "Notifications alt+T"

@@ -5,6 +5,7 @@ import {
   type ModelChannelDTO,
   type ModelChannelAddRequest,
   type ModelChannelUpdateRequest,
+  type ModelChannelQueryRequest,
   type ChannelType,
   type CapabilityMatrix,
   type CapabilityGroup,
@@ -62,6 +63,8 @@ import { userApi, type UserDTO } from '../api/modules/user';
 import { toast } from 'sonner';
 import { getRoleList, type RoleInfo } from '../api/roleMenu';
 import { useConfirm } from './common/ConfirmProvider';
+import { isMockRuntime } from '../config/runtime';
+import { mockUsers } from '../mockData';
 
 interface SystemConfigProps {
   onUpdateUserRole: (id: string, role: any, deptId?: string) => void;
@@ -78,6 +81,8 @@ interface OperationLog {
   timestamp: string;
   status: 'success' | 'failed';
 }
+
+const MockAdminNotice: React.FC<{ title: string }> = ({ title }) => <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 text-sm text-slate-600"><p className="font-bold text-slate-800">{title} Demo</p><p className="mt-2 leading-6">当前为前端 mock 模式，页面不请求管理端接口，因此不支持保存真实组织、角色或菜单配置。接入后端后会自动启用对应管理能力。</p></div>;
 
 export const SystemConfig: React.FC<SystemConfigProps> = ({
   onUpdateUserRole
@@ -97,25 +102,25 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   // 这里走 useEffect + setLocalUsers 同步派生(SystemUser 字段含 isAdmin/status 转换,非纯函数映射)。
   // 注意:useServiceQuery 内部 data 初始为 null,ES6 解构 `= []` 只对 undefined 生效,所以用 ?? [] 显式 nullish
   const userListQuery = useServiceQuery<UserDTO[]>(
-    () => userApi.listAll(),
+    () => isMockRuntime ? Promise.resolve(mockUsers.map((user) => ({ id: user.id, userName: user.email, name: user.name, headUrl: user.avatar, status: user.status === 'offline' ? 'DISABLED' as const : 'NORMAL' as const, isAdmin: user.role === '管理员', email: user.email }))) : userApi.listAll(),
     []
   );
 
   // Dynamic role list (from backend, replaces hardcoded 4 roles)
   const { data: roleList = [] } = useServiceQuery<RoleInfo[]>(
-    async () => (await getRoleList({ pageNum: 1, pageSize: 50 })).list ?? [],
+    async () => isMockRuntime ? [{ id: 'r1', roleName: '管理员', roleCode: 'ADMIN', sysRole: true, status: 'NORMAL' }, { id: 'r2', roleName: '设计/美工', roleCode: 'DESIGNER', status: 'NORMAL' }, { id: 'r3', roleName: '审核人', roleCode: 'REVIEWER', status: 'NORMAL' }] : (await getRoleList({ pageNum: 1, pageSize: 50 })).list ?? [],
     []
   );
   // Department list (direct backend query, decoupled from OrgStructureTab ref timing)
   const { data: deptList = [] } = useServiceQuery<DepartmentDTO[]>(
-    () => departmentApi.list({ pageNum: 1, pageSize: 1000 }),
+    () => isMockRuntime ? Promise.resolve([{ id: 'd1', pid: '0', deptName: '商品创意组', deptCode: 'CREATIVE', status: 'ENABLE' as const, createTime: '2026-07-01T09:00:00', updateTime: '2026-07-01T09:00:00' }]) : departmentApi.list({ pageNum: 1, pageSize: 1000 }),
     []
   );
   const allDepartments = deptList ?? [];
 
   // 通道能力矩阵(后端下发,驱动 chip 渲染 + baseUrl placeholder)
   const matrixQuery = useServiceQuery<CapabilityMatrix>(
-    () => channelApi.getCapabilityMatrix(),
+    () => isMockRuntime ? Promise.resolve({ capabilities: [], matrix: {} } as CapabilityMatrix) : channelApi.getCapabilityMatrix(),
     []
   );
   const matrix = matrixQuery.data ?? null;
@@ -136,7 +141,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   
   // 通道列表(直接走后端 page 接口,pageSize=1000 简化为全量拉,二期做分页 UI)
   // 通道列表:后端驱动筛选(channelFilter 变化时重新拉 page,避免通道多了前端卡)
-  const [channelFilter, setChannelFilter] = useState<'all' | 'cloud' | 'disabled'>('all');
+  const [channelFilter, setChannelFilter] = useState<'all' | 'cloud' | 'local' | 'relay' | 'disabled'>('all');
   const channelListQuery = useServiceQuery<PageInfo<ModelChannelDTO>>(
     () => {
       // 按 tab 拼后端筛选条件
@@ -148,8 +153,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
         // 停用通道:按 status 过滤(不限 channelType)
         req.status = 'DISABLED';
       }
-      // 'all' 不传任何过滤
-      return channelApi.page(req);
+      // 本地模型和中转站当前由前端 mock 任务配置提供；真实接口接入后补 server-side type 筛选。
+      return isMockRuntime ? Promise.resolve({ list: [], total: 0 } as PageInfo<ModelChannelDTO>) : channelApi.page(req);
     },
     [channelFilter]
   );
@@ -793,22 +798,22 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           )}
 
           {/* Inner Tab 2: 角色管理 (RBAC Role configuration matrices) */}
-          {activeUserSubTab === 'roles' && <RoleManageTab />}
+          {activeUserSubTab === 'roles' && (isMockRuntime ? <MockAdminNotice title="角色管理" /> : <RoleManageTab />)}
 
           {/* Inner Tab 3: 菜单配置 (Menu configuration) */}
-          {activeUserSubTab === 'menu' && <MenuConfigTab />}
+          {activeUserSubTab === 'menu' && (isMockRuntime ? <MockAdminNotice title="菜单配置" /> : <MenuConfigTab />)}
 
         </div>
       )}
 
       {/* MAIN VIEW: 组织架构 (Organization Structure Management) */}
-      {activeMainTab === 'org' && (
+      {activeMainTab === 'org' && (isMockRuntime ? <MockAdminNotice title="组织架构" /> : (
         <OrgStructureTab
           ref={orgTabRef}
           users={localUsers}
           onAssignUser={handleAssignUser}
         />
-      )}
+      ))}
 
       {/* MAIN VIEW B: 模型通道统管 (Model Channels Management) */}
       {activeMainTab === 'channels' && (
@@ -850,6 +855,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
             {[
               { id: 'all', label: '全部通道' },
               { id: 'cloud', label: '云端 API' },
+              { id: 'local', label: '本地模型' },
+              { id: 'relay', label: '中转站' },
               { id: 'disabled', label: '停用通道' }
             ].map((tab) => (
               <button

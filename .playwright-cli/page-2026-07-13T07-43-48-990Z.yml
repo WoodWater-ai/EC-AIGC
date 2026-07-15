@@ -1,0 +1,59 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]: AIGC 素材工作台
+        - generic [ref=e6]: 本机/内网演示版
+      - navigation [ref=e7]:
+        - link "工作台" [ref=e8] [cursor=pointer]:
+          - /url: /
+        - link "新建任务" [ref=e9] [cursor=pointer]:
+          - /url: /new-task
+        - link "视频生成" [ref=e10] [cursor=pointer]:
+          - /url: /video
+        - link "素材列表" [ref=e11] [cursor=pointer]:
+          - /url: /assets
+        - link "批量导入" [ref=e12] [cursor=pointer]:
+          - /url: /batch-import
+        - link "设置" [ref=e13] [cursor=pointer]:
+          - /url: /settings
+    - main [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - heading "AI 素材工作台" [level=1] [ref=e17]
+          - paragraph [ref=e18]: 当前版本聚焦一期核心链路：上传白底图或套图白底图，写入飞书多维表格，按生成目标读取飞书提示词，调用中转站生图，再把结果回填飞书。
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - heading "工作台主线" [level=2] [ref=e21]
+            - generic [ref=e22]:
+              - generic [ref=e23]:
+                - generic [ref=e24]: "1"
+                - generic [ref=e25]: 上传单品白底图，或先合成上下衣套图白底图
+              - generic [ref=e26]:
+                - generic [ref=e27]: "2"
+                - generic [ref=e28]: 同步商品信息到飞书主表
+              - generic [ref=e29]:
+                - generic [ref=e30]: "3"
+                - generic [ref=e31]: 等待飞书字段生成商品特点、保真项和多类提示词
+              - generic [ref=e32]:
+                - generic [ref=e33]: "4"
+                - generic [ref=e34]: 按生成目标读取对应提示词并调用中转站 API
+              - generic [ref=e35]:
+                - generic [ref=e36]: "5"
+                - generic [ref=e37]: 回写生成图片、状态和审核入口
+            - link "开始新建任务" [ref=e39] [cursor=pointer]:
+              - /url: /new-task
+          - generic [ref=e40]:
+            - heading "视频生成" [level=2] [ref=e41]
+            - paragraph [ref=e42]: 已接入 Vidu 参考生视频接口。准备好视频提示词和公网参考图 URL 后，可以直接创建视频任务并在页面轮询查看结果。
+            - link "打开视频生成" [ref=e44] [cursor=pointer]:
+              - /url: /video
+        - generic [ref=e45]:
+          - heading "先配置什么" [level=2] [ref=e46]
+          - paragraph [ref=e47]: 飞书生图流程先到设置页填 Base Token 和表名/表 ID。Vidu key 由服务端环境变量 VIDU_API_KEY 读取，不写入前端页面。
+          - link "打开设置" [ref=e49] [cursor=pointer]:
+            - /url: /settings
+        - generic [ref=e50]:
+          - heading "当前验收口径" [level=2] [ref=e51]
+          - paragraph [ref=e52]: 一期验收以完整外部工作台为准：能从飞书读取待生成记录，区分主图、三视图、风格场景图和细节图提示词，多张结果统一回填到对应附件字段，并且不影响原来的单图上传和批量上传。
+  - alert [ref=e53]

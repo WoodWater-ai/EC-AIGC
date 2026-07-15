@@ -14,13 +14,14 @@ import {
   clearToken,
 } from '../api/auth';
 import * as authApi from '../api/modules/auth';
+import { isMockRuntime } from '../config/runtime';
 
 /**
  * 鉴权 Context —— 跨组件共享 user / roles / permissions / menuTree
  *
  * 设计目标：
- * - 登录页调 useAuth().login() 一步完成「调 API + 存 token + 设 user」
- * - Header 登出按钮调 useAuth().logout() 一步完成「调 API + 清 token + 清 user」
+ * - 登录页调 useAuth().login() 一步完成「mock/API 登录 + 存 token + 设 user」
+ * - Header 登出按钮调 useAuth().logout() 一步完成「mock/API 登出 + 清 token + 清 user」
  * - Sidebar 用户卡片下拉点击 → useAuth().logout() 跳登录页（伪「切换协作账号」）
  * - 业务按钮用 useAuth().hasPermission(code) 控制可见性
  * - 后续 Sidebar 用 useAuth().menuTree 渲染真实菜单（CLAUDE.md TODO）
@@ -84,6 +85,17 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const DEV_DEMO_TOKEN = 'dev-demo-token';
+const DEV_DEMO_USER: LoginResponse = {
+  userId: 1,
+  username: 'admin',
+  name: '陆永奇',
+  token: DEV_DEMO_TOKEN,
+  roles: ['管理员'],
+  permissions: ['*'],
+  menuTree: [],
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<LoginResponse | null>(null);
   // initializing 启动时为 true；mount 后调 me()，无论成功失败都置 false
@@ -118,13 +130,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setInitializing(false);
         return;
       }
+      if (isMockRuntime && token) {
+        if (!cancelled) setUser(DEV_DEMO_USER);
+        if (!cancelled) setInitializing(false);
+        return;
+      }
       try {
         const resp = await authApi.me();
         if (!cancelled) {
           setUser(resp);
         }
       } catch (err) {
-        // me() 失败 —— 大概率 token 已过期
+    // 真实 API 模式下 me() 失败 —— 大概率 token 已过期
         // axios 拦截器已 toast（业务错误）或 console（网络错误）
         // 这里仅清前端状态，让 App 渲染 LOGIN
         if (!cancelled) {
@@ -143,7 +160,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, passwordPlain: string) => {
-    const resp = await authApi.login(username, passwordPlain);
+    let resp: LoginResponse;
+    if (isMockRuntime) {
+      if (username !== 'admin' || passwordPlain !== '123456') {
+        throw new Error('当前为演示环境，请使用 admin / 123456 登录');
+      }
+      resp = DEV_DEMO_USER;
+    } else {
+      resp = await authApi.login(username, passwordPlain);
+    }
     if (!resp.token) {
       throw new Error('登录响应缺少 token，请联系管理员');
     }
@@ -153,6 +178,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    if (isMockRuntime) {
+      clearToken();
+      setUser(null);
+      return;
+    }
     try {
       await authApi.logout();
     } catch (err) {

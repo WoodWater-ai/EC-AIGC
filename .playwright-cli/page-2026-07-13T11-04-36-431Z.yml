@@ -1,0 +1,95 @@
+- generic [ref=f2e2]:
+  - generic [ref=f2e558]:
+    - banner [ref=f2e559]:
+      - generic [ref=f2e560]:
+        - button "arrow_back" [ref=f2e561]
+        - generic [ref=f2e562]:
+          - paragraph [ref=f2e563]: 受控视频生成
+          - heading "从审核通过图片创建视频" [level=1] [ref=f2e564]
+      - button "提交视频任务" [ref=f2e565]
+    - main [ref=f2e566]:
+      - generic [ref=f2e567]:
+        - generic [ref=f2e568]:
+          - generic [ref=f2e569]:
+            - generic [ref=f2e570]:
+              - paragraph [ref=f2e571]: 已审核通过的图片版本
+              - heading "视频输入素材" [level=2] [ref=f2e572]
+            - generic [ref=f2e573]: 已通过上架审核
+          - generic [ref=f2e574]:
+            - img "已审核通过的图片" [ref=f2e575]
+            - generic [ref=f2e576]:
+              - paragraph [ref=f2e577]: 商品：极致臻颜草本精华保湿乳
+              - paragraph [ref=f2e578]: 来源任务：精华保湿乳 _ 极简北欧大理石展示 (批次#1)
+              - paragraph [ref=f2e579]: 来源排序：审核通过版本优先，其次为当前商品主体图。
+              - paragraph [ref=f2e580]: 视频仅使用已通过图片。若要替换来源，请先回到图片任务完成修改与审核。
+        - generic [ref=f2e581]:
+          - paragraph [ref=f2e582]: 视频任务配置
+          - heading "选择驱动方式与参考角色" [level=2] [ref=f2e583]
+          - generic [ref=f2e584]:
+            - button [ref=f2e585]:
+              - text: img2video
+              - paragraph [ref=f2e586]: 以审核通过图片作为首帧与主体约束。
+            - button [ref=f2e587]:
+              - text: reference2video
+              - paragraph [ref=f2e588]: 保留首帧，并额外使用风格/动作参考图。
+        - generic [ref=f2e589]:
+          - generic [ref=f2e590]:
+            - generic [ref=f2e591]:
+              - paragraph [ref=f2e592]: 时长驱动分镜
+              - heading "镜头 Prompt" [level=2] [ref=f2e593]
+            - combobox [ref=f2e594]:
+              - option "5 秒"
+              - option "8 秒" [selected]
+              - option "15 秒"
+          - paragraph [ref=f2e595]: 切换时长会补充新的建议分镜，已编辑内容不会被覆盖。
+          - generic [ref=f2e596]:
+            - generic [ref=f2e597]:
+              - text: 0-2 秒 · 建立画面
+              - textbox "0-2 秒 · 建立画面" [ref=f2e598]: 镜头缓慢建立，焦点锁定在商品主体。
+            - generic [ref=f2e599]:
+              - text: 2-5 秒 · 动作推进
+              - textbox "2-5 秒 · 动作推进" [ref=f2e600]: 保持商品主体稳定，展示材质与动作细节。
+            - generic [ref=f2e601]:
+              - text: 5-8 秒 · 商品收束
+              - textbox "5-8 秒 · 商品收束" [ref=f2e602]: 保持商品主体稳定，展示材质与动作细节。
+          - generic [ref=f2e603]:
+            - text: 负面约束
+            - textbox "负面约束" [ref=f2e604]: 商品漂移、面料闪烁、人物畸形
+      - complementary [ref=f2e605]:
+        - generic [ref=f2e606]:
+          - paragraph [ref=f2e607]: 模型能力
+          - heading "视频规格" [level=2] [ref=f2e608]
+          - generic [ref=f2e609]:
+            - text: 模型通道
+            - combobox "模型通道" [ref=f2e610]:
+              - option "云端 API"
+              - option "中转站" [selected]
+          - generic [ref=f2e611]:
+            - text: 具体模型
+            - combobox "具体模型" [ref=f2e612]:
+              - option "Vidu Q2 · 图生视频" [selected]
+          - generic [ref=f2e613]:
+            - text: 运动幅度
+            - combobox "运动幅度" [ref=f2e614]:
+              - option "轻微"
+              - option "适中" [selected]
+              - option "强烈"
+          - generic [ref=f2e615]:
+            - text: 分辨率
+            - combobox "分辨率" [ref=f2e616]:
+              - option "720p"
+              - option "1080p" [selected]
+          - generic [ref=f2e617]:
+            - paragraph [ref=f2e618]:
+              - text: 预估成本
+              - generic [ref=f2e619]: 18.0 元
+            - paragraph [ref=f2e620]: 剩余低于 20%，提交前请确认成本
+        - generic [ref=f2e621]:
+          - heading "模特上下文" [level=2] [ref=f2e622]
+          - paragraph [ref=f2e623]: 可选，仅影响本次视频 Prompt。
+          - combobox [ref=f2e624]:
+            - option "不使用模特" [selected]
+            - option "林澈 · 清冷通勤"
+            - option "周野 · 运动街头"
+            - option "顾南 · 自然生活"
+  - region "Notifications alt+T"

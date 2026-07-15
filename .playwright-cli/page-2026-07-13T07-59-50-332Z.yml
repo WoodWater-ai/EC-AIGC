@@ -1,0 +1,206 @@
+- generic [ref=e2]:
+  - generic [ref=e363]:
+    - banner [ref=e364]:
+      - generic [ref=e365]:
+        - button "arrow_back" [ref=e366]
+        - generic [ref=e368]:
+          - paragraph [ref=e369]: 图片任务工作台
+          - heading "新建多类型图片任务" [level=1] [ref=e370]
+      - generic [ref=e371]:
+        - generic [ref=e372]: 已选择 3 个图片类型，将生成独立任务
+        - button "提交 3 条任务" [ref=e519]
+    - main [ref=e374]:
+      - generic [ref=e375]:
+        - generic [ref=e376]:
+          - generic [ref=e377]:
+            - heading "输入素材" [level=2] [ref=e378]
+            - button "替换商品" [ref=e379]
+          - img "MW Series 7 智联运动手表" [ref=e380]
+          - paragraph [ref=e381]: MW Series 7 智联运动手表
+          - combobox [ref=e382]:
+            - option "当前商品" [selected]
+        - generic [ref=e383]:
+          - generic [ref=e384]:
+            - heading "上下装合成套图" [level=2] [ref=e385]
+            - generic [ref=e386]: 可选
+          - button "add_photo_alternate 上衣图 点击模拟添加素材" [ref=e387]:
+            - generic [ref=e388]: add_photo_alternate
+            - generic [ref=e389]:
+              - generic [ref=e390]: 上衣图
+              - text: 点击模拟添加素材
+          - button "add_photo_alternate 下装图 点击模拟添加素材" [ref=e391]:
+            - generic [ref=e392]: add_photo_alternate
+            - generic [ref=e393]:
+              - generic [ref=e394]: 下装图
+              - text: 点击模拟添加素材
+          - button "生成合成预览" [disabled] [ref=e395]
+        - generic [ref=e396]:
+          - heading "参考图" [level=2] [ref=e397]
+          - generic [ref=e398]:
+            - generic [ref=e399]:
+              - generic [ref=e400]: image
+              - generic [ref=e401]:
+                - paragraph [ref=e402]: 风格参考
+                - paragraph [ref=e403]: 自然光影棚参考.jpg · 模板资源
+              - button "close" [ref=e404]
+            - generic [ref=e406]:
+              - generic [ref=e407]: image
+              - generic [ref=e408]:
+                - paragraph [ref=e409]: 场景参考
+                - paragraph [ref=e410]: 柔光台面场景.jpg · 商品素材
+              - button "close" [ref=e411]
+      - generic [ref=e413]:
+        - generic [ref=e414]:
+          - generic [ref=e415]:
+            - generic [ref=e416]:
+              - paragraph [ref=e417]: 任务配置
+              - heading "用户希望得到什么结果" [level=2] [ref=e418]
+            - generic [ref=e419]: 规格选项由所选模型提供
+          - generic [ref=e420]: 生成图片类型 可多选
+          - generic [ref=e421]:
+            - button "inventory_2 check 商品主图" [ref=e422]:
+              - generic [ref=e423]:
+                - generic [ref=e424]: inventory_2
+                - generic [ref=e425]: check
+              - paragraph [ref=e427]: 商品主图
+            - button "landscape check 详情/场景图" [active] [ref=e520]:
+              - generic [ref=e429]:
+                - generic [ref=e430]: landscape
+                - generic [ref=e431]: check
+              - paragraph [ref=e432]: 详情/场景图
+            - button "zoom_in check 细节图" [ref=e522]:
+              - generic [ref=e434]:
+                - generic [ref=e435]: zoom_in
+                - generic [ref=e436]: check
+              - paragraph [ref=e437]: 细节图
+            - button "accessibility_new 上身/三视图" [ref=e438]:
+              - generic [ref=e439]: accessibility_new
+              - paragraph [ref=e442]: 上身/三视图
+          - generic [ref=e443]:
+            - generic [ref=e444]:
+              - text: 任务模板
+              - combobox "任务模板" [ref=e445]:
+                - option "商品商业展示模板 v2.1" [selected]
+                - option "服装上身展示模板"
+                - option "细节材质强化模板"
+            - generic [ref=e446]:
+              - text: 风格
+              - combobox "风格" [ref=e447]:
+                - option "轻奢极简" [selected]
+                - option "自然生活"
+                - option "运动街头"
+            - generic [ref=e448]:
+              - text: 场景
+              - combobox "场景" [ref=e449]:
+                - option "自然影棚" [selected]
+                - option "城市街景"
+                - option "居家陈列"
+          - generic [ref=e450]:
+            - generic [ref=e451]:
+              - text: 动作/姿势
+              - textbox "动作/姿势" [ref=e452]: 自然正面
+            - generic [ref=e453]:
+              - text: 负面约束
+              - textbox "负面约束" [ref=e454]: 模糊、商品漂移、错误文字、材质失真
+          - generic [ref=e455]:
+            - generic [ref=e456]:
+              - heading "模特选择" [level=3] [ref=e457]
+              - button "不使用模特" [ref=e458]
+            - generic [ref=e459]:
+              - button [ref=e460]:
+                - paragraph [ref=e461]: 林澈 · 清冷通勤
+                - paragraph [ref=e462]: 适合极简通勤和轻奢女装表达。
+              - button [ref=e463]:
+                - paragraph [ref=e464]: 周野 · 运动街头
+                - paragraph [ref=e465]: 适合鞋服和运动配件的动态场景。
+              - button [ref=e466]:
+                - paragraph [ref=e467]: 顾南 · 自然生活
+                - paragraph [ref=e468]: 适合美妆和生活方式类商品。
+        - generic [ref=e469]:
+          - generic [ref=e470]:
+            - generic [ref=e471]:
+              - paragraph [ref=e472]: 任务级 Prompt 副本
+              - heading "每种图片各自编辑" [level=2] [ref=e473]
+            - button "auto_awesome AI 助手" [ref=e474]:
+              - generic [ref=e475]: auto_awesome
+              - text: AI 助手
+          - generic [ref=e476]:
+            - generic [ref=e477]:
+              - generic [ref=e478]:
+                - generic [ref=e479]: 商品主图
+                - generic [ref=e480]: 来源：商品商业展示模板 v2.1
+              - textbox [ref=e481]: 纯净商业主图，商品主体完整、边缘清晰，保留品牌与材质细节。 商品：MW Series 7 智联运动手表。风格：轻奢极简；场景：自然影棚；动作/姿势：自然正面；模特：林澈 · 清冷通勤。负面约束：模糊、商品漂移、错误文字、材质失真。
+            - generic [ref=e524]:
+              - generic [ref=e525]:
+                - generic [ref=e526]: 细节图
+                - generic [ref=e527]: 来源：商品商业展示模板 v2.1
+              - textbox [ref=e528]: 聚焦材质、工艺与关键卖点，使用微距和局部光影。 商品：MW Series 7 智联运动手表。风格：轻奢极简；场景：自然影棚；动作/姿势：自然正面；模特：林澈 · 清冷通勤。负面约束：模糊、商品漂移、错误文字、材质失真。
+            - generic [ref=e529]:
+              - generic [ref=e530]:
+                - generic [ref=e531]: 详情/场景图
+                - generic [ref=e532]: 来源：商品商业展示模板 v2.1
+              - textbox [ref=e533]: 商品融入指定场景，强化氛围、使用感和商业叙事。 商品：MW Series 7 智联运动手表。风格：轻奢极简；场景：自然影棚；动作/姿势：自然正面；模特：林澈 · 清冷通勤。负面约束：模糊、商品漂移、错误文字、材质失真。
+      - generic [ref=e482]:
+        - generic [ref=e483]:
+          - paragraph [ref=e484]: 模型通道与模型能力
+          - heading "选择可执行的模型" [level=2] [ref=e485]
+          - generic [ref=e486]:
+            - text: 接入方式
+            - combobox "接入方式" [ref=e487]:
+              - option "云端 API · 云端 API" [selected]
+              - option "中转站 · 中转站"
+              - option "本地模型 · 本地模型"
+          - generic [ref=e488]:
+            - text: 具体模型
+            - combobox "具体模型" [ref=e489]:
+              - option "GPT Image 2 · 保真优先" [selected]
+              - option "Imagen · 稳定出图"
+          - paragraph [ref=e490]: 适合商品主体、局部修改和参考图一致性。
+          - generic [ref=e491]:
+            - generic [ref=e492]:
+              - generic [ref=e493]: 健康状态
+              - text: 运行正常
+            - generic [ref=e494]:
+              - generic [ref=e495]: 预估成本
+              - generic [ref=e496]: 35.2 元
+          - paragraph [ref=e497]: 本月可用额度 68%
+        - generic [ref=e498]:
+          - heading "输出规格" [level=3] [ref=e499]
+          - paragraph [ref=e500]: 仅展示业务需要的选择，范围由模型能力决定。
+          - generic [ref=e501]:
+            - text: 平台规格推荐
+            - generic [ref=e502]:
+              - button "电商主图推荐" [ref=e503]
+              - button "详情页长图" [ref=e504]
+              - button "内容种草竖图" [ref=e505]
+          - generic [ref=e506]:
+            - text: 比例
+            - combobox "比例" [ref=e507]:
+              - option "1:1" [selected]
+              - option "3:4"
+              - option "4:5"
+              - option "9:16"
+              - option "16:9"
+          - generic [ref=e508]:
+            - generic [ref=e509]:
+              - text: 张数
+              - combobox "张数" [ref=e510]:
+                - option "1"
+                - option "2"
+                - option "3"
+                - option "4" [selected]
+            - generic [ref=e511]:
+              - text: 图片尺寸
+              - combobox "图片尺寸" [ref=e512]:
+                - option "1024px"
+                - option "1536px"
+                - option "2048px" [selected]
+        - generic [ref=e513]:
+          - heading "审核策略" [level=3] [ref=e514]
+          - generic [ref=e515]:
+            - text: 启用审美评分
+            - checkbox "启用审美评分" [checked] [ref=e516]
+          - generic [ref=e517]:
+            - text: 启用上架审核
+            - checkbox "启用上架审核" [checked] [ref=e518]
+  - region "Notifications alt+T"

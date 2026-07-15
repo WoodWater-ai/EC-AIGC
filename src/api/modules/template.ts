@@ -62,6 +62,7 @@ export interface TemplateDTO {
 
   // PLATFORM_SPEC
   platformUsage?: string;
+  platformFormat?: string;
   platformRecommendedRatio?: string;
   platformWidth?: number;
   platformHeight?: number;
@@ -115,6 +116,7 @@ export interface TemplateCreateRequest {
 
   // PLATFORM_SPEC
   platformUsage?: string;
+  platformFormat?: string;
   platformRecommendedRatio?: string;
   platformWidth?: number;
   platformHeight?: number;

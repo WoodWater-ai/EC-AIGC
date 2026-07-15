@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { AppScreen, GenerationTask, ProductAsset, SystemUser, SystemNotification } from './types';
+import { AppScreen, GenerationTask, ProductAsset, SystemUser, SystemNotification, VideoTaskEntryContext } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { TaskList } from './components/TaskList';
 import { CreateImageTask } from './components/CreateImageTask';
-import { CreateVideoTask } from './components/CreateVideoTask';
+import { CreateVideoTaskV2 } from './components/CreateVideoTaskV2';
 import TemplateCenter from './components/TemplateCenter';
 import { ProductAssetLibrary } from './components/ProductAssetLibrary';
 import { DataAnalytics } from './components/DataAnalytics';
@@ -14,11 +14,13 @@ import { AssetTransitModal } from './components/AssetTransitModal';
 import { LoginPage } from './components/LoginPage';
 import { ResourceCategoryList } from './components/ResourceCategoryList';
 import { AsyncTaskList } from './components/AsyncTaskList';
+import { ModelLibrary } from './components/ModelLibrary';
 
 import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
 import { useServiceQuery } from './api/hooks/useServiceQuery';
 import { userApi, type UserDTO } from './api/modules/user';
+import { isMockRuntime } from './config/runtime';
 
 import {
   mockTasks,
@@ -84,7 +86,7 @@ export default function App() {
   // 注意:useServiceQuery.data 初始为 null,如果用 `data ?? []` 作为 useEffect 依赖,每次渲染会创建新 [] 引用,触发死循环。
   // 修法:用 `data` 本身做依赖(引用稳定),内部 null 短路退出
   const userListQuery = useServiceQuery<UserDTO[]>(
-    () => userApi.listAll(),
+    () => isMockRuntime ? Promise.resolve([]) : userApi.listAll(),
     []
   );
   const [users, setUsers] = useState<SystemUser[]>([]);
@@ -109,6 +111,14 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<ProductAsset>(mockProducts[0]);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
   const [isTransitOpen, setIsTransitOpen] = useState(false);
+  const [transitSelectionHandler, setTransitSelectionHandler] = useState<((fileResourceIds: number[]) => void) | null>(null);
+  const [transitTargetSlot, setTransitTargetSlot] = useState('main');
+  const [videoEntryContext, setVideoEntryContext] = useState<VideoTaskEntryContext>({ kind: 'blank' });
+
+  const navigateToScreen = (screen: AppScreen) => {
+    if (screen === AppScreen.CREATE_VIDEO_TASK) setVideoEntryContext({ kind: 'blank' });
+    setCurrentScreen(screen);
+  };
 
   /**
    * 注册登录态失效回调 —— axios 拦截器抛 A0102xx 时调用
@@ -174,7 +184,19 @@ export default function App() {
             products={products}
             onAddTask={handleAddTask}
             onUpdateTask={handleUpdateTask}
-            setScreen={setCurrentScreen}
+            setScreen={navigateToScreen}
+            onCreateVideo={(source) => {
+              const context: VideoTaskEntryContext = 'kind' in source ? source : {
+                kind: 'approved-image',
+                sourceTask: source,
+                sourceResult: source.results?.[0] ?? { id: `${source.id}-result-1`, url: source.resultUrl ?? source.productImg, version: 1, reviewStage: 'approved' },
+              };
+              setVideoEntryContext(context);
+              if (context.kind === 'approved-image') {
+                setSelectedProduct(products.find((product) => product.name === context.sourceTask.productName) ?? selectedProduct);
+              }
+              setCurrentScreen(AppScreen.CREATE_VIDEO_TASK);
+            }}
           />
         );
       case AppScreen.CREATE_IMAGE_TASK:
@@ -187,7 +209,7 @@ export default function App() {
         );
       case AppScreen.TEMPLATES:
         return (
-          <TemplateCenter setScreen={setCurrentScreen} />
+          <TemplateCenter setScreen={navigateToScreen} />
         );
       case AppScreen.ASSETS:
         return (
@@ -197,7 +219,7 @@ export default function App() {
             setSelectedProduct={setSelectedProduct}
             isDrawerOpen={isProductDrawerOpen}
             setIsDrawerOpen={setIsProductDrawerOpen}
-            setScreen={setCurrentScreen}
+            setScreen={navigateToScreen}
           />
         );
       case AppScreen.ANALYTICS:
@@ -210,10 +232,12 @@ export default function App() {
         );
       case AppScreen.ASSET_CATEGORY:
         return (
-          <ResourceCategoryList setScreen={setCurrentScreen} />
+          <ResourceCategoryList setScreen={navigateToScreen} />
         );
       case AppScreen.ASYNC_TASKS:
         return <AsyncTaskList />;
+      case AppScreen.MODEL_LIBRARY:
+        return <ModelLibrary />;
       default:
         return (
           <div className="flex flex-col items-center justify-center p-12 text-slate-400">
@@ -250,17 +274,22 @@ export default function App() {
         <CreateImageTask
           products={products}
           onAddTask={handleAddTask}
-          setScreen={setCurrentScreen}
-          openTransit={() => setIsTransitOpen(true)}
+          setScreen={navigateToScreen}
+          openTransit={(onConfirmSelection, targetSlot = 'main') => {
+            setTransitSelectionHandler(() => onConfirmSelection);
+            setTransitTargetSlot(targetSlot);
+            setIsTransitOpen(true);
+          }}
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
         />
         {isTransitOpen && (
           <AssetTransitModal
             purpose="OTHER"
+            targetSlot={transitTargetSlot}
             onConfirmSelection={(fileResIds) => {
-              // App.tsx 全局兜底:无业务上下文,仅打日志
-              console.log('[Transit] App 全局选中(未消费):', fileResIds);
+              transitSelectionHandler?.(fileResIds);
+              setTransitSelectionHandler(null);
               setIsTransitOpen(false);
             }}
             onClose={() => setIsTransitOpen(false)}
@@ -273,20 +302,26 @@ export default function App() {
   if (currentScreen === AppScreen.CREATE_VIDEO_TASK) {
     return (
       <div className="h-screen w-screen overflow-hidden bg-white">
-        <CreateVideoTask
+        <CreateVideoTaskV2
           products={products}
           onAddTask={handleAddTask}
-          setScreen={setCurrentScreen}
-          openTransit={() => setIsTransitOpen(true)}
+          setScreen={navigateToScreen}
+          openTransit={(onConfirmSelection, targetSlot = 'main') => {
+            setTransitSelectionHandler(() => onConfirmSelection);
+            setTransitTargetSlot(targetSlot);
+            setIsTransitOpen(true);
+          }}
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
+          entryContext={videoEntryContext}
         />
         {isTransitOpen && (
           <AssetTransitModal
             purpose="OTHER"
+            targetSlot={transitTargetSlot}
             onConfirmSelection={(fileResIds) => {
-              // App.tsx 全局兜底:无业务上下文,仅打日志
-              console.log('[Transit] App 全局选中(未消费):', fileResIds);
+              transitSelectionHandler?.(fileResIds);
+              setTransitSelectionHandler(null);
               setIsTransitOpen(false);
             }}
             onClose={() => setIsTransitOpen(false)}
@@ -312,7 +347,7 @@ export default function App() {
       {/* 1. Sidebar Nav */}
       <Sidebar
         currentScreen={currentScreen}
-        setScreen={setCurrentScreen}
+        setScreen={navigateToScreen}
         users={users}
         currentUser={currentUser}
         setCurrentUser={() => {
@@ -321,7 +356,10 @@ export default function App() {
           // 用户在 LoginPage 用新账号重新登录即可
           void logout();
         }}
-        openTransit={() => setIsTransitOpen(true)}
+        openTransit={() => {
+          setTransitSelectionHandler(null);
+          setIsTransitOpen(true);
+        }}
       />
 
       {/* 2. Main Area (Header + Scrollable Body) */}
@@ -330,7 +368,7 @@ export default function App() {
         {/* Header toolbar */}
         <Header
           currentScreen={currentScreen}
-          setScreen={setCurrentScreen}
+          setScreen={navigateToScreen}
           currentUser={currentUser}
           notifications={notifications}
           markAllAsRead={handleMarkAllNotificationsAsRead}
@@ -347,8 +385,8 @@ export default function App() {
         <AssetTransitModal
           purpose="OTHER"
           onConfirmSelection={(fileResIds) => {
-            // 全局工具模式 —— 没有明确业务上下文,仅打 console 提示用户
-            console.log('[Transit] App 全局选中(未消费):', fileResIds);
+            transitSelectionHandler?.(fileResIds);
+            setTransitSelectionHandler(null);
             setIsTransitOpen(false);
           }}
           onClose={() => setIsTransitOpen(false)}
