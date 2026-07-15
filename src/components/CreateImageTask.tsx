@@ -1,25 +1,61 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ProductAsset, GenerationTask, AppScreen } from '../types';
-import { TransitPickerButton } from './common/TransitPickerButton';
-import { useServiceQuery } from '../api/hooks/useServiceQuery';
-import { templateApi, type TemplateDTO } from '../api/modules/template';
-import { TaskParamsPanel } from './createTask/TaskParamsPanel';
-import { buildSubmitPayload } from './createTask/buildSubmitPayload';
-import { submitTask } from '../api/modules/task';
-import { type SlotKey, type SlotRef } from './createTask/slots';
-import { mergeImagesHorizontal } from '../utils/mergeImages';
-import { useFileUpload } from '../hooks/useFileUpload';
-import { assetApi } from '../api/modules/asset';
-import { toast } from 'sonner';
+import React, { useMemo, useState } from 'react';
+import {
+  AppScreen,
+  GenerationTask,
+  ImageGenerationType,
+  IMAGE_GENERATION_TYPE_LABELS,
+  MockModelDefinition,
+  ProductAsset,
+} from '../types';
+import { imageTypePromptHints, mockAssetResources, mockModelChannels, mockModelProfiles, mockReferenceAnalysisByFileId } from '../mockData';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
   onAddTask: (task: GenerationTask) => void;
   setScreen: (screen: AppScreen) => void;
-  openTransit: () => void;
+  openTransit: (onConfirmSelection: (fileResourceIds: number[]) => void, targetSlot?: string) => void;
   selectedProduct: ProductAsset;
   setSelectedProduct: (product: ProductAsset) => void;
 }
+
+interface TaskReference {
+  id: string;
+  role: string;
+  name: string;
+  source: string;
+  active: boolean;
+  thumbnailUrl?: string;
+}
+
+type ReferenceSlot = 'detail' | 'style' | 'scene' | 'pose';
+
+const REFERENCE_SLOTS: { id: ReferenceSlot; label: string; role: string; transitSlot: string; icon: string }[] = [
+  { id: 'detail', label: '细节', role: '细节参考', transitSlot: 'reference-detail', icon: 'zoom_in' },
+  { id: 'style', label: '风格', role: '风格参考', transitSlot: 'reference-style', icon: 'palette' },
+  { id: 'scene', label: '场景', role: '场景参考', transitSlot: 'reference-scene', icon: 'landscape' },
+  { id: 'pose', label: '姿势', role: '姿势参考', transitSlot: 'reference-pose', icon: 'accessibility_new' },
+];
+
+const TYPE_ORDER: ImageGenerationType[] = ['product_main', 'scene_detail', 'detail_closeup', 'on_model'];
+const PRESETS = [
+  { name: '电商主图推荐', ratio: '1:1', count: 4, resolution: '2048px' },
+  { name: '详情页长图', ratio: '3:4', count: 4, resolution: '1536px' },
+  { name: '内容种草竖图', ratio: '4:5', count: 2, resolution: '1536px' },
+];
+const STYLE_OPTIONS = [
+  '甜美网红风 (Sweet Influencer)',
+  '极简北欧风 (Minimalist Nordic)',
+  '科技赛博风 (Cyberpunk Cyber)',
+  '金秋自然风 (Autumn Natural)',
+  '奢华丝绸风 (Elegant Silk Satin)',
+];
+
+const typeIcon: Record<ImageGenerationType, string> = {
+  product_main: 'inventory_2',
+  scene_detail: 'landscape',
+  detail_closeup: 'zoom_in',
+  on_model: 'accessibility_new',
+};
 
 export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   products,
@@ -27,818 +63,310 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   setScreen,
   openTransit,
   selectedProduct,
-  setSelectedProduct
+  setSelectedProduct,
 }) => {
-  const { data } = useServiceQuery(() =>
-    templateApi.page({ pageSize: 200, status: 'NORMAL' }),
-  );
-  const templates: TemplateDTO[] = data?.list ?? [];
-  // 7 个 slot 的资源引用(统一 Record,替代原 13 个独立 state)
-  const [slotRefs, setSlotRefs] = useState<Record<SlotKey, SlotRef | null>>({
-    main: null, top: null, bottom: null, detail: null,
-    style: null, scene: null, pose: null,
-  });
-  const setSlotRef = useCallback((slot: SlotKey, ref: SlotRef | null) => {
-    setSlotRefs((prev) => ({ ...prev, [slot]: ref }));
-  }, []);
-
-  // Input fields in Middle Column
-  const [productName, setProductName] = useState(selectedProduct.name);
-  const [sellingPoints, setSellingPoints] = useState(selectedProduct.specs.sellingPoints.join('，'));
-  const [productCategory, setProductCategory] = useState(selectedProduct.category);
-  const [colorPattern, setColorPattern] = useState(selectedProduct.specs.color[0] || '米白色');
-  const [fitStructure, setFitStructure] = useState('修身版型');
-  const [fabricTexture, setFabricTexture] = useState(selectedProduct.specs.material || '细腻针织纹理');
-  const [keyDetails, setKeyDetails] = useState('法式复古风格');
-
-  // Constraints checkbox state
-  const [constrainColor, setConstrainColor] = useState(true);
-  const [constrainPattern, setConstrainPattern] = useState(true);
-  const [constrainLogo, setConstrainLogo] = useState(false);
-  const [constrainFit, setConstrainFit] = useState(false);
-
-  // Task parameters in Right Column
-  const [aspectRatio, setAspectRatio] = useState<'3:4' | '1:1' | '16:9'>('3:4');
+  const [selectedTypes, setSelectedTypes] = useState<ImageGenerationType[]>(['product_main']);
+  const [style, setStyle] = useState(STYLE_OPTIONS[0]);
+  const [scene, setScene] = useState('自然影棚');
+  const [pose, setPose] = useState('自然正面');
+  const [template, setTemplate] = useState('商品商业展示模板 v2.1');
+  const [negativePrompt, setNegativePrompt] = useState('模糊、商品漂移、错误文字、材质失真');
+  const [ratio, setRatio] = useState('1:1');
   const [count, setCount] = useState(4);
-  const [negativePrompt, setNegativePrompt] = useState('blurry, bad quality, distorted');
-  const [taskParams, setTaskParams] = useState<{ channelId: string | null; channelType: string | null; capability: string | null; modelId: string | null; schemaParams: Record<string, any> }>({ channelId: null, channelType: null, capability: null, modelId: null, schemaParams: {} });
-  const [imagePrefill] = useState<import('./createTask/useTaskParams').PrefillState | null>(() => {
-    try { const raw = sessionStorage.getItem('beta.template.prefill'); return raw ? JSON.parse(raw) : null; } catch { return null; }
-  });
+  const [resolution, setResolution] = useState('2048px');
+  const [reviewEnabled, setReviewEnabled] = useState(true);
+  const [channelId, setChannelId] = useState('cloud-vision');
+  const [modelId, setModelId] = useState('gpt-image-2');
+  const [selectedProfileId, setSelectedProfileId] = useState<string | 'none'>('model-1');
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [conflictOpen, setConflictOpen] = useState(false);
+  const [pendingChoice, setPendingChoice] = useState<{ channelId: string; modelId: string } | null>(null);
+  const [mainAsset, setMainAsset] = useState<TaskReference | null>(null);
+  const [topAsset, setTopAsset] = useState<TaskReference | null>(null);
+  const [bottomAsset, setBottomAsset] = useState<TaskReference | null>(null);
+  const [compositeState, setCompositeState] = useState<'idle' | 'processing' | 'ready'>('idle');
+  const [references, setReferences] = useState<Partial<Record<ReferenceSlot, TaskReference>>>({});
+  const [referenceInsights, setReferenceInsights] = useState<Partial<Record<ReferenceSlot, string>>>({});
 
-  // Assembled Prompt state
-  const [promptText, setPromptText] = useState('');
+  const channel = mockModelChannels.find((item) => item.id === channelId) ?? mockModelChannels[0];
+  const model = channel.models.find((item) => item.id === modelId) ?? channel.models[0];
+  const selectedProfile = mockModelProfiles.find((profile) => profile.id === selectedProfileId);
 
-  // Local state for composite setup
-  const [hasCompositePreviewed, setHasCompositePreviewed] = useState(false);
+  const prompts = useMemo(() => Object.fromEntries(TYPE_ORDER.map((type) => [
+    type,
+    `${imageTypePromptHints[type]} 商品：${selectedProduct.name}。风格：${style}；场景：${scene}；动作/姿势：${pose}${selectedProfile ? `；模特：${selectedProfile.name}` : ''}${Object.values(referenceInsights).length ? `；参考图解析：${Object.values(referenceInsights).join(' ')}` : ''}。${negativePrompt ? `负面约束：${negativePrompt}。` : ''}`,
+  ])) as Record<ImageGenerationType, string>, [negativePrompt, pose, referenceInsights, scene, selectedProduct.name, selectedProfile, style]);
+  const [promptOverrides, setPromptOverrides] = useState<Partial<Record<ImageGenerationType, string>>>({});
 
-  // Mock Upload state for main asset
-  const [isUploading, setIsUploading] = useState(false);
+  const isSupported = model.capability.ratios.includes(ratio)
+    && count <= model.capability.maxCount
+    && model.capability.resolutions.includes(resolution);
+  const unsupported = [
+    !model.capability.ratios.includes(ratio) ? `比例 ${ratio}` : null,
+    count > model.capability.maxCount ? `张数 ${count}（最大 ${model.capability.maxCount}）` : null,
+    !model.capability.resolutions.includes(resolution) ? `尺寸 ${resolution}` : null,
+  ].filter(Boolean);
 
-  // Sync inputs when selectedProduct changes
-  useEffect(() => {
-    setProductName(selectedProduct.name);
-    setSellingPoints(selectedProduct.specs.sellingPoints.join('，'));
-    setProductCategory(selectedProduct.category);
-    setColorPattern(selectedProduct.specs.color[0] || '米白色');
-    setFabricTexture(selectedProduct.specs.material || '细腻针织纹理');
-  }, [selectedProduct]);
-
-  // 主图 slot 选中时,同步商品名称(取文件名去后缀)
-  // 缩略图不在这里同步:商品主体图区直接读 slotRefs.main,避免 useEffect 延迟
-  useEffect(() => {
-    const main = slotRefs.main;
-    if (!main) return;
-    if (main.name) {
-      const nameNoExt = main.name.replace(/\.[^./\\]+$/, '');
-      setProductName(nameNoExt);
+  const setModelWithValidation = (nextChannelId: string, nextModelId: string) => {
+    const nextChannel = mockModelChannels.find((item) => item.id === nextChannelId);
+    const nextModel = nextChannel?.models.find((item) => item.id === nextModelId);
+    if (!nextChannel || !nextModel) return;
+    const incompatible = !nextModel.capability.ratios.includes(ratio)
+      || count > nextModel.capability.maxCount
+      || !nextModel.capability.resolutions.includes(resolution);
+    if (incompatible) {
+      setPendingChoice({ channelId: nextChannelId, modelId: nextModelId });
+      setConflictOpen(true);
+      return;
     }
-  }, [slotRefs.main?.fileResourceId]);  // 仅当 fileResourceId 变化时触发(避免循环)
-
-  /** 字节数格式化为 KB/MB 显示串 */
-  function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  }
-
-  // Reset to Global Template
-  const handleResetToTemplate = () => {
-    setProductName(selectedProduct.name);
-    setSellingPoints(selectedProduct.specs.sellingPoints.join('，'));
-    setColorPattern(selectedProduct.specs.color[0] || '米白色');
-    setFabricTexture(selectedProduct.specs.material || '细腻针织纹理');
-    setAspectRatio('3:4');
-    setConstrainColor(true);
-    setConstrainPattern(true);
-    setConstrainLogo(false);
-    setConstrainFit(false);
+    setChannelId(nextChannelId);
+    setModelId(nextModelId);
   };
 
-  const handleMockUploadMain = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setIsUploading(true);
-      setTimeout(() => {
-        setIsUploading(false);
-        // Create a temporary mock asset based on uploaded file
-        const file = e.target.files![0];
-        const mockUrl = URL.createObjectURL(file);
-        setSelectedProduct({
-          ...selectedProduct,
-          name: file.name.substring(0, file.name.lastIndexOf('.')) || file.name,
-          thumbnail: mockUrl,
-          files: [
-            {
-              id: 'uploaded-1',
-              name: file.name,
-              url: mockUrl,
-              size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-              type: 'image'
-            },
-            ...selectedProduct.files
-          ]
-        });
-      }, 1000);
-    }
+  const applyCompatibleModel = () => {
+    if (!pendingChoice) return;
+    const nextChannel = mockModelChannels.find((item) => item.id === pendingChoice.channelId)!;
+    const nextModel = nextChannel.models.find((item) => item.id === pendingChoice.modelId)!;
+    setChannelId(nextChannel.id);
+    setModelId(nextModel.id);
+    setRatio(nextModel.capability.ratios[0]);
+    setCount(Math.min(count, nextModel.capability.maxCount));
+    setResolution(nextModel.capability.resolutions[0]);
+    setConflictOpen(false);
+    setPendingChoice(null);
   };
 
-  // ===== 合成预览状态机 =====
-  // 合成预览结果(blob 用于上传, dataUrl 用于 <img> 预览)
-  const [compositePreview, setCompositePreview] = useState<
-    { blob: Blob; dataUrl: string; width: number; height: number } | null
-  >(null);
-  const [isComposing, setIsComposing] = useState(false);
-  const [isApplying, setIsApplying] = useState(false);
-  // useFileUpload: 上传合并后的 PNG
-  const {
-    upload,
-    loading: uploadLoading,
-    progress: uploadProgress,
-    error: uploadError,
-  } = useFileUpload({
-    purpose: 'PRODUCT',
-    productId: selectedProduct?.id ? Number(selectedProduct.id) : undefined,
-  });
-
-  const handleCompositePreview = async () => {
-    if (!slotRefs.top || !slotRefs.bottom) {
-      toast.warning('请先添加上衣和下装素材后再进行合成');
+  const applyPreset = (preset: typeof PRESETS[number]) => {
+    const conflicts = !model.capability.ratios.includes(preset.ratio)
+      || preset.count > model.capability.maxCount
+      || !model.capability.resolutions.includes(preset.resolution);
+    if (conflicts) {
+      setPendingChoice({ channelId, modelId });
+      setConflictOpen(true);
       return;
     }
-    const topUrl = slotRefs.top.originalUrl ?? slotRefs.top.thumbnailUrl;
-    const bottomUrl = slotRefs.bottom.originalUrl ?? slotRefs.bottom.thumbnailUrl;
-    if (!topUrl || !bottomUrl) {
-      toast.error('所选资源缺少原图 URL,无法合成');
-      return;
-    }
-
-    setIsComposing(true);
-    setCompositePreview(null);
-    try {
-      const result = await mergeImagesHorizontal(topUrl, bottomUrl, {
-        crossOrigin: true,
-        mimeType: 'image/png',
-      });
-      const dataUrl = URL.createObjectURL(result.blob);
-      setCompositePreview({
-        blob: result.blob,
-        dataUrl,
-        width: result.width,
-        height: result.height,
-      });
-      setHasCompositePreviewed(true);
-      toast.success(`合成预览完成(尺寸 ${result.width}×${result.height})`);
-    } catch (err) {
-      toast.error(`合成失败: ${(err as Error).message}`);
-    } finally {
-      setIsComposing(false);
-    }
+    setRatio(preset.ratio);
+    setCount(preset.count);
+    setResolution(preset.resolution);
   };
 
-  /**
-   * 应用合成图为主图:
-   * 1. blob → File
-   * 2. useFileUpload 上传(走 COS)
-   * 3. assetApi.create 创建业务资源(PRODUCT_ORIGINAL)
-   * 4. setSelectedProduct 换缩略图 + name
-   * 5. setSlotRef('main', ...) 把合成图写入主 slot
-   * 6. 清理 compositePreview
-   */
-  const handleApplyComposite = async () => {
-    if (!compositePreview) {
-      toast.warning('请先生成合成预览');
-      return;
-    }
-    setIsApplying(true);
-    try {
-      const file = new File(
-        [compositePreview.blob],
-        `composite-${Date.now()}.png`,
-        { type: compositePreview.blob.type || 'image/png' },
-      );
-      const { fileResourceId, accessUrl } = await upload(file);
-      // 创建业务资源
-      await assetApi.create({
-        fileResourceId,
-        name: file.name,
-        productId: selectedProduct?.id ? Number(selectedProduct.id) : undefined,
-        assetKind: 'IMAGE',
-        assetType: 'PRODUCT_ORIGINAL',
-      });
-      // 替换商品主图
-      setSelectedProduct({
-        ...selectedProduct,
-        name: '智能合成套图',
-        thumbnail: accessUrl,
-      });
-      // 主 slot 写为合成图
-      setSlotRef('main', {
-        fileResourceId,
-        originalUrl: accessUrl,
-        thumbnailUrl: accessUrl,
-        name: '智能合成套图',
-      });
-      toast.success('合成图已应用为主图');
-      // 清理预览
-      if (compositePreview.dataUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(compositePreview.dataUrl);
-      }
-      setCompositePreview(null);
-    } catch (err) {
-      toast.error(`应用失败: ${(err as Error).message}`);
-    } finally {
-      setIsApplying(false);
-    }
-  };
-
-  const handleSubmitTask = async () => {
-    if (!taskParams.channelType || !taskParams.capability) {
-      alert('请先在右侧选择通道和能力');
-      return;
-    }
-    if (!taskParams.channelId) {
-      alert('请先在右侧选择通道实例');
-      return;
-    }
-    const payload = buildSubmitPayload({
-      title: `图片生成任务_${productName}`,
-      productId: String(selectedProduct.id),
-      taskType: 'PRODUCT_MAIN',
-      channelType: taskParams.channelType,
-      capability: taskParams.capability,
-      modelId: taskParams.modelId ?? undefined,
-      modelChannelId: String(taskParams.channelId),
-      aspectRatio,
-      count,
-      prompt: promptText,
-      negativePrompt,
-      schemaParams: taskParams.schemaParams,
-      templateId: imagePrefill?.templateId,
-      templateVersionId: imagePrefill?.templateVersionId,
-      slotRefs,
+  const toggleType = (type: ImageGenerationType) => {
+    setSelectedTypes((previous) => {
+      if (previous.includes(type)) return previous.length === 1 ? previous : previous.filter((item) => item !== type);
+      return [...previous, type];
     });
-    try {
-      await submitTask(payload);
-      sessionStorage.removeItem('beta.template.prefill');
-      setScreen(AppScreen.TASKS);
-    } catch {
-      // http 拦截器已 toast 错误
+  };
+
+  const startComposite = () => {
+    if (!topAsset || !bottomAsset) return;
+    setCompositeState('processing');
+    window.setTimeout(() => setCompositeState('ready'), 700);
+  };
+
+  const toTaskReference = (fileResourceId: number, role: string): TaskReference | null => {
+    const asset = mockAssetResources.find((item) => item.fileResourceId === fileResourceId);
+    if (!asset) return null;
+    return {
+      id: `asset-${fileResourceId}`,
+      role,
+      name: asset.name,
+      source: '资源中心',
+      active: true,
+      thumbnailUrl: asset.thumbnailUrl ?? asset.originalUrl,
+    };
+  };
+
+  const selectMainAsset = (fileResourceIds: number[]) => {
+    const reference = toTaskReference(fileResourceIds[0], '主体素材');
+    if (reference) {
+      setMainAsset(reference);
+      const matchingProduct = products.find((product) => product.files.some((file) => file.name === reference.name));
+      if (matchingProduct) setSelectedProduct(matchingProduct);
+      setCompositeState('idle');
     }
+  };
+
+  const selectGarmentAsset = (part: 'top' | 'bottom') => (fileResourceIds: number[]) => {
+    const reference = toTaskReference(fileResourceIds[0], part === 'top' ? '上衣图' : '下装图');
+    if (reference) {
+      if (part === 'top') setTopAsset(reference);
+      else setBottomAsset(reference);
+      setCompositeState('idle');
+    }
+  };
+
+  const selectReferenceAsset = (slot: ReferenceSlot) => (fileResourceIds: number[]) => {
+    const slotDefinition = REFERENCE_SLOTS.find((item) => item.id === slot);
+    const reference = toTaskReference(fileResourceIds[0], slotDefinition?.role ?? '参考图');
+    if (!reference) return;
+    const analysis = mockReferenceAnalysisByFileId[fileResourceIds[0]];
+    setReferences((current) => ({ ...current, [slot]: reference }));
+    if (analysis) {
+      setReferenceInsights((current) => ({ ...current, [slot]: analysis.promptHint }));
+      if (analysis.style) setStyle(analysis.style);
+      if (analysis.scene) setScene(analysis.scene);
+      if (analysis.pose) setPose(analysis.pose);
+    }
+  };
+
+  const selectModelFromTransit = (fileResourceIds: number[]) => {
+    const reference = toTaskReference(fileResourceIds[0], '模特参考');
+    if (!reference) return;
+    const profile = mockModelProfiles.find((item) => reference.name.includes(item.name));
+    if (profile) setSelectedProfileId(profile.id);
+  };
+
+  const submitTasks = () => {
+    if (!isSupported || channel.health === 'maintenance') return;
+    const groupId = `G-${Date.now()}`;
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    const outputPreviewUrl = compositeState === 'ready'
+      ? topAsset?.thumbnailUrl ?? selectedProduct.thumbnail
+      : mainAsset?.thumbnailUrl ?? selectedProduct.thumbnail;
+    selectedTypes.forEach((imageType, index) => {
+      const task: GenerationTask = {
+        id: `I-${Date.now()}-${index + 1}`,
+        groupId,
+        name: `${IMAGE_GENERATION_TYPE_LABELS[imageType]} · ${selectedProduct.name}`,
+        type: 'image',
+        imageType,
+        status: 'running',
+        progress: 0,
+        productName: selectedProduct.name,
+        productImg: outputPreviewUrl,
+        templateName: template,
+        timestamp: now,
+        creator: '陆永奇',
+        modelChannel: `${channel.name} / ${model.name}`,
+        taskPrompt: promptOverrides[imageType] ?? prompts[imageType],
+        negativePrompt,
+        reviewStrategy: { aesthetic: reviewEnabled, listing: false },
+        modelSnapshot: {
+          accessType: channel.accessType,
+          channelId: channel.id,
+          channelName: channel.name,
+          modelId: model.id,
+          modelName: model.name,
+          supportedRatios: model.capability.ratios,
+          maxCount: model.capability.maxCount,
+          supportedResolutions: model.capability.resolutions,
+          estimatedCost: model.cost * count,
+        },
+        params: { ratio, prompt: promptOverrides[imageType] ?? prompts[imageType], negativePrompt },
+      };
+      onAddTask(task);
+      window.setTimeout(() => onAddTask({
+        ...task,
+        status: reviewEnabled ? 'candidate' : 'archived',
+        progress: 100,
+        resultUrl: outputPreviewUrl,
+        results: [{ id: `${task.id}-r1`, url: outputPreviewUrl, version: 1, reviewStage: reviewEnabled ? 'candidate' : 'approved' }],
+      }), 900 + index * 250);
+    });
+    setScreen(AppScreen.TASKS);
+  };
+
+  const applyAssistantSuggestion = () => {
+    setPromptOverrides((previous) => Object.fromEntries(selectedTypes.map((type) => [
+      type,
+      `${previous[type] ?? prompts[type]} 使用自然柔光，保持商品边缘完整，并将主体放在视觉重心。`,
+    ])));
+    setAssistantOpen(false);
   };
 
   return (
-    <div className="h-screen flex flex-col bg-white overflow-hidden text-slate-800" id="create-image-task-container">
-
-      {/* 1. Top Navigation Bar */}
-      <header className="bg-white h-16 border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-10" id="create-task-header">
-        {/* Left: Back Button & Title */}
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => setScreen(AppScreen.TASKS)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-xl">arrow_back</span>
-          </button>
-          <div>
-            <h1 className="text-sm lg:text-base font-bold leading-tight flex items-center gap-2">
-              新建任务
-            </h1>
-            <div className="text-[10px] lg:text-xs text-slate-400 font-mono">T-20231024-001</div>
-          </div>
+    <div className="h-screen overflow-hidden bg-[#f5f7fb] text-slate-800 flex flex-col" id="create-image-task-container">
+      <header className="h-16 shrink-0 px-6 bg-white border-b border-slate-200 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setScreen(AppScreen.TASKS)} className="w-8 h-8 rounded-md hover:bg-slate-100 text-slate-500" title="返回任务列表"><span className="material-symbols-outlined">arrow_back</span></button>
+          <div><p className="text-[11px] font-bold text-primary">图片任务工作台</p><h1 className="text-base font-black">新建多类型图片任务</h1></div>
         </div>
-
-        {/* Center: Step Progress */}
-        <div className="flex-1 flex justify-center items-center">
-          <div className="flex items-center space-x-2">
-            {/* Step 1 (Active) */}
-            <div className="flex items-center text-blue-600 font-medium text-[11px] lg:text-sm">
-              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full bg-blue-600 text-white flex items-center justify-center mr-1.5 lg:mr-2 text-[10px] lg:text-xs">1</div>
-              上传素材
-            </div>
-            <div className="w-6 lg:w-8 h-px bg-slate-200 mx-1 lg:mx-2" />
-            {/* Step 2 (Active state text and border circle) */}
-            <div className="flex items-center text-blue-600 font-medium text-[11px] lg:text-sm">
-              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-blue-600 flex items-center justify-center mr-1.5 lg:mr-2 text-[10px] lg:text-xs font-bold">2</div>
-              商品信息
-            </div>
-            <div className="w-6 lg:w-8 h-px bg-slate-200 mx-1 lg:mx-2" />
-            {/* Step 3 (Inactive) */}
-            <div className="flex items-center text-slate-400 text-[11px] lg:text-sm">
-              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-slate-300 flex items-center justify-center mr-1.5 lg:mr-2 text-[10px] lg:text-xs bg-slate-50">3</div>
-              模板与参数
-            </div>
-            <div className="w-6 lg:w-8 h-px bg-slate-200 mx-1 lg:mx-2" />
-            {/* Step 4 (Inactive) */}
-            <div className="flex items-center text-slate-400 text-[11px] lg:text-sm">
-              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-slate-300 flex items-center justify-center mr-1.5 lg:mr-2 text-[10px] lg:text-xs bg-slate-50">4</div>
-              确认生成
-            </div>
-          </div>
-        </div>
-
-        {/* Right: AI Assistant Button */}
-        <div>
-          <button className="flex items-center text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors cursor-pointer">
-            <span className="material-symbols-outlined text-sm mr-1">auto_awesome</span>
-            AI 助手
-          </button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-500">已选择 <b className="text-slate-800">{selectedTypes.length}</b> 个图片类型，将生成独立任务</span>
+          <button onClick={submitTasks} disabled={!isSupported || channel.health === 'maintenance'} className="h-9 px-4 rounded-md bg-primary disabled:bg-slate-300 text-white text-xs font-bold shadow-sm">提交 {selectedTypes.length} 条任务</button>
         </div>
       </header>
 
-      {/* 2. Main Content Area (Three Columns) */}
-      <main className="flex-1 flex overflow-hidden bg-white" id="create-task-main-view">
+      <main className="flex-1 overflow-y-auto p-5 grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)_380px] gap-5">
+        <section className="space-y-4">
+          <div className="bg-white border border-slate-200 rounded-lg p-4">
+            <div className="flex items-center justify-between"><h2 className="text-sm font-black">输入素材</h2><button onClick={() => openTransit(selectMainAsset, 'main')} className="text-xs text-primary font-bold">资源中心</button></div>
+            {compositeState === 'ready' && topAsset && bottomAsset ? (
+              <div className="mt-3 h-44 rounded-md border border-emerald-200 bg-emerald-50 overflow-hidden relative">
+                <div className="grid grid-cols-2 h-full"><img src={topAsset.thumbnailUrl} alt="上衣合成素材" className="w-full h-full object-cover" referrerPolicy="no-referrer" /><img src={bottomAsset.thumbnailUrl} alt="下装合成素材" className="w-full h-full object-cover" referrerPolicy="no-referrer" /></div>
+                <span className="absolute left-2 bottom-2 px-2 py-1 rounded bg-emerald-600 text-[10px] font-bold text-white">上下装合成预览</span>
+              </div>
+            ) : mainAsset?.thumbnailUrl ? (
+              <button onClick={() => openTransit(selectMainAsset, 'main')} className="mt-3 w-full text-left"><img src={mainAsset.thumbnailUrl} alt={mainAsset.name} className="w-full h-44 object-cover rounded-md border border-slate-100" referrerPolicy="no-referrer" /><p className="mt-2 text-xs font-bold leading-5">{mainAsset.name}</p></button>
+            ) : (
+              <button onClick={() => openTransit(selectMainAsset, 'main')} className="mt-3 w-full h-44 rounded-md border-2 border-dashed border-slate-300 bg-slate-50 hover:border-primary hover:bg-blue-50 transition-colors flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-primary" title="从资源中心选择主体素材"><span className="material-symbols-outlined text-4xl">add</span><span className="text-xs font-bold">添加主体素材</span></button>
+            )}
+            <select value={selectedProduct.id} onChange={(event) => {
+              const product = products.find((item) => item.id === event.target.value);
+              if (product) setSelectedProduct(product);
+            }} className="mt-3 w-full h-8 rounded border border-slate-200 px-2 text-xs bg-slate-50">{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between"><h2 className="text-sm font-black">上下装合成套图</h2><span className="text-[10px] text-slate-400">可选</span></div>
+            {([{ label: '上衣图', asset: topAsset, targetSlot: 'upper', select: selectGarmentAsset('top'), clear: () => { setTopAsset(null); setCompositeState('idle'); } }, { label: '下装图', asset: bottomAsset, targetSlot: 'lower', select: selectGarmentAsset('bottom'), clear: () => { setBottomAsset(null); setCompositeState('idle'); } }]).map((item) => {
+              return <div key={item.label} className="relative"><button onClick={() => openTransit(item.select, item.targetSlot)} className="w-full h-16 rounded-md border border-dashed border-slate-300 hover:border-primary flex items-center px-3 gap-3 text-left overflow-hidden">
+                {item.asset?.thumbnailUrl ? <img src={item.asset.thumbnailUrl} alt="" className="w-10 h-10 rounded object-cover" referrerPolicy="no-referrer" /> : <span className="material-symbols-outlined text-slate-400">add_photo_alternate</span>}<span className="text-xs min-w-0"><b className="block text-slate-700">{item.label}</b><span className="block truncate text-slate-400">{item.asset ? item.asset.name : '从资源中心选择'}</span></span>
+              </button>{item.asset && <button onClick={item.clear} className="absolute right-2 top-2 w-5 h-5 rounded-full bg-white/90 text-slate-400 hover:text-red-500" title={`移除${item.label}`}><span className="material-symbols-outlined text-sm">close</span></button>}</div>;
+            })}
+            <button onClick={startComposite} disabled={!topAsset || !bottomAsset || compositeState === 'processing'} className="w-full h-8 rounded bg-slate-900 disabled:bg-slate-200 text-white text-xs font-bold">{compositeState === 'processing' ? '合成中...' : compositeState === 'ready' ? '重新生成合成预览' : '生成合成预览'}</button>
+            {compositeState === 'ready' && <div className="rounded bg-emerald-50 border border-emerald-100 p-2 text-[11px] text-emerald-700">合成预览已显示在上方输入素材区，并会作为本次任务主体图。</div>}
+          </div>
+          <div className="bg-white border border-slate-200 rounded-lg p-4">
+            <h2 className="text-sm font-black">参考图 <span className="font-normal text-slate-400">(选传)</span></h2><p className="mt-1 text-[11px] leading-5 text-slate-400">用于补充细节、风格、场景、姿势，不直接替代主体。</p>
+            <div className="grid grid-cols-4 gap-2 mt-3">{REFERENCE_SLOTS.map((slot) => {
+              const reference = references[slot.id];
+              return <div key={slot.id} className="min-w-0 text-center"><button onClick={() => openTransit(selectReferenceAsset(slot.id), slot.transitSlot)} className={`relative w-full aspect-square rounded-xl border-2 border-dashed overflow-hidden flex items-center justify-center transition-colors ${reference ? 'border-primary bg-blue-50' : 'border-slate-200 hover:border-primary bg-slate-50'}`} title={`选择${slot.label}参考图`}>
+                {reference?.thumbnailUrl ? <><img src={reference.thumbnailUrl} alt={slot.label} className="w-full h-full object-cover" referrerPolicy="no-referrer" /><span className="absolute inset-x-0 bottom-0 py-1 bg-primary text-[10px] font-bold text-white">已解析</span></> : <span className="material-symbols-outlined text-2xl text-slate-400">add</span>}
+              </button><div className={`mt-1 text-xs font-bold ${reference ? 'text-primary' : 'text-slate-400'}`}>{slot.label}</div>{reference && <button onClick={() => { setReferences((current) => ({ ...current, [slot.id]: undefined })); setReferenceInsights((current) => ({ ...current, [slot.id]: undefined })); }} className="text-[10px] text-slate-400 hover:text-red-500">移除</button>}</div>;
+            })}</div>
+          </div>
+        </section>
 
-        {/* Column 1: 素材选择 (Left Column) */}
-        <div className="w-[300px] lg:w-[350px] shrink-0 border-r border-slate-200 flex flex-col bg-white overflow-y-auto" id="col-upload-assets">
-
-          {/* Header sticky */}
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-            <h2 className="text-sm lg:text-base font-bold text-slate-800">素材选择</h2>
+        <section className="space-y-5">
+          <div className="bg-white border border-slate-200 rounded-lg p-5">
+            <div className="flex items-center justify-between mb-4"><div><p className="text-[11px] font-bold text-primary">任务配置</p><h2 className="text-base font-black">用户希望得到什么结果</h2></div><span className="text-[11px] text-slate-400">规格选项由所选模型提供</span></div>
+            <label className="text-xs font-bold text-slate-700">生成图片类型 <span className="text-slate-400 font-normal">可多选</span></label>
+            <div className="grid sm:grid-cols-2 gap-2 mt-2">{TYPE_ORDER.map((type) => <button key={type} onClick={() => toggleType(type)} className={`p-3 text-left border rounded-md transition-colors ${selectedTypes.includes(type) ? 'border-primary bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}><div className="flex items-center justify-between"><span className="material-symbols-outlined text-primary">{typeIcon[type]}</span><span className={`w-4 h-4 rounded border flex items-center justify-center ${selectedTypes.includes(type) ? 'bg-primary border-primary text-white' : 'border-slate-300'}`}>{selectedTypes.includes(type) && <span className="material-symbols-outlined text-xs">check</span>}</span></div><p className="mt-2 text-xs font-bold">{IMAGE_GENERATION_TYPE_LABELS[type]}</p></button>)}</div>
+            <div className="grid md:grid-cols-3 gap-3 mt-5">
+              {[['任务模板', template, setTemplate, ['商品商业展示模板 v2.1', '服装上身展示模板', '细节材质强化模板']], ['风格', style, setStyle, STYLE_OPTIONS], ['场景', scene, setScene, ['自然影棚', '城市街景', '居家陈列']]].map(([label, value, setter, options]) => <label key={String(label)} className="text-xs font-bold text-slate-700">{String(label)}<select value={value as string} onChange={(event) => (setter as (value: string) => void)(event.target.value)} className="mt-1.5 w-full h-9 px-2 rounded border border-slate-200 bg-white text-xs font-medium">{(options as string[]).map((option) => <option key={option}>{option}</option>)}</select></label>)}
+            </div>
+            <div className="grid md:grid-cols-2 gap-3 mt-3"><label className="text-xs font-bold text-slate-700">动作/姿势<input value={pose} onChange={(event) => setPose(event.target.value)} className="mt-1.5 w-full h-9 px-2 rounded border border-slate-200 text-xs font-medium" /></label><label className="text-xs font-bold text-slate-700">负面约束<input value={negativePrompt} onChange={(event) => setNegativePrompt(event.target.value)} className="mt-1.5 w-full h-9 px-2 rounded border border-slate-200 text-xs font-medium" /></label></div>
+            <div className="mt-5 border-t border-slate-100 pt-4"><div className="flex items-center justify-between"><h3 className="text-xs font-black">模特选择</h3><div className="flex gap-3"><button onClick={() => openTransit(selectModelFromTransit, 'model')} className="text-[11px] text-primary font-bold">资源中心</button><button onClick={() => setSelectedProfileId('none')} className="text-[11px] text-slate-400 hover:text-slate-700">不使用模特</button></div></div><div className="grid sm:grid-cols-3 gap-2 mt-2">{mockModelProfiles.map((profile) => <button key={profile.id} onClick={() => setSelectedProfileId(profile.id)} className={`p-2 rounded-md text-left border ${selectedProfileId === profile.id ? 'border-primary bg-blue-50' : 'border-slate-200'}`}><img src={profile.image} alt="" className="w-full h-16 object-cover rounded" referrerPolicy="no-referrer"/><p className="mt-1 text-[11px] font-bold truncate">{profile.name}</p><p className="text-[10px] text-slate-400 truncate">{profile.reason}</p></button>)}</div></div>
           </div>
 
-          {/* Main Upload Area */}
-          <div className="p-5 space-y-6">
-
-            {/* Primary Image Upload Box */}
-            <div className="flex flex-col items-center">
-              <TransitPickerButton
-                slot="main"
-                value={slotRefs.main}
-                onChange={(next) => setSlotRef('main', next)}
-                size="lg"
-                placeholder="选择产品主图"
-              />
-            </div>
-
-            {/* Composite Setup: 上下装合成套图 */}
-            <div className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-xs">
-              <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center text-xs font-bold text-slate-700">
-                <span className="material-symbols-outlined text-blue-500 text-sm mr-1.5">layers</span>
-                上下装合成套图
-              </div>
-              <div className="p-4 flex flex-col items-center">
-                <div className="text-[10px] lg:text-xs text-slate-400 mb-3 font-medium">合成后将作为主任务图像输入</div>
-                <div className="flex items-center space-x-3 w-full justify-center mb-4">
-
-                  {/* Top slot */}
-                  <TransitPickerButton
-                    slot="top"
-                    value={slotRefs.top}
-                    onChange={(next) => setSlotRef('top', next)}
-                    size="md"
-                    placeholder="添加上衣"
-                    icon="checkroom"
-                  />
-
-                  <div className="text-slate-300 text-lg font-bold">+</div>
-
-                  {/* Bottom slot */}
-                  <TransitPickerButton
-                    slot="bottom"
-                    value={slotRefs.bottom}
-                    onChange={(next) => setSlotRef('bottom', next)}
-                    size="md"
-                    placeholder="添加下装"
-                    icon="accessibility_new"
-                  />
-
-                </div>
-
-                <button
-                  onClick={handleCompositePreview}
-                  disabled={isComposing}
-                  className="w-full py-2 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="material-symbols-outlined text-sm mr-1">preview</span>
-                  {isComposing ? '合成中...' : '合成预览'}
-                </button>
-
-                {/* 合成预览结果:图片 + 上传应用按钮 */}
-                {compositePreview && (
-                  <div className="mt-3 flex flex-col items-center">
-                    <div className="w-full max-w-[280px] border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
-                      <img
-                        src={compositePreview.dataUrl}
-                        alt="合成预览"
-                        className="w-full h-auto"
-                      />
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-1 font-mono">
-                      {compositePreview.width} × {compositePreview.height}
-                    </div>
-                    {isApplying && uploadProgress > 0 && (
-                      <div className="w-full max-w-[280px] mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-600 transition-all duration-200"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                    )}
-                    <button
-                      onClick={handleApplyComposite}
-                      disabled={isApplying || uploadLoading}
-                      className="w-full max-w-[280px] mt-2 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="material-symbols-outlined text-sm mr-1">upload</span>
-                      {isApplying ? `上传中 ${uploadProgress}%` : '上传并应用主图'}
-                    </button>
-                  </div>
-                )}
-
-                {uploadError && (
-                  <div className="mt-2 text-[10px] text-red-500 font-medium">
-                    上传失败: {uploadError.message}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Reference Images: 参考图 (选传) */}
-            <div>
-              <div className="text-xs lg:text-sm font-bold text-slate-800 mb-1">参考图 (选传)</div>
-              <div className="text-[10px] lg:text-xs text-slate-400 mb-3 leading-normal font-medium">
-                用于影响生成的细节、风格、场景、姿势，不直接替代主体
-              </div>
-
-              <div className="grid grid-cols-4 gap-2">
-
-                {/* Slot 1: Details */}
-                <div className="flex flex-col items-center">
-                  <TransitPickerButton
-                    slot="detail"
-                    value={slotRefs.detail}
-                    onChange={(next) => setSlotRef('detail', next)}
-                    size="sm"
-                    placeholder="细节"
-                  />
-                  <span className={`text-[10px] font-medium mt-1 ${slotRefs.detail ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>细节</span>
-                </div>
-
-                {/* Slot 2: Style */}
-                <div className="flex flex-col items-center">
-                  <TransitPickerButton
-                    slot="style"
-                    value={slotRefs.style}
-                    onChange={(next) => setSlotRef('style', next)}
-                    size="sm"
-                    placeholder="风格"
-                    icon="palette"
-                  />
-                  <span className={`text-[10px] font-medium mt-1 ${slotRefs.style ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>风格</span>
-                </div>
-
-                {/* Slot 3: Scene */}
-                <div className="flex flex-col items-center">
-                  <TransitPickerButton
-                    slot="scene"
-                    value={slotRefs.scene}
-                    onChange={(next) => setSlotRef('scene', next)}
-                    size="sm"
-                    placeholder="场景"
-                  />
-                  <span className={`text-[10px] font-medium mt-1 ${slotRefs.scene ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>场景</span>
-                </div>
-
-                {/* Slot 4: Pose */}
-                <div className="flex flex-col items-center">
-                  <TransitPickerButton
-                    slot="pose"
-                    value={slotRefs.pose}
-                    onChange={(next) => setSlotRef('pose', next)}
-                    size="sm"
-                    placeholder="姿势"
-                  />
-                  <span className={`text-[10px] font-medium mt-1 ${slotRefs.pose ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>姿势</span>
-                </div>
-
-              </div>
-            </div>
-
+          <div className="bg-white border border-slate-200 rounded-lg p-5">
+            <div className="flex items-center justify-between"><div><p className="text-[11px] font-bold text-primary">任务级 Prompt 副本</p><h2 className="text-base font-black">每种图片各自编辑</h2></div><button onClick={() => setAssistantOpen(true)} className="h-8 px-3 border border-blue-200 bg-blue-50 text-primary text-xs font-bold rounded-md flex gap-1 items-center"><span className="material-symbols-outlined text-base">auto_awesome</span>AI 助手</button></div>
+            <div className="mt-4 space-y-3">{selectedTypes.map((type) => <div key={type} className="border border-slate-200 rounded-md overflow-hidden"><div className="px-3 py-2 bg-slate-50 flex justify-between"><span className="text-xs font-black">{IMAGE_GENERATION_TYPE_LABELS[type]}</span><span className="text-[10px] text-slate-400">来源：{template}</span></div><textarea value={promptOverrides[type] ?? prompts[type]} onChange={(event) => setPromptOverrides((previous) => ({ ...previous, [type]: event.target.value }))} className="w-full h-24 resize-none p-3 outline-none text-xs leading-5" /></div>)}</div>
           </div>
-        </div>
+        </section>
 
-        {/* Column 2: 商品信息 (Middle Column - Wide) */}
-        <div className="flex-1 flex flex-col bg-[#F9FAFB] overflow-y-auto" id="col-product-info">
-          <div className="p-6 max-w-2xl lg:max-w-3xl mx-auto w-full">
-
-            {/* Main Form Card */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
-
-              {/* Card Header */}
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center bg-white">
-                <span className="material-symbols-outlined text-blue-600 mr-2 text-xl font-bold">info</span>
-                <h2 className="text-sm lg:text-base font-bold text-slate-800">商品信息</h2>
-              </div>
-
-              {/* Form Content */}
-              <div className="p-6 space-y-6">
-
-                {/* 1. 商品主体图 View */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs lg:text-sm font-bold text-slate-700">商品主体图</span>
-                    <span className="bg-blue-50 text-blue-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-blue-100 font-bold flex items-center">
-                      AI 已识别
-                    </span>
-                  </div>
-
-                  <div className="border border-slate-200 rounded-xl p-3 flex items-start space-x-4 bg-slate-50/50">
-                    {/* Preview Thumbnail —— 直接读 slotRefs.main,避免 useEffect 延迟 */}
-                    <div className="w-16 h-16 lg:w-20 lg:h-20 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center text-slate-300 relative group overflow-hidden shrink-0">
-                      {(slotRefs.main?.thumbnailUrl ?? slotRefs.main?.originalUrl ?? selectedProduct.thumbnail) ? (
-                        <img
-                          src={slotRefs.main?.thumbnailUrl ?? slotRefs.main?.originalUrl ?? selectedProduct.thumbnail ?? ''}
-                          alt={selectedProduct.name}
-                          className="w-full h-full object-contain"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <span className="material-symbols-outlined text-2xl">image</span>
-                      )}
-
-                      {/* Hover eye action */}
-                      <div className="absolute inset-0 bg-black/40 hidden group-hover:flex items-center justify-center text-white transition-opacity">
-                        <span className="material-symbols-outlined text-sm cursor-pointer hover:text-blue-300">visibility</span>
-                      </div>
-                    </div>
-
-                    {/* Metadata details */}
-                    <div className="flex-1 min-w-0 pt-1">
-                      <div className="flex items-center mb-1.5 flex-wrap gap-2">
-                        <span className="bg-slate-100 text-slate-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-slate-200 font-bold">
-                          商品原图
-                        </span>
-                        <span className="text-xs lg:text-sm font-bold text-slate-800 truncate">
-                          {slotRefs.main?.name ?? (selectedProduct.thumbnail ? 'uploaded_arrival_asset.jpg' : 'new_arrival_01.jpg')}
-                        </span>
-                      </div>
-                      <div className="text-[10px] lg:text-xs text-slate-400 font-mono">
-                        {(() => {
-                          const w = slotRefs.main?.width;
-                          const h = slotRefs.main?.height;
-                          const size = slotRefs.main?.fileSize;
-                          const sizeStr = size != null ? formatFileSize(size) : null;
-                          if (w && h) {
-                            return `尺寸: ${w}×${h}${sizeStr ? ` | 大小: ${sizeStr}` : ''}`;
-                          }
-                          return sizeStr ? `大小: ${sizeStr}` : '尺寸: 1024x1024 | 大小: 2.4 MB';
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. 商品名称 */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs lg:text-sm font-bold text-slate-700" htmlFor="product_name">
-                      商品名称 <span className="text-red-500">*</span>
-                    </label>
-                    <span className="bg-blue-50 text-blue-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-blue-100 font-bold">
-                      AI 已识别
-                    </span>
-                  </div>
-                  <input
-                    className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-medium outline-none transition-shadow"
-                    id="product_name"
-                    type="text"
-                    value={productName}
-                    onChange={(e) => setProductName(e.target.value)}
-                  />
-                </div>
-
-                {/* 3. 核心卖点 */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs lg:text-sm font-bold text-slate-700" htmlFor="selling_points">
-                      核心卖点
-                    </label>
-                    <span className="bg-blue-50 text-blue-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-blue-100 font-bold">
-                      AI 已识别
-                    </span>
-                  </div>
-                  <textarea
-                    className="w-full p-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-medium outline-none resize-y"
-                    id="selling_points"
-                    rows={3}
-                    value={sellingPoints}
-                    onChange={(e) => setSellingPoints(e.target.value)}
-                  />
-                </div>
-
-                {/* 4. 品类 */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs lg:text-sm font-bold text-slate-700" htmlFor="category">
-                      品类 <span className="text-red-500">*</span>
-                    </label>
-                    <span className="bg-blue-50 text-blue-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-blue-100 font-bold">
-                      AI 已识别
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <select
-                      className="block w-full h-10 pl-3 pr-10 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none font-bold cursor-pointer"
-                      id="category"
-                      value={productCategory}
-                      onChange={(e) => setProductCategory(e.target.value as any)}
-                    >
-                      <option value="户外服饰">针织衫/毛衣</option>
-                      <option value="美妆护肤">美妆护肤</option>
-                      <option value="箱包配饰">箱包配饰</option>
-                      <option value="智能硬件">智能硬件与穿戴设备</option>
-                      <option value="珠饰轻奢">珠宝与腕表轻奢</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
-                      <span className="material-symbols-outlined text-sm font-bold">expand_more</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5. 2-column Grid: 颜色与图案, 版型结构 */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs lg:text-sm font-bold text-slate-700">颜色与图案</label>
-                      <span className="bg-blue-50 text-blue-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-blue-100 font-bold">
-                        AI 已识别
-                      </span>
-                    </div>
-                    <input
-                      className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium"
-                      type="text"
-                      value={colorPattern}
-                      onChange={(e) => setColorPattern(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs lg:text-sm font-bold text-slate-700">版型结构</label>
-                      <span className="bg-amber-50 text-amber-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-amber-200 font-bold flex items-center">
-                        <span className="material-symbols-outlined text-[11px] mr-0.5 font-bold">warning_amber</span>
-                        需人工确认
-                      </span>
-                    </div>
-                    <input
-                      className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium"
-                      type="text"
-                      value={fitStructure}
-                      onChange={(e) => setFitStructure(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* 6. 2-column Grid: 面料质感, 关键细节 */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs lg:text-sm font-bold text-slate-700">面料质感</label>
-                      <span className="bg-blue-50 text-blue-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-blue-100 font-bold">
-                        AI 已识别
-                      </span>
-                    </div>
-                    <input
-                      className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium"
-                      type="text"
-                      value={fabricTexture}
-                      onChange={(e) => setFabricTexture(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs lg:text-sm font-bold text-slate-700">关键细节</label>
-                      <span className="bg-amber-50 text-amber-600 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md border border-amber-200 font-bold flex items-center">
-                        <span className="material-symbols-outlined text-[11px] mr-0.5 font-bold">warning_amber</span>
-                        需人工确认
-                      </span>
-                    </div>
-                    <input
-                      className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs lg:text-sm text-slate-800 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium"
-                      type="text"
-                      value={keyDetails}
-                      onChange={(e) => setKeyDetails(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* 7. 不可改变项 (Constraints/Non-negotiables) */}
-                <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center text-xs lg:text-sm font-bold text-red-600">
-                      <span className="material-symbols-outlined text-base mr-1.5 font-bold">gpp_bad</span>
-                      不可改变项 (Constraints/Non-negotiables)
-                    </div>
-                    <span className="bg-blue-100 text-blue-700 text-[9px] lg:text-[10px] px-1.5 py-0.5 rounded-md font-bold">
-                      AI 已识别
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-3">
-                    <label className="inline-flex items-center bg-white border border-slate-200 px-3 py-2 rounded-lg shadow-xs cursor-pointer hover:bg-slate-50 select-none">
-                      <input
-                        type="checkbox"
-                        checked={constrainColor}
-                        onChange={(e) => setConstrainColor(e.target.checked)}
-                        className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
-                      />
-                      <span className="ml-2 text-xs lg:text-sm font-bold text-slate-700">颜色</span>
-                    </label>
-
-                    <label className="inline-flex items-center bg-white border border-slate-200 px-3 py-2 rounded-lg shadow-xs cursor-pointer hover:bg-slate-50 select-none">
-                      <input
-                        type="checkbox"
-                        checked={constrainPattern}
-                        onChange={(e) => setConstrainPattern(e.target.checked)}
-                        className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
-                      />
-                      <span className="ml-2 text-xs lg:text-sm font-bold text-slate-700">图案</span>
-                    </label>
-
-                    <label className="inline-flex items-center bg-white border border-slate-200 px-3 py-2 rounded-lg shadow-xs cursor-pointer hover:bg-slate-50 select-none">
-                      <input
-                        type="checkbox"
-                        checked={constrainLogo}
-                        onChange={(e) => setConstrainLogo(e.target.checked)}
-                        className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
-                      />
-                      <span className="ml-2 text-xs lg:text-sm font-bold text-slate-700">Logo</span>
-                    </label>
-
-                    <label className="inline-flex items-center bg-white border border-slate-200 px-3 py-2 rounded-lg shadow-xs cursor-pointer hover:bg-slate-50 select-none">
-                      <input
-                        type="checkbox"
-                        checked={constrainFit}
-                        onChange={(e) => setConstrainFit(e.target.checked)}
-                        className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
-                      />
-                      <span className="ml-2 text-xs lg:text-sm font-bold text-slate-700">版型</span>
-                    </label>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
+        <section className="space-y-4">
+          <div className="bg-white border border-slate-200 rounded-lg p-5">
+            <p className="text-[11px] font-bold text-primary">模型通道与模型能力</p><h2 className="text-base font-black mt-1">选择可执行的模型</h2>
+            <label className="block mt-4 text-xs font-bold">接入方式<select value={channelId} onChange={(event) => { const next = mockModelChannels.find((item) => item.id === event.target.value)!; setModelWithValidation(next.id, next.models[0].id); }} className="mt-1.5 w-full h-9 rounded border border-slate-200 px-2 text-xs">{mockModelChannels.map((item) => <option key={item.id} value={item.id}>{item.accessType === 'cloud' ? '云端 API' : item.accessType === 'local' ? '本地模型' : '中转站'} · {item.name}</option>)}</select></label>
+            <label className="block mt-3 text-xs font-bold">具体模型<select value={model.id} onChange={(event) => setModelWithValidation(channel.id, event.target.value)} className="mt-1.5 w-full h-9 rounded border border-slate-200 px-2 text-xs">{channel.models.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+            <p className="mt-2 text-[11px] text-slate-500 leading-5">{model.description}</p>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-xs"><div className="p-3 rounded bg-slate-50"><span className="block text-[10px] text-slate-400">健康状态</span><b className={channel.health === 'healthy' ? 'text-emerald-600' : channel.health === 'quota_low' ? 'text-amber-600' : 'text-red-600'}>{channel.health === 'healthy' ? '运行正常' : channel.health === 'quota_low' ? '额度偏低' : '维护中'}</b></div><div className="p-3 rounded bg-slate-50"><span className="block text-[10px] text-slate-400">预估成本</span><b>{(model.cost * count).toFixed(1)} 元</b></div></div>
+            <p className={`mt-2 text-[11px] ${channel.health === 'healthy' ? 'text-slate-500' : 'text-amber-700'}`}>{channel.quotaText}</p>
           </div>
-        </div>
-
-        {/* Column 3: 任务参数 (Right Column) */}
-        <div className="w-[310px] lg:w-[350px] shrink-0 border-l border-slate-200 flex flex-col bg-[#F9FAFB] overflow-y-auto" id="col-generation-params">
-          <TaskParamsPanel
-            group="IMAGE"
-            prefill={imagePrefill}
-            unified={{
-              productName,
-              sellingPoints,
-              keyDetails,
-              constraints: [
-                constrainColor ? '颜色' : '',
-                constrainPattern ? '图案' : '',
-                constrainLogo ? 'Logo' : '',
-                constrainFit ? '版型' : '',
-              ].filter(Boolean),
-            }}
-            aspectRatio={aspectRatio}
-            count={count}
-            onAspectRatioChange={setAspectRatio}
-            onCountChange={setCount}
-            prompt={promptText}
-            onPromptChange={setPromptText}
-            negativePrompt={negativePrompt}
-            onNegativePromptChange={setNegativePrompt}
-            onParamsChange={setTaskParams}
-          />
-          <div className="mt-auto p-4 border-t border-slate-100 flex gap-2">
-            <button onClick={() => setScreen(AppScreen.TASKS)} className="flex-1 py-2 text-sm border border-slate-200 rounded-md">取消</button>
-            <button onClick={handleSubmitTask} className="flex-1 py-2 text-sm text-white rounded-md bg-blue-600">提交任务</button>
+          <div className="bg-white border border-slate-200 rounded-lg p-5">
+            <h3 className="text-sm font-black">输出规格</h3><p className="mt-1 text-[11px] text-slate-400">仅展示业务需要的选择，范围由模型能力决定。</p>
+            <div className="mt-4"><span className="text-xs font-bold">平台规格推荐</span><div className="flex flex-wrap gap-2 mt-2">{PRESETS.map((preset) => <button key={preset.name} onClick={() => applyPreset(preset)} className="px-2 py-1.5 text-[11px] font-bold rounded border border-slate-200 hover:border-primary hover:text-primary">{preset.name}</button>)}</div></div>
+            <label className="block mt-4 text-xs font-bold">比例<select value={ratio} onChange={(event) => setRatio(event.target.value)} className="mt-1.5 w-full h-9 rounded border border-slate-200 px-2 text-xs">{model.capability.ratios.map((item) => <option key={item}>{item}</option>)}</select></label>
+            <div className="grid grid-cols-2 gap-3 mt-3"><label className="text-xs font-bold">张数<select value={count} onChange={(event) => setCount(Number(event.target.value))} className="mt-1.5 w-full h-9 rounded border border-slate-200 px-2 text-xs">{Array.from({ length: model.capability.maxCount }, (_, index) => index + 1).map((item) => <option key={item}>{item}</option>)}</select></label><label className="text-xs font-bold">图片尺寸<select value={resolution} onChange={(event) => setResolution(event.target.value)} className="mt-1.5 w-full h-9 rounded border border-slate-200 px-2 text-xs">{model.capability.resolutions.map((item) => <option key={item}>{item}</option>)}</select></label></div>
+            {!isSupported && <p className="mt-3 p-2 rounded bg-red-50 text-red-700 text-[11px]">当前规格不受所选模型支持：{unsupported.join('、')}</p>}
           </div>
-        </div>
-
+          <div className="bg-white border border-slate-200 rounded-lg p-5"><h3 className="text-sm font-black">审核策略</h3><label className="mt-3 flex items-center justify-between text-xs font-bold">启用评分审核<input checked={reviewEnabled} onChange={(event) => setReviewEnabled(event.target.checked)} type="checkbox" className="accent-primary" /></label><p className="mt-2 text-[11px] text-slate-400">一次完成评分与通过/打回决策；通过后可创建视频。</p></div>
+        </section>
       </main>
 
-      {/* 3. Bottom Action Bar */}
-      <footer className="bg-white border-t border-slate-200 h-16 flex items-center justify-between px-6 shrink-0 z-20 shadow-[0_-2px_10px_rgba(0,0,0,0.02)]" id="create-task-footer">
-        <div className="text-[11px] lg:text-xs text-slate-400 font-mono font-medium flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          已自动保存于 10:42
-        </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => setScreen(AppScreen.TASKS)}
-            className="px-5 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-lg shadow-xs hover:bg-slate-50 focus:outline-none transition-colors text-xs lg:text-sm cursor-pointer"
-          >
-            保存草稿
-          </button>
-          <button
-            onClick={handleSubmitTask}
-            className="px-5 py-2 bg-blue-600 border border-transparent text-white font-bold rounded-lg shadow-xs hover:bg-blue-700 focus:outline-none transition-colors flex items-center text-xs lg:text-sm cursor-pointer active:scale-98"
-          >
-            <span className="material-symbols-outlined mr-1.5 text-sm font-bold">auto_awesome</span>
-            提交生成 (¥1.20)
-          </button>
-        </div>
-      </footer>
-
+      {assistantOpen && <div className="fixed inset-0 z-50 flex justify-end"><button className="absolute inset-0 bg-slate-900/30" onClick={() => setAssistantOpen(false)} aria-label="关闭" /><aside className="relative w-full max-w-sm h-full bg-white shadow-2xl p-6"><div className="flex justify-between items-center"><div><p className="text-[11px] text-primary font-bold">AI 助手</p><h2 className="font-black">本次任务建议</h2></div><button onClick={() => setAssistantOpen(false)} className="material-symbols-outlined">close</button></div><div className="mt-6 p-4 border border-blue-100 bg-blue-50 rounded-lg text-xs leading-6">建议保持主体周围留白，并用自然柔光强化材质层次。该建议只会应用到本次任务级 Prompt，不会修改全局模板。</div><button onClick={applyAssistantSuggestion} className="mt-4 w-full h-9 rounded bg-primary text-white text-xs font-bold">确认应用建议</button></aside></div>}
+      {conflictOpen && pendingChoice && <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><div className="absolute inset-0 bg-slate-900/40" /><div className="relative bg-white rounded-lg w-full max-w-md p-6 shadow-xl"><div className="flex gap-3"><span className="material-symbols-outlined text-amber-500">warning</span><div><h2 className="font-black">模型能力与当前规格冲突</h2><p className="mt-2 text-xs text-slate-500 leading-5">目标模型不支持当前的 {unsupported.length ? unsupported.join('、') : '输出规格'}。确认后将自动切换到该模型首个可用比例、尺寸，并将张数限制在上限内。</p></div></div><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setConflictOpen(false); setPendingChoice(null); }} className="h-8 px-3 text-xs font-bold border border-slate-200 rounded">保留当前选择</button><button onClick={applyCompatibleModel} className="h-8 px-3 text-xs font-bold text-white bg-primary rounded">确认调整</button></div></div></div>}
     </div>
   );
 };
