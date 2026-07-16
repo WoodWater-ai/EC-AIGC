@@ -1,11 +1,11 @@
 # 达芬奇密码 AI 素材工作台 API 契约 V2.3
 
 状态：正式开发依据
-日期：2026-07-15
+日期：2026-07-17
 产品基线：V2.3
 文档职责：前后端接口、DTO、错误码、幂等与交互顺序的唯一 SSOT
 
-本文定义正式产品化一期的 REST API 边界和交互顺序。当前 demo API 仅作参考，正式实现不继续把飞书作为主数据源。任何付费生成必须经过“确认 Prompt -> 选择通道和参数 -> Preflight -> 用户确认执行 -> Submit”。
+本文定义正式产品化一期的 REST API 边界和交互顺序。当前 demo API 仅作参考，正式实现不继续把飞书作为主数据源。阶段 3 使用默认通道 Prompt Profile 初始化 Prompt；阶段 4 选择或切换通道时基于已确认内容方案重新编译。任何付费生成必须经过“确认内容与 Prompt -> 选择通道并加载对应 Prompt/参数 -> Preflight -> 用户确认执行 -> Submit”。
 
 ## 1. 通用约定
 
@@ -78,6 +78,9 @@ ResultReviewStatus = pending | approved | returned | unusable | archived
 | `EXECUTION_CONFIRMATION_REQUIRED` | 409 | 缺少有效的付费执行确认 |
 | `EXECUTION_SNAPSHOT_STALE` | 409 | Prompt、参考图、通道或参数变化，执行快照已失效 |
 | `CHANNEL_CAPABILITY_MISMATCH` | 400 | 请求不符合当前通道能力 Schema |
+| `PROMPT_PROFILE_NOT_FOUND` | 404 | 当前 Provider、Model 与任务 Profile 没有可用 Prompt Profile |
+| `PROMPT_PROFILE_INCOMPATIBLE` | 409 | Prompt Profile 与内容方案、参考资产或能力版本不兼容 |
+| `CONTENT_RECONFIRMATION_REQUIRED` | 409 | 通道能力变化影响镜头、资产或语义，必须返回阶段 3 重新确认 |
 | `CHANNEL_QUEUE_BUSY` | 503 | 通道排队繁忙，任务进入重试等待或由用户决定切换 |
 | `RESULT_SPEC_MISMATCH` | 422 | 实际张数、尺寸、比例或格式与执行快照不一致 |
 | `GENERATION_TIMEOUT` | 504 | 生成超时 |
@@ -434,19 +437,33 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 
 ### `POST /generation-task-groups/{group_id}/prepare-content`
 
-由 Workflow Engine 按子任务调用 `creative-planning` 和 `prompt-composer`，返回每个子任务的内容方案、Prompt 草稿、负面约束、参考图建议和节点运行 ID。该接口不调用生图或生视频 Provider。
+由 Workflow Engine 按子任务调用 `creative-planning` 和 `prompt-composer`，返回每个子任务的内容方案、Prompt 草稿、负面约束、参考图建议和节点运行 ID。视频任务必须读取管理员配置的默认通道，并使用其 `provider + model + task_profile + version` Prompt Profile 初始化 Prompt；该动作不调用生图或生视频 Provider。
 
 ```json
 {
   "data": {
     "tasks": [
       {
-        "task_id": "task_main",
-        "content_plan": {"shot": "正面商品主图"},
-        "prompt_draft": "成年模特展示绿色小爱心缎面睡衣套装……",
+        "task_id": "task_video",
+        "content_plan_snapshot_id": "video_plan_1",
+        "content_plan": {
+          "narrative": "稳定展示商品主体并突出面料质感",
+          "duration_seconds": 8,
+          "shots": [
+            {"order": 1, "focus": "商品主体", "action": "轻微转身", "camera": "缓慢推进"},
+            {"order": 2, "focus": "面料细节", "action": "自然停留", "camera": "近景收束"}
+          ]
+        },
+        "default_channel": {"channel_id": "channel_vidu", "model_id": "vidu-q3"},
+        "prompt_profile": {
+          "profile_id": "profile_vidu_q3_ref_v1",
+          "code": "vidu-q3.reference2video",
+          "version": "1.0.0"
+        },
+        "prompt_draft": "@图片1 作为首要商品主体……",
         "negative_prompt_draft": "禁止改变服装颜色、图案、版型……",
         "reference_assets": [
-          {"asset_id": "asset_product", "role": "product", "position": 1}
+          {"asset_id": "asset_product", "role": "product", "business_role": "attract", "visual_role": "product", "position": 1}
         ],
         "workflow_node_run_ids": ["node_plan_1", "node_prompt_1"]
       }
@@ -480,7 +497,7 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 
 `position` 从 1 开始，并在同一子任务的参考图清单内唯一且连续。服务端按 `position` 升序保存和序列化。修改上下文、Prompt 或参考资产后，既有 Preflight 和执行确认全部失效。
 
-响应返回 `confirmation_batch_id`、逐子任务 `prompt_snapshot_id`、版本和 `next_action: select_channel`。
+响应返回 `confirmation_batch_id`、逐子任务 `content_plan_snapshot_id`、默认通道 `prompt_snapshot_id`、Prompt Profile、版本和 `next_action: select_channel`。视频镜头数量按时长和内容复杂度生成：5s 默认 1 镜头、8s 默认 1-2 镜头、15/16s 默认 2-3 镜头，不固定三段。
 
 ### `GET /model-channels?media_type=image|video&task_profile={profile}`
 
@@ -492,8 +509,10 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
     {
       "channel_id": "channel_agnes_image",
       "channel_name": "Agnes Image",
+      "is_default": true,
       "models": [{"model_id": "agnes-image-2.1-flash", "name": "Agnes Image 2.1 Flash"}],
       "capability_version": "2026-07-13",
+      "prompt_profile": {"code": "agnes-image.main_image", "version": "1.0.0"},
       "health": "healthy",
       "estimated_wait_ms": 30000,
       "recommendation_reason": "支持当前任务组全部 Profile"
@@ -514,6 +533,12 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
     "capability_version": "2026-07-13",
     "media_types": ["image"],
     "task_profiles": ["main_image", "scene_image", "detail_image"],
+    "prompt_profile": {
+      "profile_id": "profile_agnes_main_v1",
+      "code": "agnes-image.main_image",
+      "version": "1.0.0",
+      "compatible": true
+    },
     "parameter_schema": {
       "schema_version": 1,
       "fields": [
@@ -552,6 +577,62 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 
 一期动态字段只允许 `string`、`enum`、`integer`、`number`、`boolean` 类型，并支持 `required/default/options/min/max/step/unit/visible_when`。前端按 `fields` 数组顺序渲染，不允许 Provider 下发任意组件代码。
 
+### `POST /generation-task-groups/{group_id}/compile-prompts-for-channel`
+
+阶段 4 选择或切换通道时调用。服务端读取已确认内容方案和参考资产，按目标 `provider + model + task_profile` Prompt Profile 重新编译逐子任务 Prompt，并返回与阶段 3 已确认 Prompt 的差异。该接口不调用付费 Provider。
+
+```json
+{
+  "model_channel_id": "channel_vidu",
+  "model_id": "vidu-q3",
+  "capability_version": "2026-07-16",
+  "base_confirmation_batch_id": "prompt_batch_3",
+  "idempotency_key": "group_1:channel_vidu:prompt_batch_3"
+}
+```
+
+```json
+{
+  "data": {
+    "compilation_batch_id": "compile_batch_4",
+    "model_channel_id": "channel_vidu",
+    "model_id": "vidu-q3",
+    "capability_version": "2026-07-16",
+    "compatibility_status": "syntax_only",
+    "requires_content_reconfirmation": false,
+    "tasks": [
+      {
+        "task_id": "task_video",
+        "compiled_prompt_snapshot_id": "prompt_snapshot_vidu_4",
+        "prompt_profile": {
+          "profile_id": "profile_vidu_q3_ref_v1",
+          "code": "vidu-q3.reference2video",
+          "version": "1.0.0"
+        },
+        "compiled_prompt": "@图片1 作为商品主体，镜头缓慢推进……",
+        "diff": {
+          "summary": "增加 Vidu 图片强调与规划切镜语法，内容语义未变化",
+          "changed_sections": ["image_binding", "shot_syntax"]
+        },
+        "warnings": []
+      }
+    ],
+    "next_action": "preflight"
+  },
+  "request_id": "req_compile_4"
+}
+```
+
+`compatibility_status` 固定为：
+
+- `unchanged`：通道和 Profile 未变化，可继续阶段 4。
+- `syntax_only`：仅 Provider 语法或图片映射变化，保留阶段 3 内容确认；前端展示差异后继续阶段 4。
+- `content_revision_required`：能力差异影响镜头数量、参考资产、动作幅度或内容语义；不创建可用于 Preflight 的编译快照，返回 `requires_content_reconfirmation=true`，前端必须引导返回阶段 3。
+
+找不到可用 Profile 返回 `PROMPT_PROFILE_NOT_FOUND`；Profile 与能力版本不兼容返回 `PROMPT_PROFILE_INCOMPATIBLE`。前端不得静默沿用上一通道 Prompt。
+
+编译请求按 `group_id + idempotency_key` 幂等。同一键且输入指纹一致时返回原有效编译批次；同一键但通道、模型、能力版本或基础确认批次不同则返回 `CONFLICT`。
+
 ### `POST /generation-task-groups/{group_id}/preflight`
 
 对任务组全部子任务执行无付费预检。服务端为每个子任务创建独立 Preflight 记录，并返回组级汇总；默认 10 分钟过期。
@@ -561,6 +642,7 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
   "model_channel_id": "channel_agnes_image",
   "model_id": "agnes-image-2.1-flash",
   "capability_version": "2026-07-13",
+  "prompt_compilation_batch_id": "compile_batch_agnes_4",
   "parameters": {
     "ratio": "4:5",
     "image_count": 4,
@@ -575,7 +657,7 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 }
 ```
 
-请求中的参数和兜底策略为组级共享配置；Prompt 快照和有序参考资产由服务端读取各子任务的当前确认版本。响应返回逐子任务校验、脱敏请求预览、健康快照、预计成本/耗时和组汇总，不创建 Provider 任务。
+请求中的参数和兜底策略为组级共享配置；Prompt 快照、有序参考资产和最终通道编译结果由服务端读取当前有效版本。视频任务必须具有与目标通道、模型、任务 Profile 和能力版本一致的编译批次。响应返回逐子任务校验、脱敏请求预览、健康快照、预计成本/耗时和组汇总，不创建 Provider 任务。
 
 ```json
 {
@@ -614,7 +696,7 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 }
 ```
 
-任一子任务 `valid = false` 时组级 `valid = false`，`confirm-execution` 必须返回 `GROUP_PREFLIGHT_FAILED`。Preflight 过期、Prompt/参考图/通道/参数/能力版本/兜底策略变化后必须重新执行。
+任一子任务 `valid = false` 时组级 `valid = false`，`confirm-execution` 必须返回 `GROUP_PREFLIGHT_FAILED`。Preflight 过期，或内容方案、最终编译 Prompt、Prompt Profile、参考图、通道、参数、能力版本、兜底策略任一变化后，原 Preflight 必须失效并重新执行。
 
 ### `POST /generation-task-groups/{group_id}/confirm-execution`
 
@@ -654,7 +736,7 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 }
 ```
 
-Submit 必须验证：任务组完整性、全部 Prompt 快照有效、全部 Preflight 未过期且已确认、能力版本未失效、预算允许、幂等键未使用。通道临时不可用时，仅能执行用户已确认的兜底策略，否则拒绝提交并要求重新 Preflight。
+Submit 必须验证：任务组完整性、全部内容方案和 Prompt 快照有效、最终通道编译批次与 Prompt Profile 匹配、全部 Preflight 未过期且已确认、能力版本未失效、预算允许、幂等键有效。重复幂等键返回首次提交结果，不重复创建 attempt 或计费；同一键对应不同确认批次时返回 `GROUP_SUBMIT_CONFLICT`。通道临时不可用时，仅能执行用户已确认且已完成目标 Profile 重新编译与 Preflight 的兜底策略，否则拒绝提交并要求重新 Preflight。
 
 ```json
 {
@@ -802,6 +884,8 @@ Submit 必须验证：任务组完整性、全部 Prompt 快照有效、全部 P
 
 根据已确认商品事实、拍摄内容和参考资产生成任务级 Prompt 预览。比例、分辨率、张数、时长和通道参数由执行配置接口管理，不以 Prompt 预览接口作为提交依据。
 
+该接口用于独立预览和图片模板调试。正式视频五步流程必须使用 `prepare-content` 获取默认通道初始化 Prompt，并在阶段 4 使用 `compile-prompts-for-channel` 获取最终通道编译结果；不得用本接口替代通道 Profile 编译。
+
 ```json
 {
   "product_asset_id": "product_1",
@@ -947,10 +1031,14 @@ Submit 必须验证：任务组完整性、全部 Prompt 快照有效、全部 P
   "context": {
     "context_snapshot_id": "context_1",
     "prompt_template_version_id": "ptv_1",
+    "content_plan_snapshot_id": "video_plan_1",
+    "model_channel_id": "channel_vidu",
+    "model_id": "vidu-q3",
+    "prompt_profile": "vidu-q3.reference2video@1.0.0",
     "reference_assets": [
-      {"asset_id": "asset_product", "role": "product", "position": 1}
+      {"asset_id": "asset_product", "role": "product", "business_role": "attract", "visual_role": "product", "position": 1}
     ],
-    "task_profile": "main_image"
+    "task_profile": "reference2video"
   },
   "options": {
     "locale": "zh-CN",
@@ -978,4 +1066,3 @@ Submit 必须验证：任务组完整性、全部 Prompt 快照有效、全部 P
 ```
 
 约束：Skill 只输出结构化建议，不确认业务数据、不选择通道、不提交 Provider、不自动重试。Workflow Engine 校验输出后写入新快照或节点记录；同一幂等键不得重复产生业务副作用。
-

@@ -14,7 +14,6 @@ import { AssetTransitModal } from './components/AssetTransitModal';
 import { LoginPage } from './components/LoginPage';
 import { ResourceCategoryList } from './components/ResourceCategoryList';
 import { AsyncTaskList } from './components/AsyncTaskList';
-import { ModelLibrary } from './components/ModelLibrary';
 import { BetaPlaceholder } from './components/BetaPlaceholder';
 import { TemplateCenterNew } from './components/beta/TemplateCenterNew';
 import { CreateTaskNew } from './components/beta/CreateTaskNew';
@@ -27,6 +26,7 @@ import { setLoginRequiredHandler } from './api/error';
 import { useServiceQuery } from './api/hooks/useServiceQuery';
 import { userApi, type UserDTO } from './api/modules/user';
 import { isMockRuntime } from './config/runtime';
+import type { AssetResourceItem } from './api/modules/asset';
 
 import {
   mockTasks,
@@ -117,8 +117,9 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<ProductAsset>(mockProducts[0]);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
   const [isTransitOpen, setIsTransitOpen] = useState(false);
-  const [transitSelectionHandler, setTransitSelectionHandler] = useState<((fileResourceIds: number[]) => void) | null>(null);
+  const [transitSelectionHandler, setTransitSelectionHandler] = useState<((assets: AssetResourceItem[]) => void) | null>(null);
   const [transitTargetSlot, setTransitTargetSlot] = useState('main');
+  const [transitMultiSelect, setTransitMultiSelect] = useState(false);
   const [videoEntryContext, setVideoEntryContext] = useState<VideoTaskEntryContext>({ kind: 'blank' });
 
   const navigateToScreen = (screen: AppScreen) => {
@@ -242,8 +243,6 @@ export default function App() {
         );
       case AppScreen.ASYNC_TASKS:
         return <AsyncTaskList />;
-      case AppScreen.MODEL_LIBRARY:
-        return <ModelLibrary />;
       // ===== [v2.0 2026-07-13 F2 落地] 智能模版中心-新 真实页面 =====
       // D3 模版绑 channelType+capability+model,D5 推荐参数 Tab,D7 用此模版按钮
       case AppScreen.TEMPLATE_CENTER_NEW:
@@ -292,6 +291,7 @@ export default function App() {
           openTransit={(onConfirmSelection, targetSlot = 'main') => {
             setTransitSelectionHandler(() => onConfirmSelection);
             setTransitTargetSlot(targetSlot);
+            setTransitMultiSelect(false);
             setIsTransitOpen(true);
           }}
           selectedProduct={selectedProduct}
@@ -301,8 +301,9 @@ export default function App() {
           <AssetTransitModal
             purpose="OTHER"
             targetSlot={transitTargetSlot}
-            onConfirmSelection={(fileResIds) => {
-              transitSelectionHandler?.(fileResIds);
+            multiSelect={transitMultiSelect}
+            onConfirmSelection={(assets) => {
+              transitSelectionHandler?.(assets);
               setTransitSelectionHandler(null);
               setIsTransitOpen(false);
             }}
@@ -320,9 +321,10 @@ export default function App() {
           products={products}
           onAddTask={handleAddTask}
           setScreen={navigateToScreen}
-          openTransit={(onConfirmSelection, targetSlot = 'main') => {
+          openTransit={(onConfirmSelection, targetSlot = 'main', multiSelect = false) => {
             setTransitSelectionHandler(() => onConfirmSelection);
             setTransitTargetSlot(targetSlot);
+            setTransitMultiSelect(multiSelect);
             setIsTransitOpen(true);
           }}
           selectedProduct={selectedProduct}
@@ -333,8 +335,9 @@ export default function App() {
           <AssetTransitModal
             purpose="OTHER"
             targetSlot={transitTargetSlot}
-            onConfirmSelection={(fileResIds) => {
-              transitSelectionHandler?.(fileResIds);
+            multiSelect={transitMultiSelect}
+            onConfirmSelection={(assets) => {
+              transitSelectionHandler?.(assets);
               setTransitSelectionHandler(null);
               setIsTransitOpen(false);
             }}
@@ -391,8 +394,9 @@ export default function App() {
           // 用户在 LoginPage 用新账号重新登录即可
           void logout();
         }}
-        openTransit={() => {
+        openTransit={(targetSlot = 'main') => {
           setTransitSelectionHandler(null);
+          setTransitTargetSlot(targetSlot);
           setIsTransitOpen(true);
         }}
       />
@@ -420,8 +424,8 @@ export default function App() {
         <AssetTransitModal
           purpose="OTHER"
           mode="manager"
-          onConfirmSelection={(fileResIds) => {
-            transitSelectionHandler?.(fileResIds);
+          onConfirmSelection={(assets) => {
+            transitSelectionHandler?.(assets);
             setTransitSelectionHandler(null);
             setIsTransitOpen(false);
           }}

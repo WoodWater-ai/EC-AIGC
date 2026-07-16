@@ -1,0 +1,45 @@
+<h2>视频任务：把“选择模特”收回到参考图</h2>
+<p class="subtitle">目标：用户只做一件事 - 从资源中心选素材，并说明每张素材在生成中承担什么作用。</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">当前：两个入口描述同一件事</div>
+    <div class="mockup-body" style="padding:18px;display:grid;gap:12px">
+      <div style="border:1px solid #d7dee8;border-radius:8px;padding:12px"><strong>输入素材</strong><br><span style="color:#64748b;font-size:13px">首帧图 / 风格图 / 场景图 / 动作图</span></div>
+      <div style="border:1px solid #d7dee8;border-radius:8px;padding:12px"><strong>模特上下文</strong><br><span style="color:#64748b;font-size:13px">另选模特资料，最终又拼进 Prompt</span></div>
+      <div style="padding:10px 12px;background:#fff4e5;color:#9a5b00;border-radius:8px;font-size:13px">问题：一张模特图既可能在参考图中出现，又可能在“模特选择”中出现，角色和优先级不清晰。</div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">推荐：一个素材池 + 每张图一个角色</div>
+    <div class="mockup-body" style="padding:18px;display:grid;gap:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><strong>输入素材</strong><button class="mock-button">从资源中心选择</button></div>
+      <div style="display:grid;grid-template-columns:68px 1fr 112px 26px;align-items:center;gap:10px;border:1px solid #d7dee8;border-radius:8px;padding:8px;font-size:13px"><div class="placeholder" style="height:46px">图</div><span>商品白底图</span><select><option>首帧/主体</option></select><span>×</span></div>
+      <div style="display:grid;grid-template-columns:68px 1fr 112px 26px;align-items:center;gap:10px;border:1px solid #d7dee8;border-radius:8px;padding:8px;font-size:13px"><div class="placeholder" style="height:46px">图</div><span>模特参考图</span><select><option>模特</option></select><span>×</span></div>
+      <div style="display:grid;grid-template-columns:68px 1fr 112px 26px;align-items:center;gap:10px;border:1px solid #d7dee8;border-radius:8px;padding:8px;font-size:13px"><div class="placeholder" style="height:46px">图</div><span>街景氛围图</span><select><option>场景</option></select><span>×</span></div>
+      <div style="padding:10px 12px;background:#edf8f2;color:#176b43;border-radius:8px;font-size:13px">每张素材只出现一次。Prompt、分析、模型参考图请求都读取同一份有序角色清单。</div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:26px">
+  <div class="label">需要确认的唯一规则</div>
+  <h3>参考生视频中的“首帧”如何处理？</h3>
+  <p class="subtitle">推荐始终保留一个“首帧/主体”角色：它锁定视频开场的商品和构图；其他图片只做参考。这样输入含义稳定，也符合大多数视频模型能力。</p>
+  <div class="options">
+    <div class="option" data-choice="required-first-frame" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content"><h3>首帧必选（推荐）</h3><p>所有参考生视频至少选一张并标为“首帧/主体”；其余图标记商品、模特、风格、场景或动作。</p></div>
+    </div>
+    <div class="option" data-choice="role-only" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content"><h3>只选角色，无必选首帧</h3><p>更自由，但模型无法明确哪个素材负责开场构图，失败率和结果不确定性更高。</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:26px">
+  <div class="label">爆款复刻</div>
+  <h3>源视频也应是资源中心资产</h3>
+  <p class="subtitle">只保留“从资源中心选择视频”入口。选择后显示封面、时长、来源、授权状态和替换素材；不再提供本地上传或 URL 输入，避免未归档素材绕过权限、分析和复用记录。</p>
+</div>

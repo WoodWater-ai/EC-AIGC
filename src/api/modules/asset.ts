@@ -48,6 +48,11 @@ export interface AssetResourceItem {
   tags?: string;
   uploadUserId: number;
   productId?: number;
+  /**
+   * Mock/API adapter 的商品资产主键。真实接口接入时由 productId 归一化得到；
+   * mock 商品资产使用字符串主键，不能再用文件名反推商品归属。
+   */
+  productAssetId?: string;
   recognitionId?: number;
   /** 关联 file_resource.id(Spec-B 主路径) */
   fileResourceId?: number;

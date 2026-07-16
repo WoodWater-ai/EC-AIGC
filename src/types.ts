@@ -11,7 +11,6 @@ export enum AppScreen {
   ASSET_CATEGORY = 'ASSET_CATEGORY',
   /** [v1.2 2026-07-11] Vidu 接入 — 通道异步任务列表 */
   ASYNC_TASKS = 'ASYNC_TASKS',
-  MODEL_LIBRARY = 'MODEL_LIBRARY',
   /** 智能模板中心新流程 */
   TEMPLATE_CENTER_NEW = 'TEMPLATE_CENTER_NEW',
   /** 新建任务新流程 */
@@ -78,10 +77,39 @@ export type VideoAssetRole = 'first_frame' | 'style' | 'action' | 'scene' | 'pro
 
 export interface VideoInputAsset {
   id: string;
+  fileResourceId?: number;
+  productAssetId?: string;
   name: string;
   url: string;
+  thumbnailUrl: string;
   source: string;
   role: VideoAssetRole;
+  position: number;
+}
+
+export interface VideoSourceAsset {
+  id: string;
+  fileResourceId?: number;
+  name: string;
+  url: string;
+  thumbnailUrl: string;
+  source: string;
+  durationSec?: number;
+  licenseText: string;
+  temporary?: boolean;
+  importStatus?: 'importing' | 'ready' | 'failed';
+  originalUrl?: string;
+}
+
+/**
+ * 视频任务提交时保留的输入快照。链接导入的视频可标识为 temporary，
+ * 以便任务详情可追溯，而不会被误认为资源中心中的正式素材。
+ */
+export interface VideoTaskInputSnapshot {
+  firstFrame?: VideoInputAsset;
+  referenceImages?: VideoInputAsset[];
+  sourceVideo?: VideoSourceAsset;
+  replacementImages?: VideoInputAsset[];
 }
 
 export interface TrendingReplicateAnalysis {
@@ -120,11 +148,17 @@ export interface GenerationTask {
   errorMsg?: string;
   feedback?: string;
   modelChannel?: string;
+  videoInputs?: VideoTaskInputSnapshot;
   params?: {
     ratio?: string;
+    count?: number;
     model?: string;
     steps?: number;
     guidance?: number;
+    duration?: number;
+    resolution?: string;
+    motion?: '轻微' | '适中' | '强烈';
+    mode?: VideoTaskMode;
     prompt?: string;
     negativePrompt?: string;
   };
@@ -175,6 +209,7 @@ export interface MockModelDefinition {
   id: string;
   name: string;
   description: string;
+  mediaTypes: Array<'image' | 'video'>;
   capability: MockModelCapability;
   cost: number;
 }

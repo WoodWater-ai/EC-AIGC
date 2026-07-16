@@ -48,8 +48,16 @@ const SLOT_TAGS: Record<string, string | undefined> = {
   'reference-style': '风格参考',
   'reference-scene': '场景参考',
   'reference-pose': '姿势参考',
-  'video-reference': '参考',
+  'reference-model': '模特',
+  'model-library': '模特',
   model: '模特',
+};
+
+const SLOT_ASSET_KINDS: Record<string, AssetResourceItem['assetKind'] | undefined> = {
+  'video-first-frame': 'IMAGE',
+  'video-reference': 'IMAGE',
+  'trending-source-video': 'VIDEO',
+  'trending-replacement': 'IMAGE',
 };
 
 const SLOT_LABELS: Record<string, string> = {
@@ -60,7 +68,12 @@ const SLOT_LABELS: Record<string, string> = {
   'reference-style': '风格参考图',
   'reference-scene': '场景参考图',
   'reference-pose': '姿势参考图',
+  'reference-model': '模特参考图',
+  'model-library': '模特素材',
   'video-reference': '视频参考图',
+  'video-first-frame': '视频首帧图',
+  'trending-source-video': '复刻源视频',
+  'trending-replacement': '复刻替换素材',
   model: '模特素材',
 };
 
@@ -149,17 +162,19 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     if (isMockRuntime) {
       const keyword = searchQuery.trim().toLowerCase();
       const slotTag = SLOT_TAGS[targetSlot];
+      const assetKind = SLOT_ASSET_KINDS[targetSlot];
       setAssets(mockAssetResources.filter((asset) => {
         const matchesKeyword = !keyword || `${asset.name} ${asset.tags ?? ''}`.toLowerCase().includes(keyword);
         const matchesCategory = selectedCategoryId === null || asset.categoryIds.includes(selectedCategoryId);
         const matchesSlot = !slotTag || asset.tags?.includes(slotTag);
-        return matchesKeyword && matchesCategory && matchesSlot;
+        const matchesKind = !assetKind || asset.assetKind === assetKind;
+        return matchesKeyword && matchesCategory && matchesSlot && matchesKind;
       }));
       setLoading(false);
       return;
     }
     try {
-      const query = { ...buildQuery(), keyword: searchQuery || undefined };
+      const query = { ...buildQuery(), keyword: searchQuery || undefined, assetKind: SLOT_ASSET_KINDS[targetSlot] };
       const page = await assetApi.page(query);
       setAssets(page.list);
     } catch (err) {
@@ -178,6 +193,10 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
   useEffect(() => {
     setSelectedAssetIds([]);
+  }, [targetSlot]);
+
+  useEffect(() => {
+    setSelectedCategoryId(targetSlot === 'model-library' ? 30 : null);
   }, [targetSlot]);
 
   /**

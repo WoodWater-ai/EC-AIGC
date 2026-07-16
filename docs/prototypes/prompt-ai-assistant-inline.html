@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>任务级 Prompt 副本 - AI 解析原型</title>
+    <style>
+      :root { --blue:#1769e0; --blue-50:#eef6ff; --blue-100:#cfe5ff; --ink:#182b48; --muted:#7890af; --line:#d5e1f0; --soft:#f7faff; --green:#17805d; --amber:#b86914; }
+      * { box-sizing: border-box; }
+      body { margin:0; min-width:1050px; background:#f4f7fb; color:var(--ink); font-family:"Noto Sans SC","PingFang SC",sans-serif; }
+      .frame { width:min(1160px,calc(100vw - 80px)); margin:44px auto; }
+      .workspace-hint { color:#8aa0bd; font-size:12px; margin-bottom:13px; }
+      .prompt-card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:26px; box-shadow:0 4px 18px rgba(55,89,130,.035); }
+      .heading { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; }
+      .eyebrow { margin:0 0 3px; color:var(--blue); font-size:15px; font-weight:800; }
+      h1 { margin:0; font-size:24px; letter-spacing:0; line-height:1.25; }
+      .ai-button { height:44px; padding:0 16px; display:flex; align-items:center; gap:8px; border:1px solid #9dceff; background:var(--blue-50); color:var(--blue); border-radius:10px; font-weight:800; font-size:15px; }
+      .ai-button:hover { background:#e2f0ff; }
+      .sparkle { font-size:20px; line-height:1; }
+      .original-prompts { margin-top:23px; display:grid; gap:10px; }
+      .prompt-block { border:1px solid var(--line); border-radius:10px; overflow:hidden; transition:.2s; }
+      .prompt-block.applied { border-color:#91c9b6; }
+      .prompt-block header { padding:13px 16px; display:flex; justify-content:space-between; background:#f8fafe; font-size:14px; font-weight:800; }
+      .source { color:#89a0c0; font-weight:500; font-size:12px; }
+      textarea { width:100%; min-height:96px; border:0; display:block; resize:vertical; padding:16px; color:#243a59; font:15px/1.75 "Noto Sans SC","PingFang SC",sans-serif; outline:none; }
+      .ai-status { display:none; align-items:center; gap:9px; margin-top:16px; padding:10px 12px; border:1px solid #d8e9fb; background:#f4f9ff; color:#47719f; border-radius:7px; font-size:12px; }
+      .ai-status.visible { display:flex; }
+      .ai-status.done { color:var(--green); border-color:#b9dfd0; background:#f3fbf7; }
+      .spinner { width:15px; height:15px; border:2px solid #b8d7f6; border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
+      .ai-status.done .spinner { border-color:#9bd4bd; border-top-color:var(--green); animation:none; }
+      .facts-panel { margin-top:18px; padding:14px; border:1px solid #d9e6f2; border-radius:9px; background:#fbfdff; }
+      .facts-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+      .facts-heading b { font-size:13px; }
+      .facts-heading p { margin:3px 0 0; color:#7b8ea9; font-size:11px; }
+      .fact-status { display:flex; align-items:center; gap:7px; color:var(--amber); background:#fff7e8; border:1px solid #f0d5a8; padding:5px 7px; border-radius:5px; font-size:11px; white-space:nowrap; }
+      .fact-status.confirmed { color:var(--green); border-color:#b9dfd0; background:#f3fbf7; }
+      .facts-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:11px; }
+      .fact { min-height:59px; padding:8px 9px; border:1px solid #d9e6f2; border-radius:6px; background:#fff; }
+      .fact-label { display:block; color:#8396b0; font-size:10px; margin-bottom:4px; }
+      .fact input { width:100%; border:0; padding:0; outline:0; color:#243a59; font:700 12px/1.45 "Noto Sans SC",sans-serif; background:transparent; }
+      .facts-actions { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:10px; }
+      .facts-actions span { color:#7b8ea9; font-size:11px; }
+      .confirm-facts { height:30px; border:1px solid #b8cee5; background:white; color:#37658f; border-radius:5px; padding:0 10px; font-size:11px; font-weight:700; }
+      .confirm-facts:hover { background:#f2f8ff; }
+      .legend { margin:14px 0 0; color:#7e91ac; font-size:11px; }
+      @keyframes spin { to { transform:rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <main class="frame">
+      <div class="workspace-hint">新建图片任务 / 中间配置栏</div>
+      <section class="prompt-card">
+        <div class="heading">
+          <div><p class="eyebrow">任务级 Prompt 副本</p><h1>每种图片各自编辑</h1></div>
+          <button class="ai-button" id="open-assistant"><span class="sparkle">✦</span> AI 助手</button>
+        </div>
+
+        <div class="ai-status" id="ai-status" aria-live="polite"><span class="spinner"></span><span id="status-text">正在读取商品素材、提取商品事实并初始化任务级 Prompt…</span></div>
+
+        <section class="facts-panel" aria-label="商品事实确认">
+          <div class="facts-heading"><div><b>商品事实确认</b><p>随任务常驻保存，是 AI 推荐与 Prompt 初始化的事实依据。</p></div><span class="fact-status" id="fact-status">● 待确认</span></div>
+          <div class="facts-grid">
+            <label class="fact"><span class="fact-label">商品名称</span><input class="fact-input" placeholder="待 AI 解析" /></label>
+            <label class="fact"><span class="fact-label">核心卖点</span><input class="fact-input" placeholder="待 AI 解析" /></label>
+            <label class="fact"><span class="fact-label">品类</span><input class="fact-input" placeholder="待 AI 解析" /></label>
+            <label class="fact"><span class="fact-label">颜色</span><input class="fact-input" placeholder="待 AI 解析" /></label>
+            <label class="fact"><span class="fact-label">图案 / 质感</span><input class="fact-input" placeholder="待 AI 解析" /></label>
+            <label class="fact"><span class="fact-label">版型 / 结构</span><input class="fact-input" placeholder="待 AI 解析" /></label>
+          </div>
+          <div class="facts-actions"><span>修改事实不会自动覆盖下方 Prompt；需要重写时点击 AI 助手。</span><button class="confirm-facts" id="confirm-facts">确认商品事实</button></div>
+        </section>
+
+        <div class="original-prompts">
+          <article class="prompt-block" id="main-prompt"><header><span>商品主图</span><span class="source">来源：商品商业展示模板 v2.1</span></header><textarea id="main-text">纯净商品主图，商品主体完整、边缘清晰，保留品牌与材质细节。商品：MW Series 7 智联运动手表。风格：甜美网红风（Sweet Influencer）；场景：自然影棚；动作/姿势：自然正面；模特：林薇；负面约束：模糊、商品漂移、错误文字、材质失真。</textarea></article>
+          <article class="prompt-block" id="scene-prompt"><header><span>场景图</span><span class="source">来源：商品商业展示模板 v2.1</span></header><textarea id="scene-text">都市运动场景，手表为视觉焦点，保留表盘与腕带的原始结构和色彩，环境光自然克制，预留商品卖点文案空间。</textarea></article>
+          <article class="prompt-block" id="detail-prompt"><header><span>细节图</span><span class="source">来源：商品商业展示模板 v2.1</span></header><textarea id="detail-text">近距离展示金属边框、数字表盘与硅胶腕带的材质细节，柔和侧光，结构清晰，不添加虚构的功能标识或文字。</textarea></article>
+        </div>
+        <p class="legend">点击 AI 助手后，系统在后台执行商品特征识别和 Prompt 编排，并直接写入当前任务级副本；写入后可继续逐项编辑。</p>
+      </section>
+    </main>
+    <script>
+      const open = document.getElementById('open-assistant');
+      const status = document.getElementById('ai-status');
+      const statusText = document.getElementById('status-text');
+      const factStatus = document.getElementById('fact-status');
+      const confirmFacts = document.getElementById('confirm-facts');
+      let timer;
+
+      function markFactsPending() {
+        factStatus.className = 'fact-status'; factStatus.textContent = '● 待确认';
+      }
+
+      open.addEventListener('click', () => {
+        clearTimeout(timer); markFactsPending(); open.disabled = true; open.innerHTML = '<span class="sparkle">✦</span> AI 解析中'; status.className = 'ai-status visible'; statusText.textContent = '正在提取商品名称、卖点、品类、颜色、图案和结构，并生成三个任务的推荐 Prompt…';
+        timer = setTimeout(() => {
+        const factValues = ['MW Series 7 智联运动手表', '轻薄表身 · 运动监测 · 长续航', '智能穿戴 / 运动手表', '曜石黑 · 深灰表带', '极简数字表盘 · 金属质感', '圆角矩形表盘 · 硅胶腕带'];
+        document.querySelectorAll('.fact-input').forEach((input, index) => { input.value = factValues[index]; });
+        document.getElementById('main-text').value = '纯净电商主图，完整展示 MW Series 7 智联运动手表，曜石黑圆角矩形表盘与深灰硅胶腕带，正面自然平视构图，柔和影棚光，保留金属边缘、屏幕与材质细节；避免模糊、商品漂移、错误文字、材质失真。';
+        document.getElementById('scene-text').value = '城市晨跑后的轻运动场景，MW Series 7 智联运动手表为视觉焦点，曜石黑表盘和深灰腕带保持真实色彩，利用自然侧光强化金属边缘与轻薄结构，为卖点文案预留干净空间。';
+        document.getElementById('detail-text').value = '手表金属边框、圆角矩形数字表盘与深灰硅胶腕带的近景细节，柔和侧光，真实材质纹理，表盘读数清晰但不生成虚构文案或功能标识。';
+        ['main-prompt', 'scene-prompt', 'detail-prompt'].forEach((id) => document.getElementById(id).classList.add('applied'));
+        status.className = 'ai-status visible done'; statusText.textContent = '已根据商品事实写入 3 个任务级 Prompt。现在可直接在下方文本框中二次编辑。'; open.disabled = false; open.innerHTML = '<span class="sparkle">✦</span> 重新生成';
+        }, 850);
+      });
+      document.querySelectorAll('.fact-input').forEach((input) => input.addEventListener('input', markFactsPending));
+      confirmFacts.addEventListener('click', () => { factStatus.className = 'fact-status confirmed'; factStatus.textContent = '✓ 已确认'; });
+    </script>
+  </body>
+</html>

@@ -1,7 +1,7 @@
 # 达芬奇密码 AI 素材工作台后端技术规范 V2.3
 
 状态：正式开发依据
-日期：2026-07-15
+日期：2026-07-17
 产品基线：V2.3
 文档职责：后端架构、数据语义、事务、队列、Skills 编排和 Provider 接入的唯一技术规范
 主要读者：后端/全栈工程师、算法工程师、测试工程师
@@ -44,6 +44,7 @@
 | Task Group Service | 创建任务组和子任务、组内顺序、完整性校验、聚合状态 |
 | Workflow Engine | 状态转换、阶段确认、快照失效、队列、轮询、重试、通知 |
 | Content Orchestrator | 编排 `visual-understanding`、`creative-planning`、`prompt-composer` |
+| Content Registry | 管理通道共性模板、`channel_prompt_profiles`、Provider/Model/Profile 映射和不可变版本 |
 | Generation Gateway | 能力 Schema、Preflight、请求序列化、Provider Adapter、成本与健康度 |
 | Result Service | 图片/视频结果持久化、规格校验、Checksum、来源血缘 |
 | Review Service | 两段审核、结果结论、任务归档和打回 |
@@ -58,7 +59,8 @@ Provider Adapter 只处理外部协议差异，不读取页面状态、不决定
 - 新增 `generation_task_groups`、`generation_preflights`、`model_channel_health_snapshots`、`workflow_node_runs`。
 - `generation_tasks` 增加任务组、顺序、媒体类型和 Profile。
 - 将图片专用结果迁移为 `generation_results`，统一图片和视频。
-- Prompt、Preflight 和执行快照使用批次 ID 关联同一组确认。
+- 新增 `channel_prompt_profiles` 和 `video_content_plan_snapshots`，分离通道共性内容与 Provider 专有 Prompt。
+- Prompt 编译、Preflight 和执行快照使用批次 ID 关联同一组确认。
 - `generation_attempts.provider_task_id` 在 Provider 接受异步任务后立即持久化。
 
 必须具备数据库约束：
@@ -84,20 +86,34 @@ API 以 `API-CONTRACT-V2.3.md` 为唯一请求响应依据，固定前缀 `/api/
 | 上下文确认 | `POST /{group_id}/confirm-context` | 组级不可变快照 |
 | 内容准备 | `POST /{group_id}/prepare-content` | 每个子任务的内容和 Prompt 草稿 |
 | Prompt 确认 | `POST /{group_id}/confirm-prompts` | 同批次独立 Prompt 快照 |
+| 通道 Prompt 编译 | `POST /{group_id}/compile-prompts-for-channel` | 按最终通道/Profile 编译、返回差异和兼容性，不调用付费 Provider |
 | Preflight | `POST /{group_id}/preflight` | 逐任务记录和组汇总，不调用付费 Provider |
 | 执行确认 | `POST /{group_id}/confirm-execution` | 同批次独立执行快照 |
 | Submit | `POST /{group_id}/submit` | 原子创建 attempts 并全量入队 |
 
 所有 `{group_id}` 路径实际位于 `/generation-task-groups/{group_id}` 下。
 
+#### 4.1A 视频 Prompt 编译
+
+阶段 3 的 `prepare-content` 先生成与通道无关的 `video_content_plan_snapshot`，再读取管理员配置的默认通道和 `channel_prompt_profile` 初始化 Prompt。阶段 4 选择或切换通道时，`compile-prompts-for-channel` 必须：
+
+1. 读取已确认内容方案、商品快照、模板版本和有序参考资产，不从页面临时字段重新拼装语义。
+2. 解析 `provider + model + task_profile + version` 对应的启用 Profile，并调用 `prompt-composer` 编译。
+3. 返回与阶段 3 Prompt 的结构化差异，以及 `unchanged`、`syntax_only` 或 `content_revision_required` 兼容性。
+4. `syntax_only` 创建新的通道编译 Prompt 快照，保留阶段 3 内容确认；`content_revision_required` 不创建可执行快照，并要求返回阶段 3。
+5. Vidu Q3 的图片强调、规划切镜、自动切镜、按秒描述、宫格叙事和音画同步规则只能来自 Vidu Profile，禁止写入通道共性模板。
+6. 镜头结构按时长和内容复杂度生成：5s 默认 1 镜头、8s 默认 1-2 镜头、15/16s 默认 2-3 镜头，不固定三段。
+
+编译接口不决定用户最终通道、不调用 Provider、不确认付费执行。切换兜底通道时也必须为新通道重新编译，并创建新的生成尝试。
+
 #### 4.2 Preflight
 
 Preflight 必须执行：
 
-1. Prompt 快照存在且未失效。
+1. Prompt 快照存在且未失效；视频任务的最终通道编译批次与通道、模型、任务 Profile 和能力版本一致。
 2. 参考图角色、位置、数量、格式、大小和总请求体符合能力约束。
 3. 参数字段、必填、类型、范围、枚举和条件依赖符合能力 Schema。
-4. 通道、模型和 Profile 兼容，能力版本仍启用。
+4. 通道、模型和 Prompt Profile 兼容，能力版本仍启用；`content_revision_required` 不得进入 Preflight。
 5. Provider 请求可以完成脱敏序列化，但不发送生成请求。
 6. 预算、成本规则、队列、健康度、限流和兜底策略有效。
 
@@ -105,7 +121,7 @@ Preflight 必须执行：
 
 #### 4.3 执行确认与 Submit
 
-`confirm-execution` 只消费未过期且组内全部有效的 Preflight 批次，不调用 Provider。执行快照冻结 Prompt、参考图顺序、通道、模型、能力版本、参数、成本、健康快照和兜底策略。
+`confirm-execution` 只消费未过期且组内全部有效的 Preflight 批次，不调用 Provider。执行快照冻结内容方案、最终通道编译 Prompt、Prompt Profile、参考图顺序、通道、模型、能力版本、参数、成本、健康快照和兜底策略。
 
 Submit 再次验证：
 
@@ -547,7 +563,7 @@ P0 轻量版虚拟/授权模特参考库。不支持任意联网抓取真人图�
 | --- | --- | --- | --- |
 | `id` | uuid | 是 | 模板 ID |
 | `name` | varchar | 是 | 模板名称 |
-| `template_type` | enum | 是 | `task_profile`、`style`、`scene`、`platform_spec`、`negative_constraint` |
+| `template_type` | enum | 是 | `image_task`、`style_scene`、`video_prompt`、`platform_spec`、`negative_constraint` |
 | `applicable_task_profiles` | json/array | 否 | 适用任务 Profile |
 | `applicable_categories` | json/array | 否 | 适用品类 |
 | `prompt_body` | text | 是 | Prompt 正文，支持变量 |
@@ -561,6 +577,29 @@ P0 轻量版虚拟/授权模特参考库。不支持任意联网抓取真人图�
 | `stats` | json | 否 | 使用次数、通过率、平均分、平均成本 |
 
 模板修改时建议新增版本记录，历史任务绑定创建时版本。
+
+#### 4.8A `channel_prompt_profiles`
+
+Prompt Profile 是视频 Prompt 模板的内部版本/映射，不新增模板中心 Tab。它只保存 Provider 专有编译规则，不保存用户任务状态，也不承担模型通道选择。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | uuid | 是 | Profile ID |
+| `code` | varchar | 是 | 如 `vidu-q3.reference2video` |
+| `provider` | varchar | 是 | Provider 标识 |
+| `model_id` | varchar | 是 | Provider Model ID |
+| `task_profile` | enum | 是 | `img2video` 或 `reference2video`；图片 Profile 可按后续需要扩展 |
+| `version` | varchar | 是 | 不可变版本，如 `1.0.0` |
+| `prompt_template_id` | uuid | 否 | 关联通道共性视频 Prompt 模板 |
+| `syntax_rules` | json | 是 | 图片强调、镜头描述、专有关键字等白名单规则 |
+| `image_mapping_rules` | json | 是 | 业务/视觉角色和 position 到 Provider 图片引用的映射 |
+| `audio_rules` | json | 否 | 音频开关、音画同步和不支持能力说明 |
+| `compatibility_rules` | json | 是 | 时长、镜头、参考图、语义和能力版本兼容条件 |
+| `compiler_config` | json | 是 | 版本化编译配置；不得包含密钥或可执行前端代码 |
+| `enabled` | boolean | 是 | 是否允许用于新编译 |
+| `created_at` / `updated_at` | datetime | 是 | 审计时间 |
+
+唯一约束：`provider + model_id + task_profile + version`。启用新版本不覆盖历史 Profile；历史 Prompt 和执行快照继续引用原版本。
 
 #### 4.9 `model_channels`
 
@@ -597,6 +636,27 @@ P0 轻量版虚拟/授权模特参考库。不支持任意联网抓取真人图�
 | `confirmed_at` | datetime | 是 | 确认时间 |
 | `invalidated_at` | datetime | 否 | 上游内容变化后的失效时间 |
 
+#### 4.10A `video_content_plan_snapshots`
+
+保存阶段 3 用户确认的通道共性视频语义，禁止混入 Vidu 或其他 Provider 专有语法。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | uuid | 是 | 内容方案快照 ID |
+| `generation_task_id` | uuid | 是 | 关联单视频子任务 |
+| `context_snapshot_id` | uuid | 是 | 已确认来源事实快照 |
+| `template_version` | varchar | 否 | 视频 Prompt 模板版本 |
+| `narrative` | text | 是 | 主叙事与单一视觉目标 |
+| `shot_plan` | json/array | 是 | 动态镜头；每项含 order、focus、action、camera 和建议时段 |
+| `reference_bindings` | json/array | 是 | `{asset_id, business_role, visual_role, position}` |
+| `consistency_constraints` | json | 是 | 商品保真、人物一致性和运动风险约束 |
+| `duration_seconds` | int | 是 | 生成镜头结构所依据的目标时长 |
+| `version` | int | 是 | 任务内版本 |
+| `confirmed_by` / `confirmed_at` | uuid/datetime | 是 | 阶段 3 确认信息 |
+| `invalidated_at` | datetime | 否 | 来源、镜头、资产或语义变化后的失效时间 |
+
+镜头数量默认规则：5s 为 1 镜头，8s 为 1-2 镜头，15/16s 为 2-3 镜头；内容复杂度允许在范围内调整，不允许写死三段。
+
 #### 4.11 `task_prompt_snapshots`
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -604,11 +664,22 @@ P0 轻量版虚拟/授权模特参考库。不支持任意联网抓取真人图�
 | `id` | uuid | 是 | Prompt 快照 ID |
 | `generation_task_id` | uuid | 是 | 关联任务 |
 | `confirmation_batch_id` | uuid | 是 | 同一任务组本轮 Prompt 确认批次 |
-| `prompt` | text | 是 | 用户确认的最终 Prompt |
+| `compilation_batch_id` | uuid | 否 | 阶段 4 同一通道编译批次；阶段 3 初始快照可为空 |
+| `snapshot_kind` | enum | 是 | `default_channel_initial`、`user_confirmed`、`channel_compiled` |
+| `content_plan_snapshot_id` | uuid | 否 | 视频任务关联的通道共性内容方案 |
+| `base_prompt_snapshot_id` | uuid | 否 | 通道编译所比较的阶段 3 Prompt 快照 |
+| `model_channel_id` | uuid | 否 | 初始化或编译使用的通道 |
+| `model_id` | varchar | 否 | 初始化或编译使用的模型 |
+| `prompt_profile_id` | uuid | 否 | 使用的 Prompt Profile |
+| `prompt_profile_version` | varchar | 否 | Profile 不可变版本 |
+| `prompt` | text | 是 | 用户确认或按最终通道编译的 Prompt |
 | `negative_prompt` | text | 否 | 用户确认的负面约束 |
 | `template_version` | varchar | 否 | 模板版本 |
 | `source_snapshot_ids` | json/array | 是 | 商品、参考资产等上游快照 |
 | `variables` | json | 否 | 实际变量值和来源 |
+| `compile_fingerprint` | varchar | 否 | 内容方案、Profile、参考资产和编译器版本指纹 |
+| `compatibility_status` | enum | 否 | `unchanged`、`syntax_only`、`content_revision_required` |
+| `diff_summary` | json | 否 | 与基础 Prompt 的结构化差异 |
 | `version` | int | 是 | 任务内版本 |
 | `confirmed_by` | uuid | 是 | 确认人 |
 | `confirmed_at` | datetime | 是 | 确认时间 |
@@ -625,6 +696,9 @@ Preflight 是无付费预检记录。任务组 Preflight 为每个子任务创�
 | `task_group_id` | uuid | 是 | 关联任务组 |
 | `generation_task_id` | uuid | 是 | 关联子任务 |
 | `prompt_snapshot_id` | uuid | 是 | 已确认 Prompt 快照 |
+| `prompt_compilation_batch_id` | uuid | 否 | 视频任务必填；必须对应最终通道的有效编译批次 |
+| `prompt_profile_id` | uuid | 否 | 视频任务必填；本轮编译实际使用的不可变 Profile |
+| `prompt_profile_version` | varchar | 否 | 视频任务必填；Profile 版本 |
 | `model_channel_id` | uuid | 是 | 用户选择的主通道 |
 | `model_id` | varchar | 是 | 用户选择的模型 |
 | `capability_version` | varchar | 是 | 能力 Schema 版本 |
@@ -632,7 +706,7 @@ Preflight 是无付费预检记录。任务组 Preflight 为每个子任务创�
 | `reference_assets` | json | 是 | `{asset_id, role, position}` 有序清单 |
 | `fallback_policy` | json | 是 | 待确认的重试、切换或终止策略 |
 | `request_preview` | json | 是 | 脱敏请求摘要 |
-| `request_fingerprint` | varchar | 是 | Prompt、参考图、通道、参数和兜底策略指纹 |
+| `request_fingerprint` | varchar | 是 | 内容方案、最终编译 Prompt、Profile、参考图、通道、参数和兜底策略指纹 |
 | `validation_result` | json | 是 | 能力、素材、预算、请求大小和序列化校验 |
 | `health_snapshot_id` | uuid | 是 | 预检时通道健康快照 |
 | `estimated_cost` | decimal | 否 | 子任务预计成本 |
@@ -641,7 +715,9 @@ Preflight 是无付费预检记录。任务组 Preflight 为每个子任务创�
 | `status` | enum | 是 | `valid`、`invalid`、`expired`、`consumed` |
 | `expires_at` | datetime | 是 | 默认创建后 10 分钟过期 |
 
-索引建议：`preflight_batch_id`、`task_group_id`、`generation_task_id`、`status`、`expires_at`。
+视频任务只有在编译批次的 `compatibility_status` 为 `unchanged` 或 `syntax_only`，且 Profile、通道、模型、任务 Profile 和能力版本全部匹配时，才允许创建有效 Preflight。`content_revision_required`、Profile 缺失或 Profile 不兼容必须生成无效记录并阻断整组。
+
+索引建议：`preflight_batch_id`、`prompt_compilation_batch_id`、`task_group_id`、`generation_task_id`、`status`、`expires_at`。
 
 #### 4.13 `generation_execution_snapshots`
 
@@ -653,6 +729,11 @@ Preflight 是无付费预检记录。任务组 Preflight 为每个子任务创�
 | `generation_task_id` | uuid | 是 | 关联任务 |
 | `confirmation_batch_id` | uuid | 是 | 同一任务组本轮执行确认批次 |
 | `prompt_snapshot_id` | uuid | 是 | 已确认 Prompt 快照 |
+| `content_plan_snapshot_id` | uuid | 否 | 视频任务必填；用户在阶段 3 确认的通道共性内容方案 |
+| `prompt_compilation_batch_id` | uuid | 否 | 视频任务必填；阶段 4 最终编译批次 |
+| `prompt_profile_id` | uuid | 否 | 视频任务必填；最终通道 Prompt Profile |
+| `prompt_profile_version` | varchar | 否 | 视频任务必填；Profile 不可变版本 |
+| `compile_fingerprint` | varchar | 否 | 视频任务必填；最终编译输入与结果指纹 |
 | `preflight_id` | uuid | 是 | 确认时仍有效且未过期的 Preflight |
 | `model_channel_id` | uuid | 是 | 用户确认的主通道 |
 | `capability_version` | varchar | 是 | 预检时使用的能力 Schema 版本 |
@@ -667,7 +748,7 @@ Preflight 是无付费预检记录。任务组 Preflight 为每个子任务创�
 | `confirmed_at` | datetime | 是 | 确认时间 |
 | `invalidated_at` | datetime | 否 | 任一输入变化后的失效时间 |
 
-约束：只有 `generation_preflights.status = valid` 且未过期时才能创建执行快照。创建后 Preflight 标记为 `consumed`。Prompt、参考图、通道、参数、能力版本或兜底策略变化时，关联执行快照立即失效。
+约束：只有 `generation_preflights.status = valid` 且未过期时才能创建执行快照。创建后 Preflight 标记为 `consumed`。内容方案、最终编译 Prompt、Prompt Profile、参考图、通道、参数、能力版本或兜底策略变化时，关联执行快照立即失效。
 
 #### 4.14 `generation_attempts`
 
@@ -701,6 +782,7 @@ Preflight 是无付费预检记录。任务组 Preflight 为每个子任务创�
 | `task_profiles` | json/array | 是 | 支持的正式任务 Profile |
 | `parameter_schema` | json | 是 | `{schema_version, fields[]}`；字段按数组顺序渲染 |
 | `reference_constraints` | json | 是 | 图片数量、格式、大小、角色和顺序限制 |
+| `prompt_profile_mappings` | json/array | 否 | 视频能力对应的 `{task_profile, model_id, prompt_profile_id, version}` 映射 |
 | `cost_schema` | json | 否 | 成本估算规则 |
 | `serialization_rules` | json | 是 | 内部参数到 Provider 参数的映射 |
 | `enabled` | boolean | 是 | 是否可用于新任务 |
@@ -841,6 +923,7 @@ product_assets 1..n generation_task_groups
 generation_task_groups 1..n generation_tasks
 generation_task_groups 1..n task_context_snapshots
 generation_tasks 1..n task_prompt_snapshots
+generation_tasks 1..n video_content_plan_snapshots
 generation_task_groups 1..n generation_preflights
 generation_tasks 1..n generation_preflights
 generation_tasks 1..n generation_execution_snapshots
@@ -849,10 +932,12 @@ generation_tasks 1..n generation_results
 generation_tasks 1..n review_records
 generation_tasks 1..n cost_records
 generation_results 1..1 asset_files
-prompt_templates 1..n generation_tasks
+prompt_templates 1..n channel_prompt_profiles
+channel_prompt_profiles 1..n task_prompt_snapshots
 model_channels 1..n generation_tasks
 model_channels 1..n generation_results
 model_channels 1..n model_channel_capabilities
+model_channel_capabilities n..m channel_prompt_profiles
 model_channels 1..n model_channel_health_snapshots
 model_channel_health_snapshots 1..n generation_preflights
 generation_preflights 1..1 generation_execution_snapshots
@@ -907,6 +992,14 @@ generation_tasks 1..1 model_profile_recommendations
     ]
   },
   "reference_constraints": {"min": 1, "max": 4, "ordered": true},
+  "prompt_profile_mappings": [
+    {
+      "task_profile": "reference2video",
+      "model_id": "vidu-q3",
+      "prompt_profile_id": "profile_vidu_q3_ref_v1",
+      "version": "1.0.0"
+    }
+  ],
   "supports_seed": true,
   "supports_region_revision": true,
   "supports_callback": true,
@@ -916,7 +1009,11 @@ generation_tasks 1..1 model_profile_recommendations
 
 前端只消费业务 API 返回的标准 Schema；任务服务和 Generation Gateway 在 Preflight、执行确认和 Submit 时重复校验。动态字段只允许 `string/enum/integer/number/boolean` 及正式契约规定的约束属性。
 
+Prompt Profile 映射是能力声明的一部分。视频通道未声明与当前模型、任务 Profile、能力版本匹配的启用 Profile 时，不得通过 Preflight，也不得退回通用模板直接提交。
+
 ### 3. 统一生成接口
+
+Provider Adapter 接收的 `prompt` 必须来自执行快照冻结的最终通道编译结果。Vidu 的图片强调、规划切镜、自动切镜、按秒描述、宫格叙事和音画同步只能由 Vidu Prompt Profile 生成；其他 Provider 不得继承这些语法。兜底切换 Provider 时必须先按目标 Profile 重新编译和预检，禁止 Adapter 在 Submit 后临时改写 Prompt。
 
 本地模型和自建适配器建议提供：
 
@@ -1221,5 +1318,6 @@ POST /generate/{external_task_id}/cancel
 - 任务组、上下文快照、Prompt 快照、Preflight、执行确认和原子 Submit。
 - 异步队列、Worker、重试等待、生成尝试、结果校验和审核状态流。
 - Generation Gateway 的能力 Schema、Provider Adapter、健康度、成本和透明兜底。
+- 通道共性视频内容方案、版本化 Prompt Profile Registry 和通道编译服务；Vidu 专有规则不得污染其他通道。
 - 五个 Skills 的内部编排、`workflow_node_runs` 记录和评估可追溯性。
-- 六个关键场景的自动化测试：整组 Preflight 阻断、Prompt 修改失效、排队转重试等待、规格不符进入审核、复用结果无 attempt、视频参考图按顺序序列化。
+- 自动化测试至少覆盖：整组 Preflight 阻断、Prompt 修改失效、排队转重试等待、规格不符进入审核、复用结果无 attempt、视频参考图按顺序序列化、`syntax_only` 保留阶段 3 确认、`content_revision_required` 退回阶段 3、Profile 缺失/不兼容阻断、兜底通道重新编译。
