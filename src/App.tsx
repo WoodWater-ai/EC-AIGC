@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppScreen, GenerationTask, ProductAsset, SystemUser, SystemNotification } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -25,6 +25,8 @@ import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
 import { useServiceQuery } from './api/hooks/useServiceQuery';
 import { userApi, type UserDTO } from './api/modules/user';
+import { taskApi } from './api/modules/task';
+import { toUIGenerationTask } from './components/createTask/taskAdapter';
 
 import {
   mockTasks,
@@ -82,9 +84,22 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
 
   // Core local states
-  const [tasks, setTasks] = useState<GenerationTask[]>(mockTasks);
   const [products, setProducts] = useState<ProductAsset[]>(mockProducts);
   const [notifications, setNotifications] = useState<SystemNotification[]>(mockNotifications);
+
+  // [2026-07-16 P0] 任务列表 —— 拉真接口 /v1/task/my-page,failure fallback mockTasks
+  // 数据用 useServiceQuery 自动重试;失败 toast 警告;fallback 保留以保持首屏可用
+  const tasksQuery = useServiceQuery(() => taskApi.myPage({ pageNum: 1, pageSize: 50 }), []);
+  const realTasks: GenerationTask[] = useMemo(() => {
+    const list = tasksQuery.data?.list ?? [];
+    return list.map((r) => toUIGenerationTask(r, products));
+  }, [tasksQuery.data, products]);
+  const tasks = realTasks.length > 0 ? realTasks : mockTasks;
+  useEffect(() => {
+    if (tasksQuery.error) {
+      console.warn('[App] /v1/task/my-page 失败,使用 mock 数据:', tasksQuery.error);
+    }
+  }, [tasksQuery.error]);
 
   // 用户列表(Phase 1.5) —— 从真接口 /v1/admin/user/list 拉,SystemUser 映射供 Sidebar 切换协作账号下拉用
   // 注意:useServiceQuery.data 初始为 null,如果用 `data ?? []` 作为 useEffect 依赖,每次渲染会创建新 [] 引用,触发死循环。
@@ -145,8 +160,10 @@ export default function App() {
     });
   };
 
-  const handleUpdateTask = (updatedTask: GenerationTask) => {
-    setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+  const handleUpdateTask = (_updatedTask: GenerationTask) => {
+    // [2026-07-16 P0] tasks 已改为 useServiceQuery 真接口,不再有 setTasks
+    // 父列表数据刷新由 onRefresh / refetch 触发;Drawer 内部 setState 暂不联动后端
+    // 实际编辑类操作(评分/批注)二期接后端
   };
 
   const handleUpdateUserRole = (userId: string, newRole: any, newDeptId?: string) => {
@@ -181,6 +198,7 @@ export default function App() {
             onAddTask={handleAddTask}
             onUpdateTask={handleUpdateTask}
             setScreen={setCurrentScreen}
+            onRefresh={() => tasksQuery.refetch()}
           />
         );
       case AppScreen.CREATE_IMAGE_TASK:

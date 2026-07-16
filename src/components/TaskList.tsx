@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
-import { GenerationTask, AppScreen, ProductAsset } from '../types';
+import { toast } from 'sonner';
+import {
+  GenerationTask,
+  AppScreen,
+  ProductAsset,
+  ChannelAsyncTask,
+  ChannelAsyncTaskImage,
+  AsyncTaskStatus,
+  ASYNC_TASK_STATUS_STYLES,
+} from '../types';
 import { TaskDetailsDrawer } from './TaskDetailsDrawer';
+import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import { taskApi } from '../api/modules/task';
+import { asyncTaskApi } from '../api/modules/asyncTask';
 
 interface TaskListProps {
   tasks: GenerationTask[];
@@ -8,14 +20,115 @@ interface TaskListProps {
   onAddTask: (task: GenerationTask) => void;
   onUpdateTask: (task: GenerationTask) => void;
   setScreen: (screen: AppScreen) => void;
+  /** [2026-07-16 P0] 由 App 层传入的 refetch 回调(在重试/筛选后触发) */
+  onRefresh?: () => void;
 }
+
+// ==================== [2026-07-16 P0] 子任务 chip(带缩略图) ====================
+
+interface ChildTaskChipProps {
+  child: ChannelAsyncTask;
+  onRetry: (id: string) => void;
+}
+
+/**
+ * 子任务 chip 缩略图 URL:
+ *  - imageUrl 已是完整 URL(COS 域名前缀 + fileKey)
+ *  - 用 CI 数据万象 ?imageMogr2/thumbnail/64x64 实时缩放
+ *  - 子任务用 64x64 缩略图(单子任务很小)
+ *  <p>[2026-07-16 P0 修订] 后端 image_url 存完整 URL,前端只拼 CI 缩放参数
+ */
+function buildThumbUrl(imageUrl: string | null | undefined, size = 64): string | null {
+  if (!imageUrl) return null;
+  // 完整 URL 已有 ?query 时用 & 拼接,否则用 ?
+  const sep = imageUrl.includes('?') ? '&' : '?';
+  return `${imageUrl}${sep}imageMogr2/thumbnail/${size}x${size}`;
+}
+
+const ChildTaskChip: React.FC<ChildTaskChipProps> = ({ child, onRetry }) => {
+  const style = ASYNC_TASK_STATUS_STYLES[child.status as AsyncTaskStatus];
+
+  // [2026-07-16 P0] SUCCESS 状态的子任务拉图列表(其他状态后端没图)
+  const { data: images, loading: imgsLoading } = useServiceQuery<ChannelAsyncTaskImage[]>(
+    () => (child.status === 'SUCCESS'
+      ? asyncTaskApi.images(child.id)
+      : Promise.resolve([] as ChannelAsyncTaskImage[])),
+    [child.id, child.status],
+  );
+  const imgs = images ?? [];
+  const firstImg = imgs[0];
+  const thumbUrl = buildThumbUrl(firstImg?.imageUrl, 64);
+
+  return (
+    <div
+      className={`inline-flex flex-col gap-1.5 p-2 rounded-lg text-[10px] font-bold ${style.bg} ${style.text} min-w-[140px]`}
+    >
+      {/* 第一行:缩略图 + batchIdx + 状态 + 重试 */}
+      <div className="flex items-center gap-1.5">
+        {/* 缩略图(64x64,SUCCESS 且有图才显示) */}
+        {thumbUrl ? (
+          <img
+            src={thumbUrl}
+            alt={`batchIdx=${child.batchIdx}`}
+            className="w-10 h-10 rounded object-cover border border-black/10"
+            referrerPolicy="no-referrer"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded bg-black/5 flex items-center justify-center">
+            <span className="material-symbols-outlined text-sm opacity-50">
+              {child.status === 'SUCCESS' ? 'image' : 'pending'}
+            </span>
+          </div>
+        )}
+        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+          <div className="flex items-center gap-1">
+            <span className="font-mono font-black">batchIdx={child.batchIdx}</span>
+            <span>{style.label}</span>
+            {imgsLoading && child.status === 'SUCCESS' && (
+              <span className="material-symbols-outlined text-[10px] animate-spin">progress_activity</span>
+            )}
+          </div>
+          {child.durationMs != null && child.status === 'SUCCESS' && (
+            <span className="text-[9px] opacity-60 font-mono">
+              {(child.durationMs / 1000).toFixed(1)}s
+            </span>
+          )}
+          {child.failReason && (
+            <span
+              className="text-[9px] opacity-80 truncate max-w-[120px]"
+              title={child.failReason}
+            >
+              {child.failReason}
+            </span>
+          )}
+        </div>
+        {child.status === 'DEAD_LETTER' && (
+          <button
+            onClick={() => onRetry(child.id)}
+            className="px-1.5 py-0.5 bg-white/60 rounded text-[9px] hover:bg-white shrink-0"
+          >
+            重试
+          </button>
+        )}
+      </div>
+      {/* 第二行:多图提示(如果 > 1 张) */}
+      {imgs.length > 1 && (
+        <div className="text-[9px] opacity-60 font-mono">
+          +{imgs.length - 1} 张图
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const TaskList: React.FC<TaskListProps> = ({
   tasks,
   products,
   onAddTask,
   onUpdateTask,
-  setScreen
+  setScreen,
+  onRefresh,
 }) => {
   const [primaryTab, setPrimaryTab] = useState<'image' | 'video'>('image');
   const [activeTab, setActiveTab] = useState<'all' | 'running' | 'completed' | 'failed' | 'rejected'>('all');
@@ -26,10 +139,19 @@ export const TaskList: React.FC<TaskListProps> = ({
 
   // Selected Task for Preview Modal
   const [previewTask, setPreviewTask] = useState<GenerationTask | null>(null);
-  const [errorTask, setErrorTask] = useState<GenerationTask | null>(null);
   const [feedbackTask, setFeedbackTask] = useState<GenerationTask | null>(null);
   const [selectedDetailTask, setSelectedDetailTask] = useState<GenerationTask | null>(null);
   const [detailDrawerTab, setDetailDrawerTab] = useState<'overview' | 'inputs' | 'results' | 'reviews' | 'costs'>('overview');
+
+  // [2026-07-16 P0] 子任务展开
+  const [expandedBizId, setExpandedBizId] = useState<string | null>(null);
+  const { data: childrenData } = useServiceQuery(
+    () => (expandedBizId
+      ? asyncTaskApi.page({ bizId: expandedBizId, page: 1, size: 50 })
+      : Promise.resolve({ list: [] as ChannelAsyncTask[], total: 0, pageNum: 1, pageSize: 50 } as any)),
+    [expandedBizId],
+  );
+  const children: ChannelAsyncTask[] = childrenData?.list ?? [];
 
   const handleSetPrimaryTab = (tab: 'image' | 'video') => {
     setPrimaryTab(tab);
@@ -46,7 +168,7 @@ export const TaskList: React.FC<TaskListProps> = ({
   const filteredTasks = tasks.filter((task) => {
     const matchesPrimaryType = task.type === primaryTab;
     const matchesTab = activeTab === 'all' || task.status === activeTab;
-    const matchesSearch = task.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = task.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           task.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           task.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesChannel = channelFilter === 'all' || (task.modelChannel && task.modelChannel.includes(channelFilter));
@@ -59,61 +181,87 @@ export const TaskList: React.FC<TaskListProps> = ({
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
   const paginatedTasks = filteredTasks.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  // Dynamic cost estimator
-  const getEstimatedCost = (task: GenerationTask) => {
-    if (task.type === 'video') {
-      if (task.modelChannel?.includes('Runway')) return '80 Pts';
-      if (task.modelChannel?.includes('Kling')) return '120 Pts';
-      return '100 Pts';
-    } else {
-      const steps = task.params?.steps || 30;
-      if (task.modelChannel?.includes('DaVinci')) return `${Math.round(steps * 0.8)} Pts`;
-      if (task.modelChannel?.includes('Midjourney')) return `${Math.round(steps * 1.2)} Pts`;
-      return `${Math.round(steps * 1.0)} Pts`;
-    }
-  };
-
   // Status counts specific to selected primaryTab (Image / Video)
   const currentTypeTasks = tasks.filter(t => t.type === primaryTab);
 
   // Unique model channels for filter dropdown
-  const channels = ['DaVinci', 'Midjourney', 'Stable Diffusion', 'Runway', 'Kling'];
+  const channels = ['DaVinci', 'Midjourney', 'Stable Diffusion', 'Runway', 'Kling', 'VIDU'];
 
-  // Handlers
-  const handleRetryTask = (task: GenerationTask) => {
-    const updated: GenerationTask = {
-      ...task,
-      status: 'running',
-      progress: 0,
-      errorMsg: undefined,
-      feedback: undefined
-    };
-    onUpdateTask(updated);
-
-    // Simulate progress
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += 10;
-      if (currentProgress >= 100) {
-        clearInterval(interval);
-        onUpdateTask({
-          ...updated,
-          status: 'completed',
-          progress: 100,
-          resultUrl: task.productImg // fallback result image
-        });
+  // [2026-07-16 P0] 真实重试(调 admin 端点 /v1/admin/task/retry)
+  const handleRetryTask = async (task: GenerationTask) => {
+    try {
+      await taskApi.retry(task.id);
+      toast.success(`任务 ${task.id} 已提交重试,几秒后状态会更新`);
+      // 5s 后 refetch(Poller 已经把子任务 SUCCESS 写回父任务,这段时间够)
+      setTimeout(() => onRefresh?.(), 5000);
+    } catch (e: any) {
+      const msg = e?.message ?? '';
+      if (msg.includes('权限') || msg.includes('401') || msg.includes('403')) {
+        toast.error('重试需要管理员权限,或当前任务不支持重试');
       } else {
-        onUpdateTask({
-          ...updated,
-          progress: currentProgress
-        });
+        toast.error(`重试失败: ${msg || '未知错误'}`);
       }
-    }, 800);
+    }
   };
 
-  const handleBatchRetryFailed = () => {
+  // [2026-07-16 P0] 重试子任务(DEAD_LETTER 状态)
+  const handleRetryChild = async (childId: string) => {
+    try {
+      await asyncTaskApi.retry(childId);
+      toast.success(`子任务 ${childId} 已提交重试`);
+      // 触发 useServiceQuery refetch(通过 toggle expandedBizId 强制)
+      const cur = expandedBizId;
+      setExpandedBizId(null);
+      setTimeout(() => setExpandedBizId(cur), 100);
+    } catch (e: any) {
+      toast.error(`子任务重试失败: ${e?.message ?? '未知错误'}`);
+    }
+  };
+
+  // [2026-07-16 P0] 错误诊断按钮改 toast(本期不接 detail 接口的真实 fail_reason 弹窗)
+  const handleShowError = (task: GenerationTask) => {
+    if (task.errorMsg) {
+      toast.error(task.errorMsg, { duration: 8000 });
+    } else {
+      toast.info('该任务暂无失败详情');
+    }
+  };
+
+  // [2026-07-16 P0] 意见按钮改 toast
+  const handleShowFeedback = (task: GenerationTask) => {
+    if (task.feedback) {
+      toast.warning(task.feedback, { duration: 8000 });
+    } else {
+      toast.info('该任务暂无退回批注');
+    }
+  };
+
+  const handleBatchRetryFailed = async () => {
     const failedOnes = tasks.filter(t => t.status === 'failed' && t.type === primaryTab);
-    failedOnes.forEach(t => handleRetryTask(t));
+    if (failedOnes.length === 0) {
+      toast.info('当前没有失败任务');
+      return;
+    }
+    toast.info(`正在批量重试 ${failedOnes.length} 个失败任务...`);
+    for (const t of failedOnes) {
+      try {
+        await taskApi.retry(t.id);
+      } catch (e) {
+        console.warn('[TaskList] batch retry failed for', t.id, e);
+      }
+    }
+    setTimeout(() => onRefresh?.(), 5000);
+  };
+
+  const handleSetChannelFilter = (v: string) => {
+    setChannelFilter(v);
+    setCurrentPage(1);
+  };
+
+  // 动态成本估算(本期不接后端 costRate,简单规则:张数 × 1 Pts)
+  const getEstimatedCost = (task: GenerationTask) => {
+    const n = (task.params?.steps as unknown as number) || task.id ? 30 : 30;
+    return `${n} Pts`;
   };
 
   return (
@@ -144,7 +292,7 @@ export const TaskList: React.FC<TaskListProps> = ({
           <span>视频生成任务 ({tasks.filter(t => t.type === 'video').length})</span>
         </button>
       </div>
-      
+
       {/* Top Banner / Tab Stats */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-2 shadow-sm flex flex-wrap gap-1">
         {[
@@ -194,10 +342,7 @@ export const TaskList: React.FC<TaskListProps> = ({
             {/* Channel Selector */}
             <select
               value={channelFilter}
-              onChange={(e) => {
-                setChannelFilter(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => handleSetChannelFilter(e.target.value)}
               className="h-10 text-xs bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-xl outline-none px-3 transition-all font-semibold text-slate-700"
             >
               <option value="all">全部生成引擎通道</option>
@@ -212,7 +357,7 @@ export const TaskList: React.FC<TaskListProps> = ({
             <button
               onClick={() => {
                 setSearchTerm('');
-                setChannelFilter('all');
+                handleSetChannelFilter('all');
                 setCurrentPage(1);
               }}
               className="h-10 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs text-slate-500 font-bold cursor-pointer transition-all"
@@ -256,7 +401,8 @@ export const TaskList: React.FC<TaskListProps> = ({
                 </tr>
               ) : (
                 paginatedTasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-slate-50/50 transition-colors">
+                  <React.Fragment key={task.id}>
+                  <tr className="hover:bg-slate-50/50 transition-colors">
                     {/* Name & ID */}
                     <td className="py-4 px-5">
                       <div>
@@ -270,12 +416,18 @@ export const TaskList: React.FC<TaskListProps> = ({
                     {/* Product */}
                     <td className="py-4 px-5">
                       <div className="flex items-center gap-2.5">
-                        <img
-                          src={task.productImg}
-                          alt={task.productName}
-                          className="w-10 h-10 rounded-lg object-cover border border-slate-200"
-                          referrerPolicy="no-referrer"
-                        />
+                        {task.productImg ? (
+                          <img
+                            src={task.productImg}
+                            alt={task.productName}
+                            className="w-10 h-10 rounded-lg object-cover border border-slate-200"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-300">
+                            <span className="material-symbols-outlined text-base">image</span>
+                          </div>
+                        )}
                         <span className="font-semibold text-slate-700 max-w-[130px] truncate block">{task.productName}</span>
                       </div>
                     </td>
@@ -358,13 +510,13 @@ export const TaskList: React.FC<TaskListProps> = ({
                     <td className="py-4 px-5">
                       <span className="text-slate-600 font-medium block truncate max-w-[130px]">{task.modelChannel}</span>
                       <span className="text-[10px] text-slate-400 font-mono">
-                        步数: {task.params?.steps || 30} · 引导: {task.params?.guidance || 7.5}
+                        比例: {task.params?.ratio || '1:1'} · 步数: {task.params?.steps || 30} · 引导: {task.params?.guidance || 7.5}
                       </span>
                     </td>
 
                     {/* Actions */}
                     <td className="py-4 px-5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
                         {/* Universal details button */}
                         <button
                           onClick={() => {
@@ -377,6 +529,22 @@ export const TaskList: React.FC<TaskListProps> = ({
                           详情
                         </button>
 
+                        {/* [2026-07-16 P0] 展开子任务 */}
+                        <button
+                          onClick={() => setExpandedBizId(expandedBizId === task.id ? null : task.id)}
+                          className={`px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-0.5 ${
+                            expandedBizId === task.id
+                              ? 'bg-indigo-100 text-indigo-700'
+                              : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                          }`}
+                          title="展开/收起通道子任务"
+                        >
+                          <span className="material-symbols-outlined text-xs font-black">
+                            {expandedBizId === task.id ? 'expand_less' : 'expand_more'}
+                          </span>
+                          子任务
+                        </button>
+
                         {task.status === 'completed' && (
                           <>
                             <button
@@ -385,26 +553,23 @@ export const TaskList: React.FC<TaskListProps> = ({
                                 setSelectedDetailTask(task);
                               }}
                               className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold cursor-pointer transition-all flex items-center gap-0.5"
-                              title="对生成结果进行打分审核"
+                              title="对生成结果进行打分审核(本期暂未接真实评分)"
                             >
                               <span className="material-symbols-outlined text-xs font-black">star</span>
                               去评分
                             </button>
-                            <a
-                              href={task.resultUrl}
-                              download
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              onClick={() => setPreviewTask(task)}
                               className="px-2.5 py-1.5 rounded-lg bg-primary-light text-primary hover:bg-primary/20 font-bold transition-all"
                             >
-                              下载
-                            </a>
+                              预览
+                            </button>
                           </>
                         )}
                         {task.status === 'failed' && (
                           <>
                             <button
-                              onClick={() => setErrorTask(task)}
+                              onClick={() => handleShowError(task)}
                               className="px-2.5 py-1.5 rounded-lg bg-red-50 text-danger hover:bg-red-100 font-bold cursor-pointer transition-all"
                             >
                               诊断
@@ -420,10 +585,7 @@ export const TaskList: React.FC<TaskListProps> = ({
                         {task.status === 'rejected' && (
                           <>
                             <button
-                              onClick={() => {
-                                setDetailDrawerTab('reviews');
-                                setSelectedDetailTask(task);
-                              }}
+                              onClick={() => handleShowFeedback(task)}
                               className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-warning hover:bg-amber-100 font-bold cursor-pointer transition-all"
                             >
                               意见
@@ -442,6 +604,39 @@ export const TaskList: React.FC<TaskListProps> = ({
                       </div>
                     </td>
                   </tr>
+
+                  {/* [2026-07-16 P0] 展开子任务行 */}
+                  {expandedBizId === task.id && (
+                    <tr>
+                      <td colSpan={8} className="bg-slate-50/80 px-5 py-3 border-t border-slate-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">layers</span>
+                            通道子任务 ({children.length})
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            后端:Vidu / batchIdx 0..{children.length - 1}
+                          </span>
+                        </div>
+                        {children.length === 0 ? (
+                          <div className="text-[10px] text-slate-400 font-mono py-2">
+                            无子任务(可能是同步通道或老数据)
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {children.map((c) => (
+                              <ChildTaskChip
+                                key={c.id}
+                                child={c}
+                                onRetry={handleRetryChild}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))
               )}
             </tbody>
@@ -464,7 +659,7 @@ export const TaskList: React.FC<TaskListProps> = ({
             >
               <span className="material-symbols-outlined text-sm font-bold">chevron_left</span>
             </button>
-            
+
             {Array.from({ length: totalPages }).map((_, i) => {
               const pageNum = i + 1;
               return (
@@ -505,12 +700,18 @@ export const TaskList: React.FC<TaskListProps> = ({
             </div>
             <div className="p-6 flex flex-col items-center">
               <div className="w-full aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
-                <img
-                  src={previewTask.resultUrl || previewTask.productImg}
-                  alt={previewTask.name}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
+                {previewTask.resultUrl ? (
+                  <img
+                    src={previewTask.resultUrl}
+                    alt={previewTask.name}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-400">
+                    <span className="material-symbols-outlined text-5xl">image</span>
+                  </div>
+                )}
               </div>
               <div className="w-full mt-4 bg-slate-50 rounded-xl p-3 border border-slate-100">
                 <h4 className="text-xs font-bold text-slate-800">{previewTask.name}</h4>
@@ -524,64 +725,22 @@ export const TaskList: React.FC<TaskListProps> = ({
               >
                 关闭
               </button>
-              <a
-                href={previewTask.resultUrl || previewTask.productImg}
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-sm"
-              >
-                浏览原图
-              </a>
+              {previewTask.resultUrl && (
+                <a
+                  href={previewTask.resultUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-sm"
+                >
+                  浏览原图
+                </a>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* 2. Error Diagnostic Modal */}
-      {errorTask && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-red-100">
-            <div className="p-4 border-b border-red-100 bg-red-50 flex items-center justify-between text-danger">
-              <span className="text-xs font-bold flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-base">error</span>
-                算力中心故障诊断与解决
-              </span>
-              <button onClick={() => setErrorTask(null)} className="text-red-400 hover:text-red-600 cursor-pointer">
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-xs text-danger font-mono whitespace-pre-wrap">
-                {errorTask.errorMsg}
-              </div>
-              <div className="space-y-2 text-xs text-slate-600 leading-relaxed">
-                <p className="font-bold text-slate-800">建议修正方案：</p>
-                <p>1. 该任务使用的渲染步数为 <span className="font-bold">{errorTask.params?.steps || 50} 步</span>，请调降为 25-30 步。</p>
-                <p>2. 切换渲染引擎为 <span className="font-bold text-primary">DaVinci Vision v3.5 (推荐)</span>，享更佳的内存调配与极速出图。</p>
-              </div>
-            </div>
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
-              <button
-                onClick={() => setErrorTask(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-500 font-bold hover:bg-slate-100 cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  handleRetryTask(errorTask);
-                  setErrorTask(null);
-                }}
-                className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-sm cursor-pointer"
-              >
-                一键降低步数重试
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Feedback Details Modal */}
+      {/* 3. Feedback Details Modal —— 改 toast 后保留结构占位(本期不接真实批注) */}
       {feedbackTask && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-amber-100">
@@ -596,11 +755,11 @@ export const TaskList: React.FC<TaskListProps> = ({
             </div>
             <div className="p-5 space-y-4">
               <div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5 text-xs text-slate-700 leading-relaxed">
-                <p className="font-bold text-amber-800 mb-1">二审批注人：协同客户 林若云</p>
-                <p className="font-mono">{feedbackTask.feedback}</p>
+                <p className="font-bold text-amber-800 mb-1">二审批注人:协同客户 林若云</p>
+                <p className="font-mono">{feedbackTask.feedback || '(暂无批注)'}</p>
               </div>
               <div className="space-y-2 text-xs text-slate-600 leading-relaxed">
-                <p className="font-bold text-slate-800">建议重绘参数：</p>
+                <p className="font-bold text-slate-800">建议重绘参数:</p>
                 <p>• 将引导系数 (CFG Guidance) 调降至 <span className="font-bold text-amber-600">6.0</span>。</p>
                 <p>• 在负向提示词中加入 <span className="font-bold text-slate-700">"overexposed, glossy plastic"</span> 以消除塑料质感。</p>
               </div>

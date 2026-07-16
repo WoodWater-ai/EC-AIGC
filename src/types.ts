@@ -382,6 +382,32 @@ export interface ChannelAsyncTaskQueryRequest {
   bizId?: string;
 }
 
+// ==================== [2026-07-16] 子任务产出的图 ====================
+
+/**
+ * 生成图片响应(对齐后端 GeneratedImageResponse)
+ * <p>子任务产出的图列表 —— 用于 TaskList 子任务 chip 缩略图
+ * <p>imageUrl 存的是 COS fileKey(不带 / 不带 domain);展示层拼接 + 加 CI 缩放参数
+ */
+export interface ChannelAsyncTaskImage {
+  id: string;
+  taskId: string;
+  channelAsyncTaskId: string;        // 父 task_id + 子任务 id 双锚
+  batchIdx: number;                   // 子任务在父任务内的序号
+  version: string | null;
+  /** 完整 URL(COS 域名前缀 + fileKey);本期不用,前端用 fileKey + 拼接 domain + ?imageMogr2 拼缩略图 */
+  imageUrl: string;
+  /** 缩略图 URL —— 本期不存,前端走 CI imageMogr2 实时缩放 */
+  thumbnailUrl: string | null;
+  width: number | null;
+  height: number | null;
+  aspectRatio: string | null;
+  modelChannelId: string;
+  promptVersion: string | null;
+  status: string;
+  createTime: string;
+}
+
 /** 状态 chip 颜色映射(后端 6 状态) */
 export const ASYNC_TASK_STATUS_STYLES: Record<AsyncTaskStatus, { bg: string; text: string; label: string }> = {
   PENDING_SUBMIT: { bg: 'bg-slate-100', text: 'text-slate-700', label: '占位待提交' },
@@ -391,4 +417,51 @@ export const ASYNC_TASK_STATUS_STYLES: Record<AsyncTaskStatus, { bg: string; tex
   FAILED:         { bg: 'bg-amber-50',  text: 'text-amber-700', label: '失败(可重试)' },
   DEAD_LETTER:    { bg: 'bg-rose-50',   text: 'text-rose-700',  label: '死信' },
 };
+
+// ==================== [2026-07-16 老版 TaskList 对接后端] 父任务响应 ====================
+
+/** 父任务状态机(对齐后端 EnumTaskStatus) */
+export type TaskStatus =
+  | 'PENDING'              // 已提交,待执行
+  | 'GENERATING'           // 生成中
+  | 'PENDING_REVIEW_SCORE' // 已完成,待评分
+  | 'FAILED'               // 失败
+  | 'CANCELED'             // 取消
+  | 'COMPLETED';           // 完成(二期引入,本期不一定用到)
+
+/** 父任务响应 DTO(对齐后端 TaskResponse) */
+export interface GenerationTaskResponse {
+  id: string;                          // 后端 Long + @JsonSerialize → string
+  taskCode: string;                    // 业务编号 TASK-yyyyMMddHHmmss-XXXX
+  title: string;
+  productId: string | null;            // MVP 可空(autoCreateProduct 路径)
+  taskType: string;
+  style: string | null;
+  scene: string | null;
+  aspectRatio: string | null;
+  count: number;
+  modelChannelId: string;
+  templateId: string | null;
+  status: TaskStatus;
+  progress: number;
+  progressTotal: number;
+  progressPercent: number;
+  failReason: string | null;
+  failCode: string | null;
+  retryCount: number;
+  estimatedCost: number | null;
+  actualCost: number | null;
+  durationMs: number | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  submitterUserId: string;
+  createTime: string;
+}
+
+/** 我的任务分页查询请求 */
+export interface TaskMyPageQueryRequest {
+  pageNum?: number;
+  pageSize?: number;
+  status?: TaskStatus;
+}
 
