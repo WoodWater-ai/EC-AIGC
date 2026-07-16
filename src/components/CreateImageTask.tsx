@@ -5,6 +5,7 @@ import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { templateApi, type TemplateDTO } from '../api/modules/template';
 import { TaskParamsPanel } from './createTask/TaskParamsPanel';
 import { buildSubmitPayload } from './createTask/buildSubmitPayload';
+import { assembleTaskPrompt } from './createTask/assembleTaskPrompt';
 import { submitTask } from '../api/modules/task';
 import { type SlotKey, type SlotRef } from './createTask/slots';
 import { mergeImagesHorizontal } from '../utils/mergeImages';
@@ -73,7 +74,13 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   });
 
   // Assembled Prompt state
-  const [promptText, setPromptText] = useState('');
+  // [2026-07-16] 初始用表单字段自动算一次;之后用户编辑优先,TaskParamsPanel 不再覆盖
+  const [promptText, setPromptText] = useState(() =>
+    assembleTaskPrompt({
+      productName: '',
+      schemaParams: {},
+    })
+  );
 
   // Local state for composite setup
   const [hasCompositePreviewed, setHasCompositePreviewed] = useState(false);

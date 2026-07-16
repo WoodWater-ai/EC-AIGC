@@ -36,8 +36,10 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
     });
   }, [tp.channelId, tp.channelType, tp.capability, tp.modelId, tp.schemaParams, onParamsChange]);
 
-  // 自动组装 prompt(统一字段 + schema 字段变化时)
-  useEffect(() => {
+  // [2026-07-16 P0 修复] 用户编辑优先 —— 不再用 useEffect 自动重算 prompt
+  // 修复前:用户在 Prompt 编辑器改了字,unified/schameParams 一变就被 assembleTaskPrompt 覆盖
+  // 修复后:promptText 完全由用户控制(初始化一次),"按表单重算" / "AI 优化" 两个按钮显式触发
+  const handleRegenerateFromForm = () => {
     onPromptChange(assembleTaskPrompt({
       productName: unified.productName,
       sellingPoints: unified.sellingPoints,
@@ -46,8 +48,10 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
       schemaParams: tp.schemaParams,
       constraints: unified.constraints,
     }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unified.productName, unified.sellingPoints, unified.keyDetails, aspectRatio, tp.schemaParams]);
+  };
+  const handleAiOptimize = () => {
+    onPromptChange(applyAiOptimize(prompt));
+  };
 
   return (
     <div className="p-5 space-y-5">
@@ -165,10 +169,21 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-xs font-bold text-slate-700">Prompt 编辑器</label>
-          <button type="button" onClick={() => onPromptChange(applyAiOptimize(prompt))}
-            className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">AI 建议</button>
+          <div className="flex gap-1.5">
+            <button type="button" onClick={handleRegenerateFromForm}
+              className="text-xs px-2 py-0.5 rounded bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
+              title="按当前商品信息/能力参数重算 prompt,会覆盖你编辑的内容">
+              按表单重算
+            </button>
+            <button type="button" onClick={handleAiOptimize}
+              className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100"
+              title="对当前 prompt 包装 AI 优化(不重算)">
+              AI 建议
+            </button>
+          </div>
         </div>
         <textarea rows={5} value={prompt} onChange={(e) => onPromptChange(e.target.value)}
+          placeholder="支持手写 Prompt;点击「按表单重算」会用商品信息/能力参数自动组装,「AI 建议」会对当前 prompt 包装优化"
           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md" />
       </div>
 
