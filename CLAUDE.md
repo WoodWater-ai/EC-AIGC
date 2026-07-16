@@ -4,46 +4,12 @@
 
 ## 技术栈
 
-| 层 | 选型 | 版本 |
-|---|---|---|
-| 框架 | React | 19.0.1 |
-| 构建 | Vite | 6.2.3 |
-| 语言 | TypeScript | 5.8.2 |
-| 样式 | Tailwind CSS(用 CSS-first `@theme` 配置) | 4.1.14 |
-| 图标 | lucide-react + Material Symbols(网页字体) | 0.546 / latest |
-| 动效 | motion(原 framer-motion) | 12.x |
-| AI | @google/genai(Gemini SDK,目前仅前端 demo 用) | 2.4.0 |
+依赖版本见 `package.json`。**非默认选型,务必遵守**:
 
-## 目录约定
-
-```
-EC-AIGC/
-├── index.html                       # Vite 入口 HTML
-├── package.json                     # name: dafenqi-ai-web
-├── vite.config.ts                   # React + Tailwind plugin,Vite proxy /api → :8090
-├── tsconfig.json                    # bundler module resolution, paths "@/*" → "./*"
-├── .env.example                     # 环境变量模板(不进 commit 的是 .env.local)
-├── assets/                          # 静态资源(含 AI Studio 标记,后续清理)
-└── src/
-    ├── main.tsx                     # createRoot 入口
-    ├── App.tsx                      # 顶层组件 + 路由状态(currentScreen)
-    ├── index.css                    # Tailwind @theme + 全局样式(滚动条、毛玻璃、card-hover)
-    ├── types.ts                     # 全局类型定义(AppScreen / GenerationTask / ProductAsset / 等)
-    ├── mockData.ts                  # 临时 mock,后续要替换为 API 调用
-    └── components/                  # 业务组件,一个文件一个组件
-        ├── Sidebar.tsx              # 侧边导航
-        ├── Header.tsx               # 顶部工具栏
-        ├── Dashboard.tsx            # 仪表盘
-        ├── TaskList.tsx             # 任务列表
-        ├── CreateImageTask.tsx      # 独立窗口 — 图片任务创建
-        ├── CreateVideoTask.tsx      # 独立窗口 — 视频任务创建
-        ├── TemplateCenter.tsx       # 模板中心
-        ├── ProductAssetLibrary.tsx  # 素材库
-        ├── DataAnalytics.tsx        # 数据分析
-        ├── SystemConfig.tsx         # 系统配置(模型渠道、用户)
-        ├── TaskDetailsDrawer.tsx    # 任务详情抽屉
-        └── AssetTransitModal.tsx    # 全局素材中转站 Modal
-```
+- **Tailwind CSS 4** 用 CSS-first `@theme` 配置,**不要**创建 `tailwind.config.js`
+- **React Router 暂未引入**,用 `App.tsx` 的 `currentScreen` state 切屏
+- **Vite dev proxy** `/api/** → http://localhost:8090/**`(见 `vite.config.ts`)
+- **Gemini SDK** `@google/genai` 当前仅前端 demo 用,生产应走后端代理
 
 ## 路由约定(目前)
 

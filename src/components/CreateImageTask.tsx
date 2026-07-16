@@ -48,7 +48,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   }, []);
 
   // Input fields in Middle Column
-  const [productName, setProductName] = useState(selectedProduct.name);
+  // 商品名称默认空:选完主图后由 setSlotRef 同步主图文件名(去后缀)到该字段;用户也可手动输入
+  const [productName, setProductName] = useState('');
   const [sellingPoints, setSellingPoints] = useState(selectedProduct.specs.sellingPoints.join('，'));
   const [productCategory, setProductCategory] = useState(selectedProduct.category);
   const [colorPattern, setColorPattern] = useState(selectedProduct.specs.color[0] || '米白色');
@@ -81,8 +82,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   const [isUploading, setIsUploading] = useState(false);
 
   // Sync inputs when selectedProduct changes
+  // 注意:不重置 productName——商品名称由主图 slot 同步(选主图自动填/用户手动改),
+  // 切商品时不应覆盖用户已填的商品名称
   useEffect(() => {
-    setProductName(selectedProduct.name);
     setSellingPoints(selectedProduct.specs.sellingPoints.join('，'));
     setProductCategory(selectedProduct.category);
     setColorPattern(selectedProduct.specs.color[0] || '米白色');
@@ -260,9 +262,20 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
       alert('请先在右侧选择通道实例');
       return;
     }
+    if (!productName.trim()) {
+      alert('请填写商品名称');
+      return;
+    }
+
+    // [MVP 2026-07-16] selectedProduct.id 是否为真产品 id(纯数字字符串)
+    // - 是 → 原样透传给后端,关联已有产品
+    // - 否('p1' 等 mock 字符串 / 空) → 走 autoCreateProduct 路径,后端按表单字段建产品
+    const productIdRaw = String(selectedProduct?.id ?? '').trim();
+    const isRealProductId = /^\d+$/.test(productIdRaw);
+
     const payload = buildSubmitPayload({
       title: `图片生成任务_${productName}`,
-      productId: String(selectedProduct.id),
+      productId: isRealProductId ? productIdRaw : '',
       taskType: 'PRODUCT_MAIN',
       channelType: taskParams.channelType,
       capability: taskParams.capability,
@@ -276,6 +289,14 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
       templateId: imagePrefill?.templateId,
       templateVersionId: imagePrefill?.templateVersionId,
       slotRefs,
+      // [MVP 2026-07-16] autoCreateProduct 字段透传
+      // isRealProductId=false 时统一由后端按下面 5 个产品字段建产品
+      autoCreateProduct: !isRealProductId,
+      productName,
+      productCategory,
+      productColor: colorPattern,
+      productFabric: fabricTexture,
+      productSellingPoints: sellingPoints,
     });
     try {
       await submitTask(payload);
