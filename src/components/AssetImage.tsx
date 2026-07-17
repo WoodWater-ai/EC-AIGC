@@ -60,7 +60,7 @@ export const AssetImage: React.FC<AssetImageProps> = ({
       ? 'aspect-square'
       : aspectRatio === 'video'
         ? 'aspect-video'
-        : '';
+        : 'max-h-full';  // [2026-07-16 P0] auto 模式不加 aspect 约束,避免长图被裁剪;配合 object-contain 完整显示
 
   const handleError = () => {
     setUrlIndex((prev) => prev + 1);
@@ -127,7 +127,8 @@ export const AssetImage: React.FC<AssetImageProps> = ({
         alt={alt}
         referrerPolicy="no-referrer"
         onError={handleError}
-        className="w-full h-full object-cover"
+        loading="lazy"
+        className={`w-full h-full ${aspectRatio === 'auto' ? 'object-contain' : 'object-cover'}`}
       />
     </div>
   );

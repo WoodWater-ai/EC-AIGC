@@ -9,6 +9,7 @@ import { assembleTaskPrompt } from './createTask/assembleTaskPrompt';
 import { submitTask } from '../api/modules/task';
 import { type SlotKey, type SlotRef } from './createTask/slots';
 import { mergeImagesHorizontal } from '../utils/mergeImages';
+import { withCosThumbnail } from '../utils/cosImage';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { assetApi } from '../api/modules/asset';
 import { toast } from 'sonner';
@@ -571,14 +572,18 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
                   </div>
 
                   <div className="border border-slate-200 rounded-xl p-3 flex items-start space-x-4 bg-slate-50/50">
-                    {/* Preview Thumbnail —— 直接读 slotRefs.main,避免 useEffect 延迟 */}
-                    <div className="w-16 h-16 lg:w-20 lg:h-20 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center text-slate-300 relative group overflow-hidden shrink-0">
+                    {/* Preview Thumbnail —— 容器固定 80x80,图片走 CI 缩放至 128x128,object-contain 居中不拉伸
+                        长图/宽图都按比例放进 80x80 容器,不会撑出 */}
+                    <div className="w-20 h-20 shrink-0 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center text-slate-300 relative group overflow-hidden">
                       {slotRefs.main ? (
                         <img
-                          src={slotRefs.main.thumbnailUrl ?? slotRefs.main.originalUrl ?? ''}
+                          src={withCosThumbnail(slotRefs.main.thumbnailUrl ?? slotRefs.main.originalUrl, 128)}
                           alt={slotRefs.main.name ?? ''}
-                          className="w-full h-full object-contain"
+                          width={80}
+                          height={80}
+                          loading="lazy"
                           referrerPolicy="no-referrer"
+                          className="w-20 h-20 max-w-full max-h-full object-contain"
                         />
                       ) : (
                         // 未选主图:在缩略图占位区显示提示

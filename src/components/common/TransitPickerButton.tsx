@@ -84,11 +84,12 @@ export const TransitPickerButton: React.FC<TransitPickerButtonProps> = ({
   );
 
   // 容器尺寸(给缩略图撑开父容器)
+  // [2026-07-16 P0] size='lg' 加 max-h-[256px] + aspect-[4/3] 约束,长图/宽图都不会撑出父容器
   const containerClass =
     size === 'sm'
       ? 'w-full aspect-square'
       : size === 'lg'
-        ? 'w-full min-h-[120px]'
+        ? 'w-full aspect-[4/3] max-h-[256px]'
         : 'w-20 h-24 lg:w-24 lg:h-28';
 
   const handleConfirm = (items: AssetResourceItem[]) => {
