@@ -12,7 +12,7 @@ interface ProductCategoryListProps {
 }
 
 // 工具:深度优先遍历找节点
-function findNode(tree: ProductCategoryNode[], id: number): ProductCategoryNode | null {
+function findNode(tree: ProductCategoryNode[], id: string): ProductCategoryNode | null {
   for (const n of tree) {
     if (n.id === id) return n;
     if (n.children) {
@@ -24,7 +24,7 @@ function findNode(tree: ProductCategoryNode[], id: number): ProductCategoryNode 
 }
 
 // 工具:深度优先找父节点 ID
-function findParentId(tree: ProductCategoryNode[], id: number, parentId: number = 0): number | null {
+function findParentId(tree: ProductCategoryNode[], id: string, parentId: string = '0'): string | null {
   for (const n of tree) {
     if (n.id === id) return parentId;
     if (n.children) {
@@ -38,11 +38,11 @@ function findParentId(tree: ProductCategoryNode[], id: number, parentId: number 
 export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
   const [tree, setTree] = useState<ProductCategoryNode[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
-  const [drawerDefaultParentId, setDrawerDefaultParentId] = useState<number>(0);
+  const [drawerDefaultParentId, setDrawerDefaultParentId] = useState<string>('0');
   const [drawerEditingNode, setDrawerEditingNode] = useState<ProductCategoryNode | null>(null);
   const [drawerDirty, setDrawerDirty] = useState(false);
   const [drawerSubmitting, setDrawerSubmitting] = useState(false);
@@ -60,7 +60,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
     return walk(tree);
   }, [tree]);
 
-  const refetch = useCallback(async (selectIdAfter?: number) => {
+  const refetch = useCallback(async (selectIdAfter?: string) => {
     setLoading(true);
     try {
       const fresh = await productCategoryApi.tree();
@@ -68,7 +68,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
       if (selectIdAfter !== undefined) {
         setSelectedId(selectIdAfter);
         const newNode = findNode(fresh, selectIdAfter);
-        if (newNode?.parentId && newNode.parentId !== 0) {
+        if (newNode?.parentId && newNode.parentId !== '0') {
           setExpandedIds(prev => new Set(prev).add(newNode.parentId));
         }
       }
@@ -205,7 +205,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
           <button
             onClick={() => {
               setDrawerMode('create');
-              setDrawerDefaultParentId(0);
+              setDrawerDefaultParentId('0');
               setDrawerEditingNode(null);
               setDrawerDirty(false);
               setDrawerOpen(true);
@@ -424,7 +424,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
 
 interface CategoryDrawerProps {
   mode: 'create' | 'edit';
-  defaultParentId: number;
+  defaultParentId: string;
   editingNode: ProductCategoryNode | null;
   tree: ProductCategoryNode[];
   submitting: boolean;
@@ -446,7 +446,7 @@ const CategoryDrawer: React.FC<CategoryDrawerProps> = ({
   const [categoryName, setCategoryName] = useState(editingNode?.categoryName ?? '');
   const [description, setDescription] = useState(editingNode?.description ?? '');
   const [sort, setSort] = useState(editingNode?.sort ?? 0);
-  const [parentId, setParentId] = useState<number>(defaultParentId);
+  const [parentId, setParentId] = useState<string>(defaultParentId);
 
   useEffect(() => {
     const initial = editingNode?.categoryName ?? '';
@@ -497,13 +497,13 @@ const CategoryDrawer: React.FC<CategoryDrawerProps> = ({
               </label>
               <select
                 value={parentId}
-                onChange={(e) => setParentId(Number(e.target.value))}
+                onChange={(e) => setParentId(e.target.value)}
                 className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm"
               >
-                <option value={0}>= 顶级分类 =</option>
+                <option value="0">= 顶级分类 =</option>
                 {/* 平铺所有非顶级节点供选择 */}
                 {(() => {
-                  const options: { id: number; name: string; depth: number }[] = [];
+                  const options: { id: string; name: string; depth: number }[] = [];
                   const walk = (nodes: ProductCategoryNode[], depth: number) => {
                     for (const n of nodes) {
                       if (n.id !== editingNode?.id) {

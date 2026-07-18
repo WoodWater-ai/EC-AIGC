@@ -21,6 +21,7 @@ import { CreateTaskNew } from './components/beta/CreateTaskNew';
 import { TaskListNew } from './components/beta/TaskListNew';
 import { PromptAssistNew } from './components/beta/PromptAssistNew';
 import { RecommendParamsManageNew } from './components/beta/RecommendParamsManageNew';
+import ProductManagePage from './components/ProductManagePage';
 
 import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
@@ -251,6 +252,8 @@ export default function App() {
         return <TaskListNew />;
       case AppScreen.RECOMMEND_PARAMS_MANAGE_NEW:
         return <RecommendParamsManageNew />;
+      case AppScreen.PRODUCT_MANAGE:
+        return <ProductManagePage />;
       default:
         return (
           <div className="flex flex-col items-center justify-center p-12 text-slate-400">

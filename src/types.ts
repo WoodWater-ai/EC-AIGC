@@ -24,6 +24,8 @@ export enum AppScreen {
   PROMPT_ASSIST_NEW = 'PROMPT_ASSIST_NEW',
   /** 推荐参数管理-新(D8 独立编辑页) */
   RECOMMEND_PARAMS_MANAGE_NEW = 'RECOMMEND_PARAMS_MANAGE_NEW',
+  /** 产品基础信息管理(新增 2026-07-18) */
+  PRODUCT_MANAGE = 'PRODUCT_MANAGE',
   // 未来 P1:CHANNEL_MATRIX_NEW
 }
 
@@ -460,10 +462,15 @@ export interface GenerationTaskResponse {
   createTime: string;
 }
 
-/** 我的任务分页查询请求 */
-export interface TaskMyPageQueryRequest {
-  pageNum?: number;
-  pageSize?: number;
-  status?: TaskStatus;
-}
+// ============================================================================
+// 系统内置通道配置(2026-07-18)
+// ============================================================================
 
+/** 系统内置通道键,与后端 EnumBuiltinKey.name() 对齐 */
+export type BuiltinKey = 'BUILTIN_CHAT' | 'BUILTIN_IMAGE_UNDERSTAND';
+
+/** 单条更新项(channelId=null 表示清空) */
+export interface SystemBuiltinChannelItem {
+  builtinKey: BuiltinKey;
+  channelId: string | null;
+}

@@ -54,6 +54,7 @@ import {
 import { MenuConfigTab } from './systemConfig/MenuConfigTab';
 import RoleManageTab from './systemConfig/RoleManageTab';
 import { OrgStructureTab, type OrgStructureTabRef } from './systemConfig/OrgStructureTab';
+import { SystemBuiltinChannelTab } from './systemConfig/SystemBuiltinChannelTab';
 import { useRef } from 'react';
 import { departmentApi, type DepartmentDTO } from '../api/modules/department';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
@@ -83,7 +84,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   onUpdateUserRole
 }) => {
   // 1. High level main tabs
-  const [activeMainTab, setActiveMainTab] = useState<'users' | 'org' | 'channels' | 'logs'>('users');
+  const [activeMainTab, setActiveMainTab] = useState<'users' | 'org' | 'channels' | 'builtin' | 'logs'>('users');
   
   // 2. User management sub-tabs
   const [activeUserSubTab, setActiveUserSubTab] = useState<'accounts' | 'roles' | 'menu'>('accounts');
@@ -579,6 +580,15 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
             模型通道统管
           </button>
           <button
+            onClick={() => setActiveMainTab('builtin')}
+            className={`h-full px-6 flex items-center gap-2 text-xs font-bold relative transition-all duration-200 cursor-pointer ${
+              activeMainTab === 'builtin' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-700'
+            }`}
+          >
+            <Sliders className="w-4 h-4 shrink-0" />
+            系统内置通道配置
+          </button>
+          <button
             onClick={() => setActiveMainTab('logs')}
             className={`h-full px-6 flex items-center gap-2 text-xs font-bold relative transition-all duration-200 cursor-pointer ${
               activeMainTab === 'logs' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-700'
@@ -1018,6 +1028,9 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
         </div>
       )}
+
+      {/* MAIN VIEW: 系统内置通道配置 (System Builtin Channel) */}
+      {activeMainTab === 'builtin' && <SystemBuiltinChannelTab />}
 
       {/* MAIN VIEW C: 操作日志 (Operation Logs) */}
       {activeMainTab === 'logs' && (

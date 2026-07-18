@@ -19,8 +19,10 @@ import http from '../client';
  */
 
 export interface ProductCategoryNode {
-  id: number;
-  parentId: number;
+  /** 雪花 ID —— 后端序列化为字符串以保精度,前端必须保持 string */
+  id: string;
+  /** 父分类 ID(同样为字符串) */
+  parentId: string;
   /** 分类名称(对齐后端 ProductCategoryNodeResponse.categoryName) */
   categoryName: string;
   /** 分类描述 */
@@ -33,8 +35,8 @@ export interface ProductCategoryNode {
 
 /** 创建商品分类请求(对齐后端 ProductCategoryCreateRequest) */
 export interface ProductCategoryCreateRequest {
-  /** 父分类 ID,顶级传 0 或不传 */
-  parentId?: number;
+  /** 父分类 ID,顶级传 0 或不传(雪花 ID,字符串传输) */
+  parentId?: string;
   /** 分类名称,必填 */
   categoryName: string;
   /** 分类描述(可选) */
@@ -45,8 +47,8 @@ export interface ProductCategoryCreateRequest {
 
 /** 更新商品分类请求(对齐后端 ProductCategoryUpdateRequest) */
 export interface ProductCategoryUpdateRequest {
-  /** 分类 ID,必填 */
-  id: number;
+  /** 分类 ID,必填(字符串) */
+  id: string;
   /** 分类名称 */
   categoryName?: string;
   /** 分类描述 */
@@ -61,15 +63,15 @@ export const productCategoryApi = {
   tree: () =>
     http.post<ProductCategoryNode[]>('/v1/admin/product-category/tree'),
 
-  /** 创建商品分类,返回新分类 ID */
+  /** 创建商品分类,返回新分类 ID(雪花 ID,序列化为字符串) */
   create: (req: ProductCategoryCreateRequest) =>
-    http.post<number>('/v1/admin/product-category/create', req),
+    http.post<string>('/v1/admin/product-category/create', req),
 
   /** 更新商品分类(后端不支持改 parentId) */
   update: (req: ProductCategoryUpdateRequest) =>
     http.post('/v1/admin/product-category/update', req),
 
   /** 删除商品分类(后端要求必须是叶子节点) */
-  delete: (id: number) =>
+  delete: (id: string) =>
     http.post('/v1/admin/product-category/delete', { id }),
 };
