@@ -13,6 +13,7 @@ import { SystemConfig } from './components/SystemConfig';
 import { AssetTransitModal } from './components/AssetTransitModal';
 import { LoginPage } from './components/LoginPage';
 import { ResourceCategoryList } from './components/ResourceCategoryList';
+import { ProductCategoryList } from './components/ProductCategoryList';
 import { AsyncTaskList } from './components/AsyncTaskList';
 import { BetaPlaceholder } from './components/BetaPlaceholder';
 import { TemplateCenterNew } from './components/beta/TemplateCenterNew';
@@ -235,6 +236,10 @@ export default function App() {
       case AppScreen.ASSET_CATEGORY:
         return (
           <ResourceCategoryList setScreen={setCurrentScreen} />
+        );
+      case AppScreen.PRODUCT_CATEGORY:
+        return (
+          <ProductCategoryList setScreen={setCurrentScreen} />
         );
       case AppScreen.ASYNC_TASKS:
         return <AsyncTaskList />;

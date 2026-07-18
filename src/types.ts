@@ -9,6 +9,8 @@ export enum AppScreen {
   ANALYTICS = 'ANALYTICS',
   SYSTEM_CONFIG = 'SYSTEM_CONFIG',
   ASSET_CATEGORY = 'ASSET_CATEGORY',
+  /** [v1.6 2026-07-18] 商品分类管理页(纯独立分类,无 owner/编码/类型) */
+  PRODUCT_CATEGORY = 'PRODUCT_CATEGORY',
   /** [v1.2 2026-07-11] Vidu 接入 — 通道异步任务列表 */
   ASYNC_TASKS = 'ASYNC_TASKS',
   // ===== [v2.0 2026-07-13 F1 基础设施] 新流程尝试(Dark Launch) =====

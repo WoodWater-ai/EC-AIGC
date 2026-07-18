@@ -30,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { screen: AppScreen.SYSTEM_CONFIG, label: '系统配置模块', icon: 'settings_applications' },
     { screen: AppScreen.ASYNC_TASKS, label: '通道异步任务', icon: 'sync_alt' },
     { screen: AppScreen.ASSET_CATEGORY, label: '资源分类', icon: 'account_tree' },
+    { screen: AppScreen.PRODUCT_CATEGORY, label: '商品分类', icon: 'category' },
   ];
 
   // ===== [v2.0 2026-07-13 F1 基础设施] 新流程尝试 · 5 个 BETA 页面 =====
