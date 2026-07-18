@@ -7,6 +7,7 @@ import { templateApi, type TemplateDTO } from '../api/modules/template';
 import { TaskParamsPanel } from './createTask/TaskParamsPanel';
 import { buildSubmitPayload } from './createTask/buildSubmitPayload';
 import { submitTask } from '../api/modules/task';
+import { toast } from 'sonner';
 
 /** 从 sessionStorage 读模版 prefill(容错,失败返 null) */
 function readPrefill(): import('./createTask/useTaskParams').PrefillState | null {
@@ -160,17 +161,20 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
 
   const handleSubmitTask = async () => {
     if (!taskParams.channelType || !taskParams.capability) {
-      alert('请先在右侧选择通道和能力');
+      toast.warning('请先在右侧选择通道和能力');
       return;
     }
     if (!taskParams.channelId) {
-      alert('请先在右侧选择通道实例');
+      toast.warning('请先在右侧选择通道实例');
       return;
     }
     const selectedIds = sourceImages.filter((s) => s.selected).map((s) => s.id).join(',');
+    // [2026-07-17] mock 占位 id(如 'p1')会触发 autoCreateProduct=true,
+    // 必须传 productName 让后端按表单字段建产品;缺省值"默认产品"兜底
+    const productNameFallback = selectedProduct?.name || '默认产品';
     const payload = buildSubmitPayload({
-      title: `视频生成任务_${selectedProduct.name}`,
-      productId: String(selectedProduct.id),
+      title: `视频生成任务_${productNameFallback}`,
+      productId: selectedProduct?.id ? String(selectedProduct.id) : '',
       taskType: videoMode === 'SOLUTION' ? 'SOLUTION' : 'VIDEO',
       channelType: taskParams.channelType,
       capability: taskParams.capability,
@@ -184,6 +188,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       schemaParams: taskParams.schemaParams,
       templateId: videoPrefill?.templateId,
       templateVersionId: videoPrefill?.templateVersionId,
+      productName: productNameFallback,
     });
     try {
       await submitTask(payload);

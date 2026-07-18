@@ -14,6 +14,9 @@ import { JsonField } from './fields/JsonField';
 import { ImagePickerField } from './fields/ImagePickerField';
 import { ImagesPickerField } from './fields/ImagesPickerField';
 import { DictField } from './fields/DictField';
+import VideoPickerField from './fields/VideoPickerField';
+import AudioPickerField from './fields/AudioPickerField';
+import LipRefPickerField from './fields/LipRefPickerField';
 
 export interface ParamSchemaFormProps {
   schema: CapabilityDefinition;
@@ -82,6 +85,12 @@ export function ParamSchemaForm({
             return <ImagesPickerField key={field.key} {...commonProps} />;
           case 'DICT':
             return <DictField key={field.key} {...commonProps} />;
+          case 'VIDEO_URL':
+            return <VideoPickerField key={field.key} {...commonProps} />;
+          case 'AUDIO_URL':
+            return <AudioPickerField key={field.key} {...commonProps} />;
+          case 'LIP_REF_URL':
+            return <LipRefPickerField key={field.key} {...commonProps} />;
           default:
             return null;
         }

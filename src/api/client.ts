@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import type { ServiceResult } from './service-result';
 import { ApiError, mapErrCodeToToast } from './error';
 import { getToken } from './auth';
+import { signRequest } from '../utils/sign';
 
 /**
  * 全局 axios 实例
@@ -26,11 +27,19 @@ const httpRaw: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// 请求拦截器：注入 Authorization header
+// 请求拦截器：注入 Authorization header + 请求签名(@RequestSign 端点)
 httpRaw.interceptors.request.use((config) => {
   const token = getToken();
   if (token) {
     config.headers.Authorization = token; // 不放 'Bearer '
+  }
+  // [2026-07-17] /v1/task/submit 等端点有 @RequestSign 拦截,前端必须注入 X-Sign/X-Sign-Nonce/X-Sign-Timestamp
+  // 这里对所有 POST/PUT 请求统一签名(只有少数端点需要,目前项目内除 GET 外的请求都走签名)
+  if (config.data && (config.method === 'post' || config.method === 'put')) {
+    const signHeaders = signRequest(config.data);
+    for (const [k, v] of Object.entries(signHeaders)) {
+      config.headers.set(k, v);
+    }
   }
   return config;
 });

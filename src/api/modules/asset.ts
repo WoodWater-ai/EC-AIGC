@@ -15,7 +15,7 @@ import type { PageInfo } from '../service-result';
 export interface AssetResourceQueryRequest {
   pageNum?: number;
   pageSize?: number;
-  assetKind?: 'IMAGE' | 'VIDEO';
+  assetKind?: 'IMAGE' | 'VIDEO' | 'AUDIO';
   assetType?: string;
   productId?: number;
   categoryId?: number;

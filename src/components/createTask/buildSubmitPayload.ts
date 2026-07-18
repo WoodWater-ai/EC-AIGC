@@ -20,8 +20,8 @@ export interface TaskFormState {
   schemaParams: Record<string, any>;
   templateId?: string;
   templateVersionId?: string;
-  /** 7 个 slot 的资源引用 —— null = 未选 */
-  slotRefs: Record<SlotKey, SlotRef | null>;
+  /** 7 个 slot 的资源引用 —— null = 未选;CreateVideoTask 等老流程可能不传 */
+  slotRefs?: Record<SlotKey, SlotRef | null>;
   // ==================== [MVP 2026-07-16] autoCreateProduct 支持 ====================
   /** MVP:产品由任务提交时"涌现"。true 时 productId 留空由后端按表单字段自动建产品 */
   autoCreateProduct?: boolean;
@@ -49,10 +49,11 @@ export function buildSubmitPayload(state: TaskFormState): SubmitTaskRequest {
 
   // 把 slotRefs 折叠成 URL 列表(主图优先,其他按固定顺序)
   // 注意:用 originalUrl(COS 原图),不能用 thumbnailUrl(图床缩略图)
+  // 容错:slotRefs 可选(SOLUTION/VIDEO 老流程用 sourceImages,无 slotRefs)
   const slotOrder: SlotKey[] = ['main', 'top', 'bottom', 'detail', 'style', 'scene', 'pose'];
   const urls: string[] = [];
   for (const k of slotOrder) {
-    const r = slotRefs[k];
+    const r = slotRefs?.[k];
     if (r && r.originalUrl) {
       urls.push(r.originalUrl);
     } else if (r && r.thumbnailUrl) {

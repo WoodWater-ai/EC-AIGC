@@ -6,9 +6,9 @@ import { useServiceQuery } from '../hooks/useServiceQuery';
 export type ParamType =
   | 'INT' | 'DECIMAL' | 'TEXT' | 'TEXTAREA' | 'BOOLEAN'
   | 'SELECT' | 'MULTI_SELECT' | 'JSON'
-  | 'IMAGE_URL'   // 单图(已存在,ImagePickerField 渲染)
-  | 'IMAGES_URL'  // [F1 新] 多图,1~N 张 URL 列表(Vidu SOLUTION 4 端点必填 1~7 张)
-  | 'DICT';       // [F1 新] 字典引用,dictCode 指向 /v1/admin/dict/item/list-by-code
+  | 'IMAGE_URL' | 'IMAGES_URL'
+  | 'VIDEO_URL' | 'AUDIO_URL' | 'LIP_REF_URL'
+  | 'DICT';
 
 export interface ParamOption {
   value: string;

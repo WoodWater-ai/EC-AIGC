@@ -60,6 +60,8 @@ interface AssetTransitModalProps {
   productId?: number;
   /** 任务创建时的素材槽位提示,CreateImageTask / CreateVideoTask 用 */
   targetSlot?: string;
+  /** 资源类型过滤(默认 IMAGE) */
+  assetKind?: 'IMAGE' | 'VIDEO' | 'AUDIO';
 }
 
 export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
@@ -71,6 +73,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   purpose = 'OTHER',
   productId,
   targetSlot = 'main',
+  assetKind = 'IMAGE',
   multiSelect = false,
   mode = 'picker',
 }) => {
@@ -101,11 +104,16 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
   // 视图分类 → 后端 query 参数映射
   // 仅由 selectedCategoryId 决定:无选中 = 全部,选中 = 后端 categoryId 过滤
+  // manager mode(资源中心全局)不过滤 kind,显示所有;picker mode 按 assetKind 过滤
   const buildQuery = (): AssetResourceQueryRequest => {
     const base: AssetResourceQueryRequest = {
       pageNum: 1,
       pageSize: 100,
     };
+    // picker mode 才按 kind 过滤;manager mode 不传(查全部)
+    if (mode !== 'manager' && assetKind) {
+      base.assetKind = assetKind;
+    }
     if (selectedCategoryId !== null) {
       return { ...base, categoryId: selectedCategoryId };
     }
