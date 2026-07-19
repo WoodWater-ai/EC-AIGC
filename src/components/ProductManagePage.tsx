@@ -238,7 +238,7 @@ export default function ProductManagePage() {
             <thead className="bg-slate-50 text-slate-500 text-xs sticky top-0 z-10">
               <tr>
                 <th className="px-4 py-2.5 text-left font-semibold w-20">图片</th>
-                <th className="px-4 py-2.5 text-left font-semibold">名称</th>
+                <th className="px-4 py-2.5 text-left font-semibold w-48">名称</th>
                 <th className="px-4 py-2.5 text-left font-semibold w-24">颜色</th>
                 <th className="px-4 py-2.5 text-left font-semibold">图案/材质</th>
                 <th className="px-4 py-2.5 text-left font-semibold">版型/结构</th>
@@ -278,10 +278,10 @@ export default function ProductManagePage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-slate-800 font-medium">{p.name}</td>
-                    <td className="px-4 py-2 text-slate-600 max-w-[120px] truncate">{p.color || '—'}</td>
-                    <td className="px-4 py-2 text-slate-600 max-w-[180px] truncate">{p.patternMaterial || '—'}</td>
-                    <td className="px-4 py-2 text-slate-600 max-w-[180px] truncate">{p.silhouetteStructure || '—'}</td>
+                    <td className="px-4 py-2 text-slate-800 font-medium max-w-[180px] truncate" title={p.name}>{p.name}</td>
+                    <td className="px-4 py-2 text-slate-600 max-w-[120px] truncate" title={p.color || ''}>{p.color || '—'}</td>
+                    <td className="px-4 py-2 text-slate-600 max-w-[180px] truncate" title={p.patternMaterial || ''}>{p.patternMaterial || '—'}</td>
+                    <td className="px-4 py-2 text-slate-600 max-w-[180px] truncate" title={p.silhouetteStructure || ''}>{p.silhouetteStructure || '—'}</td>
                     {/* 品类:产品侧自由文本标签(与 product_category 表无关),独立业务定义 */}
                     <td className="px-4 py-2 max-w-[120px]">
                       {p.category ? (

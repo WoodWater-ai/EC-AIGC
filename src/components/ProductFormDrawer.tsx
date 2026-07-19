@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProductDTO, ProductAddReq, ProductUpdateReq, ProductStatus } from '../api/modules/productInfo';
-import { productInfoApi } from '../api/modules/productInfo';
+import { productInfoApi, type ProductAiAnalyzeResponse } from '../api/modules/productInfo';
 import { AssetTransitModal } from './AssetTransitModal';
 import type { AssetResourceItem } from '../api/modules/asset';
 import { AssetImage } from './AssetImage';
@@ -80,6 +80,17 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
   // 展开的父节点 id 集合 —— 抽屉每次打开时重置为"全展开"
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
+  // AI 分析相关
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiSnapshot, setAiSnapshot] = useState<{
+    name: string;
+    sellingPoints: string;
+    color: string;
+    patternMaterial: string;
+    silhouetteStructure: string;
+    category: string;
+  } | null>(null);
+
   // 初始化 + 打开时回填
   // 注意:依赖同时含 initial 和 categoryTree —— 后端返回 categories 含全链父分类,
   // 这里过滤出"叶子节点"才是用户原始选择,避免在编辑时把祖先也当成已选项。
@@ -145,6 +156,14 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
         });
     }
   }, [open, categoryTree.length]);
+
+  // 关闭抽屉时清除 AI 分析状态
+  useEffect(() => {
+    if (!open) {
+      setAiSnapshot(null);
+      setAiAnalyzing(false);
+    }
+  }, [open]);
 
   // 收集所有父节点 id(用于顶部"全部展开/收起")
   const allParentIds = useMemo(() => {
@@ -267,6 +286,54 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
     setSelectedCategories((prev) => prev.filter((c) => c.id !== id));
   }
 
+  async function handleAiAnalyze() {
+    if (!imageRef?.id) {
+      toast.error('请先选择产品图片');
+      return;
+    }
+    // 快照当前 6 字段(下一次分析会刷新快照)
+    setAiSnapshot({
+      name,
+      sellingPoints,
+      color,
+      patternMaterial,
+      silhouetteStructure,
+      category,
+    });
+    setAiAnalyzing(true);
+    try {
+      const resp = await productInfoApi.aiAnalyze({ imageId: imageRef.id });
+      applyAiResult(resp);
+      // toast 由 http 拦截器处理
+    } catch {
+      // 失败:等同"没分析过",清掉 snapshot(避免出现"恢复原值"按钮却没东西可恢复)
+      setAiSnapshot(null);
+    } finally {
+      setAiAnalyzing(false);
+    }
+  }
+
+  function applyAiResult(r: ProductAiAnalyzeResponse) {
+    if (r.name !== undefined) setName(r.name ?? '');
+    if (r.sellingPoints !== undefined) setSellingPoints(r.sellingPoints ?? '');
+    if (r.color !== undefined) setColor(r.color ?? '');
+    if (r.patternMaterial !== undefined) setPatternMaterial(r.patternMaterial ?? '');
+    if (r.silhouetteStructure !== undefined) setSilhouetteStructure(r.silhouetteStructure ?? '');
+    if (r.category !== undefined) setCategory(r.category ?? '');
+    // fabricTexture / keyDetails / unchangeable 暂不消费
+  }
+
+  function restoreSnapshot() {
+    if (!aiSnapshot) return;
+    setName(aiSnapshot.name);
+    setSellingPoints(aiSnapshot.sellingPoints);
+    setColor(aiSnapshot.color);
+    setPatternMaterial(aiSnapshot.patternMaterial);
+    setSilhouetteStructure(aiSnapshot.silhouetteStructure);
+    setCategory(aiSnapshot.category);
+    setAiSnapshot(null);
+  }
+
   async function handleSave() {
     if (!name.trim()) {
       toast.error('产品名称不能为空');
@@ -346,53 +413,82 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
             <label className="block text-xs font-semibold text-slate-600 mb-1">
               产品图片 <span className="text-rose-500">*</span>
             </label>
-
-            {imageRef ? (
-              // 已选态:缩略图 + hover × 清除
-              <div
-                className="relative group w-32 h-32 rounded-lg border border-slate-200 cursor-pointer overflow-hidden"
-                onClick={() => setPickerOpen(true)}
-                title="点击重新选择"
-              >
-                <AssetImage
-                  urls={[imageRef.thumbnailUrl ?? imageRef.originalUrl ?? '']}
-                  alt={imageRef.name ?? ''}
-                  maxWidth={200}
-                  className="w-full h-full"
-                  aspectRatio="auto"
-                  fallback={
-                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
-                      <span className="material-symbols-outlined text-2xl text-slate-300">image</span>
+            <div className="flex items-start gap-2">
+              {imageRef ? (
+                // 已选态:缩略图 + hover × 清除
+                <div
+                  className="relative group w-32 h-32 rounded-lg border border-slate-200 cursor-pointer overflow-hidden"
+                  onClick={() => setPickerOpen(true)}
+                  title="点击重新选择"
+                >
+                  <AssetImage
+                    urls={[imageRef.thumbnailUrl ?? imageRef.originalUrl ?? '']}
+                    alt={imageRef.name ?? ''}
+                    maxWidth={200}
+                    className="w-full h-full"
+                    aspectRatio="auto"
+                    fallback={
+                      <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                        <span className="material-symbols-outlined text-2xl text-slate-300">image</span>
+                      </div>
+                    }
+                  />
+                  {imageRef.name && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 py-1 pointer-events-none">
+                      <span className="text-[10px] text-white font-bold truncate block">
+                        {imageRef.name}
+                      </span>
                     </div>
-                  }
-                />
-                {imageRef.name && (
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 py-1 pointer-events-none">
-                    <span className="text-[10px] text-white font-bold truncate block">
-                      {imageRef.name}
-                    </span>
-                  </div>
-                )}
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleClearImage}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="清除选择"
+                  >
+                    <span className="material-symbols-outlined text-[14px] leading-none">close</span>
+                  </button>
+                </div>
+              ) : (
+                // 未选态:虚线占位按钮
                 <button
                   type="button"
-                  onClick={handleClearImage}
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="清除选择"
+                  onClick={() => setPickerOpen(true)}
+                  className="w-32 h-32 flex flex-col items-center justify-center border border-dashed border-rose-300 rounded-lg bg-rose-50/40 text-slate-500 hover:bg-rose-50 hover:border-rose-400 hover:text-rose-600 transition-colors"
                 >
-                  <span className="material-symbols-outlined text-[14px] leading-none">close</span>
+                  <span className="material-symbols-outlined text-3xl mb-1">add_photo_alternate</span>
+                  <span className="text-[10px] font-bold">必填 · 选择图片</span>
                 </button>
+              )}
+              {/* 新增右侧按钮组 */}
+              <div className="flex flex-col gap-1.5 pt-2">
+                <button
+                  type="button"
+                  disabled={!imageRef?.id || aiAnalyzing}
+                  onClick={handleAiAnalyze}
+                  className="h-8 px-3 text-xs font-semibold rounded-md border border-slate-300 bg-white text-primary hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  title="基于产品图片,调用 AI 提取商品属性"
+                >
+                  {aiAnalyzing ? (
+                    <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-base">auto_awesome</span>
+                  )}
+                  {aiAnalyzing ? '分析中…' : 'AI分析'}
+                </button>
+                {aiSnapshot && (
+                  <button
+                    type="button"
+                    onClick={restoreSnapshot}
+                    className="h-8 px-3 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md flex items-center gap-1.5"
+                    title="恢复到点击 AI 分析前的输入"
+                  >
+                    <span className="material-symbols-outlined text-base">undo</span>
+                    恢复原值
+                  </button>
+                )}
               </div>
-            ) : (
-              // 未选态:虚线占位按钮
-              <button
-                type="button"
-                onClick={() => setPickerOpen(true)}
-                className="w-32 h-32 flex flex-col items-center justify-center border border-dashed border-rose-300 rounded-lg bg-rose-50/40 text-slate-500 hover:bg-rose-50 hover:border-rose-400 hover:text-rose-600 transition-colors"
-              >
-                <span className="material-symbols-outlined text-3xl mb-1">add_photo_alternate</span>
-                <span className="text-[10px] font-bold">必填 · 选择图片</span>
-              </button>
-            )}
+            </div>
             <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
               从资源库中选择已上传的图片;后端会校验资源并自动转换 URL 存储。
             </p>

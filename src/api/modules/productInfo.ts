@@ -90,6 +90,27 @@ export interface ProductUpdateReq {
   status?: ProductStatus;
 }
 
+export interface ProductAiAnalyzeRequest {
+  imageId: string;
+}
+
+/**
+ * 产品图片 AI 分析响应(9 个字段全部可选,AI 可能漏判)
+ * 本版本前端只消费 6 个(name/sellingPoints/color/patternMaterial/silhouetteStructure/category),
+ * 后 3 个保留字段(fabricTexture/keyDetails/unchangeable)等待未来前端表单字段扩展时启用。
+ */
+export interface ProductAiAnalyzeResponse {
+  name?: string;
+  sellingPoints?: string;
+  color?: string;
+  patternMaterial?: string;
+  silhouetteStructure?: string;
+  category?: string;
+  fabricTexture?: string;
+  keyDetails?: string;
+  unchangeable?: string;
+}
+
 export interface ProductIdReq {
   id: string;
 }
@@ -109,4 +130,8 @@ export const productInfoApi = {
 
   detail: (req: ProductIdReq) =>
     http.post<ProductDTO>('/v1/admin/product-info/detail', req),
+
+  /** 产品图片 AI 分析(POST /v1/admin/product-info/ai-analyze) */
+  aiAnalyze: (req: ProductAiAnalyzeRequest) =>
+    http.post<ProductAiAnalyzeResponse>('/v1/admin/product-info/ai-analyze', req),
 };
