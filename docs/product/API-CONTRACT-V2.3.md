@@ -5,7 +5,7 @@
 产品基线：V2.3
 文档职责：前后端接口、DTO、错误码、幂等与交互顺序的唯一 SSOT
 
-本文定义正式产品化一期的 REST API 边界和交互顺序。当前 demo API 仅作参考，正式实现不继续把飞书作为主数据源。阶段 3 使用默认通道 Prompt Profile 初始化 Prompt；阶段 4 选择或切换通道时基于已确认内容方案重新编译。任何付费生成必须经过“确认内容与 Prompt -> 选择通道并加载对应 Prompt/参数 -> Preflight -> 用户确认执行 -> Submit”。
+本文定义正式产品化一期的 REST API 边界和交互顺序。当前 demo API 仅作参考，正式实现不继续把飞书作为主数据源。阶段 3 使用默认通道 Prompt Profile 初始化 Prompt；阶段 4 选择或切换通道时基于已确认内容方案重新编译。阶段编号表示服务端业务状态和调用顺序，不要求前端拆成五个页面或重复向导。任何付费生成必须经过“确认内容与 Prompt -> 选择通道并加载对应 Prompt/参数 -> Preflight -> 用户确认执行 -> Submit”。
 
 ## 1. 通用约定
 
@@ -756,7 +756,7 @@ Submit 必须验证：任务组完整性、全部内容方案和 Prompt 快照�
 
 ### `GET /generation-task-groups/{group_id}`
 
-返回任务组、派生 `aggregate_status`、五步确认状态、组级成本汇总和按 `group_order` 排序的子任务。
+返回任务组、派生 `aggregate_status`、五阶段确认状态、组级成本汇总和按 `group_order` 排序的子任务。
 
 ### `GET /generation-tasks`
 
@@ -884,7 +884,7 @@ Submit 必须验证：任务组完整性、全部内容方案和 Prompt 快照�
 
 根据已确认商品事实、拍摄内容和参考资产生成任务级 Prompt 预览。比例、分辨率、张数、时长和通道参数由执行配置接口管理，不以 Prompt 预览接口作为提交依据。
 
-该接口用于独立预览和图片模板调试。正式视频五步流程必须使用 `prepare-content` 获取默认通道初始化 Prompt，并在阶段 4 使用 `compile-prompts-for-channel` 获取最终通道编译结果；不得用本接口替代通道 Profile 编译。
+该接口用于独立预览和图片模板调试。正式视频五阶段流程必须使用 `prepare-content` 获取默认通道初始化 Prompt，并在阶段 4 使用 `compile-prompts-for-channel` 获取最终通道编译结果；不得用本接口替代通道 Profile 编译。
 
 ```json
 {

@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>达芬奇密码 AI 素材工作台 - 五步生成工作流原型</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <style>
+      :root {
+        --navy: #0b1c30;
+        --navy-2: #132941;
+        --navy-3: #1c3652;
+        --blue: #0756d9;
+        --blue-soft: #eaf2ff;
+        --green: #16816d;
+        --green-soft: #e8f6f1;
+        --amber: #b56815;
+        --amber-soft: #fff4df;
+        --red: #c33c3c;
+        --red-soft: #fff0f0;
+        --ink: #172234;
+        --muted: #6e7b8d;
+        --line: #dce3eb;
+        --soft-line: #edf1f5;
+        --surface: #ffffff;
+        --canvas: #f4f6f9;
+        --shadow: 0 18px 50px rgba(19, 35, 55, 0.14);
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: var(--canvas); color: var(--ink); }
+      body { font-family: "Noto Sans SC", "PingFang SC", sans-serif; font-size: 13px; }
+      button, input, select, textarea { font: inherit; }
+      button { cursor: pointer; }
+      button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #8db5f7; outline-offset: 2px; }
+      svg { width: 17px; height: 17px; stroke-width: 1.8; }
+
+      .app { min-height: 100vh; display: grid; grid-template-columns: 232px minmax(0, 1fr); }
+      .sidebar { min-height: 100vh; background: var(--navy); color: #d8e2ec; padding: 18px 14px; display: flex; flex-direction: column; }
+      .brand { display: flex; align-items: center; gap: 10px; height: 54px; padding: 0 8px 16px; border-bottom: 1px solid rgba(255,255,255,.09); }
+      .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; background: #e9f2ff; color: var(--navy); border-radius: 6px; font-family: "DM Mono", monospace; font-weight: 500; }
+      .brand strong { display: block; color: #fff; font-size: 14px; }
+      .brand span { display: block; color: #7f96ae; font-size: 10px; margin-top: 2px; }
+      .create-btn { width: 100%; height: 42px; border: 1px solid #3e6da4; border-radius: 6px; background: #0d5bd7; color: white; margin: 17px 0 21px; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; }
+      .nav-label { color: #70869d; font-size: 10px; padding: 0 10px 7px; }
+      .nav { display: grid; gap: 3px; }
+      .nav-button { width: 100%; height: 40px; padding: 0 11px; border: 0; background: transparent; color: #9db0c3; border-radius: 6px; display: flex; align-items: center; gap: 10px; text-align: left; }
+      .nav-button:hover { background: var(--navy-2); color: #dfe8f0; }
+      .nav-button.active { color: #fff; background: var(--navy-3); }
+      .nav-button.active svg { color: #79aef8; }
+      .sidebar-foot { margin-top: auto; padding: 14px 10px 3px; border-top: 1px solid rgba(255,255,255,.09); display: flex; align-items: center; gap: 9px; color: #8fa3b6; }
+      .avatar { width: 30px; height: 30px; display: grid; place-items: center; background: #d7e5f7; color: #244565; border-radius: 50%; font-weight: 800; }
+      .sidebar-foot strong { color: #dce7f0; font-size: 11px; display: block; }
+      .sidebar-foot span { font-size: 10px; }
+
+      .shell { min-width: 0; }
+      .topbar { height: 64px; background: #fff; border-bottom: 1px solid var(--line); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 15; }
+      .crumb { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+      .crumb b { color: var(--ink); }
+      .top-actions { display: flex; align-items: center; gap: 10px; }
+      .autosave { color: var(--muted); font-size: 11px; }
+      .autosave b { color: var(--green); }
+      .icon-button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); color: #526277; background: white; border-radius: 6px; }
+
+      .view { display: none; padding: 18px 22px 34px; }
+      .view.active { display: block; }
+      .page-head { min-height: 61px; display: flex; justify-content: space-between; gap: 16px; align-items: center; margin: 0 auto 15px; max-width: 1540px; }
+      .page-title { display: flex; align-items: center; gap: 12px; }
+      .back { width: 34px; height: 34px; border: 1px solid var(--line); background: white; color: #536175; border-radius: 6px; display: grid; place-items: center; }
+      h1, h2, h3, p { margin: 0; }
+      .page-title h1 { font-size: 19px; line-height: 1.3; }
+      .page-title p { color: var(--muted); margin-top: 4px; font-size: 11px; }
+      .head-actions { display: flex; align-items: center; gap: 9px; }
+      .mode-switch { display: flex; align-items: center; border: 1px solid var(--line); padding: 3px; border-radius: 6px; background: white; }
+      .mode-switch button { height: 31px; border: 0; background: transparent; color: var(--muted); padding: 0 12px; border-radius: 4px; font-weight: 700; font-size: 11px; }
+      .mode-switch button.active { color: white; background: var(--navy-2); }
+      .assistant-button { height: 38px; border: 1px solid #a9c5ef; background: var(--blue-soft); color: #174c99; border-radius: 6px; padding: 0 13px; display: flex; align-items: center; gap: 7px; font-weight: 700; }
+      .assistant-button .step-count { padding-left: 8px; border-left: 1px solid #bdd1ee; font-family: "DM Mono", monospace; font-size: 10px; }
+
+      .workflow-strip { max-width: 1540px; margin: 0 auto 14px; background: white; border: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr); border-radius: 6px; overflow: hidden; }
+      .workflow-step { min-width: 0; padding: 10px 13px; border: 0; border-right: 1px solid var(--soft-line); background: white; color: #8793a2; display: flex; align-items: center; gap: 8px; text-align: left; }
+      .workflow-step:last-child { border-right: 0; }
+      .workflow-step span { flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid #b8c2ce; border-radius: 50%; font-family: "DM Mono", monospace; font-size: 10px; }
+      .workflow-step b { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; }
+      .workflow-step.done { color: #397668; background: #fbfdfc; }
+      .workflow-step.done span { color: white; background: var(--green); border-color: var(--green); }
+      .workflow-step.current { color: #154d9c; background: #f5f9ff; box-shadow: inset 0 -2px 0 var(--blue); }
+      .workflow-step.current span { color: white; background: var(--blue); border-color: var(--blue); }
+
+      .workbench { max-width: 1540px; margin: 0 auto; display: grid; grid-template-columns: 300px minmax(460px, 1fr) 360px; gap: 14px; align-items: start; }
+      .column { display: grid; gap: 14px; }
+      .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; transition: border-color .22s, box-shadow .22s, transform .22s; }
+      .panel.focused { border-color: #74a4e8; box-shadow: 0 0 0 3px rgba(61, 125, 220, .12); transform: translateY(-1px); }
+      .panel-head { padding: 14px 15px 11px; border-bottom: 1px solid var(--soft-line); display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+      .eyebrow { color: var(--blue); font-size: 10px; font-weight: 800; }
+      .panel-head h2 { font-size: 14px; margin-top: 3px; }
+      .panel-head p { font-size: 10px; color: var(--muted); margin-top: 4px; line-height: 1.55; }
+      .text-action { border: 0; color: var(--blue); background: transparent; font-size: 11px; font-weight: 700; padding: 3px; }
+      .panel-body { padding: 14px 15px; }
+      .product-photo { width: 100%; height: 190px; object-fit: cover; border-radius: 5px; background: #e8ecf0; }
+      .asset-meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; }
+      .asset-meta strong { display: block; font-size: 12px; }
+      .asset-meta span { color: var(--muted); font-size: 10px; display: block; margin-top: 3px; }
+      .source-pill { align-self: flex-start; padding: 4px 7px; color: #387264; background: var(--green-soft); border-radius: 4px; font-size: 10px; }
+      .mini-label { color: var(--muted); font-size: 10px; font-weight: 600; margin: 16px 0 8px; }
+      .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+      .profile { min-height: 54px; border: 1px solid var(--line); background: white; border-radius: 5px; padding: 9px; text-align: left; color: #536175; position: relative; }
+      .profile strong { display: block; font-size: 11px; color: var(--ink); }
+      .profile span { display: block; font-size: 9px; color: var(--muted); margin-top: 3px; }
+      .profile.selected { border-color: #78a6e7; background: #f5f9ff; }
+      .profile.selected:after { content: "✓"; position: absolute; right: 7px; top: 6px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; background: var(--blue); color: white; font-size: 9px; }
+
+      .reference-list { display: grid; gap: 7px; }
+      .reference-item { min-width: 0; display: grid; grid-template-columns: 29px 40px minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 7px; border: 1px solid var(--soft-line); border-radius: 5px; }
+      .position { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 4px; color: #59697c; background: #eef2f6; font-family: "DM Mono", monospace; font-size: 9px; }
+      .reference-item img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+      .reference-item strong { font-size: 10px; display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      .reference-item select { width: 100%; border: 0; color: var(--muted); background: transparent; font-size: 9px; padding: 0; margin-top: 2px; }
+      .order-actions { display: flex; gap: 2px; }
+      .order-actions button { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid var(--line); background: white; border-radius: 4px; color: #65758a; }
+      .order-actions svg { width: 12px; height: 12px; }
+
+      .facts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 12px; }
+      .field label { display: block; color: var(--muted); font-size: 10px; margin-bottom: 5px; }
+      .field input, .field select, .field textarea { width: 100%; border: 1px solid var(--line); color: var(--ink); background: white; border-radius: 5px; padding: 8px 9px; font-size: 11px; }
+      .field textarea { min-height: 66px; resize: vertical; line-height: 1.6; }
+      .fact-note { margin-top: 11px; padding: 9px 10px; display: flex; gap: 8px; align-items: flex-start; background: #f6f8fa; color: #5c6c7d; border-radius: 5px; font-size: 10px; line-height: 1.55; }
+      .fact-note svg { flex: 0 0 auto; width: 14px; color: var(--green); }
+      .confirm-row { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+      .confirmation-state { color: var(--amber); background: var(--amber-soft); padding: 4px 7px; border-radius: 4px; font-size: 10px; }
+      .confirmation-state.confirmed { color: #257260; background: var(--green-soft); }
+      .small-button { height: 31px; padding: 0 10px; border: 1px solid #adc4e4; color: #174b92; background: white; border-radius: 5px; font-size: 10px; font-weight: 700; }
+      .small-button.primary { color: white; background: var(--blue); border-color: var(--blue); }
+
+      .task-tabs { display: flex; border-bottom: 1px solid var(--soft-line); padding: 0 15px; overflow-x: auto; }
+      .task-tab { height: 41px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); padding: 0 12px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+      .task-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+      .prompt-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+      .prompt-meta b { font-size: 11px; }
+      .version { color: var(--muted); font-family: "DM Mono", monospace; font-size: 9px; }
+      .prompt-area { width: 100%; min-height: 116px; border: 1px solid var(--line); border-radius: 5px; padding: 11px; line-height: 1.72; resize: vertical; color: #3f5063; font-size: 11px; }
+      .prompt-footer { display: flex; justify-content: space-between; align-items: center; gap: 9px; margin-top: 9px; }
+      .prompt-sources { display: flex; flex-wrap: wrap; gap: 4px; }
+      .source-tag { color: #536679; background: #f0f3f6; padding: 3px 6px; border-radius: 3px; font-size: 9px; }
+
+      .channel-option { width: 100%; border: 1px solid var(--line); background: white; border-radius: 5px; padding: 10px; display: grid; grid-template-columns: 31px 1fr auto; gap: 9px; align-items: center; text-align: left; margin-bottom: 7px; }
+      .channel-option.selected { border-color: #7ba8e7; background: #f7faff; }
+      .channel-icon { width: 31px; height: 31px; border-radius: 5px; display: grid; place-items: center; background: #e7eef8; color: #295c96; font-family: "DM Mono", monospace; font-size: 10px; }
+      .channel-option strong { display: block; font-size: 11px; }
+      .channel-option span { display: block; color: var(--muted); font-size: 9px; margin-top: 2px; }
+      .health { color: var(--green); font-size: 9px; }
+      .health.busy { color: var(--amber); }
+      .diff-banner { display: none; margin: 9px 0 12px; padding: 10px; border: 1px solid #f0ce99; background: var(--amber-soft); border-radius: 5px; }
+      .diff-banner.visible { display: block; }
+      .diff-banner strong { color: #7e4c13; font-size: 10px; }
+      .diff-banner p { color: #85653e; font-size: 9px; line-height: 1.55; margin-top: 4px; }
+      .diff-line { margin-top: 7px; padding: 7px; background: rgba(255,255,255,.68); border-radius: 4px; font-family: "DM Mono", monospace; font-size: 8px; color: #6d5a43; }
+      .dynamic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+      .cost-line { margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--soft-line); display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+      .metric { padding: 9px; background: #f4f6f8; border-radius: 5px; }
+      .metric span { display: block; color: var(--muted); font-size: 9px; }
+      .metric strong { display: block; font-size: 15px; margin-top: 3px; }
+      .metric.cost strong { color: var(--amber); }
+
+      .shot-list { display: grid; gap: 7px; margin-top: 10px; }
+      .shot { display: grid; grid-template-columns: 53px 1fr; gap: 9px; padding: 9px; background: #f6f8fa; border-radius: 5px; }
+      .shot-time { font-family: "DM Mono", monospace; font-size: 9px; color: var(--blue); }
+      .shot strong { display: block; font-size: 10px; }
+      .shot p { color: var(--muted); font-size: 9px; line-height: 1.55; margin-top: 3px; }
+
+      .drawer-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(7, 19, 34, .26); opacity: 0; pointer-events: none; transition: opacity .22s; }
+      .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+      .assistant-drawer { position: fixed; z-index: 45; right: 0; top: 0; width: min(470px, 100vw); height: 100vh; background: white; box-shadow: var(--shadow); transform: translateX(102%); transition: transform .26s ease; display: grid; grid-template-rows: auto auto 1fr auto; }
+      .assistant-drawer.open { transform: translateX(0); }
+      .drawer-head { min-height: 72px; padding: 15px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+      .assistant-id { display: flex; align-items: center; gap: 10px; }
+      .ai-mark { width: 36px; height: 36px; display: grid; place-items: center; background: var(--navy-2); color: white; border-radius: 6px; font-family: "DM Mono", monospace; }
+      .assistant-id strong { display: block; font-size: 13px; }
+      .assistant-id span { display: block; color: var(--muted); font-size: 10px; margin-top: 3px; }
+      .drawer-close { width: 31px; height: 31px; border: 0; background: #f1f4f7; color: #596b7f; border-radius: 5px; display: grid; place-items: center; }
+      .assistant-steps { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid var(--line); }
+      .assistant-step { min-width: 0; height: 53px; border: 0; border-right: 1px solid var(--soft-line); background: white; color: #9aa5b1; display: grid; place-items: center; gap: 1px; font-family: "DM Mono", monospace; font-size: 8px; }
+      .assistant-step:last-child { border-right: 0; }
+      .assistant-step i { width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid #bac4cf; border-radius: 50%; font-style: normal; }
+      .assistant-step.done { color: var(--green); }
+      .assistant-step.done i { color: white; background: var(--green); border-color: var(--green); }
+      .assistant-step.current { color: var(--blue); background: #f5f9ff; }
+      .assistant-step.current i { color: white; background: var(--blue); border-color: var(--blue); }
+      .drawer-body { min-height: 0; overflow-y: auto; padding: 18px; background: #f7f9fb; }
+      .assistant-content { display: none; }
+      .assistant-content.active { display: block; animation: reveal .18s ease; }
+      @keyframes reveal { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+      .message { display: grid; grid-template-columns: 29px 1fr; gap: 9px; margin-bottom: 14px; }
+      .message-avatar { width: 29px; height: 29px; display: grid; place-items: center; background: var(--navy-2); color: white; border-radius: 5px; font-family: "DM Mono", monospace; font-size: 9px; }
+      .bubble { background: white; border: 1px solid var(--line); border-radius: 6px; padding: 12px; line-height: 1.68; color: #4e5f72; font-size: 11px; }
+      .bubble b { color: var(--ink); }
+      .bubble p + p { margin-top: 7px; }
+      .bubble-note { margin-top: 9px; padding: 8px; background: #f3f6f8; border-radius: 4px; color: var(--muted); font-size: 9px; }
+      .choice-list { margin-left: 38px; display: grid; gap: 7px; }
+      .choice { width: 100%; border: 1px solid var(--line); background: white; border-radius: 5px; padding: 10px; text-align: left; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+      .choice strong { display: block; font-size: 10px; }
+      .choice span { color: var(--muted); font-size: 9px; display: block; margin-top: 2px; }
+      .choice.selected { border-color: #83ace6; background: #f5f9ff; }
+      .choice.selected svg { color: var(--blue); }
+      .fact-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+      .fact-chip { padding: 4px 6px; color: #3d685f; background: var(--green-soft); border-radius: 4px; font-size: 9px; }
+      .assistant-card { margin-left: 38px; background: white; border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+      .assistant-card + .assistant-card { margin-top: 8px; }
+      .assistant-card-head { display: flex; justify-content: space-between; gap: 9px; align-items: center; }
+      .assistant-card-head strong { font-size: 10px; }
+      .assistant-card-head span { color: var(--muted); font-family: "DM Mono", monospace; font-size: 8px; }
+      .assistant-card p { color: #59697b; line-height: 1.6; font-size: 9px; margin-top: 6px; }
+      .change-list { display: grid; gap: 6px; margin-top: 9px; }
+      .change { padding: 7px; border-left: 2px solid var(--amber); background: #fffaf1; color: #775a35; font-size: 9px; line-height: 1.55; }
+      .preflight-list { margin-left: 38px; display: grid; gap: 7px; }
+      .preflight-row { background: white; border: 1px solid var(--line); border-radius: 5px; padding: 9px 10px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+      .preflight-row div { display: flex; align-items: center; gap: 7px; }
+      .preflight-row svg { color: var(--green); width: 14px; }
+      .preflight-row span { color: var(--muted); font-size: 9px; }
+      .preflight-row strong { font-size: 10px; }
+      details.request { margin: 11px 0 0 38px; background: #eef2f5; border-radius: 5px; padding: 9px; }
+      details.request summary { cursor: pointer; color: #56687c; font-size: 9px; font-weight: 700; }
+      .request-code { margin-top: 8px; white-space: pre-wrap; color: #5f6f7f; font-family: "DM Mono", monospace; font-size: 8px; line-height: 1.65; }
+      .drawer-footer { padding: 13px 18px; border-top: 1px solid var(--line); background: white; display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+      .drawer-footer button { height: 36px; border-radius: 5px; font-weight: 700; font-size: 10px; }
+      .previous { padding: 0 12px; border: 1px solid var(--line); color: #526377; background: white; }
+      .next { flex: 1; border: 1px solid var(--blue); color: white; background: var(--blue); }
+      .next.final { background: var(--green); border-color: var(--green); }
+
+      .status-page, .template-page { max-width: 1420px; margin: 0 auto; }
+      .section-heading { margin: 10px 0 18px; display: flex; justify-content: space-between; gap: 14px; align-items: end; }
+      .section-heading h1 { font-size: 22px; }
+      .section-heading p { margin-top: 5px; color: var(--muted); font-size: 11px; }
+      .table-panel { background: white; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+      table { width: 100%; border-collapse: collapse; min-width: 920px; }
+      th { height: 42px; padding: 0 14px; background: #f7f9fb; color: var(--muted); text-align: left; font-size: 9px; }
+      td { padding: 13px 14px; border-top: 1px solid var(--soft-line); vertical-align: middle; font-size: 10px; }
+      .task-cell { display: flex; align-items: center; gap: 9px; }
+      .task-cell img { width: 42px; height: 42px; border-radius: 5px; object-fit: cover; }
+      .task-cell strong { display: block; font-size: 11px; }
+      .task-cell span { display: block; color: var(--muted); font-size: 9px; margin-top: 3px; }
+      .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; border-radius: 4px; font-size: 9px; font-weight: 700; }
+      .badge.queued { color: #245995; background: #eaf2fc; }
+      .badge.retry { color: #885315; background: var(--amber-soft); }
+      .badge.generating { color: #185c91; background: #e8f4fb; }
+      .badge.review { color: #456071; background: #edf2f5; }
+      .badge.mismatch { color: #a83333; background: var(--red-soft); }
+      .badge.generated { color: #236858; background: var(--green-soft); }
+      .badge.reused { color: #5a527e; background: #f0edf8; }
+      .table-action { border: 1px solid var(--line); background: white; color: #526377; border-radius: 4px; padding: 6px 8px; font-size: 9px; font-weight: 700; }
+      .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 13px; overflow-x: auto; }
+      .template-tab { height: 40px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); padding: 0 13px; white-space: nowrap; font-size: 10px; font-weight: 700; }
+      .template-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+      .template-summary { padding: 14px; background: white; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 13px; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+      .template-summary b { font-size: 12px; }
+      .template-summary span { color: var(--muted); font-size: 10px; display: block; margin-top: 3px; }
+
+      .toast { position: fixed; z-index: 70; left: 50%; bottom: 25px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; background: var(--navy-2); color: white; border-radius: 6px; padding: 11px 14px; box-shadow: var(--shadow); display: flex; gap: 8px; align-items: center; transition: .22s; font-size: 11px; }
+      .toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+      @media (max-width: 1180px) {
+        .app { grid-template-columns: 78px minmax(0,1fr); }
+        .sidebar { padding: 15px 9px; }
+        .brand { justify-content: center; padding: 0 0 15px; }
+        .brand div, .nav-label, .nav-button span, .create-btn span, .sidebar-foot div { display: none; }
+        .create-btn { width: 42px; margin-left: auto; margin-right: auto; }
+        .nav-button { justify-content: center; }
+        .sidebar-foot { justify-content: center; padding-left: 0; padding-right: 0; }
+        .workbench { grid-template-columns: 250px minmax(410px,1fr); }
+        .workbench > .column:last-child { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; }
+      }
+
+      @media (max-width: 760px) {
+        .app { display: block; }
+        .sidebar { display: none; }
+        .topbar { height: 55px; padding: 0 13px; }
+        .autosave { display: none; }
+        .view { padding: 12px; }
+        .page-head { align-items: flex-start; }
+        .head-actions { flex-direction: column; align-items: stretch; }
+        .mode-switch { order: 2; }
+        .workflow-strip { grid-template-columns: 1fr; }
+        .workflow-step { display: none; border-right: 0; }
+        .workflow-step.current { display: flex; }
+        .workbench { display: block; }
+        .column { margin-bottom: 12px; }
+        .workbench > .column:last-child { display: grid; grid-template-columns: 1fr; }
+        .facts-grid, .dynamic-grid { grid-template-columns: 1fr; }
+        .assistant-drawer { width: 100vw; }
+        .page-title p { max-width: 220px; }
+        .section-heading { align-items: flex-start; flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand"><div class="brand-mark">D</div><div><strong>达芬奇密码 AI</strong><span>素材工作台 · V2.3</span></div></div>
+        <button class="create-btn" data-view-target="create"><i data-lucide="circle-plus"></i><span>开始智能创作</span></button>
+        <div class="nav-label">主模块导航</div>
+        <nav class="nav">
+          <button class="nav-button" data-view-target="dashboard"><i data-lucide="layout-dashboard"></i><span>工作台首页</span></button>
+          <button class="nav-button active" data-view-target="create"><i data-lucide="wand-sparkles"></i><span>新建任务</span></button>
+          <button class="nav-button" data-view-target="tasks"><i data-lucide="list-checks"></i><span>任务列表</span></button>
+          <button class="nav-button" data-view-target="templates"><i data-lucide="layout-template"></i><span>智能模板中心</span></button>
+          <button class="nav-button" data-view-target="assets"><i data-lucide="images"></i><span>商品素材库</span></button>
+          <button class="nav-button" data-view-target="analytics"><i data-lucide="chart-no-axes-combined"></i><span>数据效能复盘</span></button>
+          <button class="nav-button" data-view-target="settings"><i data-lucide="settings-2"></i><span>系统配置模块</span></button>
+        </nav>
+        <div class="sidebar-foot"><div class="avatar">陆</div><div><strong>陆永奇</strong><span>运营策划</span></div></div>
+      </aside>
+
+      <section class="shell">
+        <header class="topbar">
+          <div class="crumb"><span>AI 素材工作台</span><i data-lucide="chevron-right"></i><b id="crumbTitle">新建任务</b></div>
+          <div class="top-actions"><span class="autosave"><b>已自动保存</b> · 刚刚</span><button class="icon-button" title="通知"><i data-lucide="bell"></i></button><button class="icon-button" title="帮助"><i data-lucide="circle-help"></i></button></div>
+        </header>
+
+        <main id="createView" class="view active">
+          <div class="page-head">
+            <div class="page-title"><button class="back" title="返回任务列表" data-view-target="tasks"><i data-lucide="arrow-left"></i></button><div><h1 id="pageTitle">新建多类型图片任务</h1><p id="pageSubtitle">保留现有三栏工作台，由 AI 助手按确认节点推进</p></div></div>
+            <div class="head-actions">
+              <div class="mode-switch"><button class="media-mode active" data-media="image">图片任务</button><button class="media-mode" data-media="video">视频任务</button></div>
+              <button class="assistant-button" id="openAssistant"><i data-lucide="sparkles"></i>AI 助手<span class="step-count" id="assistantCount">1 / 5</span></button>
+            </div>
+          </div>
+
+          <div class="workflow-strip" aria-label="创建进度">
+            <button class="workflow-step current" data-step="1"><span>1</span><b>素材与任务类型</b></button>
+            <button class="workflow-step" data-step="2"><span>2</span><b>商品信息确认</b></button>
+            <button class="workflow-step" data-step="3"><span>3</span><b>内容与 Prompt</b></button>
+            <button class="workflow-step" data-step="4"><span>4</span><b>模型与生成设置</b></button>
+            <button class="workflow-step" data-step="5"><span>5</span><b>费用与执行确认</b></button>
+          </div>
+
+          <div class="workbench">
+            <div class="column">
+              <section class="panel focused" id="sourcePanel">
+                <div class="panel-head"><div><span class="eyebrow">输入素材</span><h2>商品主体</h2><p>从素材库选择，保留来源和资产关联</p></div><button class="text-action">资源中心</button></div>
+                <div class="panel-body">
+                  <img class="product-photo" src="https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=720&q=86" alt="绿色手提包商品素材" />
+                  <div class="asset-meta"><div><strong>复古绿色手提包.jpg</strong><span>商品原图 · 2400 × 3000</span></div><span class="source-pill">已关联商品</span></div>
+                  <div class="mini-label">任务类型 · 可多选</div>
+                  <div class="profile-grid" id="imageProfiles">
+                    <button class="profile selected"><strong>商品主图</strong><span>main_image · 2 张</span></button>
+                    <button class="profile selected"><strong>场景图</strong><span>scene_image · 2 张</span></button>
+                    <button class="profile selected"><strong>细节图</strong><span>detail_image · 1 张</span></button>
+                    <button class="profile"><strong>上身 / 三视图</strong><span>tryon_three_view</span></button>
+                  </div>
+                  <div class="profile-grid" id="videoProfiles" hidden>
+                    <button class="profile selected"><strong>首帧图生视频</strong><span>img2video</span></button>
+                    <button class="profile"><strong>参考图生视频</strong><span>reference2video</span></button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel" id="referencePanel">
+                <div class="panel-head"><div><span class="eyebrow">参考素材</span><h2>角色与顺序</h2><p>顺序会进入最终请求</p></div><button class="text-action">添加</button></div>
+                <div class="panel-body"><div class="reference-list" id="referenceList">
+                  <div class="reference-item"><span class="position">1</span><img src="https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=160&q=80" alt="商品图" /><div><strong>绿色手提包主体</strong><select><option>商品主体</option><option>首帧</option></select></div><div class="order-actions"><button class="move-up" title="上移"><i data-lucide="chevron-up"></i></button><button class="move-down" title="下移"><i data-lucide="chevron-down"></i></button></div></div>
+                  <div class="reference-item"><span class="position">2</span><img src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=160&q=80" alt="模特参考" /><div><strong>轻熟通勤模特</strong><select><option>模特参考</option><option>动作参考</option></select></div><div class="order-actions"><button class="move-up" title="上移"><i data-lucide="chevron-up"></i></button><button class="move-down" title="下移"><i data-lucide="chevron-down"></i></button></div></div>
+                  <div class="reference-item"><span class="position">3</span><img src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=160&q=80" alt="场景参考" /><div><strong>现代通勤场景</strong><select><option>场景参考</option><option>风格参考</option></select></div><div class="order-actions"><button class="move-up" title="上移"><i data-lucide="chevron-up"></i></button><button class="move-down" title="下移"><i data-lucide="chevron-down"></i></button></div></div>
+                </div></div>
+              </section>
+            </div>
+
+            <div class="column">
+              <section class="panel" id="factsPanel">
+                <div class="panel-head"><div><span class="eyebrow">AI 解析结果</span><h2>商品信息确认</h2><p>用户确认后的内容才会用于生成</p></div><span class="confirmation-state" id="factsState">待确认</span></div>
+                <div class="panel-body">
+                  <div class="facts-grid">
+                    <div class="field"><label>商品名称</label><input value="复古结构感绿色手提包" /></div>
+                    <div class="field"><label>品类</label><input value="箱包配饰 / 手提包" /></div>
+                    <div class="field"><label>颜色</label><input value="深苔绿色，金色五金" /></div>
+                    <div class="field"><label>材质</label><input value="哑光纹理皮革" /></div>
+                    <div class="field"><label>核心卖点</label><input value="结构挺括、通勤容量、复古五金" /></div>
+                    <div class="field"><label>不可改动</label><input value="颜色、包型、锁扣、提手比例" /></div>
+                  </div>
+                  <div class="fact-note"><i data-lucide="shield-check"></i><span>AI 已识别 6 项商品事实，未发现素材间冲突。修改后会要求重新确认内容。</span></div>
+                  <div class="confirm-row"><span class="confirmation-state" id="factConfidence">识别置信度 94%</span><button class="small-button" id="confirmFacts">确认商品信息</button></div>
+                </div>
+              </section>
+
+              <section class="panel" id="promptPanel">
+                <div class="panel-head"><div><span class="eyebrow">任务级内容</span><h2>内容方案与 Prompt</h2><p>每个子任务独立确认，修改不影响全局模板</p></div><span class="confirmation-state" id="promptState">3 项待确认</span></div>
+                <div class="task-tabs"><button class="task-tab active">商品主图</button><button class="task-tab">场景图</button><button class="task-tab">细节图</button></div>
+                <div class="panel-body">
+                  <div class="prompt-meta"><b id="promptTitle">通勤商品主图 · 稳定构图</b><span class="version" id="profileVersion">默认内容版本 v2.3</span></div>
+                  <textarea class="prompt-area" id="promptText">以复古结构感绿色手提包为唯一商品主体，保持深苔绿色、金色锁扣、提手比例和挺括包型准确。使用克制的商业柔光与干净背景，正面略微侧转展示包体结构，画面适合电商主图。</textarea>
+                  <div class="prompt-footer"><div class="prompt-sources"><span class="source-tag">商品事实</span><span class="source-tag">主图模板 v2.1</span><span class="source-tag">参考图 1–3</span></div><button class="small-button" id="confirmPrompt">确认本组内容</button></div>
+                  <div id="videoShots" hidden>
+                    <div class="mini-label">按 8 秒动态生成 · 2 个镜头</div>
+                    <div class="shot-list"><div class="shot"><span class="shot-time">0–4s</span><div><strong>建立商品与人物关系</strong><p>人物自然入画，镜头缓慢推进，锁定手提包主体。</p></div></div><div class="shot"><span class="shot-time">4–8s</span><div><strong>材质与五金收束</strong><p>动作幅度克制，以近景突出皮革纹理和金色锁扣。</p></div></div></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="column">
+              <section class="panel" id="channelPanel">
+                <div class="panel-head"><div><span class="eyebrow">模型通道</span><h2>选择模型</h2><p>切换后自动检查内容与规格兼容性</p></div><span class="health">服务健康</span></div>
+                <div class="panel-body">
+                  <button class="channel-option selected" data-channel="agnes"><span class="channel-icon">AG</span><div><strong>Agnes Studio</strong><span>保真优先 · 推荐</span></div><span class="health">健康</span></button>
+                  <button class="channel-option" data-channel="vidu"><span class="channel-icon">VD</span><div><strong>Vidu Q3</strong><span>视频内容编译 · 参考生视频</span></div><span class="health busy">繁忙</span></button>
+                  <div class="diff-banner" id="diffBanner"><strong>Prompt 已按 Vidu Q3 重新适配</strong><p>商品语义未改变，保留已确认内容。新增图片绑定与镜头语法。</p><div class="diff-line">+ @图片1 作为商品主体<br />+ 规划切镜：0–4s / 4–8s<br />+ 画面主体一致性约束</div></div>
+                </div>
+              </section>
+
+              <section class="panel" id="paramsPanel">
+                <div class="panel-head"><div><span class="eyebrow">生成设置</span><h2>动态参数</h2><p id="schemaVersion">Agnes Image · 能力版本 2026.07</p></div><button class="text-action">恢复推荐</button></div>
+                <div class="panel-body">
+                  <div class="dynamic-grid">
+                    <div class="field"><label>比例</label><select id="ratioSelect"><option>4:5</option><option>1:1</option><option>3:4</option></select></div>
+                    <div class="field"><label id="countLabel">每类张数</label><select id="countSelect"><option>2 张</option><option>1 张</option><option>4 张</option></select></div>
+                    <div class="field"><label id="resolutionLabel">尺寸</label><select id="resolutionSelect"><option>1536px</option><option>2048px</option></select></div>
+                    <div class="field"><label id="qualityLabel">质量</label><select id="qualitySelect"><option>标准</option><option>高清</option></select></div>
+                  </div>
+                  <div class="cost-line"><div class="metric cost"><span>预计总费用</span><strong id="costValue">¥ 22.60</strong></div><div class="metric"><span>预计耗时</span><strong id="durationValue">2–4 分钟</strong></div></div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </main>
+
+        <main id="tasksView" class="view">
+          <div class="status-page">
+            <div class="section-heading"><div><h1>任务列表</h1><p>创建后的任务先进入排队状态，生成、重试和审核过程可追踪。</p></div><button class="assistant-button" data-view-target="create"><i data-lucide="circle-plus"></i>新建任务</button></div>
+            <div class="table-panel"><div style="overflow-x:auto"><table><thead><tr><th>任务</th><th>类型 / 通道</th><th>执行状态</th><th>结果状态</th><th>成本</th><th>操作</th></tr></thead><tbody>
+              <tr><td><div class="task-cell"><img src="https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=180&q=80" alt="手提包任务" /><div><strong>复古绿色手提包 · 任务组</strong><span>G-20260719-008 · 3 个子任务</span></div></div></td><td>图片 · Agnes Studio</td><td><span class="badge queued"><i data-lucide="clock-3"></i>排队中</span></td><td>—</td><td>¥ 22.60</td><td><button class="table-action">查看详情</button></td></tr>
+              <tr><td><div class="task-cell"><img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=180&q=80" alt="鞋履任务" /><div><strong>运动鞋场景图 · 城市街头</strong><span>I-20260719-031</span></div></div></td><td>图片 · Imagen</td><td><span class="badge retry"><i data-lucide="rotate-cw"></i>重试等待</span></td><td>限流后 42 秒重试</td><td>¥ 6.20</td><td><button class="table-action">查看原因</button></td></tr>
+              <tr><td><div class="task-cell"><img src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=180&q=80" alt="视频任务" /><div><strong>轻熟通勤 · 手提包展示视频</strong><span>V-20260719-014</span></div></div></td><td>视频 · Vidu Q3</td><td><span class="badge generating"><i data-lucide="loader-circle"></i>生成中 68%</span></td><td><span class="badge generated">generated</span></td><td>¥ 18.00</td><td><button class="table-action">查看进度</button></td></tr>
+              <tr><td><div class="task-cell"><img src="https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=180&q=80" alt="规格不符结果" /><div><strong>高跟鞋商品主图</strong><span>I-20260718-102 · 待人工审核</span></div></div></td><td>图片 · Agnes Studio</td><td><span class="badge review">待上架审核</span></td><td><span class="badge mismatch">规格不符</span> <span class="badge generated">generated</span></td><td>¥ 8.80</td><td><button class="table-action">检查差异</button></td></tr>
+              <tr><td><div class="task-cell"><img src="https://images.unsplash.com/photo-1590874103328-eac38a683ce7?auto=format&fit=crop&w=180&q=80" alt="复用结果" /><div><strong>历史审核图复用</strong><span>I-20260718-088 · 来源结果 R-208</span></div></div></td><td>图片 · 无新调用</td><td><span class="badge review">待审美评分</span></td><td><span class="badge reused">reused</span></td><td>¥ 0.00</td><td><button class="table-action">查看来源</button></td></tr>
+            </tbody></table></div></div>
+          </div>
+        </main>
+
+        <main id="templatesView" class="view">
+          <div class="template-page">
+            <div class="section-heading"><div><h1>智能模板中心</h1><p>模板维护通道共性的内容，不单独增加 Prompt Profile 页面。</p></div><button class="small-button primary">新建模板</button></div>
+            <div class="tabs"><button class="template-tab active">图片任务模板</button><button class="template-tab">风格场景模板</button><button class="template-tab">视频 Prompt 模板</button><button class="template-tab">平台规格模板</button><button class="template-tab">负面约束模板</button></div>
+            <div class="template-summary"><div><b id="templateTitle">图片任务模板 · 12</b><span id="templateDescription">定义生成什么图片以及通用 Prompt 骨架</span></div><span class="badge generated">已启用 10</span></div>
+            <div class="table-panel"><div style="overflow-x:auto"><table><thead><tr><th>模板名称</th><th>内容结构</th><th>适用任务</th><th>版本</th><th>状态</th><th>操作</th></tr></thead><tbody id="templateRows"><tr><td><strong>通勤商品主图</strong></td><td>主体、构图、光线、保真约束</td><td>main_image</td><td>v2.1</td><td><span class="badge generated">启用</span></td><td><button class="table-action">编辑新版本</button></td></tr><tr><td><strong>服装上身展示</strong></td><td>人物、姿态、服装版型、细节</td><td>tryon_three_view</td><td>v1.8</td><td><span class="badge generated">启用</span></td><td><button class="table-action">编辑新版本</button></td></tr></tbody></table></div></div>
+          </div>
+        </main>
+      </section>
+    </div>
+
+    <div class="drawer-backdrop open" id="drawerBackdrop"></div>
+    <aside class="assistant-drawer open" id="assistantDrawer" aria-label="AI 助手工作流">
+      <header class="drawer-head"><div class="assistant-id"><div class="ai-mark">AI</div><div><strong>达芬奇 AI 助手</strong><span id="assistantSubtitle">正在确认素材与任务类型</span></div></div><button class="drawer-close" id="closeAssistant" title="关闭"><i data-lucide="x"></i></button></header>
+      <nav class="assistant-steps"><button class="assistant-step current" data-step="1"><i>1</i><span>素材</span></button><button class="assistant-step" data-step="2"><i>2</i><span>事实</span></button><button class="assistant-step" data-step="3"><i>3</i><span>内容</span></button><button class="assistant-step" data-step="4"><i>4</i><span>设置</span></button><button class="assistant-step" data-step="5"><i>5</i><span>执行</span></button></nav>
+      <div class="drawer-body">
+        <section class="assistant-content active" data-content-step="1">
+          <div class="message"><div class="message-avatar">AI</div><div class="bubble"><b>先确认本次要使用的商品素材和任务类型。</b><p>我已识别到一张已关联商品的主体图，并按常用组合勾选了主图、场景图和细节图。</p><div class="bubble-note">多选图片类型会作为一个任务组提交，共享商品信息、模型和执行策略。</div></div></div>
+          <div class="choice-list"><button class="choice selected"><div><strong>当前素材可用</strong><span>原图清晰，商品关联完整</span></div><i data-lucide="circle-check"></i></button><button class="choice selected"><div><strong>创建 3 个图片子任务</strong><span>主图 2 张 · 场景图 2 张 · 细节图 1 张</span></div><i data-lucide="layers-3"></i></button></div>
+        </section>
+        <section class="assistant-content" data-content-step="2">
+          <div class="message"><div class="message-avatar">AI</div><div class="bubble"><b>商品信息已解析完成，请确认事实是否准确。</b><p>这些字段会作为后续所有 Prompt 的共同事实，不会被风格图或场景图覆盖。</p><div class="fact-chips"><span class="fact-chip">深苔绿色</span><span class="fact-chip">哑光皮革</span><span class="fact-chip">金色锁扣</span><span class="fact-chip">结构挺括</span></div></div></div>
+          <div class="assistant-card"><div class="assistant-card-head"><strong>未发现素材冲突</strong><span>confidence 94%</span></div><p>主体图、商品信息和参考图的颜色、品类与结构描述一致。</p></div>
+        </section>
+        <section class="assistant-content" data-content-step="3">
+          <div class="message"><div class="message-avatar">AI</div><div class="bubble"><b>我已为每个子任务生成独立内容方案。</b><p>你可以在原页面继续编辑。确认后，我才会解锁模型和执行设置。</p></div></div>
+          <div class="assistant-card"><div class="assistant-card-head"><strong>商品主图</strong><span>draft v2.3</span></div><p>正面略微侧转，克制商业柔光，保持包型、颜色和五金准确。</p></div>
+          <div class="assistant-card"><div class="assistant-card-head"><strong>场景图</strong><span>draft v2.3</span></div><p>现代通勤环境，自然人物关系，商品主体保持清晰。</p></div>
+          <div class="assistant-card"><div class="assistant-card-head"><strong>细节图</strong><span>draft v2.3</span></div><p>聚焦皮革纹理、锁扣和边缘缝线，不改变商品结构。</p></div>
+        </section>
+        <section class="assistant-content" data-content-step="4">
+          <div class="message"><div class="message-avatar">AI</div><div class="bubble"><b>现在选择模型和生成规格。</b><p>切换模型后我会重新检查 Prompt、参考图和参数是否兼容；仅语法变化时不会要求你重新确认内容。</p></div></div>
+          <div class="assistant-card"><div class="assistant-card-head"><strong>通道切换结果</strong><span id="compileState">Agnes · unchanged</span></div><div class="change-list" id="compileChanges"><div class="change">当前 Prompt 与 Agnes Studio 兼容，无需重新编译。</div></div></div>
+          <div class="assistant-card"><div class="assistant-card-head"><strong>动态参数</strong><span>schema 2026.07</span></div><p>比例 4:5 · 每类 2 张 · 1536px · 标准质量</p></div>
+        </section>
+        <section class="assistant-content" data-content-step="5">
+          <div class="message"><div class="message-avatar">AI</div><div class="bubble"><b>检查已完成，可以确认执行。</b><p>这是本次会产生费用的最后确认。提交后任务先进入排队中，不会直接显示生成成功。</p></div></div>
+          <div class="preflight-list"><div class="preflight-row"><div><i data-lucide="circle-check"></i><strong>3 个子任务检查通过</strong></div><span>完整</span></div><div class="preflight-row"><div><i data-lucide="circle-check"></i><strong>参考素材顺序有效</strong></div><span>1–3</span></div><div class="preflight-row"><div><i data-lucide="circle-check"></i><strong>模型服务健康</strong></div><span>预计等待 38 秒</span></div><div class="preflight-row"><div><i data-lucide="circle-check"></i><strong>预算允许</strong></div><span id="finalCost">¥ 22.60</span></div></div>
+          <div class="assistant-card"><div class="assistant-card-head"><strong>失败处理</strong><span>用户已确认</span></div><p>同配置最多重试 1 次；仍失败则停止并通知，不自动切换到其他付费通道。</p></div>
+          <details class="request"><summary>查看本次请求摘要</summary><div class="request-code">任务组：3 个图片子任务
+模型：Agnes Studio / image-2.1
+参数：ratio 4:5 · count 2 · quality standard
+参考图：商品主体(1) · 模特(2) · 场景(3)
+预计耗时：2–4 分钟</div></details>
+        </section>
+      </div>
+      <footer class="drawer-footer"><button class="previous" id="previousStep">上一步</button><button class="next" id="nextStep">确认素材，继续</button></footer>
+    </aside>
+
+    <div class="toast" id="toast"><i data-lucide="circle-check"></i><span>任务组已提交，当前状态：排队中</span></div>
+
+    <script>
+      const state = { step: 1, media: 'image', drawerOpen: true, factsConfirmed: false, promptConfirmed: false, channel: 'agnes' };
+      const stepNames = ['素材与任务类型', '商品信息确认', '内容与 Prompt', '模型与生成设置', '费用与执行确认'];
+      const nextLabels = ['确认素材，继续', '确认商品信息，继续', '确认内容，选择模型', '运行检查并查看费用', '确认费用并提交任务'];
+      const focusMap = {
+        1: ['sourcePanel', 'referencePanel'],
+        2: ['factsPanel'],
+        3: ['promptPanel'],
+        4: ['channelPanel', 'paramsPanel'],
+        5: ['paramsPanel']
+      };
+
+      function refreshIcons() { if (window.lucide) window.lucide.createIcons(); }
+      function updatePositions() {
+        [...document.querySelectorAll('#referenceList .reference-item')].forEach((item, index) => { item.querySelector('.position').textContent = index + 1; });
+      }
+      function setStep(next) {
+        state.step = Math.max(1, Math.min(5, next));
+        document.querySelectorAll('[data-step]').forEach((button) => {
+          const step = Number(button.dataset.step);
+          button.classList.toggle('current', step === state.step);
+          button.classList.toggle('done', step < state.step);
+          const circle = button.querySelector('span, i');
+          if (circle && step < state.step) circle.textContent = '✓';
+          if (circle && step >= state.step) circle.textContent = step;
+        });
+        document.querySelectorAll('[data-content-step]').forEach((content) => content.classList.toggle('active', Number(content.dataset.contentStep) === state.step));
+        document.querySelectorAll('.panel').forEach((panel) => panel.classList.remove('focused'));
+        (focusMap[state.step] || []).forEach((id) => document.getElementById(id)?.classList.add('focused'));
+        document.getElementById('assistantCount').textContent = `${state.step} / 5`;
+        document.getElementById('assistantSubtitle').textContent = `正在进行：${stepNames[state.step - 1]}`;
+        const nextButton = document.getElementById('nextStep');
+        nextButton.textContent = nextLabels[state.step - 1];
+        nextButton.classList.toggle('final', state.step === 5);
+        document.getElementById('previousStep').disabled = state.step === 1;
+        refreshIcons();
+      }
+
+      function openAssistant() {
+        state.drawerOpen = true;
+        document.getElementById('assistantDrawer').classList.add('open');
+        document.getElementById('drawerBackdrop').classList.add('open');
+      }
+      function closeAssistant() {
+        state.drawerOpen = false;
+        document.getElementById('assistantDrawer').classList.remove('open');
+        document.getElementById('drawerBackdrop').classList.remove('open');
+      }
+      function switchView(view) {
+        const known = ['create', 'tasks', 'templates'];
+        const target = known.includes(view) ? view : 'create';
+        document.querySelectorAll('.view').forEach((item) => item.classList.remove('active'));
+        document.getElementById(`${target}View`).classList.add('active');
+        document.querySelectorAll('.nav-button').forEach((button) => button.classList.toggle('active', button.dataset.viewTarget === target));
+        document.getElementById('crumbTitle').textContent = target === 'create' ? '新建任务' : target === 'tasks' ? '任务列表' : '智能模板中心';
+        if (target !== 'create') closeAssistant();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      function setMedia(media) {
+        state.media = media;
+        document.querySelectorAll('.media-mode').forEach((button) => button.classList.toggle('active', button.dataset.media === media));
+        document.getElementById('imageProfiles').hidden = media !== 'image';
+        document.getElementById('videoProfiles').hidden = media !== 'video';
+        document.getElementById('videoShots').hidden = media !== 'video';
+        document.getElementById('pageTitle').textContent = media === 'image' ? '新建多类型图片任务' : '新建视频任务';
+        document.getElementById('pageSubtitle').textContent = media === 'image' ? '保留现有三栏工作台，由 AI 助手按确认节点推进' : '首帧与参考图仍在左侧，内容和镜头在中间，模型设置在右侧';
+        document.getElementById('promptTitle').textContent = media === 'image' ? '通勤商品主图 · 稳定构图' : '通勤商品展示 · 8 秒内容方案';
+        document.getElementById('promptText').value = media === 'image'
+          ? '以复古结构感绿色手提包为唯一商品主体，保持深苔绿色、金色锁扣、提手比例和挺括包型准确。使用克制的商业柔光与干净背景，正面略微侧转展示包体结构，画面适合电商主图。'
+          : '人物在现代通勤场景中自然展示深苔绿色手提包。保持商品颜色、包型、锁扣和提手比例准确，镜头运动克制，先建立人物与商品关系，再以近景突出皮革纹理与五金细节。';
+        document.getElementById('profileVersion').textContent = media === 'image' ? '默认内容版本 v2.3' : '默认通道初始化 · Agnes Video v1.0';
+        document.getElementById('countLabel').textContent = media === 'image' ? '每类张数' : '时长';
+        document.getElementById('countSelect').innerHTML = media === 'image' ? '<option>2 张</option><option>1 张</option><option>4 张</option>' : '<option>8 秒</option><option>5 秒</option><option>15 秒</option>';
+        document.getElementById('resolutionLabel').textContent = media === 'image' ? '尺寸' : '分辨率';
+        document.getElementById('resolutionSelect').innerHTML = media === 'image' ? '<option>1536px</option><option>2048px</option>' : '<option>1080p</option><option>720p</option>';
+        document.getElementById('qualityLabel').textContent = media === 'image' ? '质量' : '运动幅度';
+        document.getElementById('qualitySelect').innerHTML = media === 'image' ? '<option>标准</option><option>高清</option>' : '<option>适中</option><option>轻微</option><option>强烈</option>';
+        document.getElementById('costValue').textContent = media === 'image' ? '¥ 22.60' : '¥ 18.00';
+        document.getElementById('finalCost').textContent = media === 'image' ? '¥ 22.60' : '¥ 18.00';
+        document.getElementById('durationValue').textContent = media === 'image' ? '2–4 分钟' : '约 3–6 分钟';
+        document.querySelectorAll('.task-tab').forEach((tab, index) => { tab.style.display = media === 'image' || index === 0 ? '' : 'none'; });
+        if (media === 'video') {
+          document.querySelector('[data-channel="vidu"]').click();
+          setStep(3);
+          openAssistant();
+        }
+      }
+
+      document.getElementById('openAssistant').addEventListener('click', openAssistant);
+      document.getElementById('closeAssistant').addEventListener('click', closeAssistant);
+      document.getElementById('drawerBackdrop').addEventListener('click', closeAssistant);
+      document.getElementById('previousStep').addEventListener('click', () => setStep(state.step - 1));
+      document.getElementById('nextStep').addEventListener('click', () => {
+        if (state.step === 2) {
+          state.factsConfirmed = true;
+          document.getElementById('factsState').textContent = '已确认';
+          document.getElementById('factsState').classList.add('confirmed');
+        }
+        if (state.step === 3) {
+          state.promptConfirmed = true;
+          document.getElementById('promptState').textContent = state.media === 'image' ? '3 项已确认' : '内容已确认';
+          document.getElementById('promptState').classList.add('confirmed');
+        }
+        if (state.step < 5) setStep(state.step + 1);
+        else {
+          closeAssistant();
+          switchView('tasks');
+          const toast = document.getElementById('toast');
+          toast.classList.add('show');
+          window.setTimeout(() => toast.classList.remove('show'), 2800);
+        }
+      });
+      document.getElementById('confirmFacts').addEventListener('click', () => {
+        state.factsConfirmed = true;
+        document.getElementById('factsState').textContent = '已确认';
+        document.getElementById('factsState').classList.add('confirmed');
+        document.getElementById('confirmFacts').textContent = '已确认';
+        setStep(3);
+        openAssistant();
+      });
+      document.getElementById('confirmPrompt').addEventListener('click', () => {
+        state.promptConfirmed = true;
+        document.getElementById('promptState').textContent = state.media === 'image' ? '3 项已确认' : '内容已确认';
+        document.getElementById('promptState').classList.add('confirmed');
+        document.getElementById('confirmPrompt').textContent = '已确认';
+        setStep(4);
+        openAssistant();
+      });
+
+      document.querySelectorAll('[data-step]').forEach((button) => button.addEventListener('click', () => {
+        const target = Number(button.dataset.step);
+        if (target <= state.step || target === state.step + 1) { setStep(target); openAssistant(); }
+      }));
+      document.querySelectorAll('[data-view-target]').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.viewTarget)));
+      document.querySelectorAll('.media-mode').forEach((button) => button.addEventListener('click', () => setMedia(button.dataset.media)));
+      document.querySelectorAll('.profile').forEach((button) => button.addEventListener('click', () => button.classList.toggle('selected')));
+      document.querySelectorAll('.task-tab').forEach((button) => button.addEventListener('click', () => {
+        document.querySelectorAll('.task-tab').forEach((item) => item.classList.remove('active'));
+        button.classList.add('active');
+      }));
+      document.querySelectorAll('.channel-option').forEach((button) => button.addEventListener('click', () => {
+        document.querySelectorAll('.channel-option').forEach((item) => item.classList.remove('selected'));
+        button.classList.add('selected');
+        state.channel = button.dataset.channel;
+        const isVidu = state.channel === 'vidu';
+        document.getElementById('diffBanner').classList.toggle('visible', isVidu);
+        document.getElementById('schemaVersion').textContent = isVidu ? 'Vidu Q3 · 能力版本 2026.07' : 'Agnes Image · 能力版本 2026.07';
+        document.getElementById('compileState').textContent = isVidu ? 'Vidu Q3 · syntax_only' : 'Agnes · unchanged';
+        document.getElementById('compileChanges').innerHTML = isVidu
+          ? '<div class="change">新增 Vidu 图片绑定和规划切镜语法，商品语义未变化。</div><div class="change">阶段 3 的内容确认保持有效，动态参数已刷新。</div>'
+          : '<div class="change">当前 Prompt 与 Agnes Studio 兼容，无需重新编译。</div>';
+        if (isVidu && state.media !== 'video') setMedia('video');
+      }));
+
+      document.getElementById('referenceList').addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        const item = button.closest('.reference-item');
+        if (button.classList.contains('move-up') && item.previousElementSibling) item.parentNode.insertBefore(item, item.previousElementSibling);
+        if (button.classList.contains('move-down') && item.nextElementSibling) item.parentNode.insertBefore(item.nextElementSibling, item);
+        updatePositions();
+      });
+
+      const templateContent = [
+        ['图片任务模板 · 12', '定义生成什么图片以及通用 Prompt 骨架', '<tr><td><strong>通勤商品主图</strong></td><td>主体、构图、光线、保真约束</td><td>main_image</td><td>v2.1</td><td><span class="badge generated">启用</span></td><td><button class="table-action">编辑新版本</button></td></tr><tr><td><strong>服装上身展示</strong></td><td>人物、姿态、服装版型、细节</td><td>tryon_three_view</td><td>v1.8</td><td><span class="badge generated">启用</span></td><td><button class="table-action">编辑新版本</button></td></tr>'],
+        ['风格场景模板 · 8', '定义画面的风格、场景和动作倾向', '<tr><td><strong>现代通勤空间</strong></td><td>自然光、办公空间、克制高级感</td><td>图片 / 视频</td><td>v1.4</td><td><span class="badge generated">启用</span></td><td><button class="table-action">编辑新版本</button></td></tr>'],
+        ['视频 Prompt 模板 · 6', '维护通道共性内容与动态镜头建议，不存放 Vidu 专有语法', '<tr><td><strong>商品动态展示</strong></td><td>5s 1 镜头 · 8s 1–2 镜头 · 15/16s 2–3 镜头</td><td>img2video / reference2video</td><td>v2.3</td><td><span class="badge generated">启用</span></td><td><button class="table-action">编辑新版本</button></td></tr>'],
+        ['平台规格模板 · 5', '维护各素材用途的推荐比例、尺寸和格式', '<tr><td><strong>电商商品主图</strong></td><td>1:1 · 2048 × 2048 · JPG</td><td>图片</td><td>v1.2</td><td><span class="badge generated">启用</span></td><td><button class="table-action">编辑新版本</button></td></tr>'],
+        ['负面约束模板 · 9', '维护商品保真、人物自然度和视频稳定性约束', '<tr><td><strong>商品保真约束</strong></td><td>颜色、结构、文字、品牌与材质</td><td>图片 / 视频</td><td>v2.0</td><td><span class="badge generated">启用</span></td><td><button class="table-action">编辑新版本</button></td></tr>']
+      ];
+      document.querySelectorAll('.template-tab').forEach((button, index) => button.addEventListener('click', () => {
+        document.querySelectorAll('.template-tab').forEach((item) => item.classList.remove('active'));
+        button.classList.add('active');
+        document.getElementById('templateTitle').textContent = templateContent[index][0];
+        document.getElementById('templateDescription').textContent = templateContent[index][1];
+        document.getElementById('templateRows').innerHTML = templateContent[index][2];
+      }));
+
+      refreshIcons();
+      setStep(1);
+    </script>
+  </body>
+</html>

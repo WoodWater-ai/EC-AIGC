@@ -12,7 +12,7 @@ interface TaskListProps {
 }
 
 const STATUS_META: Record<TaskStatus, { label: string; style: string }> = {
-  pending: { label: '待生成', style: 'bg-slate-100 text-slate-600' }, running: { label: '生成中', style: 'bg-blue-50 text-primary' }, completed: { label: '已完成', style: 'bg-slate-100 text-slate-600' }, failed: { label: '生成失败', style: 'bg-red-50 text-red-700' }, rejected: { label: '已打回', style: 'bg-red-50 text-red-700' }, candidate: { label: '待评分审核', style: 'bg-slate-100 text-slate-600' }, aesthetic_review: { label: '待评分审核', style: 'bg-slate-100 text-slate-600' }, listing_review: { label: '待评分审核', style: 'bg-slate-100 text-slate-600' }, archived: { label: '审核通过', style: 'bg-emerald-50 text-emerald-700' }, cancelled: { label: '已取消', style: 'bg-slate-200 text-slate-500' },
+  pending: { label: '排队中', style: 'bg-blue-50 text-primary' }, running: { label: '生成中', style: 'bg-blue-50 text-primary' }, completed: { label: '已完成', style: 'bg-slate-100 text-slate-600' }, failed: { label: '生成失败', style: 'bg-red-50 text-red-700' }, rejected: { label: '已打回', style: 'bg-red-50 text-red-700' }, candidate: { label: '待评分审核', style: 'bg-slate-100 text-slate-600' }, aesthetic_review: { label: '待评分审核', style: 'bg-slate-100 text-slate-600' }, listing_review: { label: '待评分审核', style: 'bg-slate-100 text-slate-600' }, archived: { label: '审核通过', style: 'bg-emerald-50 text-emerald-700' }, cancelled: { label: '已取消', style: 'bg-slate-200 text-slate-500' },
 };
 
 export const TaskList: React.FC<TaskListProps> = ({ tasks, products, onAddTask, onUpdateTask, setScreen, onCreateVideo }) => {
@@ -27,7 +27,7 @@ export const TaskList: React.FC<TaskListProps> = ({ tasks, products, onAddTask, 
     onUpdateTask(next);
     window.setTimeout(() => onUpdateTask({ ...next, status: 'candidate', progress: 100, resultUrl: task.productImg, results: [{ id: `${task.id}-retry-${Date.now()}`, url: task.productImg, version: 1, reviewStage: 'candidate' }] }), 900);
   };
-  const statusTabs: Array<'all' | TaskStatus> = ['all', 'running', 'candidate', 'archived', 'failed', 'rejected'];
+  const statusTabs: Array<'all' | TaskStatus> = ['all', 'pending', 'running', 'candidate', 'archived', 'failed', 'rejected'];
   return <div className="space-y-5">
     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4"><div><p className="text-xs font-bold text-primary">生成与评分审核闭环</p><h2 className="text-2xl font-black text-slate-900 mt-1">任务列表</h2><p className="mt-2 text-sm text-slate-500">每种图片类型都是独立任务，评分审核一次完成：通过可创建视频，打回可继续修改。</p></div><div className="flex gap-2"><button onClick={() => setScreen(AppScreen.CREATE_IMAGE_TASK)} className="h-9 px-4 rounded-md bg-primary text-white text-xs font-bold">新建图片任务</button><button onClick={() => setScreen(AppScreen.CREATE_VIDEO_TASK)} className="h-9 px-4 rounded-md border border-slate-200 bg-white text-slate-700 text-xs font-bold">新建视频任务</button></div></div>
     <div className="bg-white rounded-lg border border-slate-200 p-2 flex gap-2"><button onClick={() => { setKind('image'); setStatus('all'); }} className={`h-9 px-4 rounded-md text-xs font-bold ${kind === 'image' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>图片任务 ({tasks.filter((task) => task.type === 'image').length})</button><button onClick={() => { setKind('video'); setStatus('all'); }} className={`h-9 px-4 rounded-md text-xs font-bold ${kind === 'video' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>视频任务 ({tasks.filter((task) => task.type === 'video').length})</button></div>

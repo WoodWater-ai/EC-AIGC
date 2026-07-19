@@ -1,4 +1,4 @@
-# 前端实施任务书：五步生成工作流 V2.3
+# 前端实施任务书：单页生成工作台与五阶段门禁 V2.3
 
 状态：内部执行文档
 日期：2026-07-17
@@ -14,7 +14,7 @@
 
 | 能力 | 当前实现 | 目标实现 |
 | --- | --- | --- |
-| 创建流程 | 图片/视频单页表单，直接提交 | 统一五步向导，阶段不可跳过 |
+| 创建流程 | 图片/视频单页表单，直接提交 | 保留单页工作台，以就地确认、准备度核验和付费确认弹窗完成五阶段门禁 |
 | 多图片类型 | 创建多条松散任务 | 一个任务组和多个独立子任务 |
 | Prompt 确认 | 可编辑文本，无确认快照 | 每个子任务独立确认并展示快照版本 |
 | 通道参数 | `mockModelChannels` 静态字段 | 根据后端 `parameter_schema.fields[]` 动态渲染 |
@@ -148,7 +148,9 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 
 `promptApi.compileForChannel` 的 mock 必须至少覆盖 `unchanged`、`syntax_only`、`content_revision_required`、Profile 缺失和 Profile 不兼容，不得只返回一条固定成功数据。相同 `idempotency_key` 和相同输入返回同一 `compilation_batch_id`。
 
-### 2.3 五步交互状态
+### 2.3 五阶段业务状态
+
+五阶段用于约束接口顺序、确认快照和失效规则，不要求映射为五个页面或顶部 Stepper。前端保留图片/视频三栏工作台：用户在原区域编辑素材、事实、Prompt 和模型参数；点击“检查并生成”时按阶段顺序核验，失败则定位原区域，成功才运行 Preflight 并打开最终付费确认弹窗。AI 助手是独立内容辅助入口，不参与 Preflight、费用确认或 Submit。
 
 | 步骤 | 前端允许动作 | 完成条件 |
 | --- | --- | --- |
@@ -158,7 +160,7 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 | 4 通道参数与 Preflight | 选通道/模型后调用通道编译、展示 Prompt 差异、刷新动态参数，再运行 Preflight | 编译兼容且组级 `valid=true`、未过期 |
 | 5 付费执行确认 | 展示请求、成本、耗时、健康度和兜底策略，确认执行并 Submit | Submit 返回全部子任务 `queued` |
 
-上游变化的失效规则：上下文变化清除内容方案、Prompt、编译批次、Preflight 和执行确认；Prompt、镜头或参考图变化清除编译批次、Preflight 和执行确认；通道变化先清除旧编译批次、参数、Preflight 和执行确认，再重新编译并刷新能力 Schema；参数或兜底策略变化清除 Preflight 和执行确认。`syntax_only` 保留阶段 3 内容确认，`content_revision_required` 自动回到阶段 3。失效后页面自动回到最早需要重新确认的步骤。
+上游变化的失效规则：上下文变化清除内容方案、Prompt、编译批次、Preflight 和执行确认；Prompt、镜头或参考图变化清除编译批次、Preflight 和执行确认；通道变化先清除旧编译批次、参数、Preflight 和执行确认，再重新编译并刷新能力 Schema；参数或兜底策略变化清除 Preflight 和执行确认。`syntax_only` 保留阶段 3 内容确认，`content_revision_required` 使 Prompt 区重新进入待确认。失效后页面在原工作台定位最早需要补充或重新确认的区域，不切换到另一套向导。
 
 ## 3. 页面与组件改造
 
@@ -168,7 +170,7 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 
 | 文件 | 行为 |
 | --- | --- |
-| `src/components/TaskCreationStepper.tsx` | 固定五步、当前/完成/失效状态，不允许点击跳过未完成步骤 |
+| `src/components/ExecutionConfirmDialog.tsx` | Preflight 通过后展示费用、耗时、健康度、请求摘要和兜底策略；最终确认后才允许 Submit |
 | `src/components/DynamicParameterForm.tsx` | 按 `fields[]` 顺序渲染并执行必填、范围、枚举和 `visible_when` 校验 |
 | `src/components/OrderedReferenceList.tsx` | 展示角色和顺序，使用上移/下移按钮重排并重新生成连续 position |
 | `src/components/PreflightSummary.tsx` | 组总成本/耗时/健康度、逐子任务请求预览、警告和错误 |
@@ -177,17 +179,18 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 
 ### 3.2 图片创建页
 
-`CreateImageTask.tsx` 改为任务组五步容器：
+`CreateImageTask.tsx` 保留现有三栏任务工作台，并接入五阶段业务状态：
 
-- 步骤 1 支持多选图片 Profile，但只调用一次 `createTaskGroup`。
-- 步骤 3 为每个子任务保留独立 Prompt 编辑区和参考图顺序。
-- 步骤 4 共享通道、模型、动态参数和兜底策略；Preflight 结果按子任务展示。
-- 任一子任务校验失败时禁用“确认执行”，并滚动定位第一个错误子任务。
+- 素材区支持多选图片 Profile，但只调用一次 `createTaskGroup`。
+- 内容区为每个子任务保留独立 Prompt 编辑区、就地确认和参考图顺序；AI 助手继续负责解析与改写。
+- 设置区共享通道、模型、动态参数和兜底策略；通道选择不依赖 AI 助手。
+- 顶部主操作改为“检查并生成”；缺失或失效时展示准备度问题并滚动定位第一个问题区域。
+- Preflight 通过后打开付费确认弹窗，汇总逐子任务请求、成本、耗时、健康度和兜底策略。
 - 删除直接创建 `running` 任务和所有模拟生成完成的 `setTimeout`。
 
 ### 3.3 视频创建页
 
-当前路由实际使用 `CreateVideoTaskV2.tsx`，它是本轮主改造入口；`CreateVideoTask.tsx` 仅保留兼容用途，不承载两套并行状态机。视频页复用相同五步和共享组件：
+当前路由实际使用 `CreateVideoTaskV2.tsx`，它是本轮主改造入口；`CreateVideoTask.tsx` 仅保留兼容用途，不承载两套并行状态机。视频页复用相同单页核验和付费确认组件：
 
 - `img2video` 只允许一个 `first_frame`；`reference2video` 按能力限制多个有序参考图。
 - 步骤 3 调用内容准备接口，使用默认通道的 Prompt Profile 初始化 Prompt，并展示 Profile 名称和版本。
@@ -197,6 +200,7 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 - Vidu 的图片强调、规划切镜、自动切镜、按秒描述、宫格叙事和音画同步只作为 Vidu Profile 编译结果展示，不在浏览器自行拼装。
 - 模式变化时重新获取能力 Schema，清空不兼容参数并使执行确认失效。
 - 来源冲突展示 `asset_conflict`，用户调整后重新分析，不允许进入 Prompt 确认。
+- AI 助手只提供 Prompt、镜头和风险建议；“检查并生成”独立运行确定性校验和 Preflight。
 - Submit 只发送任务组确认批次和幂等键，不在前端拼装 Provider 请求。
 
 ### 3.4 模板中心
@@ -215,8 +219,10 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 
 | 文件 | 改造内容 |
 | --- | --- |
+| `src/components/ExecutionConfirmDialog.tsx` | 图片/视频共用的最终付费确认弹窗，不包含 AI 助手能力 |
+| `src/components/CreateImageTask.tsx` | 原页面就地确认、生成准备度核验、问题定位和最终付费确认 |
 | `src/components/CreateVideoTaskV2.tsx` | 默认 Profile 初始化、动态镜头、通道切换编译状态、Prompt diff、兼容回退、动态参数刷新 |
-| `src/components/CreateVideoTask.tsx` | 仅处理兼容入口；不得形成另一套 Prompt 编译和五步状态 |
+| `src/components/CreateVideoTask.tsx` | 仅处理兼容入口；不得形成另一套 Prompt 编译和阶段状态 |
 | `src/components/TemplateCenter.tsx` | 保持五类模板和通道共性内容，不新增 Profile Tab，不写入 Vidu 专有语法 |
 | `src/types.ts` 或 `src/api/modules/generation.types.ts` | 增加内容方案、Prompt Profile、编译结果、兼容状态和通道切换状态 DTO |
 | `src/mockData.ts` | 增加默认通道/Profile、动态镜头和三类兼容结果样例 |
@@ -228,7 +234,7 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 
 1. 先完成 DTO、API 模块和 mock/real adapter，确保两个实现返回相同对象。
 2. 替换 `src/types.ts` 中旧任务状态和图片专用结果类型，并更新 mock 数据。
-3. 实现五步共享组件及失效逻辑。
+3. 实现准备度核验、最终付费确认组件及失效逻辑，不新增可见向导。
 4. 改造图片创建页，再复用到视频创建页；视频页补默认 Profile 初始化、通道编译和兼容回退。
 5. 增加 `promptApi.compileForChannel` mock，覆盖差异展示、动态参数刷新和动态镜头规则。
 6. 改造任务列表和详情结果展示。
@@ -240,7 +246,8 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 
 - 多选三个图片 Profile 只创建一个任务组和三个子任务。
 - 任一子任务 Preflight 失败时整组不能确认或 Submit。
-- 修改 Prompt 后步骤 4、5 失效并要求重新 Preflight。
+- 修改 Prompt 后通道编译、Preflight 和执行确认失效；页面保留当前布局并把 Prompt 区标记为待确认。
+- AI 助手和“检查并生成”是两个独立入口；助手不能运行 Preflight、确认费用或 Submit。
 - 视频参考图上移/下移后提交预览与 position 顺序一致。
 - Submit 后首先显示排队中，限流后显示重试等待，不复用旧图伪装成功。
 - 结果卡能够区分 `generated`、`reused` 和 `spec_mismatch`。

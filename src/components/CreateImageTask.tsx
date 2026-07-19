@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { imageTypePromptHints, mockModelChannels, mockReferenceAnalysisByFileId } from '../mockData';
 import type { AssetResourceItem } from '../api/modules/asset';
+import { ExecutionConfirmDialog } from './ExecutionConfirmDialog';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
@@ -152,6 +153,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<string | null>(null);
   const [templateOverwriteOpen, setTemplateOverwriteOpen] = useState(false);
+  const [promptsConfirmed, setPromptsConfirmed] = useState(false);
+  const [executionConfirmOpen, setExecutionConfirmOpen] = useState(false);
+  const [readinessIssue, setReadinessIssue] = useState('');
 
   const channel = mockModelChannels.find((item) => item.id === channelId) ?? mockModelChannels[0];
   const model = channel.models.find((item) => item.id === modelId) ?? channel.models[0];
@@ -171,6 +175,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   const orderedReferenceInsights = useMemo(() => Object.entries(referenceInsights)
     .sort(([left], [right]) => (referenceOrder[left as ReferenceSlot] ?? 99) - (referenceOrder[right as ReferenceSlot] ?? 99))
     .map(([, insight]) => insight), [referenceInsights, referenceOrder]);
+  const orderedReferences = useMemo(() => Object.entries(references)
+    .filter((entry): entry is [ReferenceSlot, TaskReference] => Boolean(entry[1]))
+    .sort(([left], [right]) => (referenceOrder[left] ?? 99) - (referenceOrder[right] ?? 99))
+    .map(([slot, reference], index) => ({ ...reference, position: index + 1, slot })), [referenceOrder, references]);
 
   const prompts = useMemo(() => Object.fromEntries(TYPE_ORDER.map((type) => [
     type,
@@ -188,6 +196,15 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     selectedTypes.some((type) => typeCounts[type] > model.capability.maxCount) ? `单个图片类型张数（最大 ${model.capability.maxCount}）` : null,
     !model.capability.resolutions.includes(resolution) ? `尺寸 ${resolution}` : null,
   ].filter(Boolean);
+  const factsComplete = PRODUCT_FACT_FIELDS.every((field) => productFacts[field.key].trim().length > 0);
+  const promptsComplete = selectedTypes.every((type) => (promptOverrides[type] ?? prompts[type]).trim().length > 0);
+  const readinessChecks = [
+    { complete: isProductBound, message: '请先选择已关联商品资产的主体素材。', targetId: 'image-source-section' },
+    { complete: factsConfirmed && factsComplete, message: '请检查并确认商品事实。', targetId: 'image-content-section' },
+    { complete: promptsConfirmed && promptsComplete, message: '请确认本组任务 Prompt。', targetId: 'image-content-section' },
+    { complete: isSupported && channel.health !== 'maintenance', message: '当前模型通道或输出规格不可执行，请调整设置。', targetId: 'image-settings-section' },
+  ];
+  const readinessCount = readinessChecks.filter((item) => item.complete).length;
 
   const setModelWithValidation = (nextChannelId: string, nextModelId: string) => {
     const nextChannel = mockModelChannels.find((item) => item.id === nextChannelId);
@@ -236,6 +253,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   };
 
   const toggleType = (type: ImageGenerationType) => {
+    setPromptsConfirmed(false);
     if (selectedTypes.includes(type)) {
       if (selectedTypes.length > 1) setSelectedTypes((previous) => previous.filter((item) => item !== type));
       return;
@@ -259,6 +277,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     setAssistantState('idle');
     setPromptOverrides({});
     setPromptHasEdits(false);
+    setPromptsConfirmed(false);
+    setReadinessIssue('');
   };
 
   const startComposite = () => {
@@ -308,6 +328,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     const reference = toTaskReference(asset, slotDefinition?.role ?? '参考图');
     const analysis = asset.fileResourceId ? mockReferenceAnalysisByFileId[asset.fileResourceId] : undefined;
     setReferences((current) => ({ ...current, [slot]: reference }));
+    setPromptsConfirmed(false);
     setReferenceOrder((current) => ({ ...current, [slot]: current[slot] ?? Object.keys(current).length + 1 }));
     if (analysis) {
       setReferenceInsights((current) => ({ ...current, [slot]: analysis.promptHint }));
@@ -318,7 +339,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   };
 
   const submitTasks = () => {
-    if (!isProductBound || !isSupported) return;
+    if (!isProductBound || !isSupported || !factsConfirmed || !promptsConfirmed) return;
+    setExecutionConfirmOpen(false);
     const groupId = `G-${Date.now()}`;
     const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
     const outputPreviewUrl = compositeState === 'ready'
@@ -331,7 +353,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
         name: `${IMAGE_GENERATION_TYPE_LABELS[imageType]} · ${taskProduct.name}`,
         type: 'image',
         imageType,
-        status: 'running',
+        status: 'pending',
         progress: 0,
         productName: taskProduct.name,
         productImg: outputPreviewUrl,
@@ -356,20 +378,19 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
         params: { ratio, count: typeCounts[imageType], prompt: promptOverrides[imageType] ?? prompts[imageType], negativePrompt },
       };
       onAddTask(task);
-      window.setTimeout(() => onAddTask({
-        ...task,
-        status: reviewEnabled ? 'candidate' : 'archived',
-        progress: 100,
-        resultUrl: outputPreviewUrl,
-        results: Array.from({ length: typeCounts[imageType] }, (_, resultIndex) => ({
-          id: `${task.id}-r${resultIndex + 1}`,
-          url: outputPreviewUrl,
-          version: resultIndex + 1,
-          reviewStage: reviewEnabled ? 'candidate' : 'approved' as const,
-        })),
-      }), 900 + index * 250);
     });
     setScreen(AppScreen.TASKS);
+  };
+
+  const checkAndGenerate = () => {
+    const issue = readinessChecks.find((item) => !item.complete);
+    if (issue) {
+      setReadinessIssue(issue.message);
+      window.requestAnimationFrame(() => document.getElementById(issue.targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      return;
+    }
+    setReadinessIssue('');
+    setExecutionConfirmOpen(true);
   };
 
   const runAssistantAnalysis = () => {
@@ -384,6 +405,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
         buildPromptFromFacts(type, nextFacts),
       ])));
       setPromptHasEdits(true);
+      setPromptsConfirmed(false);
       setAssistantState('complete');
     }, 500);
   };
@@ -391,6 +413,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   const updateProductFact = (key: keyof ProductFacts, value: string) => {
     setProductFacts((previous) => ({ ...previous, [key]: value }));
     setFactsConfirmed(false);
+    setPromptsConfirmed(false);
   };
 
   const applyTemplate = (nextTemplate: string) => {
@@ -399,6 +422,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
       ? Object.fromEntries(selectedTypes.map((type) => [type, buildPromptFromFacts(type, productFacts, nextTemplate)]))
       : {});
     setPromptHasEdits(false);
+    setPromptsConfirmed(false);
     setTemplatePickerOpen(false);
     setTemplateOverwriteOpen(false);
     setPendingTemplate(null);
@@ -419,6 +443,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   };
 
   const updateReferenceOrder = (slot: ReferenceSlot, nextOrder: number) => {
+    setPromptsConfirmed(false);
     setReferenceOrder((current) => {
       const currentOrder = current[slot];
       const swapSlot = (Object.keys(current) as ReferenceSlot[]).find((item) => item !== slot && current[item] === nextOrder);
@@ -438,14 +463,16 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
           <div><p className="text-[11px] font-bold text-primary">图片任务工作台</p><h1 className="text-base font-black">新建多类型图片任务</h1></div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500">已选择 <b className="text-slate-800">{selectedTypes.length}</b> 个图片类型，共 <b className="text-slate-800">{totalCount}</b> 张</span>
-          <button onClick={submitTasks} disabled={!isProductBound || !isSupported} className="h-9 px-4 rounded-md bg-primary disabled:bg-slate-300 text-white text-xs font-bold shadow-sm">提交 {selectedTypes.length} 条任务</button>
+          <div className="text-right"><span className="block text-[10px] font-bold text-slate-400">生成准备度 {readinessCount}/4</span><span className="text-xs text-slate-500">{selectedTypes.length} 个图片类型 · {totalCount} 张</span></div>
+          <button onClick={checkAndGenerate} className="h-9 px-4 rounded-md bg-primary text-white text-xs font-bold shadow-sm">检查并生成</button>
         </div>
       </header>
 
+      {readinessIssue && <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-6 py-2 text-[11px] font-bold text-amber-700"><span className="material-symbols-outlined mr-1 align-middle text-sm">error</span>{readinessIssue}</div>}
+
       <main className="flex-1 overflow-y-auto p-5 grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)_380px] gap-5">
         <section className="space-y-4">
-          <div className="bg-white border border-slate-200 rounded-lg p-4">
+          <div id="image-source-section" className="bg-white border border-slate-200 rounded-lg p-4">
             <div className="flex items-center justify-between"><h2 className="text-sm font-black">输入素材</h2><button onClick={() => openTransit(selectMainAsset, 'main')} className="text-xs text-primary font-bold">资源中心</button></div>
             {compositeState === 'ready' && topAsset && bottomAsset ? (
               <div className="mt-3 h-44 rounded-md border border-emerald-200 bg-emerald-50 overflow-hidden relative">
@@ -476,7 +503,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
               const reference = references[slot.id];
               return <div key={slot.id} className="min-w-0"><button onClick={() => openTransit(selectReferenceAsset(slot.id), slot.transitSlot)} className={`relative w-full h-16 rounded-md border-2 border-dashed overflow-hidden flex items-center gap-2 px-2 text-left transition-colors ${reference ? 'border-primary bg-blue-50' : 'border-slate-200 hover:border-primary bg-slate-50'}`} title={`选择${slot.label}参考图`}>
                 {reference?.thumbnailUrl ? <><img src={reference.thumbnailUrl} alt={slot.label} className="w-10 h-10 rounded object-cover" referrerPolicy="no-referrer" /><span className="min-w-0 text-[11px] font-bold text-primary truncate">{reference.name}</span></> : <><span className="material-symbols-outlined text-2xl text-slate-400">add</span><span className="text-[11px] text-slate-400">添加{slot.label}参考</span></>}
-              </button><div className="mt-1 flex items-center justify-between gap-1"><span className={`text-[11px] font-bold ${reference ? 'text-primary' : 'text-slate-400'}`}>{slot.label}参考</span>{reference && <><label className="text-[10px] text-slate-400">顺序<select value={referenceOrder[slot.id] ?? index + 1} onChange={(event) => updateReferenceOrder(slot.id, Number(event.target.value))} className="ml-1 h-5 border border-slate-200 bg-white text-[10px]">{REFERENCE_SLOTS.map((item, orderIndex) => <option key={item.id} value={orderIndex + 1}>{orderIndex + 1}</option>)}</select></label><button onClick={() => { setReferences((current) => ({ ...current, [slot.id]: undefined })); setReferenceInsights((current) => ({ ...current, [slot.id]: undefined })); setReferenceOrder((current) => ({ ...current, [slot.id]: undefined })); }} className="text-[10px] text-slate-400 hover:text-red-500">移除</button></>}</div></div>;
+              </button><div className="mt-1 flex items-center justify-between gap-1"><span className={`text-[11px] font-bold ${reference ? 'text-primary' : 'text-slate-400'}`}>{slot.label}参考</span>{reference && <><label className="text-[10px] text-slate-400">顺序<select value={referenceOrder[slot.id] ?? index + 1} onChange={(event) => updateReferenceOrder(slot.id, Number(event.target.value))} className="ml-1 h-5 border border-slate-200 bg-white text-[10px]">{REFERENCE_SLOTS.map((item, orderIndex) => <option key={item.id} value={orderIndex + 1}>{orderIndex + 1}</option>)}</select></label><button onClick={() => { setReferences((current) => ({ ...current, [slot.id]: undefined })); setReferenceInsights((current) => ({ ...current, [slot.id]: undefined })); setReferenceOrder((current) => ({ ...current, [slot.id]: undefined })); setPromptsConfirmed(false); }} className="text-[10px] text-slate-400 hover:text-red-500">移除</button></>}</div></div>;
             })}</div>
           </div>
         </section>
@@ -496,26 +523,27 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
             })}</div>
             <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
               <div className="relative text-xs font-bold text-slate-700"><span>当前模板</span><div className="mt-1.5 flex h-9 items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2"><span className="min-w-0 truncate text-xs font-medium">{template}</span><button onClick={() => setTemplatePickerOpen((open) => !open)} className="shrink-0 text-[11px] font-bold text-primary">更换模板</button></div>{templatePickerOpen && <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white p-1 shadow-lg">{TASK_TEMPLATES.map((item) => <button key={item.name} onClick={() => requestTemplateChange(item.name)} className={`w-full rounded px-2 py-2 text-left hover:bg-slate-50 ${item.name === template ? 'bg-blue-50 text-primary' : ''}`}><span className="block text-[11px] font-bold">{item.name}</span><span className="block mt-0.5 text-[10px] font-normal text-slate-400">{item.description}</span></button>)}</div>}</div>
-              {[['风格', style, setStyle, STYLE_OPTIONS], ['场景', scene, setScene, ['自然影棚', '城市街景', '居家陈列']], ['姿势', pose, setPose, POSE_OPTIONS]].map(([label, value, setter, options]) => <label key={String(label)} className="text-xs font-bold text-slate-700">{String(label)}<select value={value as string} onChange={(event) => (setter as (value: string) => void)(event.target.value)} className="mt-1.5 w-full h-9 px-2 rounded border border-slate-200 bg-white text-xs font-medium">{(options as string[]).map((option) => <option key={option}>{option}</option>)}</select></label>)}
+              {[['风格', style, setStyle, STYLE_OPTIONS], ['场景', scene, setScene, ['自然影棚', '城市街景', '居家陈列']], ['姿势', pose, setPose, POSE_OPTIONS]].map(([label, value, setter, options]) => <label key={String(label)} className="text-xs font-bold text-slate-700">{String(label)}<select value={value as string} onChange={(event) => { (setter as (value: string) => void)(event.target.value); setPromptsConfirmed(false); }} className="mt-1.5 w-full h-9 px-2 rounded border border-slate-200 bg-white text-xs font-medium">{(options as string[]).map((option) => <option key={option}>{option}</option>)}</select></label>)}
             </div>
-            <details className="mt-4 border-t border-slate-100 pt-4"><summary className="cursor-pointer text-xs font-bold text-slate-600">高级设置</summary><label className="mt-3 block text-xs font-bold text-slate-700">负面约束<input value={negativePrompt} onChange={(event) => setNegativePrompt(event.target.value)} className="mt-1.5 w-full h-9 px-2 rounded border border-slate-200 text-xs font-medium" /></label><p className="mt-1.5 text-[10px] text-slate-400">默认沿用当前模板的约束，可按本次任务覆盖。</p></details>
+            <details className="mt-4 border-t border-slate-100 pt-4"><summary className="cursor-pointer text-xs font-bold text-slate-600">高级设置</summary><label className="mt-3 block text-xs font-bold text-slate-700">负面约束<input value={negativePrompt} onChange={(event) => { setNegativePrompt(event.target.value); setPromptsConfirmed(false); }} className="mt-1.5 w-full h-9 px-2 rounded border border-slate-200 text-xs font-medium" /></label><p className="mt-1.5 text-[10px] text-slate-400">默认沿用当前模板的约束，可按本次任务覆盖。</p></details>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-lg p-5">
+          <div id="image-content-section" className="bg-white border border-slate-200 rounded-lg p-5">
             <div className="flex items-center justify-between"><div><p className="text-[11px] font-bold text-primary">任务级 Prompt 副本</p><h2 className="text-base font-black">每种图片各自编辑</h2></div><button onClick={runAssistantAnalysis} disabled={!isProductBound || assistantState === 'processing'} className="h-8 px-3 border border-blue-200 bg-blue-50 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 text-primary text-xs font-bold rounded-md flex gap-1 items-center"><span className={`material-symbols-outlined text-base ${assistantState === 'processing' ? 'animate-pulse' : ''}`}>auto_awesome</span>{assistantState === 'processing' ? 'AI 解析中' : assistantState === 'complete' ? '重新生成' : 'AI 助手'}</button></div>
             {!isProductBound && <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">先选择已关联商品资产的主体素材，才能确认商品事实、生成 Prompt 和提交任务。</div>}
             {assistantState !== 'idle' && <div className={`mt-4 flex items-center gap-2 rounded-md border px-3 py-2 text-[11px] ${assistantState === 'complete' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-blue-100 bg-blue-50 text-primary'}`}><span className="material-symbols-outlined text-sm">{assistantState === 'complete' ? 'check_circle' : 'progress_activity'}</span>{assistantState === 'complete' ? '已基于商品事实写入当前任务的 Prompt 副本，可在下方继续编辑。' : '正在提取商品名称、卖点、品类、颜色、图案和结构，并初始化 Prompt…'}</div>}
             <div className="mt-4 border-y border-slate-100 py-3">
               <div className="flex items-start justify-between gap-3"><div><h3 className="text-xs font-black">商品事实确认</h3><p className="mt-1 text-[11px] text-slate-400">随任务常驻保存，是 AI 推荐和 Prompt 初始化的事实依据。</p></div><span className={`shrink-0 px-2 py-1 rounded text-[10px] font-bold ${factsConfirmed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{factsConfirmed ? '已确认' : '待确认'}</span></div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">{PRODUCT_FACT_FIELDS.map((field) => <label key={field.key} className="min-w-0 rounded border border-slate-200 bg-slate-50 px-2 py-1.5"><span className="block text-[10px] text-slate-400">{field.label}</span><input disabled={!isProductBound} value={productFacts[field.key]} onChange={(event) => updateProductFact(field.key, event.target.value)} placeholder="待 AI 解析" className="mt-0.5 w-full min-w-0 bg-transparent outline-none disabled:cursor-not-allowed text-[11px] font-bold text-slate-700 placeholder:text-slate-300" /></label>)}</div>
-              <div className="mt-3 flex items-center justify-between gap-3"><p className="text-[10px] leading-4 text-slate-400">修改事实不会自动覆盖下方 Prompt；需要重写时点击 AI 助手。</p><button onClick={() => setFactsConfirmed(true)} disabled={!isProductBound} className="shrink-0 h-7 px-2.5 rounded border border-slate-200 bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[11px] font-bold text-slate-600 hover:border-primary hover:text-primary">确认商品事实</button></div>
+              <div className="mt-3 flex items-center justify-between gap-3"><p className="text-[10px] leading-4 text-slate-400">修改事实不会自动覆盖下方 Prompt；需要重写时点击 AI 助手。</p><button onClick={() => { setFactsConfirmed(true); setReadinessIssue(''); }} disabled={!isProductBound || !factsComplete} className="shrink-0 h-7 px-2.5 rounded border border-slate-200 bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[11px] font-bold text-slate-600 hover:border-primary hover:text-primary">确认商品事实</button></div>
             </div>
-            <div className="mt-4 space-y-3">{selectedTypes.map((type) => <div key={type} className="border border-slate-200 rounded-md overflow-hidden"><div className="px-3 py-2 bg-slate-50 flex justify-between"><span className="text-xs font-black">{IMAGE_GENERATION_TYPE_LABELS[type]}</span><span className="text-[10px] text-slate-400">来源：{template}</span></div><textarea disabled={!isProductBound} value={promptOverrides[type] ?? prompts[type]} onChange={(event) => { setPromptOverrides((previous) => ({ ...previous, [type]: event.target.value })); setPromptHasEdits(true); }} className="w-full h-24 resize-none p-3 outline-none disabled:bg-slate-50 disabled:text-slate-400 text-xs leading-5" /></div>)}</div>
+            <div className="mt-4 space-y-3">{selectedTypes.map((type) => <div key={type} className="border border-slate-200 rounded-md overflow-hidden"><div className="px-3 py-2 bg-slate-50 flex justify-between"><span className="text-xs font-black">{IMAGE_GENERATION_TYPE_LABELS[type]}</span><span className="text-[10px] text-slate-400">来源：{template}</span></div><textarea disabled={!isProductBound} value={promptOverrides[type] ?? prompts[type]} onChange={(event) => { setPromptOverrides((previous) => ({ ...previous, [type]: event.target.value })); setPromptHasEdits(true); setPromptsConfirmed(false); }} className="w-full h-24 resize-none p-3 outline-none disabled:bg-slate-50 disabled:text-slate-400 text-xs leading-5" /></div>)}</div>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4"><div><p className="text-xs font-black text-slate-700">本组 Prompt</p><p className="mt-1 text-[10px] text-slate-400">确认后如修改事实、Prompt、模板或参考图，将自动变为待确认。</p></div><button onClick={() => { setPromptsConfirmed(true); setReadinessIssue(''); }} disabled={!factsConfirmed || !promptsComplete} className={`h-8 shrink-0 rounded-md border px-3 text-xs font-bold ${promptsConfirmed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-primary bg-white text-primary disabled:border-slate-200 disabled:text-slate-300'}`}>{promptsConfirmed ? 'Prompt 已确认' : '确认本组 Prompt'}</button></div>
           </div>
         </section>
 
         <section className="space-y-4">
-          <div className="bg-white border border-slate-200 rounded-lg p-5">
+          <div id="image-settings-section" className="bg-white border border-slate-200 rounded-lg p-5">
             <p className="text-[11px] font-bold text-primary">执行参数</p><h2 className="text-base font-black mt-1">模型与输出规格</h2><p className="mt-1 text-[11px] text-slate-400">仅展示当前可用模型；成本、耗时和执行风险将在提交前确认。</p>
             <label className="block mt-4 text-xs font-bold">模型<select value={`${channel.id}:${model.id}`} onChange={(event) => { const choice = availableModels.find((item) => `${item.channel.id}:${item.model.id}` === event.target.value); if (choice) setModelWithValidation(choice.channel.id, choice.model.id); }} className="mt-1.5 w-full h-9 rounded border border-slate-200 px-2 text-xs">{availableModels.map((item) => <option key={`${item.channel.id}:${item.model.id}`} value={`${item.channel.id}:${item.model.id}`}>{item.model.name} · {item.model.description}</option>)}</select></label>
             <div className="mt-4"><span className="text-xs font-bold">平台规格推荐</span><div className="flex flex-wrap gap-2 mt-2">{PRESETS.map((preset) => <button key={preset.name} onClick={() => applyPreset(preset)} className="px-2 py-1.5 text-[11px] font-bold rounded border border-slate-200 hover:border-primary hover:text-primary">{preset.name}</button>)}</div></div>
@@ -527,6 +555,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
         </section>
       </main>
 
+      {executionConfirmOpen && <ExecutionConfirmDialog title={`确认生成 ${selectedTypes.length} 个图片子任务`} description="系统已按当前素材、商品事实、Prompt、模型能力和预算完成预检。确认后任务会先进入排队中。" estimatedCost={`¥ ${(model.cost * totalCount).toFixed(2)}`} estimatedDuration={`${Math.max(1, Math.ceil(totalCount / 2))}–${Math.max(2, Math.ceil(totalCount * 0.8))} 分钟`} healthLabel={channel.health === 'healthy' ? '服务健康' : '额度偏低'} healthDetail={channel.quotaText} fallbackPolicy="同配置最多自动重试 1 次；仍失败则停止并通知，不自动切换到其他付费通道，也不复用历史结果伪装生成成功。" summary={[{ label: '任务组', value: `${selectedTypes.map((type) => IMAGE_GENERATION_TYPE_LABELS[type]).join('、')} · 共 ${totalCount} 张` }, { label: '模型通道', value: `${channel.name} / ${model.name}` }, { label: '输出规格', value: `${ratio} · ${resolution}` }, { label: '审核策略', value: reviewEnabled ? '生成后进入评分审核' : '不启用评分审核' }]} requestLines={[`Prompt：已确认 ${selectedTypes.length} 个任务级副本`, `参考图：${orderedReferences.length ? orderedReferences.map((item) => `${item.position}.${item.role}`).join('、') : '未使用参考图'}`, `参数：ratio=${ratio}，resolution=${resolution}，count=${totalCount}`]} onCancel={() => setExecutionConfirmOpen(false)} onConfirm={submitTasks} />}
       {conflictOpen && pendingChoice && <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><div className="absolute inset-0 bg-slate-900/40" /><div className="relative bg-white rounded-lg w-full max-w-md p-6 shadow-xl"><div className="flex gap-3"><span className="material-symbols-outlined text-amber-500">warning</span><div><h2 className="font-black">模型能力与当前规格冲突</h2><p className="mt-2 text-xs text-slate-500 leading-5">目标模型不支持当前的 {unsupported.length ? unsupported.join('、') : '输出规格'}。确认后将自动切换到该模型首个可用比例、尺寸，并将张数限制在上限内。</p></div></div><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setConflictOpen(false); setPendingChoice(null); }} className="h-8 px-3 text-xs font-bold border border-slate-200 rounded">保留当前选择</button><button onClick={applyCompatibleModel} className="h-8 px-3 text-xs font-bold text-white bg-primary rounded">确认调整</button></div></div></div>}
       {templateOverwriteOpen && pendingTemplate && <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><div className="absolute inset-0 bg-slate-900/40" /><div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl"><div className="flex gap-3"><span className="material-symbols-outlined text-amber-500">warning</span><div><h2 className="font-black">覆盖当前任务级 Prompt？</h2><p className="mt-2 text-xs leading-5 text-slate-500">已由 AI 或人工改写的 Prompt 会被“{pendingTemplate}”重新初始化。本次任务之外的模板和任务不会受影响。</p></div></div><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setTemplateOverwriteOpen(false); setPendingTemplate(null); }} className="h-8 rounded border border-slate-200 px-3 text-xs font-bold">保留当前 Prompt</button><button onClick={() => applyTemplate(pendingTemplate)} className="h-8 rounded bg-primary px-3 text-xs font-bold text-white">覆盖并更换</button></div></div></div>}
     </div>
