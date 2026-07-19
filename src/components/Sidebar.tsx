@@ -32,6 +32,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { screen: AppScreen.ASSET_CATEGORY, label: '资源分类', icon: 'account_tree' },
     { screen: AppScreen.PRODUCT_CATEGORY, label: '商品分类', icon: 'category' },
     { screen: AppScreen.PRODUCT_MANAGE, label: '产品管理', icon: 'inventory_2' },
+    { screen: AppScreen.DICT_CATEGORY, label: '字典分类管理', icon: 'dataset' },
+    { screen: AppScreen.DICT_ITEM, label: '字典管理', icon: 'menu_book' },
   ];
 
   // ===== [v2.0 2026-07-13 F1 基础设施] 新流程尝试 · 5 个 BETA 页面 =====

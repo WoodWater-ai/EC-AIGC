@@ -65,6 +65,10 @@ export const Header: React.FC<HeaderProps> = ({
         return { parent: '成效数据复盘', child: 'AI 生成效能分析' };
       case AppScreen.SYSTEM_CONFIG:
         return { parent: '运维与渠道', child: '系统通道配置' };
+      case AppScreen.DICT_CATEGORY:
+        return { parent: '基础数据', child: '字典分类管理' };
+      case AppScreen.DICT_ITEM:
+        return { parent: '基础数据', child: '字典管理' };
       default:
         return { parent: '达芬奇密码 AI', child: '控制台' };
     }

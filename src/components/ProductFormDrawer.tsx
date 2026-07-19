@@ -8,6 +8,7 @@ import { AssetImage } from './AssetImage';
 import { withCosThumbnail } from '../utils/cosImage';
 import { productCategoryApi, type ProductCategoryNode } from '../api/modules/productCategory';
 import { useConfirm } from './common/ConfirmProvider';
+import { OutfitComposePanel, type AppliedCompositeAsset } from './common/OutfitComposePanel';
 
 /**
  * 产品图片选择状态(取自 AssetResourceItem 关键字段,够前端预览 + 提交用)
@@ -67,6 +68,7 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
   const [category, setCategory] = useState('');
   const [imageRef, setImageRef] = useState<ProductImageRef | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
   const [status, setStatus] = useState<ProductStatus>('ON_SHELF');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -250,6 +252,16 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
   function handleClearImage(e: React.MouseEvent) {
     e.stopPropagation();
     setImageRef(null);
+  }
+
+  function handleAppliedComposite(asset: AppliedCompositeAsset): void {
+    setImageRef({
+      id: asset.fileResourceId, // 已是 string
+      thumbnailUrl: asset.thumbnailUrl,
+      originalUrl: asset.originalUrl,
+      name: asset.name,
+    });
+    setComposeOpen(false);
   }
 
   function toggleCategory(id: string, categoryName: string) {
@@ -487,12 +499,32 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
                     恢复原值
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setComposeOpen((o) => !o)}
+                  className={`h-8 px-3 text-xs font-semibold rounded-md border flex items-center gap-1.5 transition-colors ${
+                    composeOpen
+                      ? 'bg-blue-50 text-primary border-blue-200 hover:bg-blue-100'
+                      : 'bg-white text-primary border-slate-300 hover:bg-blue-50'
+                  }`}
+                  title="基于两张图片合成新的产品主图"
+                >
+                  <span className="material-symbols-outlined text-base">layers</span>
+                  上下装合成套图
+                </button>
               </div>
             </div>
             <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
               从资源库中选择已上传的图片;后端会校验资源并自动转换 URL 存储。
             </p>
           </div>
+
+          {/* 上下装合成套图 —— 替换产品主图 */}
+          <OutfitComposePanel
+            productId={initial?.id}
+            onApplied={handleAppliedComposite}
+            defaultCollapsed
+          />
 
           {/* 名称 */}
           <div>

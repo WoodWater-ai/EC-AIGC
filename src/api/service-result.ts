@@ -50,3 +50,13 @@ export interface PageInfo<T> {
   hasPreviousPage: boolean;
   hasNextPage: boolean;
 }
+
+/**
+ * 单 ID 响应 —— 对应后端 com.dafenqi.ai.web.model.response.BaseIdResponse
+ *
+ * 后端 id 字段已 @JsonSerialize(ToStringSerializer),前端拿到 string。
+ * 用于 create 类接口的统一响应包装。
+ */
+export interface BaseIdResponse {
+  id: string;
+}

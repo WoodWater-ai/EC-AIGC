@@ -22,6 +22,8 @@ import { TaskListNew } from './components/beta/TaskListNew';
 import { PromptAssistNew } from './components/beta/PromptAssistNew';
 import { RecommendParamsManageNew } from './components/beta/RecommendParamsManageNew';
 import ProductManagePage from './components/ProductManagePage';
+import DictCategoryList from './components/DictCategoryList';
+import DictItemList from './components/DictItemList';
 
 import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
@@ -254,6 +256,10 @@ export default function App() {
         return <RecommendParamsManageNew />;
       case AppScreen.PRODUCT_MANAGE:
         return <ProductManagePage />;
+      case AppScreen.DICT_CATEGORY:
+        return <DictCategoryList />;
+      case AppScreen.DICT_ITEM:
+        return <DictItemList />;
       default:
         return (
           <div className="flex flex-col items-center justify-center p-12 text-slate-400">

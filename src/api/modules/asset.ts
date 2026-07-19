@@ -62,7 +62,7 @@ export interface AssetResourceCreateRequest {
   name: string;
   assetKind?: 'IMAGE' | 'VIDEO';
   assetType?: string;
-  productId?: number;
+  productId?: string | number;  // accepts snowflake ID as string (precision-safe) OR legacy number
   recognitionId?: number;
   description?: string;
   tags?: string;

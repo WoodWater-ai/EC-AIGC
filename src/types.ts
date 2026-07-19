@@ -26,6 +26,11 @@ export enum AppScreen {
   RECOMMEND_PARAMS_MANAGE_NEW = 'RECOMMEND_PARAMS_MANAGE_NEW',
   /** 产品基础信息管理(新增 2026-07-18) */
   PRODUCT_MANAGE = 'PRODUCT_MANAGE',
+  // ===== [2026-07-19] 字典管理 =====
+  /** 字典分类管理 */
+  DICT_CATEGORY = 'DICT_CATEGORY',
+  /** 字典管理(字典项) */
+  DICT_ITEM = 'DICT_ITEM',
   // 未来 P1:CHANNEL_MATRIX_NEW
 }
 

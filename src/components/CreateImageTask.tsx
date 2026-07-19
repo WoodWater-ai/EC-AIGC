@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ProductAsset, GenerationTask, AppScreen } from '../types';
 import { TransitPickerButton } from './common/TransitPickerButton';
+import { OutfitComposePanel } from './common/OutfitComposePanel';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { templateApi, type TemplateDTO } from '../api/modules/template';
 import { TaskParamsPanel } from './createTask/TaskParamsPanel';
@@ -8,10 +9,7 @@ import { buildSubmitPayload } from './createTask/buildSubmitPayload';
 import { assembleTaskPrompt } from './createTask/assembleTaskPrompt';
 import { submitTask } from '../api/modules/task';
 import { type SlotKey, type SlotRef } from './createTask/slots';
-import { mergeImagesHorizontal } from '../utils/mergeImages';
 import { withCosThumbnail } from '../utils/cosImage';
-import { useFileUpload } from '../hooks/useFileUpload';
-import { assetApi } from '../api/modules/asset';
 import { toast } from 'sonner';
 
 interface CreateImageTaskProps {
@@ -83,9 +81,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     })
   );
 
-  // Local state for composite setup
-  const [hasCompositePreviewed, setHasCompositePreviewed] = useState(false);
-
   // Mock Upload state for main asset
   const [isUploading, setIsUploading] = useState(false);
 
@@ -149,115 +144,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
           ]
         });
       }, 1000);
-    }
-  };
-
-  // ===== 合成预览状态机 =====
-  // 合成预览结果(blob 用于上传, dataUrl 用于 <img> 预览)
-  const [compositePreview, setCompositePreview] = useState<
-    { blob: Blob; dataUrl: string; width: number; height: number } | null
-  >(null);
-  const [isComposing, setIsComposing] = useState(false);
-  const [isApplying, setIsApplying] = useState(false);
-  // useFileUpload: 上传合并后的 PNG
-  const {
-    upload,
-    loading: uploadLoading,
-    progress: uploadProgress,
-    error: uploadError,
-  } = useFileUpload({
-    purpose: 'UP_DOWN_MERGE',
-    productId: selectedProduct?.id ? Number(selectedProduct.id) : undefined,
-  });
-
-  const handleCompositePreview = async () => {
-    if (!slotRefs.top || !slotRefs.bottom) {
-      toast.warning('请先添加上衣和下装素材后再进行合成');
-      return;
-    }
-    const topUrl = slotRefs.top.originalUrl ?? slotRefs.top.thumbnailUrl;
-    const bottomUrl = slotRefs.bottom.originalUrl ?? slotRefs.bottom.thumbnailUrl;
-    if (!topUrl || !bottomUrl) {
-      toast.error('所选资源缺少原图 URL,无法合成');
-      return;
-    }
-
-    setIsComposing(true);
-    setCompositePreview(null);
-    try {
-      const result = await mergeImagesHorizontal(topUrl, bottomUrl, {
-        crossOrigin: true,
-        mimeType: 'image/png',
-      });
-      const dataUrl = URL.createObjectURL(result.blob);
-      setCompositePreview({
-        blob: result.blob,
-        dataUrl,
-        width: result.width,
-        height: result.height,
-      });
-      setHasCompositePreviewed(true);
-      toast.success(`合成预览完成(尺寸 ${result.width}×${result.height})`);
-    } catch (err) {
-      toast.error(`合成失败: ${(err as Error).message}`);
-    } finally {
-      setIsComposing(false);
-    }
-  };
-
-  /**
-   * 应用合成图为主图:
-   * 1. blob → File
-   * 2. useFileUpload 上传(走 COS)
-   * 3. assetApi.create 创建业务资源(PRODUCT_ORIGINAL)
-   * 4. setSelectedProduct 换缩略图 + name
-   * 5. setSlotRef('main', ...) 把合成图写入主 slot
-   * 6. 清理 compositePreview
-   */
-  const handleApplyComposite = async () => {
-    if (!compositePreview) {
-      toast.warning('请先生成合成预览');
-      return;
-    }
-    setIsApplying(true);
-    try {
-      const file = new File(
-        [compositePreview.blob],
-        `composite-${Date.now()}.png`,
-        { type: compositePreview.blob.type || 'image/png' },
-      );
-      const { fileResourceId, accessUrl } = await upload(file);
-      // 创建业务资源
-      await assetApi.create({
-        fileResourceId,
-        name: file.name,
-        productId: selectedProduct?.id ? Number(selectedProduct.id) : undefined,
-        assetKind: 'IMAGE',
-        assetType: 'PRODUCT_ORIGINAL',
-      });
-      // 替换商品主图
-      setSelectedProduct({
-        ...selectedProduct,
-        name: '智能合成套图',
-        thumbnail: accessUrl,
-      });
-      // 主 slot 写为合成图
-      setSlotRef('main', {
-        fileResourceId,
-        originalUrl: accessUrl,
-        thumbnailUrl: accessUrl,
-        name: '智能合成套图',
-      });
-      toast.success('合成图已应用为主图');
-      // 清理预览
-      if (compositePreview.dataUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(compositePreview.dataUrl);
-      }
-      setCompositePreview(null);
-    } catch (err) {
-      toast.error(`应用失败: ${(err as Error).message}`);
-    } finally {
-      setIsApplying(false);
     }
   };
 
@@ -399,88 +285,30 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
               />
             </div>
 
-            {/* Composite Setup: 上下装合成套图 */}
-            <div className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-xs">
-              <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center text-xs font-bold text-slate-700">
-                <span className="material-symbols-outlined text-blue-500 text-sm mr-1.5">layers</span>
-                上下装合成套图
-              </div>
-              <div className="p-4 flex flex-col items-center">
-                <div className="text-[10px] lg:text-xs text-slate-400 mb-3 font-medium">合成后将作为主任务图像输入</div>
-                <div className="flex items-center space-x-3 w-full justify-center mb-4">
-
-                  {/* Top slot */}
-                  <TransitPickerButton
-                    slot="top"
-                    value={slotRefs.top}
-                    onChange={(next) => setSlotRef('top', next)}
-                    size="md"
-                    placeholder="添加上衣"
-                    icon="checkroom"
-                  />
-
-                  <div className="text-slate-300 text-lg font-bold">+</div>
-
-                  {/* Bottom slot */}
-                  <TransitPickerButton
-                    slot="bottom"
-                    value={slotRefs.bottom}
-                    onChange={(next) => setSlotRef('bottom', next)}
-                    size="md"
-                    placeholder="添加下装"
-                    icon="accessibility_new"
-                  />
-
-                </div>
-
-                <button
-                  onClick={handleCompositePreview}
-                  disabled={isComposing}
-                  className="w-full py-2 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="material-symbols-outlined text-sm mr-1">preview</span>
-                  {isComposing ? '合成中...' : '合成预览'}
-                </button>
-
-                {/* 合成预览结果:图片 + 上传应用按钮 */}
-                {compositePreview && (
-                  <div className="mt-3 flex flex-col items-center">
-                    <div className="w-full max-w-[280px] border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
-                      <img
-                        src={compositePreview.dataUrl}
-                        alt="合成预览"
-                        className="w-full h-auto"
-                      />
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-1 font-mono">
-                      {compositePreview.width} × {compositePreview.height}
-                    </div>
-                    {isApplying && uploadProgress > 0 && (
-                      <div className="w-full max-w-[280px] mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-600 transition-all duration-200"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                    )}
-                    <button
-                      onClick={handleApplyComposite}
-                      disabled={isApplying || uploadLoading}
-                      className="w-full max-w-[280px] mt-2 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="material-symbols-outlined text-sm mr-1">upload</span>
-                      {isApplying ? `上传中 ${uploadProgress}%` : '上传并应用主图'}
-                    </button>
-                  </div>
-                )}
-
-                {uploadError && (
-                  <div className="mt-2 text-[10px] text-red-500 font-medium">
-                    上传失败: {uploadError.message}
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Composite Setup: 上下装合成套图(由公共组件实现) */}
+            <OutfitComposePanel
+              productId={
+                selectedProduct?.id && /^\d+$/.test(selectedProduct.id)
+                  ? selectedProduct.id
+                  : undefined
+              }
+              defaultCollapsed={false}
+              onApplied={(asset) => {
+                // 写回 slotRefs.main(主图缩略图、提交 payload 用)
+                setSlotRef('main', {
+                  fileResourceId: asset.fileResourceId,
+                  originalUrl: asset.originalUrl,
+                  thumbnailUrl: asset.thumbnailUrl,
+                  name: asset.name,
+                });
+                // 同步 selectedProduct.thumbnail(ProductAssetLibrary 等下游消费者用)
+                setSelectedProduct({
+                  ...selectedProduct,
+                  name: '智能合成套图',
+                  thumbnail: asset.originalUrl,
+                });
+              }}
+            />
 
             {/* Reference Images: 参考图 (选传) */}
             <div>
@@ -874,29 +702,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
 
       </main>
 
-      {/* 3. Bottom Action Bar */}
-      <footer className="bg-white border-t border-slate-200 h-16 flex items-center justify-between px-6 shrink-0 z-20 shadow-[0_-2px_10px_rgba(0,0,0,0.02)]" id="create-task-footer">
-        <div className="text-[11px] lg:text-xs text-slate-400 font-mono font-medium flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          已自动保存于 10:42
-        </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => setScreen(AppScreen.TASKS)}
-            className="px-5 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-lg shadow-xs hover:bg-slate-50 focus:outline-none transition-colors text-xs lg:text-sm cursor-pointer"
-          >
-            保存草稿
-          </button>
-          <button
-            onClick={handleSubmitTask}
-            className="px-5 py-2 bg-blue-600 border border-transparent text-white font-bold rounded-lg shadow-xs hover:bg-blue-700 focus:outline-none transition-colors flex items-center text-xs lg:text-sm cursor-pointer active:scale-98"
-          >
-            <span className="material-symbols-outlined mr-1.5 text-sm font-bold">auto_awesome</span>
-            提交生成 (¥1.20)
-          </button>
-        </div>
-      </footer>
-
+      {/* 3. Bottom Action Bar — 已移除底部 footer(原保存草稿 / 提交生成) */}
     </div>
   );
 };

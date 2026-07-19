@@ -32,6 +32,12 @@ export interface TransitPickerButtonProps {
   clearable?: boolean;
   /** 缩略图最大宽度(传给 AssetImage,走 COS thumbnail 压缩);默认 200 */
   maxWidth?: number;
+  /**
+   * 若提供,按钮点击不再打开内部 picker,而是回调给外层。
+   * 外层可借此共享一个 AssetTransitModal 实例,避免抽屉内同时挂多份 modal。
+   * 不传则维持原行为(内部 useState 控制 picker open)。
+   */
+  onOpenPicker?: () => void;
 }
 
 /** 把 AssetResourceItem 拍扁成 SlotRef —— 父组件写值唯一入口 */
@@ -70,6 +76,7 @@ export const TransitPickerButton: React.FC<TransitPickerButtonProps> = ({
   disabled = false,
   clearable = true,
   maxWidth = 200,
+  onOpenPicker,
 }) => {
   const [open, setOpen] = useState(false);
   const meta = SLOT_META[slot];
@@ -113,13 +120,13 @@ export const TransitPickerButton: React.FC<TransitPickerButtonProps> = ({
           data-slot={slot}
           data-testid={`transit-picker-${slot}`}
           className={`relative group overflow-hidden rounded-lg cursor-pointer ${containerClass} ${variant === 'primary' ? 'border-2 border-blue-400' : 'border border-slate-200'}`}
-          onClick={() => !disabled && setOpen(true)}
+          onClick={() => !disabled && (onOpenPicker ? onOpenPicker() : setOpen(true))}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              if (!disabled) setOpen(true);
+              if (!disabled) (onOpenPicker ? onOpenPicker() : setOpen(true));
             }
           }}
           title={selectedLabel ?? value.name ?? '已选择资源'}
@@ -173,7 +180,7 @@ export const TransitPickerButton: React.FC<TransitPickerButtonProps> = ({
     <>
       <button
         type="button"
-        onClick={() => !disabled && setOpen(true)}
+        onClick={() => !disabled && (onOpenPicker ? onOpenPicker() : setOpen(true))}
         disabled={disabled}
         data-slot={slot}
         data-testid={`transit-picker-${slot}`}
