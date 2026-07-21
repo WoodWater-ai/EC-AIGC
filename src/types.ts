@@ -13,17 +13,6 @@ export enum AppScreen {
   PRODUCT_CATEGORY = 'PRODUCT_CATEGORY',
   /** [v1.2 2026-07-11] Vidu 接入 — 通道异步任务列表 */
   ASYNC_TASKS = 'ASYNC_TASKS',
-  // ===== [v2.0 2026-07-13 F1 基础设施] 新流程尝试(Dark Launch) =====
-  /** 智能模版中心-新(D3+D5+D7 改造,模版绑 capability + 推荐参数 Tab + 用此模版按钮) */
-  TEMPLATE_CENTER_NEW = 'TEMPLATE_CENTER_NEW',
-  /** 新建任务-新(D1 B v2 方案,统一 CreateTask,3 group,模版预填) */
-  CREATE_TASK_NEW = 'CREATE_TASK_NEW',
-  /** 任务列表-新(D2+D4 改造,3 级 chip 过滤 + 通道能力角标) */
-  TASK_LIST_NEW = 'TASK_LIST_NEW',
-  /** AI 帮我写 prompt-新(D6 TEXT 能力独立功能) */
-  PROMPT_ASSIST_NEW = 'PROMPT_ASSIST_NEW',
-  /** 推荐参数管理-新(D8 独立编辑页) */
-  RECOMMEND_PARAMS_MANAGE_NEW = 'RECOMMEND_PARAMS_MANAGE_NEW',
   /** 产品基础信息管理(新增 2026-07-18) */
   PRODUCT_MANAGE = 'PRODUCT_MANAGE',
   // ===== [2026-07-19] 字典管理 =====

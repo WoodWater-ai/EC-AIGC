@@ -36,17 +36,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { screen: AppScreen.DICT_ITEM, label: '字典管理', icon: 'menu_book' },
   ];
 
-  // ===== [v2.0 2026-07-13 F1 基础设施] 新流程尝试 · 5 个 BETA 页面 =====
-  // 与老菜单并存,老 URL/老 setScreen 行为 0 改动。
-  // 后端 API 复用(后端 2 个新 API 由 F4 PR 同步推进)。
-  const betaMenuItems = [
-    { screen: AppScreen.TEMPLATE_CENTER_NEW, label: '智能模版中心-新', icon: 'dashboard_customize' },
-    { screen: AppScreen.CREATE_TASK_NEW, label: '新建任务-新', icon: 'add_circle' },
-    { screen: AppScreen.TASK_LIST_NEW, label: '任务列表-新', icon: 'auto_schedule' },
-    { screen: AppScreen.PROMPT_ASSIST_NEW, label: 'AI 帮我写 prompt-新', icon: 'auto_awesome' },
-    { screen: AppScreen.RECOMMEND_PARAMS_MANAGE_NEW, label: '推荐参数管理-新', icon: 'tune' },
-  ];
-
   return (
     <aside className="w-68 bg-[#0B1C30] text-slate-300 flex flex-col justify-between select-none shrink-0 h-screen overflow-y-auto border-r border-slate-800">
       {/* Top Brand Section */}
@@ -152,41 +141,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="material-symbols-outlined text-lg text-slate-500">grid_view</span>
             资源中心
           </button>
-        </div>
-
-        {/* [v2.0 2026-07-13 F1 基础设施] 新流程尝试 · 5 个 BETA 菜单 */}
-        <div className="mt-6 px-3">
-          <div className="flex items-center justify-between px-3 mb-2">
-            <span className="text-[10px] font-semibold text-slate-500 tracking-wider uppercase">新流程尝试</span>
-            <span className="text-[9px] font-bold tracking-wider text-rose-400 bg-rose-400/10 px-1.5 py-0.5 rounded">BETA</span>
-          </div>
-          {betaMenuItems.map((item) => {
-            const isActive = currentScreen === item.screen;
-            return (
-              <button
-                key={item.screen}
-                onClick={() => setScreen(item.screen)}
-                className={`w-full h-9 px-3 rounded-lg flex items-center justify-between font-medium text-sm cursor-pointer transition-all duration-150 group ${
-                  isActive
-                    ? 'bg-rose-500/10 text-rose-300'
-                    : 'text-slate-400 hover:bg-[#142337] hover:text-slate-200'
-                }`}
-                id={`beta-menu-${item.screen.toLowerCase()}`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className={`material-symbols-outlined text-lg transition-colors ${
-                    isActive ? 'text-rose-400' : 'text-slate-500 group-hover:text-slate-400'
-                  }`}>
-                    {item.icon}
-                  </span>
-                  <span>{item.label}</span>
-                </div>
-                {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
-                )}
-              </button>
-            );
-          })}
         </div>
       </div>
 
