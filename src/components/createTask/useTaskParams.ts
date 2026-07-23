@@ -153,6 +153,15 @@ export function useTaskParams(
     return m;
   }, [recommendList]);
 
+  // isSupported 占位(简化):只检查 schema 是否存在就返回 true;
+  // 真正的兼容性拒绝入口在 UI 层 useCreateImageTaskState.isSupported
+  const isSupported = useMemo(() => schema != null, [schema]);
+
+  const setModelWithValidation = (id: string | null) => {
+    if (locked) return;
+    setModelId(id);
+  };
+
   return {
     channelId, channelType, capability, modelId, schema, schemaParams,
     instances,
@@ -161,6 +170,6 @@ export function useTaskParams(
     setChannelId: locked ? () => {} : setChannelId,
     setCapability,
     setModelId, setSchemaParams,
-    recommendValues, locked,
+    recommendValues, locked, isSupported, setModelWithValidation,
   };
 }

@@ -10,6 +10,7 @@ import {
   ASYNC_TASK_STATUS_STYLES,
 } from '../types';
 import { TaskDetailsDrawer } from './TaskDetailsDrawer';
+import { ImagePreviewModal, PreviewImage } from './ImagePreviewModal';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { taskApi } from '../api/modules/task';
 import { asyncTaskApi } from '../api/modules/asyncTask';
@@ -29,6 +30,8 @@ interface TaskListProps {
 interface ChildTaskChipProps {
   child: ChannelAsyncTask;
   onRetry: (id: string) => void;
+  /** [2026-07-21] 点击缩略图放大预览:把该子任务全部产出图冒泡到 TaskList 顶层 */
+  onPreview: (images: PreviewImage[], index: number) => void;
 }
 
 /**
@@ -45,7 +48,7 @@ function buildThumbUrl(imageUrl: string | null | undefined, size = 64): string |
   return `${imageUrl}${sep}imageMogr2/thumbnail/${size}x${size}`;
 }
 
-const ChildTaskChip: React.FC<ChildTaskChipProps> = ({ child, onRetry }) => {
+const ChildTaskChip: React.FC<ChildTaskChipProps> = ({ child, onRetry, onPreview }) => {
   const style = ASYNC_TASK_STATUS_STYLES[child.status as AsyncTaskStatus];
 
   // [2026-07-16 P0] SUCCESS 状态的子任务拉图列表(其他状态后端没图)
@@ -59,21 +62,37 @@ const ChildTaskChip: React.FC<ChildTaskChipProps> = ({ child, onRetry }) => {
   const firstImg = imgs[0];
   const thumbUrl = buildThumbUrl(firstImg?.imageUrl, 64);
 
+  // [2026-07-21] 放大预览用原图(不加缩略参数);label 用 batchIdx + version
+  const previewImages: PreviewImage[] = imgs
+    .filter((im) => !!im.imageUrl)
+    .map((im) => ({
+      url: im.imageUrl,
+      label: im.version ? `batchIdx=${im.batchIdx} · ${im.version}` : `batchIdx=${im.batchIdx}`,
+    }));
+  const canPreview = previewImages.length > 0;
+
   return (
     <div
       className={`inline-flex flex-col gap-1.5 p-2 rounded-lg text-[10px] font-bold ${style.bg} ${style.text} min-w-[140px]`}
     >
       {/* 第一行:缩略图 + batchIdx + 状态 + 重试 */}
       <div className="flex items-center gap-1.5">
-        {/* 缩略图(64x64,SUCCESS 且有图才显示) */}
+        {/* 缩略图(64x64,SUCCESS 且有图才显示;可点击放大) */}
         {thumbUrl ? (
-          <img
-            src={thumbUrl}
-            alt={`batchIdx=${child.batchIdx}`}
-            className="w-10 h-10 rounded object-cover border border-black/10"
-            referrerPolicy="no-referrer"
-            loading="lazy"
-          />
+          <button
+            type="button"
+            onClick={() => canPreview && onPreview(previewImages, 0)}
+            className="w-10 h-10 rounded overflow-hidden border border-black/10 cursor-zoom-in p-0 block"
+            aria-label={`放大预览 batchIdx=${child.batchIdx}`}
+          >
+            <img
+              src={thumbUrl}
+              alt={`batchIdx=${child.batchIdx}`}
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+              loading="lazy"
+            />
+          </button>
         ) : (
           <div className="w-10 h-10 rounded bg-black/5 flex items-center justify-center">
             <span className="material-symbols-outlined text-sm opacity-50">
@@ -140,6 +159,9 @@ export const TaskList: React.FC<TaskListProps> = ({
   // Selected Task for Preview Modal
   const [previewTask, setPreviewTask] = useState<GenerationTask | null>(null);
   const [feedbackTask, setFeedbackTask] = useState<GenerationTask | null>(null);
+  // [2026-07-21] 子任务缩略图放大预览
+  const [previewImages, setPreviewImages] = useState<PreviewImage[] | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [selectedDetailTask, setSelectedDetailTask] = useState<GenerationTask | null>(null);
   const [detailDrawerTab, setDetailDrawerTab] = useState<'overview' | 'inputs' | 'results' | 'reviews' | 'costs'>('overview');
 
@@ -629,6 +651,10 @@ export const TaskList: React.FC<TaskListProps> = ({
                                 key={c.id}
                                 child={c}
                                 onRetry={handleRetryChild}
+                                onPreview={(imgs, idx) => {
+                                  setPreviewImages(imgs);
+                                  setPreviewIndex(idx);
+                                }}
                               />
                             ))}
                           </div>
@@ -796,6 +822,15 @@ export const TaskList: React.FC<TaskListProps> = ({
             onUpdateTask(updated);
             setSelectedDetailTask(updated);
           }}
+        />
+      )}
+
+      {/* 5. [2026-07-21] 子任务缩略图放大预览 */}
+      {previewImages && (
+        <ImagePreviewModal
+          images={previewImages}
+          initialIndex={previewIndex}
+          onClose={() => setPreviewImages(null)}
         />
       )}
 

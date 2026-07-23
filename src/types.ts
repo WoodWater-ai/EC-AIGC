@@ -38,14 +38,20 @@ export interface GenerationTask {
   errorMsg?: string;
   feedback?: string;
   modelChannel?: string;
+  taskPrompt?: string;
+  negativePrompt?: string;
+  reviewStrategy?: { aesthetic: boolean; listing: boolean };
   params?: {
     ratio?: string;
     model?: string;
     steps?: number;
     guidance?: number;
+    count?: number;
     prompt?: string;
     negativePrompt?: string;
   };
+  imageType?: ImageGenerationType;
+  groupId?: string;
   rating?: number; // 1 to 5 stars
   reviews?: {
     id: string;
@@ -468,3 +474,9 @@ export interface SystemBuiltinChannelItem {
   builtinKey: BuiltinKey;
   channelId: string | null;
 }
+
+// [2026-07-21 重构 create-image-task 复刻 demo] 图片生成任务类型
+// - imageType: 与 demo 主版对齐 — product_main / scene_detail / detail_closeup / on_model
+// - ReferenceSlot: 5 个参考图槽位
+export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'on_model';
+export type ReferenceSlot = 'detail' | 'style' | 'scene' | 'pose' | 'model';
