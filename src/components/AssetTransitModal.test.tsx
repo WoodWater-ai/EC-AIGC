@@ -6,7 +6,7 @@ import type { AssetResourceItem } from '../api/modules/asset';
 
 // 类型层校验为主,运行时交互留给 Playwright/E2E(本计划不引入)
 
-const asset = (id: number, fileResourceId: number | null): AssetResourceItem => ({
+const asset = (id: string, fileResourceId: string | null): AssetResourceItem => ({
   id,
   name: `asset-${id}`,
   assetKind: 'IMAGE',
@@ -44,7 +44,7 @@ test('空选中时不应调用 onConfirmSelection(items 应为空数组或干脆
 });
 
 test('fileResourceId 缺失的资源不应通过确认(校验逻辑)', () => {
-  const items: AssetResourceItem[] = [asset(1, null)];
+  const items: AssetResourceItem[] = [asset('1', null)];
   const allHaveFileResId = items.every((it) => it.fileResourceId != null);
   assert.equal(allHaveFileResId, false);
 });

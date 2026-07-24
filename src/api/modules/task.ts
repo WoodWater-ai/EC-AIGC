@@ -7,7 +7,10 @@
 import http from '../client';
 import type { PageInfo } from '../service-result';
 import type {
+  GeneratedImageVO,
   GenerationTaskResponse,
+  ImageTaskSubmitPayload,
+  ImageTaskSubmitResponse,
   TaskMyPageQueryRequest,
 } from '../../types';
 
@@ -72,5 +75,28 @@ export const taskApi = {
    */
   retry(id: string): Promise<void> {
     return http.post<void>('/v1/admin/task/retry', null, { params: { id } });
+  },
+
+  // ==================== [2026-07-24 图片任务产品化重构 Task 12] 图片任务提交 + 生成图拉取 ====================
+
+  /** 提交图片生成任务(/v1/task/submit) —— 返回 groupId + taskIds[] */
+  submitImageTask(
+    payload: ImageTaskSubmitPayload
+  ): Promise<ImageTaskSubmitResponse> {
+    return http.post<ImageTaskSubmitResponse>('/v1/task/submit', payload);
+  },
+
+  /** 单任务拉取生成图片列表(/v1/task/generated-images) */
+  fetchGeneratedImages(taskId: string): Promise<GeneratedImageVO[]> {
+    return http.post<GeneratedImageVO[]>('/v1/task/generated-images', {
+      id: taskId,
+    });
+  },
+
+  /** 批量拉取生成图片(/v1/task/generated-images-batch) */
+  fetchGeneratedImagesBatch(taskIds: string[]): Promise<GeneratedImageVO[]> {
+    return http.post<GeneratedImageVO[]>('/v1/task/generated-images-batch', {
+      taskIds,
+    });
   },
 };

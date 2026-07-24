@@ -1,16 +1,89 @@
 import React, { useState, useEffect } from 'react';
 import { GenerationTask, ProductAsset, AppScreen } from '../types';
+import type { GeneratedImageVO } from '../types';
+import { taskApi } from '../api/modules/task';
 
 interface TaskDetailsDrawerProps {
   task: GenerationTask;
+  taskIds: string[];
   products: ProductAsset[];
   onClose: () => void;
   onUpdateTask: (task: GenerationTask) => void;
   initialTab?: 'overview' | 'inputs' | 'results' | 'reviews' | 'costs';
 }
 
+function TaskResultsTab({ taskIds }: { taskIds: string[] }) {
+  const [results, setResults] = useState<GeneratedImageVO[]>([]);
+  const taskIdsKey = taskIds.join(',');
+
+  useEffect(() => {
+    if (!taskIds.length) return;
+    let tick = 0;
+    let cancelled = false;
+
+    const fetchOnce = async () => {
+      const data = await taskApi.fetchGeneratedImagesBatch(taskIds);
+      if (cancelled) return;
+      setResults(data);
+      const allTerminal = data.length > 0 && data.every((result) =>
+        ['PASSED', 'REJECTED', 'UNAVAILABLE', 'FAILED'].includes(result.status)
+      );
+      return allTerminal;
+    };
+
+    fetchOnce().then((terminal) => {
+      if (terminal || cancelled) return;
+      const interval = window.setInterval(async () => {
+        tick++;
+        const isTerminal = await fetchOnce();
+        if (isTerminal || tick >= 60 || cancelled) window.clearInterval(interval);
+      }, 3000);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [taskIdsKey]);
+
+  if (results.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
+        <span className="material-symbols-outlined text-4xl block mb-2 animate-spin text-slate-300">sync</span>
+        <span>任务正在努力生成中，生成结果会自动刷新...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {results.map((img) => (
+        <div key={img.id} className="border border-slate-200 rounded-xl p-2 bg-white">
+          <img
+            src={img.thumbnailUrl ?? img.imageUrl}
+            alt={img.taskId}
+            className="w-full aspect-square object-cover rounded-lg"
+            referrerPolicy="no-referrer"
+          />
+          <div className="text-xs mt-2 flex items-center gap-2">
+            <span className={
+              img.status === 'PASSED' ? 'text-success' :
+              img.status === 'REJECTED' ? 'text-danger' :
+              img.status === 'FAILED' ? 'text-red-900' :
+              'text-text-muted'
+            }>
+              {img.status}
+            </span>
+            {img.score != null && <span>★ {img.score.toFixed(1)}</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   task,
+  taskIds,
   products,
   onClose,
   onUpdateTask,
@@ -443,396 +516,9 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
             </div>
           )}
 
-          {/* TAB 3: 生成结果 (Generation Results & Interactive Rating / Scoring) */}
+          {/* TAB 3: 生成结果 (poll-driven real data) */}
           {activeTab === 'results' && (
-            <div className="space-y-6">
-              
-              {task.status !== 'completed' && task.status !== 'rejected' ? (
-                <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
-                  <span className="material-symbols-outlined text-4xl block mb-2 animate-spin text-slate-300">sync</span>
-                  <span>任务正在努力生成中，完成后即可在此查看高画质结果并去评分审核...</span>
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-between items-center bg-[#eff4ff] border border-blue-200/50 p-3.5 rounded-xl text-xs font-bold text-blue-800">
-                    <span>💡 您可以在下方查看渲染结果，对单张图片点击“审核评分”提出修正或赋予星级。</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {generatedImages.map((img) => (
-                      <div key={img.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-xs transition-shadow">
-                        {/* Image Frame */}
-                        <div className="aspect-square bg-slate-50 relative overflow-hidden group">
-                          <img src={img.url} alt={img.id} className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300" referrerPolicy="no-referrer" />
-                          
-                          {/* Rating and Status Overlay top left */}
-                          <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10">
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border flex items-center gap-1 bg-white/90 backdrop-blur-xs ${
-                              img.status === 'approved' ? 'text-emerald-600 border-emerald-200' :
-                              img.status === 'rejected' ? 'text-red-600 border-red-200' :
-                              'text-amber-600 border-amber-200'
-                            }`}>
-                              <span className={`w-1 h-1 rounded-full ${img.status === 'approved' ? 'bg-emerald-500' : img.status === 'rejected' ? 'bg-red-500' : 'bg-amber-500'}`} />
-                              {img.status === 'approved' ? '已通过' : img.status === 'rejected' ? '被退回' : '未审核'}
-                            </span>
-                            
-                            <span className="bg-white/90 backdrop-blur-xs text-[9px] font-bold px-2 py-0.5 rounded-full border border-slate-200 flex items-center gap-1 text-amber-500">
-                              <span className="material-symbols-outlined text-[10px] font-black">star</span>
-                              {img.rating}分
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Text and Actions panel */}
-                        <div className="p-3 bg-white border-t border-slate-100">
-                          <div className="flex justify-between items-start gap-2 mb-2">
-                            <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                              IMAGE #{img.id.split('-')[1]}
-                            </span>
-                            
-                            <button
-                              onClick={() => {
-                                setActiveReviewImgId(img.id);
-                                setReviewStatus(img.status === 'rejected' ? 'rejected' : 'approved');
-                                setReviewRating(img.rating || 4.0);
-                                setReviewAccuracy(img.accuracyRating || 4.0);
-                                setReviewConsistency(img.consistencyRating || 4.0);
-                                setReviewComposition(img.compositionRating || 4.0);
-                                setReviewTexture(img.textureRating || 4.0);
-                                setSelectedReviewTags(img.problemTags || []);
-                                setReviewComment(img.comment || '');
-                                setShowCustomTagInput(false);
-                                setNewCustomTag('');
-                              }}
-                              className="text-[10px] text-blue-600 font-extrabold hover:text-blue-700 cursor-pointer border border-blue-200 hover:bg-blue-50/50 px-2.5 py-1 rounded-lg"
-                            >
-                              去评分 / 审核
-                            </button>
-                          </div>
-                          
-                          <p className="text-[10px] text-slate-500 italic truncate font-medium">
-                            {img.comment || '暂无评语'}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* Popup Overlay Modal for rating an individual image */}
-              {activeReviewImgId && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-55 p-4 animate-fadeIn">
-                  <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200">
-                    <div className="p-4 border-b border-slate-150 bg-slate-50 flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700">图片单件评分与审核</span>
-                      <button onClick={() => setActiveReviewImgId(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <span className="material-symbols-outlined text-lg">close</span>
-                      </button>
-                    </div>
-
-                    <div className="p-5 space-y-4">
-                      {/* Image Preview thumbnail */}
-                      <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <img 
-                          src={generatedImages.find(img => img.id === activeReviewImgId)?.url} 
-                          alt="preview" 
-                          className="w-12 h-12 object-cover rounded-lg border border-slate-200 shrink-0" 
-                        />
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-bold text-slate-800 truncate">IMAGE #{activeReviewImgId.split('-')[1]}</h4>
-                          <span className="text-[10px] text-slate-400">进行审核决策与评分星级记录</span>
-                        </div>
-                      </div>
-
-                      {/* Score Selection (1-5 Stars) & Sub-dimensions */}
-                      <div className="space-y-4">
-                        {/* Approval Status Toggle - Sleek Segmented Control */}
-                        <div>
-                          <label className="text-[11px] font-extrabold text-slate-500 block mb-1.5 uppercase tracking-wide">审核决策 (Approval Decision)</label>
-                          <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReviewStatus('approved');
-                                // Selecting "Approved" can optionally clear problem tags for clean state
-                                setSelectedReviewTags([]);
-                              }}
-                              className={`flex-1 py-1.5 text-center rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                reviewStatus === 'approved' 
-                                  ? 'bg-emerald-500 text-white shadow-xs' 
-                                  : 'text-slate-500 hover:text-slate-800'
-                              }`}
-                            >
-                              通过 (Pass)
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setReviewStatus('rejected')}
-                              className={`flex-1 py-1.5 text-center rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                reviewStatus === 'rejected' 
-                                  ? 'bg-rose-500 text-white shadow-xs' 
-                                  : 'text-slate-500 hover:text-slate-800'
-                              }`}
-                            >
-                              退回 (Reject)
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Heading for Aesthetic Rating */}
-                        <div className="pt-2 border-t border-slate-100/80">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-1 h-3.5 bg-[#1D6FFF] rounded-full" />
-                            <span className="text-xs font-extrabold text-slate-800">审美评分 (1-5)</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-1.5 mb-4">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <button
-                                key={star}
-                                type="button"
-                                onClick={() => {
-                                  // Quick-set all sub-dimensions to this star value
-                                  setReviewAccuracy(star);
-                                  setReviewConsistency(star);
-                                  setReviewComposition(star);
-                                  setReviewTexture(star);
-                                }}
-                                className={`material-symbols-outlined text-2xl transition-colors cursor-pointer ${
-                                  star <= Math.round(reviewRating) ? 'text-amber-500 fill' : 'text-slate-250 hover:text-amber-400'
-                                }`}
-                                style={{ fontVariationSettings: star <= Math.round(reviewRating) ? "'FILL' 1" : "'FILL' 0" }}
-                              >
-                                star
-                              </button>
-                            ))}
-                            <span className="text-sm font-black text-slate-800 ml-2 font-display">{reviewRating.toFixed(1)}</span>
-                          </div>
-
-                          {/* 4 Fine-grained sliders */}
-                          <div className="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            {/* Accuracy */}
-                            <div className="flex items-center gap-4">
-                              <span className="text-xs font-bold text-slate-600 w-12 shrink-0">准确度</span>
-                              <div className="relative flex-1">
-                                <input
-                                  type="range"
-                                  min="1.0"
-                                  max="5.0"
-                                  step="0.1"
-                                  value={reviewAccuracy}
-                                  onChange={(e) => {
-                                    setReviewAccuracy(parseFloat(e.target.value));
-                                  }}
-                                  className="w-full h-1.5 bg-blue-50 rounded-lg appearance-none cursor-pointer accent-[#1D6FFF]"
-                                  style={{
-                                    background: `linear-gradient(to right, #1D6FFF 0%, #1D6FFF ${((reviewAccuracy - 1) / 4) * 100}%, #eff6ff ${((reviewAccuracy - 1) / 4) * 100}%, #eff6ff 100%)`
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs font-extrabold text-slate-700 w-6 text-right font-mono">{reviewAccuracy.toFixed(1)}</span>
-                            </div>
-
-                            {/* Consistency */}
-                            <div className="flex items-center gap-4">
-                              <span className="text-xs font-bold text-slate-600 w-12 shrink-0">一致性</span>
-                              <div className="relative flex-1">
-                                <input
-                                  type="range"
-                                  min="1.0"
-                                  max="5.0"
-                                  step="0.1"
-                                  value={reviewConsistency}
-                                  onChange={(e) => {
-                                    setReviewConsistency(parseFloat(e.target.value));
-                                  }}
-                                  className="w-full h-1.5 bg-blue-50 rounded-lg appearance-none cursor-pointer accent-[#1D6FFF]"
-                                  style={{
-                                    background: `linear-gradient(to right, #1D6FFF 0%, #1D6FFF ${((reviewConsistency - 1) / 4) * 100}%, #eff6ff ${((reviewConsistency - 1) / 4) * 100}%, #eff6ff 100%)`
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs font-extrabold text-slate-700 w-6 text-right font-mono">{reviewConsistency.toFixed(1)}</span>
-                            </div>
-
-                            {/* Composition */}
-                            <div className="flex items-center gap-4">
-                              <span className="text-xs font-bold text-slate-600 w-12 shrink-0">构图</span>
-                              <div className="relative flex-1">
-                                <input
-                                  type="range"
-                                  min="1.0"
-                                  max="5.0"
-                                  step="0.1"
-                                  value={reviewComposition}
-                                  onChange={(e) => {
-                                    setReviewComposition(parseFloat(e.target.value));
-                                  }}
-                                  className="w-full h-1.5 bg-blue-50 rounded-lg appearance-none cursor-pointer accent-[#1D6FFF]"
-                                  style={{
-                                    background: `linear-gradient(to right, #1D6FFF 0%, #1D6FFF ${((reviewComposition - 1) / 4) * 100}%, #eff6ff ${((reviewComposition - 1) / 4) * 100}%, #eff6ff 100%)`
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs font-extrabold text-slate-700 w-6 text-right font-mono">{reviewComposition.toFixed(1)}</span>
-                            </div>
-
-                            {/* Texture */}
-                            <div className="flex items-center gap-4">
-                              <span className="text-xs font-bold text-slate-600 w-12 shrink-0">质感</span>
-                              <div className="relative flex-1">
-                                <input
-                                  type="range"
-                                  min="1.0"
-                                  max="5.0"
-                                  step="0.1"
-                                  value={reviewTexture}
-                                  onChange={(e) => {
-                                    setReviewTexture(parseFloat(e.target.value));
-                                  }}
-                                  className="w-full h-1.5 bg-blue-50 rounded-lg appearance-none cursor-pointer accent-[#1D6FFF]"
-                                  style={{
-                                    background: `linear-gradient(to right, #1D6FFF 0%, #1D6FFF ${((reviewTexture - 1) / 4) * 100}%, #eff6ff ${((reviewTexture - 1) / 4) * 100}%, #eff6ff 100%)`
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs font-extrabold text-slate-700 w-6 text-right font-mono">{reviewTexture.toFixed(1)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* SECTION: Problem Tagging */}
-                        <div className="pt-2 border-t border-slate-100/80">
-                          <div className="flex items-center gap-2 mb-2.5">
-                            <div className="w-1 h-3.5 bg-[#1D6FFF] rounded-full" />
-                            <span className="text-xs font-extrabold text-slate-800">问题打标 (多选)</span>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            {availableReviewTags.map((tag) => {
-                              const isSelected = selectedReviewTags.includes(tag);
-                              return (
-                                <button
-                                  key={tag}
-                                  type="button"
-                                  onClick={() => {
-                                    if (isSelected) {
-                                      setSelectedReviewTags(prev => prev.filter(t => t !== tag));
-                                    } else {
-                                      setSelectedReviewTags(prev => [...prev, tag]);
-                                      // Auto toggle status to reject if an issue tag is selected
-                                      setReviewStatus('rejected');
-                                    }
-                                  }}
-                                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-blue-50/50 border-blue-500 text-blue-600'
-                                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  {tag}
-                                  {isSelected && (
-                                    <span className="material-symbols-outlined text-[10px] font-extrabold text-blue-500 leading-none">close</span>
-                                  )}
-                                </button>
-                              );
-                            })}
-
-                            {/* Add Custom tag inline control */}
-                            {!showCustomTagInput ? (
-                              <button
-                                type="button"
-                                onClick={() => setShowCustomTagInput(true)}
-                                className="px-3 py-1.5 rounded-full text-xs font-bold border border-slate-200 bg-slate-50/50 text-slate-500 hover:bg-slate-100 cursor-pointer flex items-center gap-0.5"
-                              >
-                                <span>+ 自定义</span>
-                              </button>
-                            ) : (
-                              <div className="flex items-center gap-1">
-                                <input
-                                  type="text"
-                                  value={newCustomTag}
-                                  onChange={(e) => setNewCustomTag(e.target.value)}
-                                  placeholder="标签名"
-                                  className="px-2.5 py-1 text-xs border border-blue-400 rounded-full outline-none w-20 text-slate-700 font-bold"
-                                  autoFocus
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      const trimmed = newCustomTag.trim();
-                                      if (trimmed) {
-                                        if (!availableReviewTags.includes(trimmed)) {
-                                          setAvailableReviewTags(prev => [...prev, trimmed]);
-                                        }
-                                        if (!selectedReviewTags.includes(trimmed)) {
-                                          setSelectedReviewTags(prev => [...prev, trimmed]);
-                                          setReviewStatus('rejected');
-                                        }
-                                      }
-                                      setNewCustomTag('');
-                                      setShowCustomTagInput(false);
-                                    } else if (e.key === 'Escape') {
-                                      setShowCustomTagInput(false);
-                                    }
-                                  }}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const trimmed = newCustomTag.trim();
-                                    if (trimmed) {
-                                      if (!availableReviewTags.includes(trimmed)) {
-                                        setAvailableReviewTags(prev => [...prev, trimmed]);
-                                      }
-                                      if (!selectedReviewTags.includes(trimmed)) {
-                                        setSelectedReviewTags(prev => [...prev, trimmed]);
-                                        setReviewStatus('rejected');
-                                      }
-                                    }
-                                    setNewCustomTag('');
-                                    setShowCustomTagInput(false);
-                                  }}
-                                  className="p-1 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center cursor-pointer"
-                                >
-                                  <span className="material-symbols-outlined text-[10px] font-black">check</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Comment text */}
-                        <div className="pt-2 border-t border-slate-100/80">
-                          <textarea
-                            value={reviewComment}
-                            onChange={(e) => setReviewComment(e.target.value)}
-                            placeholder="添加审核备注说明..."
-                            className="w-full text-xs font-medium border border-slate-200 focus:border-blue-500 rounded-xl p-3 h-20 outline-none resize-none transition-all bg-slate-50/50 focus:bg-white"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2 shrink-0">
-                      <button
-                        onClick={() => setActiveReviewImgId(null)}
-                        className="px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-500 font-bold hover:bg-slate-100 cursor-pointer"
-                      >
-                        取消
-                      </button>
-                      <button
-                        onClick={() => handleSubmitImageReview(activeReviewImgId)}
-                        className="px-5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-sm cursor-pointer"
-                      >
-                        提交决策评分
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            </div>
+            <TaskResultsTab taskIds={taskIds} />
           )}
 
           {/* TAB 4: 审核记录 (Review Records History Timeline) */}

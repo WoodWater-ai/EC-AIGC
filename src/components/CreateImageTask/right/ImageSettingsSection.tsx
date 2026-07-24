@@ -6,21 +6,40 @@ import { ParamSchemaForm } from '../../common/ParamSchemaForm';
 import { UnsupportedNotice } from './UnsupportedNotice';
 import { messages } from '../../../labels/createImageTask';
 
+export interface TaskParamsSnapshot {
+  channelId: string | null;
+  channelType: string | null;
+  capability: string | null;
+  modelId: string | null;
+}
+
 /** ratio 由 useCreateImageTaskState 内部维护;本节不再展示。
  *  在 ImageTypeSelector 顶部 banner 加一句话提示"比例由图片类型决定 + 上方头部显示",
  *  让用户感知到 ratio 实际由 schema 与 image-set 联动,而不是孤立选择。
  */
 export interface ImageSettingsSectionProps {
-  isSupported: boolean;
+  /** 已废弃:由 useTaskParams.isSupported 真实判定(基于 Vidu 能力 schema);
+   *  保留仅为不破坏调用方,实际不再使用。 */
+  isSupported?: boolean;
+  /** 选中状态变化时通知父组件,父组件用于 submit payload 的 channelInstanceId/modelId */
+  onParamsChange?: (snapshot: TaskParamsSnapshot) => void;
 }
 
-export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({ isSupported }) => {
+export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
+  onParamsChange,
+}) => {
   // 通道实例 / 能力 / 模型 三级联动 — 与 demo 创建图片任务 "任务参数"一致
   const tp = useTaskParams('IMAGE', null);
 
+  // 选中状态变化时通知父组件
   useEffect(() => {
-    // reserved: 后续如需把 channel/capability/modelId 同步给父容器,在此处 onParamsChange?.({...})
-  }, [tp.channelId, tp.channelType, tp.capability, tp.modelId]);
+    onParamsChange?.({
+      channelId: tp.channelId,
+      channelType: tp.channelType,
+      capability: tp.capability,
+      modelId: tp.modelId,
+    });
+  }, [tp.channelId, tp.channelType, tp.capability, tp.modelId, onParamsChange]);
 
   return (
     <div
@@ -134,7 +153,9 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({ isSu
         </div>
       )}
 
-      <UnsupportedNotice show={!isSupported} />
+      {/* 由 useTaskParams.isSupported 真实判定(基于 Vidu 能力 schema + 当前 schemaParams),
+          取代之前用写死 model.capability 的旧判定 */}
+      <UnsupportedNotice show={!tp.isSupported} />
     </div>
   );
 };

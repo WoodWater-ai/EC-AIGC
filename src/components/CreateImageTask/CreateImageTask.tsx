@@ -2,7 +2,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AppScreen } from '../../types';
-import type { ProductAsset, GenerationTask } from '../../types';
+import type { ProductAsset } from '../../types';
 import type { ProductDTO } from '../../api/modules/productInfo';
 import type { ImageGenerationType, ReadinessCheck } from '../../lib/createImageTask/readinessChecks';
 import type { ReferenceSlot } from '../../lib/createImageTask/extractReferenceInsights';
@@ -22,7 +22,7 @@ import { TemplatePicker } from './center/TemplatePicker';
 import { StyleScenePoseRow } from './center/StyleScenePoseRow';
 import { AdvancedSettings } from './center/AdvancedSettings';
 import { ImageContentSection } from './center/ImageContentSection';
-import { ImageSettingsSection } from './right/ImageSettingsSection';
+import { ImageSettingsSection, type TaskParamsSnapshot } from './right/ImageSettingsSection';
 import { ReviewStrategyPanel } from './right/ReviewStrategyPanel';
 import { ConflictDialog } from './dialogs/ConflictDialog';
 import { TemplateOverwriteDialog } from './dialogs/TemplateOverwriteDialog';
@@ -34,8 +34,8 @@ import { withCosThumbnail } from '../../utils/cosImage';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
-  onAddTask: (task: GenerationTask) => void;
-  setScreen: (screen: AppScreen) => void;
+  onAddTask: (info: { groupId: string; taskIds: string[] }) => void;
+  setScreen: (screen: AppScreen, payload?: { highlightGroupId?: string }) => void;
   openTransit: () => void;
   selectedProduct: ProductAsset;
   setSelectedProduct: (product: ProductAsset) => void;
@@ -61,10 +61,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     fitStructure: '修身版型',
   });
   const [mainValue, setMainValue] = useState<{
-    /** asset_resource.id(后端 aiAnalyze 需要) */
-    id?: number;
-    /** file_resource.id(原有 SlotRef 主键,提交 payload 用) */
-    fileResourceId?: number;
+    /** asset_resource.id(后端 aiAnalyze + 提交 assetId 用)—— 雪花 ID 必须 string 避免 JS 精度丢失 */
+    id?: string;
+    /** 兼容字段:历史命名,实际存的是 asset_resource.id(不是 file_resource.id) */
+    fileResourceId?: string;
     originalUrl?: string;
     thumbnailUrl?: string;
     name?: string;
@@ -82,25 +82,46 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const isTransitOpen = pendingSlot !== null;
 
   // ---- hook ----
+  // 通道/能力/模型 真实值由 ImageSettingsSection 内部 useTaskParams 装载(从
+  // /v1/admin/capability/supported-list 等接口拉取);子组件通过 onParamsChange
+  // 回调把选中状态冒泡到此处,提交时 channelInstanceId/modelId 必须是真实雪花 ID。
+  // 之前写死 channel-1 / gpt-image-1 已被替换,父组件不再自己调 useTaskParams(避免两份独立 state)。
+  const [paramsSnapshot, setParamsSnapshot] = useState<TaskParamsSnapshot>({
+    channelId: null,
+    channelType: null,
+    capability: null,
+    modelId: null,
+  });
   const state = useCreateImageTaskState({
     isProductBound: !!mainValue,
     mainAssetId: mainValue?.id ?? null,
-    product: selectedProduct,
+    mainImage: mainValue,
+    // 选产品(从 ProductPickerModal)用 selectedFromLibrary 的 id(真实 ProductDTO.id,雪花 ID string)
+    // 顶层 selectedProduct 是 SKU(ProductAsset),仅用于初始化 form state 6 字段,不是提交用的 productId 源。
+    productId: selectedFromLibrary?.id ?? null,
     // AI 助手成功后,把后端 6 字段一次回写到顶层 productFacts state,
     // 让 ProductFactsEditor 的 input 实时刷新。
     onAiComplete: setProductFacts,
-    channel: { id: 'channel-1', name: '云端 API', accessType: 'cloud', health: 'NORMAL' },
+    channel: {
+      id: paramsSnapshot.channelId ?? '',
+      name: paramsSnapshot.channelId ?? '',
+      accessType: 'cloud',
+      health: 'NORMAL',
+    },
     model: {
-      id: 'gpt-image-1',
-      name: 'gpt-image-1',
+      id: paramsSnapshot.modelId ?? '',
+      name: paramsSnapshot.modelId ?? '',
       capability: {
         ratios: ['1:1', '3:4', '4:5', '9:16', '16:9'],
         maxCount: 5,
         resolutions: ['1024px', '1536px', '2048px'],
       },
     },
-    ratio: '3:4',
-    resolution: '1536px',
+    // 本期页面没有 ratio/resolution 选择 UI(右栏 ImageSettingsSection 只暴露 channel/capability/model),
+    // 直接用 Vidu 能力 schema 的默认/推荐值:ratio=16:9(主图常用),resolution=1080p(Vidu 接受值之一)。
+    // 后续如需在 UI 暴露选择,接 setRatio/setResolution 即可。
+    ratio: '16:9',
+    resolution: '1080p',
     templateName: '默认模板',
     toSubmit: async () => '',
     onAddTask,
@@ -173,7 +194,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
 
   // ---- composite applied: set as main (上下装合成预览后写主图) ----
   const handleCompositeApplied = useCallback(
-    (asset: { fileResourceId?: number; originalUrl?: string; thumbnailUrl?: string; name?: string }) => {
+    (asset: { fileResourceId?: string; originalUrl?: string; thumbnailUrl?: string; name?: string }) => {
       // 合成图通常无 asset_resource.id(file_resource 走专用合成流程),
       // 主图分支不调 AI 助手 → id 可为空。
       setMainValue({
@@ -206,8 +227,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       // 主图:imageUrl(ossKey) → withCosThumbnail(256) 拼 COS thumbnail,
       // 与 handleTransitConfirm 的主图分支保持一致缩放规则。
       const compressedThumb = withCosThumbnail(product.imageUrl, 256) ?? product.imageUrl;
+      // product.imageId 是后端 product.image_id 的字符串形式(雪花 ID),
+      // 必须保持 string,绝不能 Number()(19 位 ID 超出 number 安全范围)
       setMainValue({
-        id: product.imageId ? Number(product.imageId) : undefined,
+        id: product.imageId,
         thumbnailUrl: compressedThumb,
         originalUrl: product.imageUrl,
         name: product.name,
@@ -243,7 +266,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       const slotRef = toSlotRef(item);
       if (pendingSlot === 'main') {
         const compressedThumb = withCosThumbnail(slotRef.thumbnailUrl, 256) ?? slotRef.thumbnailUrl ?? slotRef.originalUrl;
-        // 主图要保留 item.id(asset_resource.id),给后端 aiAnalyze 用;
+        // 主图要保留 item.id(asset_resource.id,string),给后端 aiAnalyze + 提交 assetId 用;
         // toSlotRef 不带 id 字段,所以这里手写。
         setMainValue({
           id: item.id,
@@ -253,10 +276,14 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
           name: slotRef.name,
         });
       } else if (pendingSlot !== null) {
-        // 5 个参考图 slot 之一(不需要 aiAnalyze,只存 URL 信息即可)
+        // 5 个参考图 slot 之一
+        // 关键:必须携带 fileResourceId(实际是 asset_resource.id)和 id,否则后端
+        //      收到的 assetId 是空串。
         const compressedThumb = withCosThumbnail(slotRef.thumbnailUrl, 64) ?? slotRef.thumbnailUrl ?? slotRef.originalUrl;
         selectReference(pendingSlot, {
           slot: pendingSlot,
+          id: item.id,
+          fileResourceId: slotRef.fileResourceId,
           thumbnailUrl: compressedThumb,
           originalUrl: slotRef.originalUrl,
           name: slotRef.name,
@@ -368,7 +395,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         }
         right={
           <>
-            <ImageSettingsSection isSupported={isSupported} />
+            <ImageSettingsSection onParamsChange={setParamsSnapshot} />
             <ReviewStrategyPanel
               reviewEnabled={reviewEnabled}
               onChange={setReviewEnabled}

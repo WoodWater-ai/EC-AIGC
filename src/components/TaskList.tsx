@@ -20,6 +20,7 @@ interface TaskListProps {
   products: ProductAsset[];
   onAddTask: (task: GenerationTask) => void;
   onUpdateTask: (task: GenerationTask) => void;
+  highlightGroupId: string | null;
   setScreen: (screen: AppScreen) => void;
   /** [2026-07-16 P0] 由 App 层传入的 refetch 回调(在重试/筛选后触发) */
   onRefresh?: () => void;
@@ -146,6 +147,7 @@ export const TaskList: React.FC<TaskListProps> = ({
   products,
   onAddTask,
   onUpdateTask,
+  highlightGroupId,
   setScreen,
   onRefresh,
 }) => {
@@ -424,7 +426,11 @@ export const TaskList: React.FC<TaskListProps> = ({
               ) : (
                 paginatedTasks.map((task) => (
                   <React.Fragment key={task.id}>
-                  <tr className="hover:bg-slate-50/50 transition-colors">
+                  <tr className={`hover:bg-slate-50/50 transition-colors ${
+                    highlightGroupId && task.groupId === highlightGroupId
+                      ? 'bg-primary-light ring-2 ring-primary'
+                      : ''
+                  }`}>
                     {/* Name & ID */}
                     <td className="py-4 px-5">
                       <div>
@@ -815,6 +821,7 @@ export const TaskList: React.FC<TaskListProps> = ({
       {selectedDetailTask && (
         <TaskDetailsDrawer
           task={selectedDetailTask}
+          taskIds={[selectedDetailTask.id]}
           products={products}
           initialTab={detailDrawerTab}
           onClose={() => setSelectedDetailTask(null)}

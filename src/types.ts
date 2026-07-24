@@ -480,3 +480,94 @@ export interface SystemBuiltinChannelItem {
 // - ReferenceSlot: 5 个参考图槽位
 export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'on_model';
 export type ReferenceSlot = 'detail' | 'style' | 'scene' | 'pose' | 'model';
+
+// ============================================================================
+// [2026-07-24 图片任务产品化重构 Task 12] 图片任务提交 + 生成图片拉取
+// 对齐后端 ImageTaskSubmitRequest / GeneratedImageVO
+// ============================================================================
+
+/** 图片任务类型(对齐后端 EnumImageTaskType,大写形式) */
+export type ImageTaskType =
+  | 'PRODUCT_MAIN'
+  | 'SCENE_DETAIL'
+  | 'DETAIL_CLOSEUP'
+  | 'ON_MODEL';
+
+/** 任务资产槽位(对齐后端 EnumTaskAssetSlot) */
+export type TaskAssetSlot =
+  | 'MAIN'
+  | 'REFERENCE_DETAIL'
+  | 'REFERENCE_STYLE'
+  | 'REFERENCE_SCENE'
+  | 'REFERENCE_POSE'
+  | 'REFERENCE_MODEL';
+
+/** 单张图片类型条目(prompt + 可选 negativePrompt + 可选 perTypeParams + count) */
+export interface ImageTypeEntry {
+  imageType: ImageTaskType;
+  prompt: string;
+  negativePrompt?: string;
+  perTypeParams?: Record<string, string>;
+  /** 本类型生成张数(默认 1);Vidu count 由后端按 task 写入 generation_task.count */
+  count?: number;
+}
+
+/** 任务资产引用(槽位绑定,Long → string 避免 JS 精度丢失) */
+export interface TaskAssetRef {
+  /** Long 雪花 ID,前端用 string 避免 JS 精度丢失 */
+  assetId: string;
+  slotRole: TaskAssetSlot;
+  sortOrder: number;
+  originalUrl: string;
+  thumbnailUrl?: string;
+  name?: string;
+}
+
+/** 图片任务提交请求体(对齐后端 ImageTaskSubmitRequest) */
+export interface ImageTaskSubmitPayload {
+  groupId?: string;
+  productId?: string | null;
+  productFacts: ProductFactsInput;
+  channelInstanceId: string;
+  capability: 'REF_IMG_EDIT';
+  channelType: 'VIDU';
+  modelId?: string | null;
+  taskParamsJson: string;
+  imageTypes: ImageTypeEntry[];
+  assets: TaskAssetRef[];
+}
+
+/** 图片任务提交响应 */
+export interface ImageTaskSubmitResponse {
+  groupId: string;
+  taskIds: string[];
+}
+
+/** 生成图片 VO(对齐后端 GeneratedImageVO) */
+export interface GeneratedImageVO {
+  id: string;
+  taskId: string;
+  imageUrl: string;
+  thumbnailUrl?: string;
+  aspectRatio?: string;
+  status: string;
+  score?: number;
+  batchIdx: number;
+}
+
+/**
+ * 商品事实输入(对齐后端 ImageTaskSubmitRequest.productFacts)。
+ *
+ * 注:本类型与 src/lib/createImageTask/extractProductFacts.ts 中已有的 ProductFactsInput
+ *     存在声明合并 —— 后者字段更严格(全必填,且用 colorPattern);本处补 `color?` 字段
+ *     以满足新提交接口的 JSON schema。两者经 TS declaration merging 后,实际类型为:
+ *     name / sellingPoints / productCategory / colorPattern / color? / fabricTexture / fitStructure
+ */
+export interface ProductFactsInput {
+  name: string;
+  sellingPoints?: string;
+  productCategory?: string;
+  color?: string;
+  fabricTexture?: string;
+  fitStructure?: string;
+}

@@ -29,7 +29,8 @@ export interface AssetResourceQueryRequest {
 }
 
 export interface AssetResourceItem {
-  id: number;
+  /** 后端 Long → string(雪花 ID,JS number 会丢精度) */
+  id: string;
   resourceCode?: string;
   name: string;
   assetKind: 'IMAGE' | 'VIDEO';
@@ -46,47 +47,47 @@ export interface AssetResourceItem {
   description?: string;
   /** 标签(逗号分隔) */
   tags?: string;
-  uploadUserId: number;
-  productId?: number;
-  recognitionId?: number;
-  /** 关联 file_resource.id(Spec-B 主路径) */
-  fileResourceId?: number;
+  uploadUserId: string;
+  productId?: string;
+  recognitionId?: string;
+  /** 关联 file_resource.id(Spec-B 主路径;长 string 防 JS 精度丢失) */
+  fileResourceId?: string;
   status: 'NORMAL' | 'ARCHIVED';
-  categoryIds: number[];
+  categoryIds: string[];
   createTime?: string;
 }
 
 export interface AssetResourceCreateRequest {
-  /** file_resource.id(由 /file/upload-complete 返回) */
-  fileResourceId: number;
+  /** file_resource.id(由 /file/upload-complete 返回);string 防 JS 精度丢失 */
+  fileResourceId: string;
   name: string;
   assetKind?: 'IMAGE' | 'VIDEO';
   assetType?: string;
   productId?: string | number;  // accepts snowflake ID as string (precision-safe) OR legacy number
-  recognitionId?: number;
+  recognitionId?: string;
   description?: string;
   tags?: string;
   thumbnailUrl?: string;
-  categoryIds?: number[];
+  categoryIds?: string[];
 }
 
 export const assetApi = {
   page: (req: AssetResourceQueryRequest) =>
     http.post<PageInfo<AssetResourceItem>>('/v1/admin/asset/page', req),
 
-  get: (id: number) =>
+  get: (id: string) =>
     http.post<AssetResourceItem>('/v1/admin/asset/get', { id }),
 
   create: (req: AssetResourceCreateRequest) =>
-    http.post<number>('/v1/admin/asset/create', req),
+    http.post<string>('/v1/admin/asset/create', req),
 
-  delete: (id: number) =>
+  delete: (id: string) =>
     http.post('/v1/admin/asset/delete', { id }),
 
   /** 批量删除;若 file_resource 引用归 0,后端会自动物理删除 COS 文件 */
-  deleteBatch: (ids: number[]) =>
-    http.post<number>('/v1/admin/asset/delete-batch', { ids }),
+  deleteBatch: (ids: string[]) =>
+    http.post<string>('/v1/admin/asset/delete-batch', { ids }),
 
-  updateCategories: (resourceId: number, categoryIds: number[]) =>
+  updateCategories: (resourceId: string, categoryIds: string[]) =>
     http.post('/v1/admin/asset/update-categories', { resourceId, categoryIds }),
 };

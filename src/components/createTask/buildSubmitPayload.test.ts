@@ -39,7 +39,7 @@ test('uses channelId as modelChannelId (新链路)', () => {
 
 import type { SlotRef } from './slots';
 
-const ref = (id: number, name?: string, originalUrl?: string): SlotRef => ({
+const ref = (id: string, name?: string, originalUrl?: string): SlotRef => ({
   fileResourceId: id,
   thumbnailUrl: `https://example/${id}.jpg`,
   originalUrl: originalUrl ?? `https://example/${id}-orig.jpg`,
@@ -51,7 +51,7 @@ test('主图 slot 折叠到 inputImageUrls(只填主图)', () => {
     title: 't', productId: '5', taskType: 'PRODUCT_MAIN',
     channelType: 'VIDU', capability: 'REF_IMG_EDIT', modelChannelId: '9',
     schemaParams: {},
-    slotRefs: { main: ref(101, '主图.jpg'), top: null, bottom: null, detail: null, style: null, scene: null, pose: null },
+    slotRefs: { main: ref('101', '主图.jpg'), top: null, bottom: null, detail: null, style: null, scene: null, pose: null },
   });
   assert.equal(p.inputImageUrls, 'https://example/101-orig.jpg');
   // taskParamsJson 不再含 slotRefs(否则 schema 校验拒)
@@ -65,8 +65,8 @@ test('多 slot 全部填,按 main→top→bottom→detail→style→scene→pose
     channelType: 'QWEN', capability: 'MAIN_IMAGE', modelChannelId: '1',
     schemaParams: {},
     slotRefs: {
-      main: ref(1), top: ref(2), bottom: ref(3), detail: ref(4),
-      style: ref(5), scene: ref(6), pose: ref(7),
+      main: ref('1'), top: ref('2'), bottom: ref('3'), detail: ref('4'),
+      style: ref('5'), scene: ref('6'), pose: ref('7'),
     },
   });
   assert.equal(p.inputImageUrls,
@@ -88,7 +88,7 @@ test('slotRefs 部分填,只输出非 null 字段(按固定顺序)', () => {
     title: 't', productId: '5', taskType: 'X',
     channelType: 'QWEN', capability: 'MAIN_IMAGE', modelChannelId: '1',
     schemaParams: {},
-    slotRefs: { main: ref(11), top: null, bottom: ref(33), detail: null, style: null, scene: null, pose: null },
+    slotRefs: { main: ref('11'), top: null, bottom: ref('33'), detail: null, style: null, scene: null, pose: null },
   });
   assert.equal(p.inputImageUrls, 'https://example/11-orig.jpg,https://example/33-orig.jpg');
 });

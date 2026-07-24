@@ -80,6 +80,14 @@ export default function App() {
   // initializing=false 后根据 isAuthenticated 决定 LOGIN 还是 DASHBOARD。
   // 旧版本初始值是 LOGIN（依赖 user 未持久化），现在 AuthProvider 会用 /me 恢复 user。
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
+  const [highlightGroupId, setHighlightGroupId] = useState<string | null>(null);
+
+  const setScreen = (screen: AppScreen, payload?: { highlightGroupId?: string }) => {
+    setCurrentScreen(screen);
+    if (payload?.highlightGroupId) {
+      setHighlightGroupId(payload.highlightGroupId);
+    }
+  };
 
   // Core local states
   const [products, setProducts] = useState<ProductAsset[]>(mockProducts);
@@ -146,16 +154,9 @@ export default function App() {
   }, []);
 
   // State Mutators
-  const handleAddTask = (newTask: GenerationTask) => {
-    setTasks(prev => {
-      const idx = prev.findIndex(t => t.id === newTask.id);
-      if (idx > -1) {
-        const updated = [...prev];
-        updated[idx] = newTask;
-        return updated;
-      }
-      return [newTask, ...prev];
-    });
+  const handleAddTask = (info: { groupId: string; taskIds: string[] }) => {
+    setHighlightGroupId(info.groupId);
+    setCurrentScreen(AppScreen.TASKS);
   };
 
   const handleUpdateTask = (_updatedTask: GenerationTask) => {
@@ -195,7 +196,8 @@ export default function App() {
             products={products}
             onAddTask={handleAddTask}
             onUpdateTask={handleUpdateTask}
-            setScreen={setCurrentScreen}
+            highlightGroupId={highlightGroupId}
+            setScreen={setScreen}
             onRefresh={() => tasksQuery.refetch()}
           />
         );
@@ -282,7 +284,7 @@ export default function App() {
         <CreateImageTask
           products={products}
           onAddTask={handleAddTask}
-          setScreen={setCurrentScreen}
+          setScreen={setScreen}
           openTransit={() => setIsTransitOpen(true)}
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
@@ -309,7 +311,7 @@ export default function App() {
         <CreateVideoTask
           products={products}
           onAddTask={handleAddTask}
-          setScreen={setCurrentScreen}
+          setScreen={setScreen}
           openTransit={() => setIsTransitOpen(true)}
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}

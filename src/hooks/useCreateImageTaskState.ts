@@ -3,7 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { AppScreen } from '../types';
-import type { ProductAsset, GenerationTask } from '../types';
+import type {
+  ProductAsset,
+  ImageTypeEntry, TaskAssetRef, ImageTaskSubmitPayload, ImageTaskType, TaskAssetSlot,
+} from '../types';
 import type { ImageGenerationType, ReadinessCheck } from '../lib/createImageTask/readinessChecks';
 import type { ReferenceSlot } from '../lib/createImageTask/extractReferenceInsights';
 import { computeReadinessChecks } from '../lib/createImageTask/readinessChecks';
@@ -14,12 +17,65 @@ import { applyAiOptimizePerType, type AllTypePrompts } from '../lib/createImageT
 import { buildGenerationTask } from '../lib/createImageTask/buildGenerationTask';
 import { compactReferenceOrder, moveReferenceInOrder, assignNextOrder, REFERENCE_SLOTS } from '../lib/createImageTask/referenceOrder';
 import type { ProductAiAnalyzeResponse } from '../api/modules/productInfo';
+import { taskApi } from '../api/modules/task';
 import { messages } from '../labels/createImageTask';
 
 // 与 referencesConfig 保持同步的 5 个参考图 slot 名。
 // 重新声明一份以避免 export-re-export 在 Vite HMR 下偶发的 TDZ
 // (ReferenceError: ... is not defined) — 直接定义比 re-export 稳定。
 const REFERENCE_SLOTS_INTERNAL: readonly ReferenceSlot[] = REFERENCE_SLOTS;
+
+// ==================== [2026-07-24 Task 13] 图片任务提交辅助 ====================
+
+/**
+ * 5 个参考图 slot → 后端 TaskAssetSlot 枚举的映射。
+ * 用于拼 submitImageTask payload 的 assets[] 数组。
+ */
+const REFERENCE_SLOT_MAP: Record<ReferenceSlot, TaskAssetSlot> = {
+  detail: 'REFERENCE_DETAIL',
+  style: 'REFERENCE_STYLE',
+  scene: 'REFERENCE_SCENE',
+  pose: 'REFERENCE_POSE',
+  model: 'REFERENCE_MODEL',
+};
+
+/**
+ * 前端 UI 的小写 imageType(product_main / scene_detail / detail_closeup / on_model)
+ * → 后端 EnumImageTaskType 大写枚举值。
+ */
+function mapImageGenerationType(t: string): ImageTaskType {
+  switch (t) {
+    case 'product_main': return 'PRODUCT_MAIN';
+    case 'scene_detail': return 'SCENE_DETAIL';
+    case 'detail_closeup': return 'DETAIL_CLOSEUP';
+    case 'on_model': return 'ON_MODEL';
+    default:
+      throw new Error(`unknown image type: ${t}`);
+  }
+}
+
+/**
+ * 解析度映射:Vidu 能力 schema(ViduCapabilities.REF_IMG_EDIT 字段定义)
+ * 接受 1080p / 2k / 4k 三种值。前端 UI 的内部表示是像素值(1080px / 1536px / 2048px),
+ * 提交到后端前必须转成 Vidu 接受的格式,否则 Vidu 报 invalid field: resolution。
+ * 找不到匹配时安全 fallback 到 '1080p'。
+ */
+function mapResolutionToVidu(r: string): '1080p' | '2k' | '4k' {
+  const lower = (r ?? '').toLowerCase().replace(/p$/, '').replace(/x$/, '');
+  // 数字像素 → Vidu 等级
+  const pxMatch = lower.match(/(\d+)/);
+  if (pxMatch) {
+    const px = parseInt(pxMatch[1], 10);
+    if (px >= 2160) return '4k';
+    if (px >= 1440) return '2k';
+    return '1080p';
+  }
+  // 已是 Vidu 格式
+  if (lower === '1080' || lower === '1080p') return '1080p';
+  if (lower === '2k' || lower === '2kp') return '2k';
+  if (lower === '4k' || lower === '4kp') return '4k';
+  return '1080p';
+}
 
 export { REFERENCE_SLOTS_INTERNAL };
 export type { ReferenceSlot } from '../lib/createImageTask/extractReferenceInsights';
@@ -29,7 +85,23 @@ export interface UseCreateImageTaskStateOpts {
   isProductBound: boolean;
   /** 主图 asset_resource.id —— AI 助手调 productInfoApi.aiAnalyze(imageId) 用 */
   mainAssetId?: string | number | null;
-  product: ProductAsset | null;
+  /**
+   * [2026-07-24 Task 13] 主图素材的 file_resource + asset_resource 信息。
+   * 由调用方(CreateImageTask.tsx)从 mainValue 注入;未传时 MAIN 槽位 asset 省略。
+   * 本期 CreateImageTask.tsx 暂未注入,后续 task 补 push。
+   */
+  mainImage?: {
+    /** 雪花 ID 字符串,实际是 asset_resource.id(后端业务主键),命名沿用历史 */
+    fileResourceId?: string;
+    /** asset_resource.id(后端 aiAnalyze 用) */
+    id?: string;
+    originalUrl?: string;
+    thumbnailUrl?: string;
+    name?: string;
+  } | null;
+  // productId 可空:空/null 则 ProductService.upsert 创建新产品
+  // string 类型(雪花 ID 字符串,后端 @JsonSerialize(ToStringSerializer) 输出形式)
+  productId?: string | null;
   /** AI 助手拿到后端返回的 6 字段后回写到顶层 UI state */
   onAiComplete?: (facts: ProductFactsInput) => void;
   /** 顶层手动(选择产品时)把 6 字段灌进 hook 内部 formInput,触发 prompts 重算 */
@@ -40,8 +112,13 @@ export interface UseCreateImageTaskStateOpts {
   resolution: string;
   templateName: string;
   toSubmit: () => Promise<string>;
-  onAddTask: (task: GenerationTask) => void;
-  setScreen: (screen: AppScreen) => void;
+  onAddTask: (info: { groupId: string; taskIds: string[] }) => void;
+  /**
+   * 切换 AppScreen 的 setter。
+   * [2026-07-24 Task 13] 第二个 payload 参数供 Task 14 实现"高亮 groupId"用;
+   * App.tsx 暂时忽略,只取第 1 个 screen 字段。少参签名对此处兼容(TS 函数参数双变性)。
+   */
+  setScreen: (screen: AppScreen, payload?: { highlightGroupId?: string }) => void;
   onRatioChange?: (v: string) => void;
   onResolutionChange?: (v: string) => void;
 }
@@ -162,7 +239,7 @@ export function useCreateImageTaskState(
   const [promptsConfirmed, setPromptsConfirmed] = useState<boolean>(false);
   const [assistantState, setAssistantState] = useState<'idle' | 'processing' | 'complete'>('idle');
   const [reviewEnabled, setReviewEnabled] = useState<boolean>(false);
-  const [references, setReferences] = useState<Record<ReferenceSlot, any | undefined>>({
+  const [references, setReferences] = useState<Record<ReferenceSlot, { fileResourceId?: string | number; id?: string | number; originalUrl?: string; thumbnailUrl?: string; name?: string } | undefined>>({
     detail: undefined, style: undefined, scene: undefined, pose: undefined, model: undefined,
   });
   const [referenceOrder, setReferenceOrder] = useState<Record<ReferenceSlot, number | undefined>>({
@@ -279,11 +356,14 @@ export function useCreateImageTaskState(
   );
 
   const isSupported = useMemo(() => {
+    // 之前对照写死的 model.capability.ratios/resolutions 判定,但写死值与真实 Vidu schema
+    // 不一致(写死 resolutions=['1024px','1536px','2048px'],Vidu 实际只接受 1080p/2k/4k),
+    // 永远 false → readiness 报"不支持"假阳性。本期页面没有 ratio/resolution UI 选择,
+    // 直接信任 Vidu 能力 schema 默认值(由 useTaskParams 装载,父组件传 ratio=16:9 + resolution=1080p)。
+    // 唯一继续校验:每 imageType 的张数不超过模型 maxCount。
     const cm = opts.model.capability;
-    if (!cm.ratios.includes(ratio)) return false;
-    if (!cm.resolutions.includes(resolution)) return false;
     return !selectedTypes.some((t) => typeCounts[t] > Math.min(cm.maxCount, MAX_TYPE_COUNT));
-  }, [opts.model.capability, ratio, resolution, selectedTypes, typeCounts]);
+  }, [opts.model.capability, selectedTypes, typeCounts]);
 
   const totalCount = useMemo(
     () => selectedTypes.reduce((sum, t) => sum + typeCounts[t], 0),
@@ -505,38 +585,96 @@ export function useCreateImageTaskState(
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const groupId = `G-${Date.now()}`;
-      const mainPreviewUrl = opts.product?.thumbnail;
-      for (let i = 0; i < selectedTypes.length; i++) {
-        const t = selectedTypes[i];
-        const task = buildGenerationTask({
-          imageType: t,
-          index: i,
-          groupId,
-          product: opts.product ?? ({} as ProductAsset),
-          taskProductName: opts.product?.name ?? '',
-          productName: formInput.name,
-          templateName: template,
-          promptText: promptOverrides[t] ?? prompts[t],
-          negativePrompt,
-          reviewEnabled,
-          ratio: opts.ratio,
-          count: typeCounts[t],
-          channel: { id: opts.channel.id, name: opts.channel.name, accessType: opts.channel.accessType },
-          model: { id: opts.model.id, name: opts.model.name, estimatedCost: 0, capability: opts.model.capability },
-          mainPreviewUrl,
+      // ==================== [2026-07-24 Task 13] 真实后端提交 ====================
+      // 拼 assets[]:MAIN(主图,从 opts.mainImage 取)
+      //              + 5 个参考图 slot(没选的不发,避免后端收到空 assetId 报错)
+      const assets: TaskAssetRef[] = [];
+
+      // 工具:从 ref 对象中提取有效 assetId(后端要的是 asset_resource.id,不是 file_resource.id)
+      // - 优先 id:AssetResourceItem.id 即 asset_resource.id(后端任务-资源关联表的 asset_id)
+      // - 兜底 fileResourceId:仅在 id 缺失时用
+      // - 必须 String() 兜底:历史遗留 ref 可能是 number(雪花 ID 19 位超 number 安全范围)
+      const extractAssetId = (ref: { id?: string | number; fileResourceId?: string | number } | undefined | null): string => {
+        if (!ref) return '';
+        const raw = ref.id ?? ref.fileResourceId;
+        if (raw == null || raw === '') return '';
+        return String(raw);
+      };
+
+      const mainAssetId = extractAssetId(opts.mainImage);
+      if (mainAssetId) {
+        assets.push({
+          assetId: mainAssetId,
+          slotRole: 'MAIN',
+          sortOrder: 0,
+          originalUrl: opts.mainImage?.originalUrl ?? '',
+          thumbnailUrl: opts.mainImage?.thumbnailUrl,
+          name: opts.mainImage?.name,
         });
-        opts.onAddTask(task);
       }
-      try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
+
+      (['detail', 'style', 'scene', 'pose', 'model'] as ReferenceSlot[]).forEach((slot) => {
+        const ref = references[slot] as
+          | { fileResourceId?: string | number; id?: string | number; originalUrl?: string; thumbnailUrl?: string; name?: string }
+          | undefined;
+        const refAssetId = extractAssetId(ref);
+        if (refAssetId) {
+          assets.push({
+            assetId: refAssetId,
+            slotRole: REFERENCE_SLOT_MAP[slot],
+            sortOrder: referenceOrder[slot] ?? 0,
+            originalUrl: ref?.originalUrl ?? '',
+            thumbnailUrl: ref?.thumbnailUrl,
+            name: ref?.name,
+          });
+        }
+      });
+
+      // 拼 imageTypes[]:每种 imageType 配 prompt/negativePrompt/count
+      const imageTypes: ImageTypeEntry[] = selectedTypes.map((t) => ({
+        imageType: mapImageGenerationType(t),
+        prompt: promptOverrides[t] ?? prompts[t],
+        negativePrompt,
+        count: typeCounts[t] ?? 1,
+      }));
+
+      // 拼 payload
+      // 注:本地 state productFacts 是 ProductFacts(extractProductFacts 输出),
+      //     而 payload.productFacts 要求 ProductFactsInput(含 colorPattern)。
+      //     这里用 formInput(ProductFactsInput,始终含 colorPattern 6 字段)传入。
+      // productId 处理:仅当是合法数字字符串(雪花 ID 形式)时发送,否则 null(后端走新建路径)
+      // opts.productId 是从 ProductPickerModal 选中的 ProductDTO.id(后端雪花 ID 字符串)
+      const productIdRaw = opts.productId;
+      const productIdValid = typeof productIdRaw === 'string'
+          && /^\d+$/.test(productIdRaw);
+      const payload: ImageTaskSubmitPayload = {
+        groupId: crypto.randomUUID(),
+        productId: productIdValid ? productIdRaw : null,
+        productFacts: formInput,
+        channelInstanceId: opts.channel.id,
+        capability: 'REF_IMG_EDIT',
+        channelType: 'VIDU',
+        modelId: opts.model?.id ?? null,
+        taskParamsJson: JSON.stringify({ ratio, resolution: mapResolutionToVidu(resolution) }),
+        imageTypes,
+        assets,
+      };
+
+      // 提交到后端
+      const resp = await taskApi.submitImageTask(payload);
+
+      // 跳转:通知 App 高亮本次提交的 group,并切到任务列表。
+      opts.onAddTask?.({ groupId: resp.groupId, taskIds: resp.taskIds });
+      opts.setScreen(AppScreen.TASKS, { highlightGroupId: resp.groupId });
+
+      try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* quota */ }
       setExecutionConfirmOpen(false);
-      opts.setScreen(AppScreen.TASKS);
     } catch {
       toast.error('提交失败,请稍后重试');
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, selectedTypes, opts, formInput.name, template, promptOverrides, prompts, negativePrompt, reviewEnabled, typeCounts]);
+  }, [isSubmitting, opts, references, referenceOrder, selectedTypes, promptOverrides, prompts, negativePrompt, formInput, ratio, resolution, setExecutionConfirmOpen]);
 
   const selectReference = useCallback((slot: ReferenceSlot, ref: any | undefined) => {
     setReferences((prev) => ({ ...prev, [slot]: ref }));

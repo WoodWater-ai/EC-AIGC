@@ -21,28 +21,28 @@ test('TransitPickerButton multiSelect prop 默认 false', () => {
 
 test('toSlotRef(item) → SlotRef 映射(fileResourceId 必填)', () => {
   const item = {
-    id: 1,
+    id: '1',
     name: 'test',
     assetKind: 'IMAGE' as const,
     uploadUserId: 1,
-    fileResourceId: 99,
+    fileResourceId: '99',
     categoryIds: [],
     status: 'NORMAL' as const,
   };
   const ref: SlotRef = toSlotRef(item);
-  assert.equal(ref.fileResourceId, 99);
+  assert.equal(ref.fileResourceId, '99');
   assert.equal(ref.name, 'test');
 });
 
 test('toSlotRef 优先用 thumbnailUrl,fallback 到 originalUrl', () => {
   const item1 = {
-    id: 1, name: 'a', assetKind: 'IMAGE' as const, uploadUserId: 1,
-    fileResourceId: 1, categoryIds: [], status: 'NORMAL' as const,
+    id: '1', name: 'a', assetKind: 'IMAGE' as const, uploadUserId: 1,
+    fileResourceId: '1', categoryIds: [], status: 'NORMAL' as const,
     thumbnailUrl: 'thumb-a',
   };
   const item2 = {
-    id: 2, name: 'b', assetKind: 'IMAGE' as const, uploadUserId: 1,
-    fileResourceId: 2, categoryIds: [], status: 'NORMAL' as const,
+    id: '2', name: 'b', assetKind: 'IMAGE' as const, uploadUserId: 1,
+    fileResourceId: '2', categoryIds: [], status: 'NORMAL' as const,
     originalUrl: 'orig-b',
   };
   assert.equal(toSlotRef(item1).thumbnailUrl, 'thumb-a');

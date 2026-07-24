@@ -139,7 +139,8 @@ export interface UseFileUploadOptions {
 }
 
 export interface FileUploadResult {
-  fileResourceId: number;
+  /** 后端 Long → string,避免 JS 精度丢失 */
+  fileResourceId: string;
   fileKey: string;
   accessUrl: string;
 }

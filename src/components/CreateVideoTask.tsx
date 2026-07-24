@@ -131,7 +131,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   };
 
   // Handle selected items from transit modal —— 接 fileResourceIds,异步反查详情生成 SourceImage
-  const handleConfirmTransitSelection = async (fileResourceIds: number[]) => {
+  const handleConfirmTransitSelection = async (fileResourceIds: string[]) => {
     if (fileResourceIds.length === 0) return;
 
     try {
