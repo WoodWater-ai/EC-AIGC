@@ -12,6 +12,7 @@ import type {
   ChannelAsyncTask,
   ChannelAsyncTaskImage,
   ChannelAsyncTaskQueryRequest,
+  ChannelAsyncTaskVideo,
 } from '../../types';
 
 export const asyncTaskApi = {
@@ -26,6 +27,15 @@ export const asyncTaskApi = {
    */
   images(asyncTaskId: string): Promise<ChannelAsyncTaskImage[]> {
     return http.get<ChannelAsyncTaskImage[]>(`/v1/admin/channel/async-task/${asyncTaskId}/images`);
+  },
+
+  /**
+   * 拉子任务产出的视频列表(对齐 GET /v1/admin/channel/async-task/{id}/videos)
+   * <p>[2026-07-25] 对齐 images 端点,用于视频子任务 chip 缩略图 + 弹层播放
+   * <p>前端根据 ChannelAsyncTask.resultType 决定走 images 还是 videos
+   */
+  videos(asyncTaskId: string): Promise<ChannelAsyncTaskVideo[]> {
+    return http.get<ChannelAsyncTaskVideo[]>(`/v1/admin/channel/async-task/${asyncTaskId}/videos`);
   },
 
   /** 重试死信任务(对齐 POST /v1/admin/channel/async-task/retry) */

@@ -412,6 +412,35 @@ export interface ChannelAsyncTaskImage {
   createTime: string;
 }
 
+/**
+ * 生成视频响应(对齐后端 GeneratedVideoResponse)
+ * <p>[2026-07-25] 对齐 ChannelAsyncTaskImage 的同款字段,给视频子任务 chip 用
+ * <p>videoUrl / coverUrl / thumbnailUrl 都是后端已拼完整 URL(COS domain + fileKey)
+ */
+export interface ChannelAsyncTaskVideo {
+  id: string;
+  taskId: string;
+  /** [2026-07-25] 子任务 ID(channel_async_task.id) */
+  channelAsyncTaskId: string;
+  /** [2026-07-25] 子任务在父任务内的序号 */
+  batchIdx: number;
+  version: string | null;
+  /** 视频完整 URL —— 用于弹层播放 */
+  videoUrl: string;
+  /** 封面图 URL —— 缩略图优先用这个(海报表) */
+  coverUrl: string | null;
+  /** 缩略图 URL —— 兜底,本期一般不用 */
+  thumbnailUrl: string | null;
+  durationSec: number | null;
+  width: number | null;
+  height: number | null;
+  aspectRatio: string | null;
+  modelChannelId: string;
+  capability: string | null;
+  status: string;
+  createTime: string;
+}
+
 /** 状态 chip 颜色映射(后端 6 状态) */
 export const ASYNC_TASK_STATUS_STYLES: Record<AsyncTaskStatus, { bg: string; text: string; label: string }> = {
   PENDING_SUBMIT: { bg: 'bg-slate-100', text: 'text-slate-700', label: '占位待提交' },
@@ -476,9 +505,9 @@ export interface SystemBuiltinChannelItem {
 }
 
 // [2026-07-21 重构 create-image-task 复刻 demo] 图片生成任务类型
-// - imageType: 与 demo 主版对齐 — product_main / scene_detail / detail_closeup / on_model
+// - imageType: 与 demo 主版对齐 — product_main / scene_detail / detail_closeup / model_front
 // - ReferenceSlot: 5 个参考图槽位
-export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'on_model';
+export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'model_front';
 export type ReferenceSlot = 'detail' | 'style' | 'scene' | 'pose' | 'model';
 
 // ============================================================================
@@ -491,7 +520,7 @@ export type ImageTaskType =
   | 'PRODUCT_MAIN'
   | 'SCENE_DETAIL'
   | 'DETAIL_CLOSEUP'
-  | 'ON_MODEL';
+  | 'MODEL_FRONT';
 
 /** 任务资产槽位(对齐后端 EnumTaskAssetSlot) */
 export type TaskAssetSlot =
@@ -570,4 +599,33 @@ export interface ProductFactsInput {
   color?: string;
   fabricTexture?: string;
   fitStructure?: string;
+}
+
+// ============================================================================
+// [2026-07-25 视频任务提交独立入口] 对齐后端 VideoTaskSubmitRequest / VideoTaskSubmitResponse
+// ============================================================================
+
+/** 视频任务提交请求体(对齐后端 VideoTaskSubmitRequest) */
+export interface VideoTaskSubmitPayload {
+  groupId?: string;
+  productId?: string | null;
+  productFacts: ProductFactsInput;
+  channelInstanceId: string;
+  capability: string;
+  channelType: string;
+  modelId?: string | null;
+  taskParamsJson: string;
+  taskPrompt: string;
+  negativePrompt?: string;
+  inputImageUrls?: string;
+  templateId?: string;
+  templateVersionId?: string;
+  title?: string;
+  count?: number;
+}
+
+/** 视频任务提交响应(对齐后端 VideoTaskSubmitResponse) */
+export interface VideoTaskSubmitResponse {
+  groupId: string;
+  taskIds: string[];
 }

@@ -13,7 +13,7 @@ export function applyAiOptimizePerType(
 ): AllTypePrompts {
   const set = new Set(selectedTypes);
   const out: AllTypePrompts = { ...prompts };
-  for (const t of ['product_main','scene_detail','detail_closeup','on_model'] as ImageGenerationType[]) {
+  for (const t of ['product_main','scene_detail','detail_closeup','model_front'] as ImageGenerationType[]) {
     if (!set.has(t)) continue;
     out[t] = `(Cinematic backlight, photorealistic studio render) ${prompts[t]}, raytracing reflections, cinematic color grading, warm ambient glow`;
   }

@@ -24,10 +24,16 @@ export interface ReferenceGridProps {
   onMove: (fromSlot: ReferenceSlot, toIndex: number) => void;
   /** 由父容器注入的 picker 打开回调 */
   openSlotPicker: (slot: ReferenceSlot) => void;
+  /**
+   * 移除已选参考图:卡片底部"移除"按钮触发。
+   * 父容器一般走 selectReference(slot, undefined) 复用现有重排 + promptsConfirmed 重置逻辑。
+   * 不传则不渲染移除按钮。
+   */
+  onRemove?: (slot: ReferenceSlot) => void;
 }
 
 export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
-  orderedRefs, onMove, openSlotPicker,
+  orderedRefs, onMove, openSlotPicker, onRemove,
 }) => {
   const [dragSlot, setDragSlot] = useState<ReferenceSlot | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -183,11 +189,23 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
                 </button>
               )}
 
-              {/* 卡片下方:slot 中文标签(已选/空槽都显示,固定 detail/style/...) */}
-              <div className="mt-1 flex items-center text-[10px] font-bold">
+              {/* 卡片下方:slot 中文标签(已选/空槽都显示,固定 detail/style/...)。
+                  已选时右侧追加红色「移除」文字按钮,点击走 onRemove 移除该 slot。
+                  stopPropagation 防止冒泡触发卡片本身的换图 picker。 */}
+              <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
                 <span className={item.kind === 'filled' ? 'text-primary' : 'text-slate-400'}>
                   {slotLabel}参考
                 </span>
+                {item.kind === 'filled' && onRemove && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onRemove(item.slot); }}
+                    className="text-red-500 hover:text-red-700 hover:underline transition-colors"
+                    aria-label={`移除${slotLabel}参考`}
+                  >
+                    移除
+                  </button>
+                )}
               </div>
             </div>
           );

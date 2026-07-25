@@ -1,5 +1,5 @@
 // src/components/CreateImageTask/CreateImageTask.tsx
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AppScreen } from '../../types';
 import type { ProductAsset } from '../../types';
@@ -29,6 +29,7 @@ import { TemplateOverwriteDialog } from './dialogs/TemplateOverwriteDialog';
 import { ExecutionConfirmDialog } from './dialogs/ExecutionConfirmDialog';
 import { AssetTransitModal } from '../AssetTransitModal';
 import { useCreateImageTaskState } from '../../hooks/useCreateImageTaskState';
+import { useDictOptions } from '../../api/hooks/useDict';
 import { REFERENCE_SLOTS_INTERNAL } from '../../lib/createImageTask/referencesConfig';
 import { withCosThumbnail } from '../../utils/cosImage';
 
@@ -86,11 +87,20 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   // /v1/admin/capability/supported-list 等接口拉取);子组件通过 onParamsChange
   // 回调把选中状态冒泡到此处,提交时 channelInstanceId/modelId 必须是真实雪花 ID。
   // 之前写死 channel-1 / gpt-image-1 已被替换,父组件不再自己调 useTaskParams(避免两份独立 state)。
+
+  // 风格 / 场景 / 姿势 字典(从后端 dict 实时拉取,后端 categoryCode 由 dafenqi-ai 字典管理配置)
+  const { options: styleOptions, loading: loadingStyle } = useDictOptions('STYLE');
+  const { options: sceneOptions, loading: loadingScene } = useDictOptions('SCENE');
+  const { options: poseOptions,  loading: loadingPose  } = useDictOptions('POSTURE');
+
   const [paramsSnapshot, setParamsSnapshot] = useState<TaskParamsSnapshot>({
     channelId: null,
     channelType: null,
     capability: null,
     modelId: null,
+    // [2026-07-25 P0 修复] 加 schemaParams 字段,接收 ImageSettingsSection.onParamsChange
+    // 冒泡上来的能力参数(包含 aspect_ratio / resolution 等),透传给 useCreateImageTaskState。
+    schemaParams: {},
   });
   const state = useCreateImageTaskState({
     isProductBound: !!mainValue,
@@ -111,17 +121,16 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     model: {
       id: paramsSnapshot.modelId ?? '',
       name: paramsSnapshot.modelId ?? '',
-      capability: {
-        ratios: ['1:1', '3:4', '4:5', '9:16', '16:9'],
-        maxCount: 5,
-        resolutions: ['1024px', '1536px', '2048px'],
-      },
+      // [2026-07-25 P0 修复] 删 capability.ratios / resolutions 写死假数据 ——
+      // 这俩字段在 isSupported 旧判定里用过,但写死值与 Vidu 真实 schema 不一致
+      // (写死 resolutions=['1024px','1536px','2048px'],Vidu 实际只接受 1080p/2K/4K),
+      // 导致 readiness 永远报"不支持"假阳性。只保留 maxCount(由 useTaskParams 装载)。
+      capability: { maxCount: 5 },
     },
-    // 本期页面没有 ratio/resolution 选择 UI(右栏 ImageSettingsSection 只暴露 channel/capability/model),
-    // 直接用 Vidu 能力 schema 的默认/推荐值:ratio=16:9(主图常用),resolution=1080p(Vidu 接受值之一)。
-    // 后续如需在 UI 暴露选择,接 setRatio/setResolution 即可。
-    ratio: '16:9',
-    resolution: '1080p',
+    // [2026-07-25 P0 修复] ratio / resolution 不再作为独立字段传入(前端不做供应商映射)。
+    // ParamSchemaForm 收集的能力参数整体透传给 hook,直接作为 taskParamsJson 提交;
+    // 后端 ChannelParamBinder 按 ViduCapabilities schema 字段名映射到 Vidu body。
+    schemaParams: paramsSnapshot.schemaParams,
     templateName: '默认模板',
     toSubmit: async () => '',
     onAddTask,
@@ -136,9 +145,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     conflictOpen, templatePickerOpen, pendingTemplate,
     templateOverwriteOpen, executionConfirmOpen,
     isSubmitting,
-    ratio, resolution,
     setConflictOpen, setTemplateOverwriteOpen, setExecutionConfirmOpen,
-    setRatio, setResolution,
     readinessCount, prompts, promptsComplete, factsComplete,
     isSupported, totalCount,
     toggleType, changeTypeCount, requestTemplateChange, applyTemplate,
@@ -146,12 +153,35 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     updateProductFact, setFormFactsExternal, setFactsConfirmed, confirmFacts,
     setPromptOverride, confirmPrompts, runAssistantAnalysis,
     regeneratePrompts, applyAiOptimizeToSelected,
-    applyPreset, setReviewEnabled,
+    setReviewEnabled,
     selectReference, updateReferenceOrder, checkAndGenerate, submitTasks,
   } = state;
 
-  // ---- 移除参考图(本期未在 UI 暴露:用户点卡片走 picker 选图覆盖,顺序拖拽走 moveReference) ----
-// 保持 onRemove 入口为 future 留位
+  // 字典加载完成后,若 hook 内 style/scene/pose 仍是空串(初始化时字典尚未回来),
+  // 自动选 options[0],让 select 不再停留在"暂无数据"占位态
+  useEffect(() => {
+    if (!loadingStyle && styleOptions.length > 0 && !style) {
+      setStyle(styleOptions[0].value);
+    }
+  }, [styleOptions, loadingStyle, style, setStyle]);
+
+  useEffect(() => {
+    if (!loadingScene && sceneOptions.length > 0 && !scene) {
+      setScene(sceneOptions[0].value);
+    }
+  }, [sceneOptions, loadingScene, scene, setScene]);
+
+  useEffect(() => {
+    if (!loadingPose && poseOptions.length > 0 && !pose) {
+      setPose(poseOptions[0].value);
+    }
+  }, [poseOptions, loadingPose, pose, setPose]);
+
+  // ---- 移除参考图:走 selectReference(slot, undefined) 复用现有重排 + promptsConfirmed 重置逻辑 ----
+  const handleRemoveReference = useCallback(
+    (slot: ReferenceSlot) => selectReference(slot, undefined),
+    [selectReference],
+  );
 
   // ---- derived readiness state for banner ----
   const readiness = useMemo(() => {
@@ -180,17 +210,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const handleAiOptimizeSelected = useCallback(() => {
     applyAiOptimizeToSelected(selectedTypes);
   }, [applyAiOptimizeToSelected, selectedTypes]);
-
-  // ---- preset apply: update ratio/resolution via hook ----
-  const handlePresetApply = useCallback(
-    (preset: { name: string; ratio: string; resolution: string }) => {
-      if (preset.ratio === ratio && preset.resolution === resolution) return;
-      setRatio(preset.ratio);
-      setResolution(preset.resolution);
-      applyPreset(preset);
-    },
-    [applyPreset, ratio, resolution, setRatio, setResolution],
-  );
 
   // ---- composite applied: set as main (上下装合成预览后写主图) ----
   const handleCompositeApplied = useCallback(
@@ -342,6 +361,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
               orderedRefs={state.orderedRefs}
               onMove={state.moveReference}
               openSlotPicker={openSlotPicker}
+              onRemove={handleRemoveReference}
             />
           </>
         }
@@ -360,6 +380,12 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
               onPickRequest={requestTemplateChange}
             />
             <StyleScenePoseRow
+              styleOptions={styleOptions}
+              sceneOptions={sceneOptions}
+              poseOptions={poseOptions}
+              loadingStyle={loadingStyle}
+              loadingScene={loadingScene}
+              loadingPose={loadingPose}
               style={style}
               scene={scene}
               pose={pose}
@@ -436,8 +462,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
           selectedTypes,
           typeCounts,
           totalCount,
-          ratio,
-          resolution,
+          // [2026-07-25 P0 修复] ratio / resolution 直接从 paramsSnapshot.schemaParams 读
+          // (ParamSchemaForm 收集,ViduCapabilities schema 字段名),不经过 hook 内部 state。
+          ratio: paramsSnapshot.schemaParams?.aspect_ratio ?? '',
+          resolution: paramsSnapshot.schemaParams?.resolution ?? '',
         }}
       />
       <ConflictDialog

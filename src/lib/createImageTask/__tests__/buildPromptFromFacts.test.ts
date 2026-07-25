@@ -36,7 +36,7 @@ test('referenceInsights array empty → no trailing empty line', () => {
 });
 
 test('multiple reference insights each rendered on new line', () => {
-  const out = buildPromptFromFacts('on_model', facts, '甜美网红风', '自然影棚', '自然站姿', ['a', 'b', 'c']);
+  const out = buildPromptFromFacts('model_front', facts, '甜美网红风', '自然影棚', '自然站姿', ['a', 'b', 'c']);
   assert.ok(out.includes('a\nb\nc'));
 });
 

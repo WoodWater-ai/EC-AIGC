@@ -12,6 +12,8 @@ import type {
   ImageTaskSubmitPayload,
   ImageTaskSubmitResponse,
   TaskMyPageQueryRequest,
+  VideoTaskSubmitPayload,
+  VideoTaskSubmitResponse,
 } from '../../types';
 
 export interface SubmitTaskRequest {
@@ -98,5 +100,12 @@ export const taskApi = {
     return http.post<GeneratedImageVO[]>('/v1/task/generated-images-batch', {
       taskIds,
     });
+  },
+
+  /** 提交视频任务(/v1/video-task/submit) —— 返回 groupId + taskIds[] */
+  submitVideoTask(
+    payload: VideoTaskSubmitPayload
+  ): Promise<VideoTaskSubmitResponse> {
+    return http.post<VideoTaskSubmitResponse>('/v1/video-task/submit', payload);
   },
 };

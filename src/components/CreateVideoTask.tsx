@@ -5,8 +5,8 @@ import { assetApi } from '../api/modules/asset';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { templateApi, type TemplateDTO } from '../api/modules/template';
 import { TaskParamsPanel } from './createTask/TaskParamsPanel';
-import { buildSubmitPayload } from './createTask/buildSubmitPayload';
-import { submitTask } from '../api/modules/task';
+import { taskApi } from '../api/modules/task';
+import type { VideoTaskSubmitPayload } from '../types';
 import { toast } from 'sonner';
 
 /** 从 sessionStorage 读模版 prefill(容错,失败返 null) */
@@ -168,30 +168,49 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       toast.warning('请先在右侧选择通道实例');
       return;
     }
-    const selectedIds = sourceImages.filter((s) => s.selected).map((s) => s.id).join(',');
-    // [2026-07-17] mock 占位 id(如 'p1')会触发 autoCreateProduct=true,
-    // 必须传 productName 让后端按表单字段建产品;缺省值"默认产品"兜底
+    // [2026-07-25] inputImageUrls:选中 sourceImages 的 URL 列表(逗号分隔),
+    // 后端 Worker 解析为 List<String> 喂给 Vidu images:[] / taskParamsJson.images。
+    const inputImageUrls = sourceImages
+      .filter((s) => s.selected)
+      .map((s) => s.url)
+      .join(',');
+    // [2026-07-25] productFacts 6 字段,从 selectedProduct 派生。
+    // 本期保留 mock 兼容;后续引入 ProductPickerModal 后,改用 selectedFromLibrary。
     const productNameFallback = selectedProduct?.name || '默认产品';
-    const payload = buildSubmitPayload({
+    const specs = selectedProduct?.specs;
+    const productFacts: VideoTaskSubmitPayload['productFacts'] = {
+      name: productNameFallback,
+      sellingPoints: specs?.sellingPoints?.length
+        ? specs.sellingPoints.join('、')
+        : '',
+      productCategory: (selectedProduct as any)?.category ?? '',
+      color: (specs?.color?.length ? specs.color.join('、') : (selectedProduct as any)?.mainColor ?? ''),
+      fabricTexture: (selectedProduct as any)?.fabricTexture ?? specs?.material ?? '',
+      fitStructure: (selectedProduct as any)?.fitStructure ?? '',
+    };
+    const payload: VideoTaskSubmitPayload = {
       title: `视频生成任务_${productNameFallback}`,
-      productId: selectedProduct?.id ? String(selectedProduct.id) : '',
-      taskType: videoMode === 'SOLUTION' ? 'SOLUTION' : 'VIDEO',
+      // [2026-07-25] selectedProduct.id 是 mock 占位(如 "p1")时 → 视为未选产品,
+      // 走后端 productFacts 6 字段新建产品路径;仅当 id 是纯数字字符串才作为真雪花 ID 透传。
+      // 对齐 image 路径 buildSubmitPayload.ts:69-72 的 numeric-id 判定逻辑。
+      productId: (typeof selectedProduct?.id === 'string' && /^\d+$/.test(selectedProduct.id))
+        ? selectedProduct.id
+        : null,
+      productFacts,
+      channelInstanceId: String(taskParams.channelId),
       channelType: taskParams.channelType,
       capability: taskParams.capability,
       modelId: taskParams.modelId ?? undefined,
-      modelChannelId: String(taskParams.channelId),
-      aspectRatio,
-      count,
-      prompt: promptText,
-      negativePrompt,
-      inputImageIds: selectedIds,
-      schemaParams: taskParams.schemaParams,
+      taskParamsJson: JSON.stringify(taskParams.schemaParams ?? {}),
+      taskPrompt: promptText,
+      negativePrompt: negativePrompt || undefined,
+      inputImageUrls: inputImageUrls || undefined,
       templateId: videoPrefill?.templateId,
       templateVersionId: videoPrefill?.templateVersionId,
-      productName: productNameFallback,
-    });
+      count,
+    };
     try {
-      await submitTask(payload);
+      await taskApi.submitVideoTask(payload);
       sessionStorage.removeItem('beta.template.prefill');
       setScreen(AppScreen.TASKS);
     } catch {

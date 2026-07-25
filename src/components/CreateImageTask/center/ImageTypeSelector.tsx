@@ -3,7 +3,7 @@ import React from 'react';
 import type { ImageGenerationType } from '../../../lib/createImageTask/readinessChecks';
 import { messages } from '../../../labels/createImageTask';
 
-const TYPE_ORDER: ImageGenerationType[] = ['product_main','scene_detail','detail_closeup','on_model'];
+const TYPE_ORDER: ImageGenerationType[] = ['product_main','scene_detail','detail_closeup','model_front'];
 const MIN_TYPE_COUNT = 1;
 const MAX_TYPE_COUNT = 5;
 

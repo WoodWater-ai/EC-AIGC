@@ -11,6 +11,13 @@ export interface TaskParamsSnapshot {
   channelType: string | null;
   capability: string | null;
   modelId: string | null;
+  /**
+   * 能力参数(ParamSchemaForm 渲染 Vidu 能力 schema 收集),例如
+   * { aspect_ratio: '9:16', resolution: '1080p' }。
+   * 父组件把它透传给 useCreateImageTaskState,提交时合并到 taskParamsJson;
+   * 不传则 hook 用 Vidu 能力 schema 的默认/推荐值兜底。
+   */
+  schemaParams?: Record<string, any>;
 }
 
 /** ratio 由 useCreateImageTaskState 内部维护;本节不再展示。
@@ -38,8 +45,12 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
       channelType: tp.channelType,
       capability: tp.capability,
       modelId: tp.modelId,
+      // [2026-07-25 P0 修复] schemaParams 必须冒泡,否则 ParamSchemaForm 改的
+      // aspect_ratio / resolution 等参数不会进提交 payload;
+      // 之前 useCreateImageTaskState 写死 ratio='16:9' 正是因为收不到这个值。
+      schemaParams: tp.schemaParams,
     });
-  }, [tp.channelId, tp.channelType, tp.capability, tp.modelId, onParamsChange]);
+  }, [tp.channelId, tp.channelType, tp.capability, tp.modelId, tp.schemaParams, onParamsChange]);
 
   return (
     <div
@@ -135,9 +146,9 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
         </div>
       )}
 
-      {/* ④ 比例由选择的图片类型 + 模型能力共同决定,此处不再展示 */}
+      {/* ④ 比例/分辨率在下方"能力参数"里改(ParamSchemaForm 根据 Vidu 能力 schema 动态渲染) */}
       <p className="mt-3 text-[10px] text-slate-400">
-        输出比例与图片尺寸由当前所选图片类型 + 模型能力自动匹配,顶部状态栏实时显示。
+        输出比例与分辨率由下方"能力参数"区域控制,选择会同步到提交参数。
       </p>
 
       {/* ⑤ 能力参数 schema 动态表单(对齐 demo 的 `ParamSchemaForm`) */}

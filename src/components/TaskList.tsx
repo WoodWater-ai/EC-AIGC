@@ -6,11 +6,13 @@ import {
   ProductAsset,
   ChannelAsyncTask,
   ChannelAsyncTaskImage,
+  ChannelAsyncTaskVideo,
   AsyncTaskStatus,
   ASYNC_TASK_STATUS_STYLES,
 } from '../types';
 import { TaskDetailsDrawer } from './TaskDetailsDrawer';
 import { ImagePreviewModal, PreviewImage } from './ImagePreviewModal';
+import { VideoPreviewModal, PreviewVideo } from './VideoPreviewModal';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { taskApi } from '../api/modules/task';
 import { asyncTaskApi } from '../api/modules/asyncTask';
@@ -31,12 +33,14 @@ interface TaskListProps {
 interface ChildTaskChipProps {
   child: ChannelAsyncTask;
   onRetry: (id: string) => void;
-  /** [2026-07-21] 点击缩略图放大预览:把该子任务全部产出图冒泡到 TaskList 顶层 */
-  onPreview: (images: PreviewImage[], index: number) => void;
+  /** [2026-07-21] 点击图片子任务缩略图:把全部产出图冒泡到 TaskList 顶层 */
+  onPreviewImage: (images: PreviewImage[], index: number) => void;
+  /** [2026-07-25] 点击视频子任务缩略图:把全部产出视频冒泡到 TaskList 顶层 */
+  onPreviewVideo: (videos: PreviewVideo[], index: number) => void;
 }
 
 /**
- * 子任务 chip 缩略图 URL:
+ * 子任务 chip 缩略图 URL(图片):
  *  - imageUrl 已是完整 URL(COS 域名前缀 + fileKey)
  *  - 用 CI 数据万象 ?imageMogr2/thumbnail/64x64 实时缩放
  *  - 子任务用 64x64 缩略图(单子任务很小)
@@ -49,28 +53,59 @@ function buildThumbUrl(imageUrl: string | null | undefined, size = 64): string |
   return `${imageUrl}${sep}imageMogr2/thumbnail/${size}x${size}`;
 }
 
-const ChildTaskChip: React.FC<ChildTaskChipProps> = ({ child, onRetry, onPreview }) => {
+const ChildTaskChip: React.FC<ChildTaskChipProps> = ({
+  child,
+  onRetry,
+  onPreviewImage,
+  onPreviewVideo,
+}) => {
   const style = ASYNC_TASK_STATUS_STYLES[child.status as AsyncTaskStatus];
+  const isVideo = child.resultType === 'VIDEO';
 
-  // [2026-07-16 P0] SUCCESS 状态的子任务拉图列表(其他状态后端没图)
+  // [2026-07-16 P0 / 2026-07-25] SUCCESS 状态子任务拉产物列表
+  // 图片走 /images,视频走 /videos —— 走哪个由后端 ChannelAsyncTask.resultType 决定
   const { data: images, loading: imgsLoading } = useServiceQuery<ChannelAsyncTaskImage[]>(
-    () => (child.status === 'SUCCESS'
+    () => (child.status === 'SUCCESS' && !isVideo
       ? asyncTaskApi.images(child.id)
       : Promise.resolve([] as ChannelAsyncTaskImage[])),
-    [child.id, child.status],
+    [child.id, child.status, isVideo],
+  );
+  const { data: videos, loading: vidsLoading } = useServiceQuery<ChannelAsyncTaskVideo[]>(
+    () => (child.status === 'SUCCESS' && isVideo
+      ? asyncTaskApi.videos(child.id)
+      : Promise.resolve([] as ChannelAsyncTaskVideo[])),
+    [child.id, child.status, isVideo],
   );
   const imgs = images ?? [];
+  const vids = videos ?? [];
+  const loading = isVideo ? vidsLoading : imgsLoading;
+
+  // ============== 缩略图 + 预览数据准备 ==============
+  // 图片路径
   const firstImg = imgs[0];
   const thumbUrl = buildThumbUrl(firstImg?.imageUrl, 64);
-
-  // [2026-07-21] 放大预览用原图(不加缩略参数);label 用 batchIdx + version
   const previewImages: PreviewImage[] = imgs
     .filter((im) => !!im.imageUrl)
     .map((im) => ({
       url: im.imageUrl,
       label: im.version ? `batchIdx=${im.batchIdx} · ${im.version}` : `batchIdx=${im.batchIdx}`,
     }));
-  const canPreview = previewImages.length > 0;
+  const canPreviewImage = previewImages.length > 0;
+
+  // 视频路径
+  const firstVid = vids[0];
+  // 缩略图优先 coverUrl(海报表),没有再 fallback thumbnailUrl
+  const videoThumbUrl = firstVid?.coverUrl ?? firstVid?.thumbnailUrl ?? null;
+  const previewVideos: PreviewVideo[] = vids
+    .filter((v) => !!v.videoUrl)
+    .map((v) => ({
+      url: v.videoUrl,
+      poster: v.coverUrl ?? v.thumbnailUrl ?? null,
+      label: v.durationSec != null
+        ? `batchIdx=${v.batchIdx} · ${v.durationSec}s`
+        : `batchIdx=${v.batchIdx}`,
+    }));
+  const canPreviewVideo = previewVideos.length > 0;
 
   return (
     <div
@@ -78,34 +113,78 @@ const ChildTaskChip: React.FC<ChildTaskChipProps> = ({ child, onRetry, onPreview
     >
       {/* 第一行:缩略图 + batchIdx + 状态 + 重试 */}
       <div className="flex items-center gap-1.5">
-        {/* 缩略图(64x64,SUCCESS 且有图才显示;可点击放大) */}
-        {thumbUrl ? (
-          <button
-            type="button"
-            onClick={() => canPreview && onPreview(previewImages, 0)}
-            className="w-10 h-10 rounded overflow-hidden border border-black/10 cursor-zoom-in p-0 block"
-            aria-label={`放大预览 batchIdx=${child.batchIdx}`}
-          >
-            <img
-              src={thumbUrl}
-              alt={`batchIdx=${child.batchIdx}`}
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-              loading="lazy"
-            />
-          </button>
+        {/* ============ 缩略图(按 resultType 分支) ============ */}
+        {!isVideo ? (
+          // ===== 图片缩略图 =====
+          thumbUrl ? (
+            <button
+              type="button"
+              onClick={() => canPreviewImage && onPreviewImage(previewImages, 0)}
+              className="w-10 h-10 rounded overflow-hidden border border-black/10 cursor-zoom-in p-0 block"
+              aria-label={`放大预览 batchIdx=${child.batchIdx}`}
+            >
+              <img
+                src={thumbUrl}
+                alt={`batchIdx=${child.batchIdx}`}
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+                loading="lazy"
+              />
+            </button>
+          ) : (
+            <div className="w-10 h-10 rounded bg-black/5 flex items-center justify-center">
+              <span className="material-symbols-outlined text-sm opacity-50">
+                {child.status === 'SUCCESS' ? 'image' : 'pending'}
+              </span>
+            </div>
+          )
         ) : (
-          <div className="w-10 h-10 rounded bg-black/5 flex items-center justify-center">
-            <span className="material-symbols-outlined text-sm opacity-50">
-              {child.status === 'SUCCESS' ? 'image' : 'pending'}
-            </span>
-          </div>
+          // ===== 视频缩略图(cover + 播放按钮 + 时长 badge) =====
+          videoThumbUrl ? (
+            <button
+              type="button"
+              onClick={() => canPreviewVideo && onPreviewVideo(previewVideos, 0)}
+              className="w-10 h-10 rounded overflow-hidden border border-black/10 cursor-zoom-in p-0 block relative group"
+              aria-label={`播放视频 batchIdx=${child.batchIdx}`}
+            >
+              <img
+                src={videoThumbUrl}
+                alt={`batchIdx=${child.batchIdx}`}
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+                loading="lazy"
+              />
+              {/* 居中播放按钮(半透明) */}
+              <span className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
+                <span className="material-symbols-outlined text-white text-base drop-shadow">play_circle</span>
+              </span>
+              {/* 右下角时长 badge */}
+              {firstVid?.durationSec != null && (
+                <span className="absolute bottom-0.5 right-0.5 px-1 py-px rounded bg-black/70 text-white text-[8px] font-mono font-black leading-tight">
+                  {firstVid.durationSec}s
+                </span>
+              )}
+            </button>
+          ) : (
+            <div
+              className="w-10 h-10 rounded bg-black/5 flex items-center justify-center"
+              aria-label={`无封面视频 batchIdx=${child.batchIdx}`}
+            >
+              <span className="material-symbols-outlined text-sm opacity-50">
+                {child.status === 'SUCCESS' ? 'movie' : 'pending'}
+              </span>
+            </div>
+          )
         )}
+
         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
           <div className="flex items-center gap-1">
             <span className="font-mono font-black">batchIdx={child.batchIdx}</span>
+            {isVideo && (
+              <span className="material-symbols-outlined text-[10px] opacity-70" title="视频子任务">movie</span>
+            )}
             <span>{style.label}</span>
-            {imgsLoading && child.status === 'SUCCESS' && (
+            {loading && child.status === 'SUCCESS' && (
               <span className="material-symbols-outlined text-[10px] animate-spin">progress_activity</span>
             )}
           </div>
@@ -132,11 +211,12 @@ const ChildTaskChip: React.FC<ChildTaskChipProps> = ({ child, onRetry, onPreview
           </button>
         )}
       </div>
-      {/* 第二行:多图提示(如果 > 1 张) */}
-      {imgs.length > 1 && (
-        <div className="text-[9px] opacity-60 font-mono">
-          +{imgs.length - 1} 张图
-        </div>
+      {/* 第二行:多产物提示 */}
+      {!isVideo && imgs.length > 1 && (
+        <div className="text-[9px] opacity-60 font-mono">+{imgs.length - 1} 张图</div>
+      )}
+      {isVideo && vids.length > 1 && (
+        <div className="text-[9px] opacity-60 font-mono">+{vids.length - 1} 个视频</div>
       )}
     </div>
   );
@@ -161,9 +241,14 @@ export const TaskList: React.FC<TaskListProps> = ({
   // Selected Task for Preview Modal
   const [previewTask, setPreviewTask] = useState<GenerationTask | null>(null);
   const [feedbackTask, setFeedbackTask] = useState<GenerationTask | null>(null);
-  // [2026-07-21] 子任务缩略图放大预览
+  // [2026-07-21] 子任务缩略图放大预览(图)
   const [previewImages, setPreviewImages] = useState<PreviewImage[] | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
+  // [2026-07-25] 子任务缩略图放大预览(视频)
+  const [previewVideos, setPreviewVideos] = useState<PreviewVideo[] | null>(null);
+  const [previewVideoIndex, setPreviewVideoIndex] = useState(0);
+  // [2026-07-25] 手动刷新按钮 loading 态(onRefresh 不返回 Promise,这里用最小动画时长兜底)
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDetailTask, setSelectedDetailTask] = useState<GenerationTask | null>(null);
   const [detailDrawerTab, setDetailDrawerTab] = useState<'overview' | 'inputs' | 'results' | 'reviews' | 'costs'>('overview');
 
@@ -282,6 +367,17 @@ export const TaskList: React.FC<TaskListProps> = ({
     setCurrentPage(1);
   };
 
+  // [2026-07-25] 手动刷新任务列表
+  // onRefresh 由 App 层传 tasksQuery.refetch() —— refetch 不返回 Promise,
+  // 用 setTimeout 给个最小动画时长(600ms),保证用户能看到旋转反馈,
+  // 避免请求极快时旋转一闪而过体感差
+  const handleRefresh = () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    onRefresh?.();
+    setTimeout(() => setIsRefreshing(false), 600);
+  };
+
   // 动态成本估算(本期不接后端 costRate,简单规则:张数 × 1 Pts)
   const getEstimatedCost = (task: GenerationTask) => {
     const n = (task.params?.steps as unknown as number) || task.id ? 30 : 30;
@@ -378,6 +474,15 @@ export const TaskList: React.FC<TaskListProps> = ({
 
           {/* Action buttons on the right */}
           <div className="flex gap-2 w-full md:w-auto shrink-0 justify-end">
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="h-10 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs text-slate-500 font-bold cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="手动刷新任务列表"
+            >
+              <span className={`material-symbols-outlined text-sm font-bold ${isRefreshing ? 'animate-spin' : ''}`}>refresh</span>
+              刷新
+            </button>
             <button
               onClick={() => {
                 setSearchTerm('');
@@ -657,9 +762,13 @@ export const TaskList: React.FC<TaskListProps> = ({
                                 key={c.id}
                                 child={c}
                                 onRetry={handleRetryChild}
-                                onPreview={(imgs, idx) => {
+                                onPreviewImage={(imgs, idx) => {
                                   setPreviewImages(imgs);
                                   setPreviewIndex(idx);
+                                }}
+                                onPreviewVideo={(vids, idx) => {
+                                  setPreviewVideos(vids);
+                                  setPreviewVideoIndex(idx);
                                 }}
                               />
                             ))}
@@ -832,12 +941,21 @@ export const TaskList: React.FC<TaskListProps> = ({
         />
       )}
 
-      {/* 5. [2026-07-21] 子任务缩略图放大预览 */}
+      {/* 5. [2026-07-21] 子任务缩略图放大预览(图片) */}
       {previewImages && (
         <ImagePreviewModal
           images={previewImages}
           initialIndex={previewIndex}
           onClose={() => setPreviewImages(null)}
+        />
+      )}
+
+      {/* 6. [2026-07-25] 子任务缩略图放大预览(视频) */}
+      {previewVideos && (
+        <VideoPreviewModal
+          videos={previewVideos}
+          initialIndex={previewVideoIndex}
+          onClose={() => setPreviewVideos(null)}
         />
       )}
 

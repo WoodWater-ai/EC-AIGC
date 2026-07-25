@@ -40,7 +40,7 @@ const REFERENCE_SLOT_MAP: Record<ReferenceSlot, TaskAssetSlot> = {
 };
 
 /**
- * 前端 UI 的小写 imageType(product_main / scene_detail / detail_closeup / on_model)
+ * 前端 UI 的小写 imageType(product_main / scene_detail / detail_closeup / model_front)
  * → 后端 EnumImageTaskType 大写枚举值。
  */
 function mapImageGenerationType(t: string): ImageTaskType {
@@ -48,33 +48,10 @@ function mapImageGenerationType(t: string): ImageTaskType {
     case 'product_main': return 'PRODUCT_MAIN';
     case 'scene_detail': return 'SCENE_DETAIL';
     case 'detail_closeup': return 'DETAIL_CLOSEUP';
-    case 'on_model': return 'ON_MODEL';
+    case 'model_front': return 'MODEL_FRONT';
     default:
       throw new Error(`unknown image type: ${t}`);
   }
-}
-
-/**
- * 解析度映射:Vidu 能力 schema(ViduCapabilities.REF_IMG_EDIT 字段定义)
- * 接受 1080p / 2k / 4k 三种值。前端 UI 的内部表示是像素值(1080px / 1536px / 2048px),
- * 提交到后端前必须转成 Vidu 接受的格式,否则 Vidu 报 invalid field: resolution。
- * 找不到匹配时安全 fallback 到 '1080p'。
- */
-function mapResolutionToVidu(r: string): '1080p' | '2k' | '4k' {
-  const lower = (r ?? '').toLowerCase().replace(/p$/, '').replace(/x$/, '');
-  // 数字像素 → Vidu 等级
-  const pxMatch = lower.match(/(\d+)/);
-  if (pxMatch) {
-    const px = parseInt(pxMatch[1], 10);
-    if (px >= 2160) return '4k';
-    if (px >= 1440) return '2k';
-    return '1080p';
-  }
-  // 已是 Vidu 格式
-  if (lower === '1080' || lower === '1080p') return '1080p';
-  if (lower === '2k' || lower === '2kp') return '2k';
-  if (lower === '4k' || lower === '4kp') return '4k';
-  return '1080p';
 }
 
 export { REFERENCE_SLOTS_INTERNAL };
@@ -107,9 +84,7 @@ export interface UseCreateImageTaskStateOpts {
   /** 顶层手动(选择产品时)把 6 字段灌进 hook 内部 formInput,触发 prompts 重算 */
   onPickedFacts?: (facts: ProductFactsInput) => void;
   channel: { id: string; name: string; accessType: string; health: string };
-  model: { id: string; name: string; capability: { ratios: string[]; maxCount: number; resolutions: string[] } };
-  ratio: string;
-  resolution: string;
+  model: { id: string; name: string; capability: { maxCount: number } };
   templateName: string;
   toSubmit: () => Promise<string>;
   onAddTask: (info: { groupId: string; taskIds: string[] }) => void;
@@ -119,8 +94,13 @@ export interface UseCreateImageTaskStateOpts {
    * App.tsx 暂时忽略,只取第 1 个 screen 字段。少参签名对此处兼容(TS 函数参数双变性)。
    */
   setScreen: (screen: AppScreen, payload?: { highlightGroupId?: string }) => void;
-  onRatioChange?: (v: string) => void;
-  onResolutionChange?: (v: string) => void;
+  /**
+   * [2026-07-25 P0 修复] 右栏 ParamSchemaForm 收集的能力参数。
+   * 直接作为 taskParamsJson 提交,字段名对齐后端 ViduCapabilities schema(aspect_ratio / resolution 等)。
+   * 之前前端写死 ratio: '16:9' + mapResolutionToVidu 单位转换是把"供应商映射"提前做了,
+   * 现在让后端 ChannelParamBinder 按 schema 自动映射(单源真相)。
+   */
+  schemaParams?: Record<string, any>;
 }
 
 export interface UseCreateImageTaskStateReturn {
@@ -150,8 +130,6 @@ export interface UseCreateImageTaskStateReturn {
   templateOverwriteOpen: boolean;
   executionConfirmOpen: boolean;
   isSubmitting: boolean;
-  ratio: string;
-  resolution: string;
   // computed
   readinessChecks: ReadinessCheck[];
   readinessCount: number;
@@ -181,7 +159,6 @@ export interface UseCreateImageTaskStateReturn {
   runAssistantAnalysis(): Promise<void>;
   regeneratePrompts(): void;
   applyAiOptimizeToSelected(selected: ImageGenerationType[]): void;
-  applyPreset(preset: { name: string; ratio: string; resolution: string }): void;
   setReviewEnabled(v: boolean): void;
   selectReference(slot: ReferenceSlot, ref: any | undefined): void;
   updateReferenceOrder(slot: ReferenceSlot, order: number): void;
@@ -196,13 +173,11 @@ export interface UseCreateImageTaskStateReturn {
   setConflictOpen(v: boolean): void;
   setTemplateOverwriteOpen(v: boolean): void;
   setExecutionConfirmOpen(v: boolean): void;
-  setRatio(v: string): void;
-  setResolution(v: string): void;
   // autosave wiring
   hydrated: boolean;
 }
 
-const DRAFT_KEY = 'create-image-task-draft-v2';
+const DRAFT_KEY = 'create-image-task-draft-v3';
 const DRAFT_THROTTLE_MS = 800;
 const MIN_TYPE_COUNT = 1;
 const MAX_TYPE_COUNT = 5;
@@ -226,12 +201,12 @@ export function useCreateImageTaskState(
   // ---------- state ----------
   const [selectedTypes, setSelectedTypes] = useState<ImageGenerationType[]>(['product_main']);
   const [typeCounts, setTypeCounts] = useState<Record<ImageGenerationType, number>>({
-    product_main: 1, scene_detail: 1, detail_closeup: 1, on_model: 1,
+    product_main: 1, scene_detail: 1, detail_closeup: 1, model_front: 1,
   });
   const [template, setTemplateName] = useState<string>(opts.templateName);
-  const [style, setStyle] = useState<string>(messages.styleOptions[0]);
-  const [scene, setScene] = useState<string>(messages.sceneOptions[0]);
-  const [pose, setPose] = useState<string>(messages.poseOptions[0]);
+  const [style, setStyle] = useState<string>('');
+  const [scene, setScene] = useState<string>('');
+  const [pose, setPose] = useState<string>('');
   const [negativePrompt, setNegativePrompt] = useState<string>('blurry, bad quality, distorted');
   const [promptOverrides, setPromptOverrides] = useState<Partial<Record<ImageGenerationType, string>>>({});
   const [promptHasEdits, setPromptHasEdits] = useState<boolean>(false);
@@ -256,8 +231,6 @@ export function useCreateImageTaskState(
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [hydrated, setHydrated] = useState<boolean>(false);
   const [productFacts, setProductFacts] = useState<ReturnType<typeof extractProductFacts> | null>(null);
-  const [ratio, setRatio] = useState<string>(opts.ratio);
-  const [resolution, setResolution] = useState<string>(opts.resolution);
 
   const [formInput, setFormInput] = useState<ProductFactsInput>({
     name: '', sellingPoints: '', productCategory: '',
@@ -270,8 +243,20 @@ export function useCreateImageTaskState(
       const raw = sessionStorage.getItem(DRAFT_KEY);
       if (raw) {
         const data = JSON.parse(raw) as PersistedDraft;
-        if (data.selectedTypes) setSelectedTypes(data.selectedTypes);
-        if (data.typeCounts) setTypeCounts(data.typeCounts as Record<ImageGenerationType, number>);
+        // 过滤掉已废弃的 imageType 键(如 on_model)避免渲染空卡片
+        const VALID_TYPES: ImageGenerationType[] = ['product_main','scene_detail','detail_closeup','model_front'];
+        if (data.selectedTypes) {
+          const validSelected = data.selectedTypes.filter((t): t is ImageGenerationType => VALID_TYPES.includes(t as ImageGenerationType));
+          setSelectedTypes(validSelected);
+        }
+        if (data.typeCounts) {
+          const tc = data.typeCounts as Record<string, number>;
+          const validCounts: Record<ImageGenerationType, number> = { product_main: 1, scene_detail: 1, detail_closeup: 1, model_front: 1 };
+          (Object.keys(tc) as ImageGenerationType[]).forEach((k) => {
+            if (VALID_TYPES.includes(k)) validCounts[k] = tc[k] ?? 1;
+          });
+          setTypeCounts(validCounts);
+        }
         if (data.template) setTemplateName(data.template);
         if (data.style) setStyle(data.style);
         if (data.scene) setScene(data.scene);
@@ -282,6 +267,19 @@ export function useCreateImageTaskState(
       }
       setHydrated(true);
       if (raw) toast.success('已恢复上次编辑');
+      // [v1 2026-07-25] 清理已废弃 imageType 键(on_model)避免空卡片:
+      // 老版本(enum 改名 model_front 之前)sessionStorage 仍带 on_model 残留,
+      // filter 后如果 selectedTypes 全部被清空,说明草稿不兼容,直接清掉。
+      try {
+        const rawAfter = sessionStorage.getItem(DRAFT_KEY);
+        if (rawAfter) {
+          const d = JSON.parse(rawAfter) as PersistedDraft;
+          if (Array.isArray(d.selectedTypes) && d.selectedTypes.length > 0
+              && d.selectedTypes.every((t) => !VALID_TYPES.includes(t as ImageGenerationType))) {
+            sessionStorage.removeItem(DRAFT_KEY);
+          }
+        }
+      } catch { /* ignore */ }
     } catch {
       sessionStorage.removeItem(DRAFT_KEY);
       toast.error('已清除无法识别的草稿');
@@ -305,7 +303,7 @@ export function useCreateImageTaskState(
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
-  }, [hydrated, selectedTypes, typeCounts, template, style, scene, pose, negativePrompt, reviewEnabled, formInput, ratio, resolution]);
+  }, [hydrated, selectedTypes, typeCounts, template, style, scene, pose, negativePrompt, reviewEnabled, formInput]);
 
   // ---------- computed ----------
   const orderedReferenceInsights = useMemo(
@@ -333,8 +331,8 @@ export function useCreateImageTaskState(
 
   const prompts = useMemo<AllTypePrompts>(() => {
     const facts = productFacts ?? extractProductFacts(formInput);
-    const result: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', on_model: '' };
-    (['product_main', 'scene_detail', 'detail_closeup', 'on_model'] as ImageGenerationType[]).forEach((t) => {
+    const result: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_front: '' };
+    (['product_main', 'scene_detail', 'detail_closeup', 'model_front'] as ImageGenerationType[]).forEach((t) => {
       result[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
     });
     return result;
@@ -347,7 +345,12 @@ export function useCreateImageTaskState(
 
   const promptsComplete = useMemo(() => {
     if (selectedTypes.length === 0) return false;
-    return selectedTypes.every((t) => (promptOverrides[t] ?? prompts[t]).trim().length > 0);
+    return selectedTypes.every((t) => {
+      // promptOverrides 是 Partial<Record, string>>(可选编辑覆盖),
+      // 兜底 prompts[t](由 buildPromptFromFacts 生成,保证 string);再兜底空串。
+      const prompt = promptOverrides[t] ?? prompts[t] ?? '';
+      return typeof prompt === 'string' && prompt.trim().length > 0;
+    });
   }, [selectedTypes, promptOverrides, prompts]);
 
   const factsComplete = useMemo(
@@ -356,11 +359,11 @@ export function useCreateImageTaskState(
   );
 
   const isSupported = useMemo(() => {
-    // 之前对照写死的 model.capability.ratios/resolutions 判定,但写死值与真实 Vidu schema
-    // 不一致(写死 resolutions=['1024px','1536px','2048px'],Vidu 实际只接受 1080p/2k/4k),
-    // 永远 false → readiness 报"不支持"假阳性。本期页面没有 ratio/resolution UI 选择,
-    // 直接信任 Vidu 能力 schema 默认值(由 useTaskParams 装载,父组件传 ratio=16:9 + resolution=1080p)。
-    // 唯一继续校验:每 imageType 的张数不超过模型 maxCount。
+    // [2026-07-25 P0 修复] 删 model.capability.ratios/resolutions 写死字段(Phase 2 清理);
+    // 现在 model.capability 只剩 maxCount 字段(由 useTaskParams 装载 Vidu 能力 schema 的 groupDefault)。
+    // ratio/resolution 由 ParamSchemaForm 收集的 schemaParams 管控,后端 SchemaValidator
+    // 严格白名单校验合法性(走 /v1/task/capability-params/validate)。
+    // 本 hook 只校验:每 imageType 的张数不超过模型 maxCount。
     const cm = opts.model.capability;
     return !selectedTypes.some((t) => typeCounts[t] > Math.min(cm.maxCount, MAX_TYPE_COUNT));
   }, [opts.model.capability, selectedTypes, typeCounts]);
@@ -536,13 +539,6 @@ export function useCreateImageTaskState(
     }
   }, [opts.isProductBound, opts.mainAssetId, opts.onAiComplete, assistantState, formInput, selectedTypes, style, scene, pose, orderedReferenceInsights]);
 
-  const applyPreset = useCallback((preset: { name: string; ratio: string; resolution: string }) => {
-    setRatio(preset.ratio);
-    setResolution(preset.resolution);
-    opts.onRatioChange?.(preset.ratio);
-    opts.onResolutionChange?.(preset.resolution);
-  }, [opts.onRatioChange, opts.onResolutionChange]);
-
   const regeneratePrompts = useCallback(() => {
     setPromptOverrides({});
     setPromptHasEdits(false);
@@ -554,8 +550,8 @@ export function useCreateImageTaskState(
 
   const applyAiOptimizeToSelected = useCallback((selected: ImageGenerationType[]) => {
     const facts = productFacts ?? extractProductFacts(formInput);
-    const basePrompts: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', on_model: '' };
-    (['product_main', 'scene_detail', 'detail_closeup', 'on_model'] as ImageGenerationType[]).forEach((t) => {
+    const basePrompts: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_front: '' };
+    (['product_main', 'scene_detail', 'detail_closeup', 'model_front'] as ImageGenerationType[]).forEach((t) => {
       basePrompts[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
     });
     const optimized = applyAiOptimizePerType(basePrompts, selected);
@@ -633,7 +629,7 @@ export function useCreateImageTaskState(
       // 拼 imageTypes[]:每种 imageType 配 prompt/negativePrompt/count
       const imageTypes: ImageTypeEntry[] = selectedTypes.map((t) => ({
         imageType: mapImageGenerationType(t),
-        prompt: promptOverrides[t] ?? prompts[t],
+        prompt: promptOverrides[t] ?? prompts[t] ?? '',
         negativePrompt,
         count: typeCounts[t] ?? 1,
       }));
@@ -655,7 +651,11 @@ export function useCreateImageTaskState(
         capability: 'REF_IMG_EDIT',
         channelType: 'VIDU',
         modelId: opts.model?.id ?? null,
-        taskParamsJson: JSON.stringify({ ratio, resolution: mapResolutionToVidu(resolution) }),
+        // [2026-07-25 P0 修复] taskParamsJson 直接透传 ParamSchemaForm 收集的 schemaParams
+        // (字段名 aspect_ratio / resolution 对齐 ViduCapabilities schema),后端 GenerationTaskServiceImpl
+        // 用 schema 字段名解析、ChannelParamBinder 按 targetField 映射到 Vidu body。
+        // 之前前端做 mapResolutionToVidu 单位转换 + ratio: '16:9' 写死是把供应商映射提前做,链路断裂。
+        taskParamsJson: JSON.stringify(opts.schemaParams ?? {}),
         imageTypes,
         assets,
       };
@@ -674,7 +674,7 @@ export function useCreateImageTaskState(
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, opts, references, referenceOrder, selectedTypes, promptOverrides, prompts, negativePrompt, formInput, ratio, resolution, setExecutionConfirmOpen]);
+  }, [isSubmitting, opts, references, referenceOrder, selectedTypes, promptOverrides, prompts, negativePrompt, formInput, setExecutionConfirmOpen]);
 
   const selectReference = useCallback((slot: ReferenceSlot, ref: any | undefined) => {
     setReferences((prev) => ({ ...prev, [slot]: ref }));
@@ -748,8 +748,6 @@ export function useCreateImageTaskState(
     templateOverwriteOpen,
     executionConfirmOpen,
     isSubmitting,
-    ratio,
-    resolution,
     hydrated,
     readinessChecks,
     readinessCount,
@@ -777,7 +775,6 @@ export function useCreateImageTaskState(
     runAssistantAnalysis,
     regeneratePrompts,
     applyAiOptimizeToSelected,
-    applyPreset,
     setReviewEnabled,
     selectReference,
     updateReferenceOrder,
@@ -789,7 +786,5 @@ export function useCreateImageTaskState(
     setConflictOpen,
     setTemplateOverwriteOpen,
     setExecutionConfirmOpen,
-    setRatio,
-    setResolution,
   };
 }

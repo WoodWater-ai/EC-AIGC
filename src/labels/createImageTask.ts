@@ -33,7 +33,7 @@ export const messages = {
     product_main: '商品主图',
     scene_detail: '场景图',
     detail_closeup: '细节图',
-    on_model: '三视图',
+    model_front: '模特展示图',
     labelHelper: '可多选',
   },
   template: {
@@ -46,7 +46,7 @@ export const messages = {
     product_main: 'inventory_2',
     scene_detail: 'landscape',
     detail_closeup: 'zoom_in',
-    on_model: 'accessibility_new',
+    model_front: 'accessibility_new',
   } as const,
   refSlot: {
     detail: '细节', style: '风格', scene: '场景', pose: '姿势', model: '模特',
@@ -54,15 +54,6 @@ export const messages = {
   refSlotIcon: {
     detail: 'zoom_in', style: 'palette', scene: 'landscape', pose: 'accessibility_new', model: 'face_3',
   } as const,
-  styleOptions: [
-    '甜美网红风', '极简北欧风', '科技赛博风', '金秋自然风', '奢华丝绸风',
-  ] as const,
-  sceneOptions: [
-    '自然影棚', '城市街景', '居家陈列',
-  ] as const,
-  poseOptions: [
-    '自然站姿', '正面站姿', '轻松坐姿', '行走动态',
-  ] as const,
   presetPlatforms: [
     { name: '电商主图推荐', ratio: '1:1',  resolution: '2048px' },
     { name: '详情页长图',   ratio: '3:4',  resolution: '1536px' },
@@ -111,6 +102,3 @@ export const messages = {
   },
 };
 
-export type StyleOption = (typeof messages.styleOptions)[number];
-export type SceneOption = (typeof messages.sceneOptions)[number];
-export type PoseOption  = (typeof messages.poseOptions)[number];

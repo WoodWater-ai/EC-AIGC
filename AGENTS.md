@@ -72,3 +72,27 @@
 - 组件 props 必须有 interface 定义
 - 业务枚举统一放在 `src/types.ts` 的 const enum / 普通 enum 对象里(参考 `AppScreen`)
 - `tsconfig.json` 是 bundler 模式,不要改回 classic / node
+
+## 能力参数 schemaParams 透传约定(2026-07-25 P0 修复后)
+
+**核心原则**:右栏 `ParamSchemaForm` 收集的 `schemaParams` 必须**原样**作为 `taskParamsJson` 提交,**前端不做字段名映射、不做单位转换、不做供应商适配**。
+
+链路:
+```
+ParamSchemaForm(useTaskParams.schemaParams)
+  → ImageSettingsSection.onParamsChange 冒泡(必须有 schemaParams 字段)
+  → CreateImageTask.paramsSnapshot.schemaParams
+  → useCreateImageTaskState.opts.schemaParams
+  → submitTasks: taskParamsJson: JSON.stringify(opts.schemaParams ?? {})
+  → 后端 ChannelParamBinder.bindToBody 按 ViduCapabilities schema 字段名映射
+```
+
+**反例(P0 bug 现场,2026-07-25 修复)**:之前前端把 `schemaParams.aspect_ratio` 重命名成 `ratio`、`schemaParams.resolution` 走 `mapResolutionToVidu('2048px' → '4k')` 转换后再提交,导致后端 `ChannelParamBinder` 按 schema 字段遍历拿不到任何 key,链路断裂;同时 `task.aspectRatio` 由 `pm.get("ratio")` 写入,Vidu 收到的始终是 16:9。
+
+**禁止**:
+- 在前端给 schema 字段做 key 重命名(后端 `FieldDef.targetField` 已经管映射)
+- 在前端做单位/格式转换(Vidu schema 的 `OptionItem.value` 已经是 Vidu API 接受的值)
+- 在 hook 内部维护 ratio/resolution 等"前端 state"——单一权威是 schemaParams
+- 写死 `'16:9'` / `'1080p'` / `'2048px'` 等默认值到 `taskParamsJson`——让 `useTaskParams` 的 schema defaults 接管
+
+参考:`dafenqi-ai/AGENTS.md` 的"能力 schema 单一权威"段(后端侧约定)
