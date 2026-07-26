@@ -16,7 +16,6 @@ import { extractReferenceInsights } from '../lib/createImageTask/extractReferenc
 import { applyAiOptimizePerType, type AllTypePrompts } from '../lib/createImageTask/applyAiOptimizePerType';
 import { buildGenerationTask } from '../lib/createImageTask/buildGenerationTask';
 import { compactReferenceOrder, moveReferenceInOrder, assignNextOrder, REFERENCE_SLOTS } from '../lib/createImageTask/referenceOrder';
-import type { ProductAiAnalyzeResponse } from '../api/modules/productInfo';
 import { taskApi } from '../api/modules/task';
 import { messages } from '../labels/createImageTask';
 
@@ -114,6 +113,11 @@ export interface UseCreateImageTaskStateReturn {
   negativePrompt: string;
   promptOverrides: Partial<Record<ImageGenerationType, string>>;
   promptHasEdits: boolean;
+  /**
+   * [2026-07-26] AI 助手是否降级到本地拼 prompt(后端 imagePlanApi.analyze 失败时为 true)。
+   * UI 可据此显示"已使用本地建议"提示。
+   */
+  assistantFallback: boolean;
   factsConfirmed: boolean;
   promptsConfirmed: boolean;
   assistantState: 'idle' | 'processing' | 'complete';
@@ -213,6 +217,11 @@ export function useCreateImageTaskState(
   const [factsConfirmed, setFactsConfirmed] = useState<boolean>(false);
   const [promptsConfirmed, setPromptsConfirmed] = useState<boolean>(false);
   const [assistantState, setAssistantState] = useState<'idle' | 'processing' | 'complete'>('idle');
+  /**
+   * [2026-07-26] AI 助手是否降级(后端 imagePlanApi.analyze 失败时为 true)。
+   * UI 可据此展示"已使用本地建议"提示。
+   */
+  const [assistantFallback, setAssistantFallback] = useState<boolean>(false);
   const [reviewEnabled, setReviewEnabled] = useState<boolean>(false);
   const [references, setReferences] = useState<Record<ReferenceSlot, { fileResourceId?: string | number; id?: string | number; originalUrl?: string; thumbnailUrl?: string; name?: string } | undefined>>({
     detail: undefined, style: undefined, scene: undefined, pose: undefined, model: undefined,
@@ -467,25 +476,54 @@ export function useCreateImageTaskState(
     setPromptsConfirmed(false);
   }, []);
 
+  /**
+   * [2026-07-26] 前端 ReferenceSlot -> 后端 ImagePlanReferenceSlot 映射。
+   * 前端 5 个 slot(detail/style/scene/pose/model) -> 后端 5 个槽位(全大写 + _REF 后缀)。
+   */
+  const mapSlotToBackend = (slot: ReferenceSlot): 'STYLE_REF' | 'SCENE_REF' | 'POSE_REF' | 'MODEL_REF' | 'DETAIL_REF' => {
+    switch (slot) {
+      case 'style':  return 'STYLE_REF';
+      case 'scene':  return 'SCENE_REF';
+      case 'pose':   return 'POSE_REF';
+      case 'model':  return 'MODEL_REF';
+      case 'detail': return 'DETAIL_REF';
+      default:       return 'STYLE_REF';
+    }
+  };
+
+  /**
+   * [2026-07-26] 后端 AI 助手失败时的本地降级:
+   * 用 buildPromptFromFacts 拼 4 类 prompt,语义跟 imagePlanServiceImpl.buildFallbackPrompt 一致。
+   */
+  const fallbackToLocalPrompts = (facts: ProductFactsInput) => {
+    const nextOverrides: Partial<Record<ImageGenerationType, string>> = {};
+    selectedTypes.forEach((t) => {
+      nextOverrides[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
+    });
+    setPromptOverrides(nextOverrides);
+    setFactsConfirmed(true);
+    setPromptHasEdits(true);
+    setPromptsConfirmed(false);
+    setAssistantState('complete');
+  };
+
   const runAssistantAnalysis = useCallback(async () => {
     if (!opts.isProductBound) return;
-    if (!opts.mainAssetId) {
-      // 退化:无 asset_id 时(理论上不应发生,因为 isProductBound=true)用当前 formInput 作为 fallback
+
+    // 主图 URL 兜底:opts.mainImage 暴露 originalUrl,无 URL 时退回本地拼
+    const mainImageUrl = opts.mainImage?.originalUrl ?? '';
+    if (!opts.mainAssetId || !mainImageUrl) {
+      setAssistantFallback(true);
       const facts = extractProductFacts(formInput);
       setProductFacts(facts);
-      const nextOverrides: Partial<Record<ImageGenerationType, string>> = {};
-      selectedTypes.forEach((t) => {
-        nextOverrides[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
-      });
-      setPromptOverrides(nextOverrides);
-      setFactsConfirmed(true);
-      setPromptHasEdits(true);
-      setPromptsConfirmed(false);
-      setAssistantState('complete');
+      fallbackToLocalPrompts(facts);
+      opts.onAiComplete?.(formInput);
+      toast.warning('后端 AI 助手暂不可用,已使用本地建议');
       return;
     }
     if (assistantState === 'processing') return;
     setAssistantState('processing');
+    setAssistantFallback(false);
 
     // 5 分钟超时兜底(防御真实 AI 接口卡死)
     let timedOut = false;
@@ -495,49 +533,69 @@ export function useCreateImageTaskState(
       toast.error(messages.assistant.timeout);
     }, 300_000);
 
+    // 优先调后端 imagePlanApi.analyze(2026-07-26 新增)
+    let remoteSuccess = false;
     try {
       // dynamic import 避免 module-level 加载 http 客户端(测试环境无 jsdom)
-      const { productInfoApi } = await import('../api/modules/productInfo');
-      const resp: ProductAiAnalyzeResponse = await productInfoApi.aiAnalyze({
-        // 后端 ProductServiceImpl.aiAnalyze(imageId) → assetResourceService.getById(imageId),
-        // 要求 asset_resource.id,不是 file_resource.id。
-        imageId: String(opts.mainAssetId),
+      const { imagePlanApi } = await import('../api/modules/imagePlan');
+      const resp = await imagePlanApi.analyze({
+        mainImageUrl,
+        referenceAssets: orderedRefs
+          .map((r) => r.ref)
+          .filter((ref): ref is { id?: string; fileResourceId?: string; originalUrl?: string } => !!ref)
+          .filter((ref) => !!ref.originalUrl)
+          .map((ref) => ({
+            assetId: String(ref.id ?? ref.fileResourceId ?? ''),
+            url: ref.originalUrl!,
+            slotRole: mapSlotToBackend(
+              // 通过 orderedRefs 找到对应 slot
+              orderedRefs.find((r) => r.ref === ref)!.slot,
+            ),
+          })),
+        style,
+        scene,
+        pose,
       });
       if (timedOut) return;
       window.clearTimeout(guardTimeout);
 
-      // 把后端 6 字段映射回 ProductFactsInput(field name 对齐)
-      // 后端 camelCase 与前端 ProductFactsInput 一致(name / sellingPoints / color / patternMaterial / silhouetteStructure / category)
-      // 同时也接受旧字段 fabricTexture / keyDetails 的友好兜底
-      const nextInput: ProductFactsInput = {
-        name: (resp.name ?? formInput.name).trim(),
-        sellingPoints: (resp.sellingPoints ?? formInput.sellingPoints).trim(),
-        productCategory: (resp.category ?? formInput.productCategory).trim(),
-        colorPattern: (resp.color ?? formInput.colorPattern).trim(),
-        fabricTexture: (resp.fabricTexture ?? resp.patternMaterial ?? formInput.fabricTexture).trim(),
-        fitStructure: (resp.silhouetteStructure ?? resp.keyDetails ?? formInput.fitStructure).trim(),
-      };
-      setFormInput(nextInput);
-      const facts = extractProductFacts(nextInput);
-      setProductFacts(facts);
+      // 回填
+      setFormInput(resp.productFacts);
+      setProductFacts(resp.productFacts);
+      // [2026-07-26] 后端 Map<EnumImageTaskType, String> 序列化为大写 enum name(),
+      // 写入 promptOverrides(小写 ImageGenerationType)时做 toLowerCase 转换,
+      // 否则 UI 用 promptOverrides['product_main'] 取值会拿到 undefined,fallback 到本地拼,
+      // AI 助手失灵。
       const nextOverrides: Partial<Record<ImageGenerationType, string>> = {};
-      selectedTypes.forEach((t) => {
-        nextOverrides[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
-      });
+      for (const k of Object.keys(resp.prompts)) {
+        const t = k.toLowerCase() as ImageGenerationType;
+        nextOverrides[t] = resp.prompts[k];
+      }
       setPromptOverrides(nextOverrides);
+      setNegativePrompt(resp.negativePrompt);
       setFactsConfirmed(true);
       setPromptHasEdits(true);
       setPromptsConfirmed(false);
       setAssistantState('complete');
-      // 回写到顶层 UI state(让 ProductFactsEditor 6 字段 input 刷新)
-      opts.onAiComplete?.(nextInput);
+      opts.onAiComplete?.(resp.productFacts);
       toast.success(messages.assistant.complete);
-    } catch {
-      // 失败:错误 toast 已在 http 拦截器出,这里只回退到 idle 态
+      remoteSuccess = true;
+    } catch (err) {
+      // 降级到本地拼 prompt
+      if (timedOut) return;
       window.clearTimeout(guardTimeout);
-      setAssistantState('idle');
+      console.warn('[imagePlan] analyze failed, fallback to buildPromptFromFacts', err);
+      setAssistantFallback(true);
+      const facts = extractProductFacts(formInput);
+      setProductFacts(facts);
+      fallbackToLocalPrompts(facts);
+      opts.onAiComplete?.(formInput);
+      toast.warning('后端 AI 助手暂不可用,已使用本地建议');
     }
-  }, [opts.isProductBound, opts.mainAssetId, opts.onAiComplete, assistantState, formInput, selectedTypes, style, scene, pose, orderedReferenceInsights]);
+  }, [
+    opts.isProductBound, opts.mainAssetId, opts.mainImage, opts.onAiComplete,
+    assistantState, formInput, selectedTypes, style, scene, pose, orderedReferenceInsights,
+  ]);
 
   const regeneratePrompts = useCallback(() => {
     setPromptOverrides({});
@@ -781,6 +839,7 @@ export function useCreateImageTaskState(
     moveReference,
     compactReferenceOrder: compactReferenceOrderFn,
     orderedRefs,
+    assistantFallback,
     checkAndGenerate,
     submitTasks,
     setConflictOpen,

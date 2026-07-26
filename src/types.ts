@@ -629,3 +629,46 @@ export interface VideoTaskSubmitResponse {
   groupId: string;
   taskIds: string[];
 }
+
+// ============================================================================
+// [2026-07-26 图片任务规划] 对齐后端 ImagePlanAnalyzeRequest / Response
+// 后端 Map<EnumImageTaskType, String> 经 Fastjson2 序列化为全大写 enum name()
+// (PRODUCT_MAIN / SCENE_DETAIL / DETAIL_CLOSEUP / MODEL_FRONT),前端 Record 用同样 key。
+// ============================================================================
+
+/** 参考图槽位(对齐后端 EnumReferenceSlot,大写形式) */
+export type ImagePlanReferenceSlot =
+  | 'STYLE_REF'
+  | 'SCENE_REF'
+  | 'POSE_REF'
+  | 'MODEL_REF'
+  | 'DETAIL_REF';
+
+/** 单张参考图(对齐后端 ImagePlanReferenceAsset) */
+export interface ImagePlanReferenceAsset {
+  assetId: string;
+  url: string;
+  slotRole: ImagePlanReferenceSlot;
+}
+
+/** 图片任务规划-分析请求(对齐后端 ImagePlanAnalyzeRequest) */
+export interface ImagePlanAnalyzeRequest {
+  mainImageUrl: string;
+  referenceAssets?: ImagePlanReferenceAsset[];
+  style?: string;
+  scene?: string;
+  pose?: string;
+}
+
+/** 图片任务规划-分析响应(对齐后端 ImagePlanAnalyzeResponse) */
+export interface ImagePlanAnalyzeResponse {
+  productFacts: ProductFactsInput;
+  /**
+   * key: 后端 enum name() 全大写(PRODUCT_MAIN / SCENE_DETAIL / DETAIL_CLOSEUP / MODEL_FRONT)。
+   * 故意用 `Record<string, string>` 而非小写 `ImageGenerationType`,避免类型陷阱
+   * (TypeScript 不会捕获运行时大写 key 错误)。调用方需用 `t.toLowerCase() as ImageGenerationType` 转小写后写入 UI 状态。
+   */
+  prompts: Record<string, string>;
+  negativePrompt: string;
+  skillVersion: string;
+}
