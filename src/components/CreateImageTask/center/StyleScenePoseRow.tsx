@@ -29,7 +29,9 @@ interface RenderSelectArgs {
 function renderSelect({ label, value, options, loading, onChange }: RenderSelectArgs) {
   const isEmpty = !loading && options.length === 0;
   const disabled = loading || isEmpty;
-  const valueInOptions = options.some((o) => o.value === value);
+  // 本组件 value 语义 = 中文 itemName(toDictOptions 的 opt.value 是 itemCode 英文枚举,
+  // 这里取 opt.label 即 itemName 作为 select value,保证提交到 prompt 拼接的是中文)
+  const valueInOptions = options.some((o) => o.label === value);
   const placeholder = loading
     ? '加载中…'
     : isEmpty
@@ -50,7 +52,7 @@ function renderSelect({ label, value, options, loading, onChange }: RenderSelect
           <option value={value}>{value} (已不在字典中)</option>
         )}
         {options.map((opt) => (
-          <option key={opt.id} value={opt.value}>{opt.label}</option>
+          <option key={opt.id} value={opt.label}>{opt.label}</option>
         ))}
       </select>
     </label>

@@ -158,22 +158,24 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   } = state;
 
   // 字典加载完成后,若 hook 内 style/scene/pose 仍是空串(初始化时字典尚未回来),
-  // 自动选 options[0],让 select 不再停留在"暂无数据"占位态
+  // 自动选 options[0] 的中文 label (itemName),让 select 不再停留在"暂无数据"占位态
+  // 注:toDictOptions 给的 opt.value 是 itemCode(英文枚举),opt.label 才是中文 itemName,
+  //     这里取 label 才能保证默认值和后续 prompt 拼接都是中文
   useEffect(() => {
     if (!loadingStyle && styleOptions.length > 0 && !style) {
-      setStyle(styleOptions[0].value);
+      setStyle(styleOptions[0].label);
     }
   }, [styleOptions, loadingStyle, style, setStyle]);
 
   useEffect(() => {
     if (!loadingScene && sceneOptions.length > 0 && !scene) {
-      setScene(sceneOptions[0].value);
+      setScene(sceneOptions[0].label);
     }
   }, [sceneOptions, loadingScene, scene, setScene]);
 
   useEffect(() => {
     if (!loadingPose && poseOptions.length > 0 && !pose) {
-      setPose(poseOptions[0].value);
+      setPose(poseOptions[0].label);
     }
   }, [poseOptions, loadingPose, pose, setPose]);
 

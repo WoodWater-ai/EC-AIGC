@@ -15,7 +15,7 @@ export function applyAiOptimizePerType(
   const out: AllTypePrompts = { ...prompts };
   for (const t of ['product_main','scene_detail','detail_closeup','model_front'] as ImageGenerationType[]) {
     if (!set.has(t)) continue;
-    out[t] = `(Cinematic backlight, photorealistic studio render) ${prompts[t]}, raytracing reflections, cinematic color grading, warm ambient glow`;
+    out[t] = `[画质增强] 电影级背光、真实感影棚渲染,${prompts[t]},光线追踪反射、电影级调色、温暖环境光`;
   }
   return out;
 }
