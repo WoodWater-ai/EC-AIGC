@@ -183,10 +183,8 @@ export default function App() {
         return (
           <Dashboard
             tasks={tasks}
-            products={products}
+            currentUser={currentUser}
             setScreen={setCurrentScreen}
-            setSelectedProduct={setSelectedProduct}
-            openProductDrawer={() => setIsProductDrawerOpen(true)}
           />
         );
       case AppScreen.TASKS:

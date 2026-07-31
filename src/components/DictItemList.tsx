@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useConfirm } from './common/ConfirmProvider';
 import {
@@ -7,6 +7,8 @@ import {
   Search,
   RotateCcw,
   X,
+  ImagePlus,
+  Trash2,
 } from 'lucide-react';
 import {
   dictApi,
@@ -15,8 +17,11 @@ import {
   type DictItemStatus,
   type DictItemCreateRequest,
   type DictItemUpdateRequest,
+  parseDictItemExtra,
 } from '../api/modules/dict';
 import type { PageInfo } from '../api/service-result';
+import { useFileUpload } from '../hooks/useFileUpload';
+import { withCosThumbnail } from '../utils/cosImage';
 
 /**
  * 字典管理(字典项) — 列表页
@@ -290,6 +295,7 @@ function ItemTable({ list, loading, renderCategoryName, onEdit, onChangeStatus }
           <thead className="bg-slate-50 text-slate-500 text-xs">
             <tr>
               <th className="px-4 py-3 text-left font-semibold">ID</th>
+              <th className="px-4 py-3 text-left font-semibold">参考图</th>
               <th className="px-4 py-3 text-left font-semibold">分类</th>
               <th className="px-4 py-3 text-left font-semibold">字典项编码</th>
               <th className="px-4 py-3 text-left font-semibold">字典项名称</th>
@@ -303,6 +309,26 @@ function ItemTable({ list, loading, renderCategoryName, onEdit, onChangeStatus }
             {list.map((item) => (
               <tr key={item.id} className="hover:bg-slate-50 group">
                 <td className="px-4 py-3 text-xs text-slate-400 font-mono">{item.id}</td>
+                <td className="px-4 py-3">
+                  {typeof parseDictItemExtra(item.extra).imageUrl === 'string' ? (
+                    <img
+                      src={
+                        withCosThumbnail(
+                          parseDictItemExtra(item.extra).imageUrl as string,
+                          80,
+                        ) ?? (parseDictItemExtra(item.extra).imageUrl as string)
+                      }
+                      alt=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      className="h-10 w-10 rounded-lg border border-slate-100 bg-slate-50 object-contain p-0.5"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                      <ImagePlus className="h-4 w-4 text-slate-300" />
+                    </div>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-sm text-text-main">{renderCategoryName(item)}</td>
                 <td className="px-4 py-3 text-sm font-mono font-semibold text-text-main">{item.itemCode}</td>
                 <td className="px-4 py-3 text-sm text-text-main">{item.itemName}</td>
@@ -391,21 +417,91 @@ function ItemDrawer({ mode, editing, categories, submitting, onClose, onSaved, o
   const [itemName, setItemName] = useState(mode === 'create' ? '' : editing?.itemName ?? '');
   const [describe, setDescribe] = useState(mode === 'create' ? '' : editing?.describe ?? '');
   const [sort, setSort] = useState<number>(mode === 'create' ? 0 : editing?.sort ?? 0);
+  const initialExtra = useMemo(() => parseDictItemExtra(editing?.extra), [editing?.extra]);
+  const [imageUrl, setImageUrl] = useState(
+    typeof initialExtra.imageUrl === 'string' ? initialExtra.imageUrl : '',
+  );
+  const [fileResourceId, setFileResourceId] = useState(
+    typeof initialExtra.fileResourceId === 'string' ? initialExtra.fileResourceId : '',
+  );
+  const [fileKey, setFileKey] = useState(
+    typeof initialExtra.fileKey === 'string' ? initialExtra.fileKey : '',
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    upload,
+    loading: uploading,
+    progress: uploadProgress,
+    reset: resetUpload,
+  } = useFileUpload({ purpose: 'DICT' });
 
   const codeValid = mode === 'edit' || (itemCode.length > 0 && ITEM_CODE_RE.test(itemCode));
   const nameValid = itemName.trim().length > 0;
   const categoryValid = mode === 'edit' || categoryId.length > 0;
-  const canSubmit = codeValid && nameValid && categoryValid && !submitting;
+  const canSubmit = codeValid && nameValid && categoryValid && !submitting && !uploading;
+
+  function serializeExtra(): string {
+    const next = { ...initialExtra };
+    if (imageUrl) {
+      next.imageUrl = imageUrl;
+      next.fileResourceId = fileResourceId;
+      next.fileKey = fileKey;
+    } else {
+      delete next.imageUrl;
+      delete next.fileResourceId;
+      delete next.fileKey;
+    }
+    return JSON.stringify(next);
+  }
+
+  async function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('请选择图片文件');
+      return;
+    }
+    try {
+      const result = await upload(file);
+      setImageUrl(result.accessUrl);
+      setFileResourceId(result.fileResourceId);
+      setFileKey(result.fileKey);
+      toast.success('图片上传成功');
+    } catch {
+      // 上传 hook 和请求拦截器会展示具体错误。
+    }
+  }
+
+  function removeImage() {
+    setImageUrl('');
+    setFileResourceId('');
+    setFileKey('');
+    resetUpload();
+  }
 
   async function handleSubmit() {
     if (!canSubmit) return;
     onSubmittingChange(true);
     try {
       if (mode === 'create') {
-        const req: DictItemCreateRequest = { categoryId, itemCode, itemName, describe, sort };
+        const req: DictItemCreateRequest = {
+          categoryId,
+          itemCode,
+          itemName,
+          describe,
+          sort,
+          extra: serializeExtra(),
+        };
         await dictApi.createItem(req);
       } else if (editing) {
-        const req: DictItemUpdateRequest = { id: editing.id, itemName, describe, sort };
+        const req: DictItemUpdateRequest = {
+          id: editing.id,
+          itemName,
+          describe,
+          sort,
+          extra: serializeExtra(),
+        };
         await dictApi.updateItem(req);
       }
       toast.success(mode === 'create' ? '新建成功' : '保存成功');
@@ -471,6 +567,64 @@ function ItemDrawer({ mode, editing, categories, submitting, onClose, onSaved, o
               rows={3}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 resize-none"
             />
+          </FormField>
+          <FormField label="参考图片" hint="用于创建图片任务中的风格、场景、姿势视觉预览">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageChange}
+            />
+            {imageUrl ? (
+              <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                <img
+                  src={withCosThumbnail(imageUrl, 480) ?? imageUrl}
+                  alt={`${itemName || '字典项'}参考图`}
+                  referrerPolicy="no-referrer"
+                  className="h-48 w-full object-contain p-2"
+                />
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 bg-gradient-to-t from-black/60 to-transparent p-3 pt-8">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-white disabled:opacity-50"
+                  >
+                    替换图片
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    disabled={uploading}
+                    className="inline-flex items-center gap-1 rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-white disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    删除
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-500 transition hover:border-primary hover:bg-primary/5 hover:text-primary disabled:cursor-wait disabled:opacity-60"
+              >
+                <ImagePlus className="h-6 w-6" />
+                <span className="text-xs font-semibold">
+                  {uploading ? `上传中 ${uploadProgress}%` : '点击上传参考图片'}
+                </span>
+              </button>
+            )}
+            {uploading && imageUrl && (
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            )}
           </FormField>
           <FormField label="排序" hint="整数,数字越小排序越靠前,留空使用默认值 0">
             <input

@@ -1,73 +1,252 @@
-// src/components/CreateImageTask/center/StyleScenePoseRow.tsx
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, Image as ImageIcon } from 'lucide-react';
 import type { DictOption } from '../../../api/modules/dict';
+import { withCosThumbnail } from '../../../utils/cosImage';
 
 export interface StyleScenePoseRowProps {
-  // 数据
   styleOptions: DictOption[];
   sceneOptions: DictOption[];
-  poseOptions:  DictOption[];
-  // 加载态(来自 useDictOptions.loading)
+  poseOptions: DictOption[];
   loadingStyle?: boolean;
   loadingScene?: boolean;
-  loadingPose?:  boolean;
-  // 值与变更
-  style: string; scene: string; pose: string;
-  onStyleChange: (v: string) => void;
-  onSceneChange: (v: string) => void;
-  onPoseChange:  (v: string) => void;
+  loadingPose?: boolean;
+  style: string;
+  scene: string;
+  pose: string;
+  onStyleChange: (value: string) => void;
+  onSceneChange: (value: string) => void;
+  onPoseChange: (value: string) => void;
 }
 
-interface RenderSelectArgs {
+type PickerKind = 'style' | 'scene' | 'pose';
+
+const ASSET_ROOT = '/mock-assets/tag-icons';
+
+const DEMO_IMAGE_BY_CODE: Record<string, string> = {
+  SWEET_CREAMY: `${ASSET_ROOT}/style-sweet-creamy.png`,
+  QUIET_LUXURY: `${ASSET_ROOT}/style-quiet-luxury.png`,
+  VINTAGE_HOME: `${ASSET_ROOT}/style-vintage-home.png`,
+  EASTERN_MATURE: `${ASSET_ROOT}/style-eastern-mature.png`,
+  NEW_CHINESE_MINIMAL: `${ASSET_ROOT}/style-new-chinese-minimal.png`,
+  DOPAMINE_PLAYFUL: `${ASSET_ROOT}/style-dopamine-playful.png`,
+  DARK_GOTHIC: `${ASSET_ROOT}/style-dark-gothic.png`,
+  SWEET_COOL_STREET: `${ASSET_ROOT}/style-sweet-cool-street.png`,
+  FRENCH_FEMININE: `${ASSET_ROOT}/style-french-feminine.png`,
+  SWEET_INFLUENCER: `${ASSET_ROOT}/style-sweet-creamy.png`,
+  PURE_DESIRE: `${ASSET_ROOT}/style-french-feminine.png`,
+  MATURE: `${ASSET_ROOT}/style-eastern-mature.png`,
+  CHINESE_TRADITIONAL: `${ASSET_ROOT}/style-new-chinese-minimal.png`,
+
+  CREAMY_BEDROOM: `${ASSET_ROOT}/scene-creamy-bedroom.png`,
+  QUIET_WINDOW: `${ASSET_ROOT}/scene-quiet-window.png`,
+  VINTAGE_WOOD: `${ASSET_ROOT}/scene-vintage-wood.png`,
+  LIGHT_HOME: `${ASSET_ROOT}/scene-light-home.png`,
+  CHINESE_MINIMAL: `${ASSET_ROOT}/scene-chinese-minimal.png`,
+  COLORFUL_ROOM: `${ASSET_ROOT}/scene-colorful-room.png`,
+  DARK_HOME: `${ASSET_ROOT}/scene-dark-home.png`,
+  WHITE_STUDIO: `${ASSET_ROOT}/scene-white-studio.png`,
+  INDOOR: `${ASSET_ROOT}/scene-light-home.png`,
+  OUTDOOR: `${ASSET_ROOT}/scene-vintage-wood.png`,
+
+  NATURAL_STAND: `${ASSET_ROOT}/pose-natural-stand.svg`,
+  THREE_QUARTER: `${ASSET_ROOT}/pose-three-quarter.svg`,
+  BED_EDGE_SIT: `${ASSET_ROOT}/pose-bed-edge-sit.svg`,
+  WINDOW_WALK: `${ASSET_ROOT}/pose-window-walk.svg`,
+  SLEEVE_ADJUST: `${ASSET_ROOT}/pose-sleeve-adjust.svg`,
+  TURN_BACK: `${ASSET_ROOT}/pose-turn-back.svg`,
+  LOOK_BACK: `${ASSET_ROOT}/pose-look-back.svg`,
+  ACTION_POSE: `${ASSET_ROOT}/pose-natural-stand.svg`,
+};
+
+const FALLBACK_IMAGES: Record<PickerKind, string[]> = {
+  style: [
+    `${ASSET_ROOT}/style-sweet-creamy.png`,
+    `${ASSET_ROOT}/style-quiet-luxury.png`,
+    `${ASSET_ROOT}/style-vintage-home.png`,
+    `${ASSET_ROOT}/style-eastern-mature.png`,
+    `${ASSET_ROOT}/style-new-chinese-minimal.png`,
+  ],
+  scene: [
+    `${ASSET_ROOT}/scene-creamy-bedroom.png`,
+    `${ASSET_ROOT}/scene-quiet-window.png`,
+    `${ASSET_ROOT}/scene-vintage-wood.png`,
+    `${ASSET_ROOT}/scene-light-home.png`,
+    `${ASSET_ROOT}/scene-white-studio.png`,
+  ],
+  pose: [
+    `${ASSET_ROOT}/pose-natural-stand.svg`,
+    `${ASSET_ROOT}/pose-three-quarter.svg`,
+    `${ASSET_ROOT}/pose-bed-edge-sit.svg`,
+    `${ASSET_ROOT}/pose-window-walk.svg`,
+    `${ASSET_ROOT}/pose-sleeve-adjust.svg`,
+  ],
+};
+
+function optionImage(option: DictOption, kind: PickerKind, index: number): string {
+  return option.imageUrl
+    ?? DEMO_IMAGE_BY_CODE[option.value]
+    ?? FALLBACK_IMAGES[kind][index % FALLBACK_IMAGES[kind].length];
+}
+
+interface VisualTagPickerProps {
+  kind: PickerKind;
   label: string;
   value: string;
   options: DictOption[];
   loading?: boolean;
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
 }
 
-function renderSelect({ label, value, options, loading, onChange }: RenderSelectArgs) {
-  const isEmpty = !loading && options.length === 0;
-  const disabled = loading || isEmpty;
-  // 本组件 value 语义 = 中文 itemName(toDictOptions 的 opt.value 是 itemCode 英文枚举,
-  // 这里取 opt.label 即 itemName 作为 select value,保证提交到 prompt 拼接的是中文)
-  const valueInOptions = options.some((o) => o.label === value);
-  const placeholder = loading
-    ? '加载中…'
-    : isEmpty
-      ? '暂无数据,请联系管理员'
-      : null;
+function VisualTagPicker({
+  kind,
+  label,
+  value,
+  options,
+  loading,
+  onChange,
+}: VisualTagPickerProps) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const decoratedOptions = useMemo(
+    () => options.map((option, index) => ({
+      ...option,
+      resolvedImageUrl: optionImage(option, kind, index),
+    })),
+    [kind, options],
+  );
+  const selected = decoratedOptions.find((option) => option.label === value);
+  const isEmpty = !loading && decoratedOptions.length === 0;
+  const disabled = Boolean(loading || isEmpty);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   return (
-    <label className="block">
-      <span className="text-xs font-bold text-slate-700">{label}</span>
-      <select
-        className="mt-1.5 w-full h-9 px-2 rounded border border-slate-200 bg-white text-xs font-bold disabled:bg-slate-50 disabled:text-slate-400"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+    <div ref={rootRef} className="relative min-w-0">
+      <div className="mb-1.5 text-xs font-bold text-slate-700">{label}</div>
+      <button
+        type="button"
         disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+        className={`flex h-13 w-full items-center gap-2.5 rounded-xl border bg-white px-2.5 text-left transition ${
+          open
+            ? 'border-primary ring-2 ring-primary/10'
+            : 'border-slate-200 hover:border-primary/50 hover:bg-primary/5'
+        } disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400`}
       >
-        {placeholder !== null && <option value="">{placeholder}</option>}
-        {value && !valueInOptions && (
-          <option value={value}>{value} (已不在字典中)</option>
+        {selected ? (
+          <img
+            src={withCosThumbnail(selected.resolvedImageUrl, 64) ?? selected.resolvedImageUrl}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="h-9 w-9 shrink-0 rounded-lg border border-slate-100 bg-slate-50 object-contain p-0.5 shadow-sm"
+          />
+        ) : (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+            <ImageIcon className="h-4 w-4 text-slate-400" />
+          </span>
         )}
-        {options.map((opt) => (
-          <option key={opt.id} value={opt.label}>{opt.label}</option>
-        ))}
-      </select>
-    </label>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[10px] text-slate-400">{label}</span>
+          <span className="block truncate text-xs font-semibold text-slate-700">
+            {loading ? '加载中…' : isEmpty ? '暂无可用字典项' : selected?.label ?? value ?? '请选择'}
+          </span>
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && !disabled && (
+        <div className="absolute left-0 right-0 z-40 mt-2 max-h-80 min-w-[260px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
+          {decoratedOptions.map((option) => {
+            const active = option.label === value;
+            return (
+              <button
+                type="button"
+                key={option.id}
+                onClick={() => {
+                  onChange(option.label);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-3 rounded-xl p-2 text-left transition ${
+                  active ? 'bg-primary/10' : 'hover:bg-slate-50'
+                }`}
+              >
+                <img
+                  src={withCosThumbnail(option.resolvedImageUrl, 112) ?? option.resolvedImageUrl}
+                  alt=""
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  className="h-14 w-14 shrink-0 rounded-xl border border-slate-100 bg-slate-50 object-contain p-1"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-semibold text-slate-800">
+                    {option.label}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] text-slate-400">
+                    {option.description || `选择${option.label}作为${label}参考`}
+                  </span>
+                </span>
+                {active && <Check className="h-4 w-4 shrink-0 text-primary" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
 export const StyleScenePoseRow: React.FC<StyleScenePoseRowProps> = ({
-  styleOptions, sceneOptions, poseOptions,
-  loadingStyle, loadingScene, loadingPose,
-  style, scene, pose,
-  onStyleChange, onSceneChange, onPoseChange,
+  styleOptions,
+  sceneOptions,
+  poseOptions,
+  loadingStyle,
+  loadingScene,
+  loadingPose,
+  style,
+  scene,
+  pose,
+  onStyleChange,
+  onSceneChange,
+  onPoseChange,
 }) => (
-  <div className="grid md:grid-cols-3 gap-3">
-    {renderSelect({ label: '风格', value: style, options: styleOptions, loading: loadingStyle, onChange: onStyleChange })}
-    {renderSelect({ label: '场景', value: scene, options: sceneOptions, loading: loadingScene, onChange: onSceneChange })}
-    {renderSelect({ label: '姿势', value: pose,  options: poseOptions,  loading: loadingPose,  onChange: onPoseChange })}
+  <div className="grid gap-3 md:grid-cols-3">
+    <VisualTagPicker
+      kind="style"
+      label="风格"
+      value={style}
+      options={styleOptions}
+      loading={loadingStyle}
+      onChange={onStyleChange}
+    />
+    <VisualTagPicker
+      kind="scene"
+      label="场景"
+      value={scene}
+      options={sceneOptions}
+      loading={loadingScene}
+      onChange={onSceneChange}
+    />
+    <VisualTagPicker
+      kind="pose"
+      label="姿势"
+      value={pose}
+      options={poseOptions}
+      loading={loadingPose}
+      onChange={onPoseChange}
+    />
   </div>
 );

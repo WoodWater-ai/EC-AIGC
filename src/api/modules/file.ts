@@ -12,7 +12,7 @@ import http from '../client';
  * 不需要前端直接调 /file/confirm。
  */
 
-export type UploadTokenPurpose = 'AVATAR' | 'PRODUCT' | 'OTHER' | 'UP_DOWN_MERGE';
+export type UploadTokenPurpose = 'AVATAR' | 'PRODUCT' | 'DICT' | 'OTHER' | 'UP_DOWN_MERGE';
 
 export interface UploadTokenRequest {
   purpose: UploadTokenPurpose;
