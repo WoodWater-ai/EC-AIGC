@@ -77,16 +77,16 @@ export const Header: React.FC<HeaderProps> = ({
   const breadcrumb = getBreadcrumb();
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between select-none relative z-40">
+    <header className="relative z-40 flex h-14 items-center justify-between border-b border-border-main bg-white px-4 select-none sm:h-16 sm:px-6">
       {/* Left: Breadcrumbs */}
       <div className="flex items-center gap-2 text-xs text-slate-400">
-        <span className="font-medium hover:text-slate-600 transition-colors cursor-pointer">{breadcrumb.parent}</span>
-        <span className="material-symbols-outlined text-xs">chevron_right</span>
-        <span className="text-[#0B1C30] font-bold text-sm tracking-tight">{breadcrumb.child}</span>
+        <span className="hidden cursor-pointer font-medium transition-colors hover:text-text-main sm:inline">{breadcrumb.parent}</span>
+        <span className="material-symbols-outlined hidden text-xs sm:inline">chevron_right</span>
+        <span className="text-sm font-bold tracking-tight text-text-main">{breadcrumb.child}</span>
       </div>
 
       {/* Center & Right Area */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2 sm:gap-6">
 
         {/* Action icons */}
         <div className="flex items-center gap-1">
@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="px-3.5 py-1.5 rounded-lg bg-primary-light text-primary hover:bg-primary/15 active:scale-97 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all duration-150"
               >
                 <span className="material-symbols-outlined text-sm font-bold">add</span>
-                <span>新建任务</span>
+                <span className="hidden sm:inline">新建任务</span>
                 <span className="material-symbols-outlined text-xs">keyboard_arrow_down</span>
               </button>
 
@@ -139,7 +139,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           {/* Separation line */}
-          <span className="w-px h-5 bg-slate-200 mx-2" />
+          <span className="mx-1 hidden h-5 w-px bg-border-main sm:mx-2 sm:inline" />
 
           {/* Notification Button */}
           <div className="relative">
@@ -166,7 +166,7 @@ export const Header: React.FC<HeaderProps> = ({
             {showNotificationPanel && (
               <div className="absolute right-0 mt-2 w-96 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                  <span className="text-sm font-bold text-[#0B1C30]">系统消息通知 ({unreadCount})</span>
+                  <span className="text-sm font-bold text-text-main">系统消息通知 ({unreadCount})</span>
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}

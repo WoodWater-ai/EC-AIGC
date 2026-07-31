@@ -343,7 +343,7 @@ export default function App() {
 
   // ===== 主分支：登录后的工作台 =====
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-base font-sans antialiased text-[#0B1C30]" id="app-root-container">
+    <div className="flex h-screen overflow-hidden bg-bg-base font-sans antialiased text-text-main" id="app-root-container">
 
       {/* 1. Sidebar Nav */}
       <Sidebar
@@ -373,7 +373,7 @@ export default function App() {
         />
 
         {/* Scrollable Workspace panel */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8" id="main-content-scroll">
+        <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-5 sm:pb-24 lg:p-8 lg:pb-8" id="main-content-scroll">
           {renderScreenContent()}
         </main>
       </div>

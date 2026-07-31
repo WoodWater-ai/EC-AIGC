@@ -36,49 +36,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { screen: AppScreen.DICT_ITEM, label: '字典管理', icon: 'menu_book' },
   ];
 
+  const mobileMenuItems = menuItems.filter((item) =>
+    [AppScreen.DASHBOARD, AppScreen.TASKS, AppScreen.TEMPLATES, AppScreen.ASSETS].includes(item.screen)
+  );
+
   return (
-    <aside className="w-68 bg-[#0B1C30] text-slate-300 flex flex-col justify-between select-none shrink-0 h-screen overflow-y-auto border-r border-slate-800">
+    <>
+    <aside className="hidden h-screen w-56 shrink-0 flex-col justify-between overflow-y-auto border-r border-[#302d29] bg-bg-dark text-stone-300 select-none lg:flex">
       {/* Top Brand Section */}
       <div>
-        <div className="p-6 border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0256FF] to-[#3B82F6] flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <span className="material-symbols-outlined font-bold text-white text-xl">blur_on</span>
+        <div className="border-b border-[#302d29] p-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary shadow-[3px_3px_0_rgba(216,92,66,0.22)]">
+              <span className="material-symbols-outlined text-lg font-bold text-white">blur_on</span>
             </div>
             <div>
-              <h1 className="text-white font-bold font-display text-base tracking-wide leading-none">达芬奇密码 AI</h1>
-              <span className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">DaVinci Code v2.0</span>
+              <h1 className="font-display text-[13px] font-bold leading-none tracking-wide text-white">达芬奇密码 AI</h1>
+              <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-stone-500">WORKBENCH</span>
             </div>
           </div>
         </div>
 
         {/* Global Action Button with dropdown */}
-        <div className="p-4 relative">
+        <div className="relative p-3">
           <button
             onClick={() => setShowCreateDropdown(!showCreateDropdown)}
-            className="w-full h-11 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-600 active:scale-98 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/10 cursor-pointer transition-all duration-150"
+            className="flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md bg-primary text-xs font-bold text-white shadow-[0_6px_16px_rgba(216,92,66,0.18)] transition-all duration-150 hover:bg-primary-hover active:scale-[0.98]"
             id="sidebar-create-btn"
           >
             <span className="material-symbols-outlined text-lg">add_circle</span>
-            开始智能创作
-            <span className="material-symbols-outlined text-xs transition-transform duration-200" style={{ transform: showCreateDropdown ? 'rotate(180deg)' : 'rotate(0)' }}>keyboard_arrow_down</span>
+            新建创作
+            <span className="material-symbols-outlined text-[15px] transition-transform duration-200" style={{ transform: showCreateDropdown ? 'rotate(180deg)' : 'rotate(0)' }}>keyboard_arrow_down</span>
           </button>
 
           {showCreateDropdown && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowCreateDropdown(false)} />
-              <div className="absolute top-16 left-4 right-4 bg-[#112239] border border-slate-800/80 rounded-xl p-1.5 shadow-2xl z-50 text-xs text-slate-300 animate-fadeIn">
+              <div className="absolute left-3 right-3 top-14 z-50 animate-fadeIn rounded-md border border-[#48423d] bg-[#302d29] p-1.5 text-xs text-stone-300 shadow-2xl">
                 <button
                   onClick={() => {
                     setScreen(AppScreen.CREATE_IMAGE_TASK);
                     setShowCreateDropdown(false);
                   }}
-                  className="w-full flex items-center gap-3 p-2.5 rounded-lg text-left hover:bg-[#182a42] transition-all group cursor-pointer"
+                  className="group flex w-full cursor-pointer gap-2.5 rounded-md p-2.5 text-left transition-all hover:bg-[#403a35]"
                 >
                   <span className="material-symbols-outlined text-primary text-lg group-hover:scale-110 transition-transform">image</span>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-white text-[11px]">新建图片生成任务</p>
-                    <p className="text-[9px] text-slate-500 truncate mt-0.5">多维智能模板背景融合合成</p>
+                    <p className="mt-0.5 truncate text-[9px] text-stone-500">多维智能模板背景融合合成</p>
                   </div>
                 </button>
                 <button
@@ -86,12 +91,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     setScreen(AppScreen.CREATE_VIDEO_TASK);
                     setShowCreateDropdown(false);
                   }}
-                  className="w-full flex items-center gap-3 p-2.5 rounded-lg text-left hover:bg-[#182a42] transition-all group mt-1 cursor-pointer"
+                  className="group mt-1 flex w-full cursor-pointer gap-2.5 rounded-md p-2.5 text-left transition-all hover:bg-[#403a35]"
                 >
                   <span className="material-symbols-outlined text-success text-lg group-hover:scale-110 transition-transform">video_library</span>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-white text-[11px]">新建视频生成任务</p>
-                    <p className="text-[9px] text-slate-500 truncate mt-0.5">分镜脚本多层轨道动感视频</p>
+                    <p className="mt-0.5 truncate text-[9px] text-stone-500">分镜脚本多层轨道动感视频</p>
                   </div>
                 </button>
               </div>
@@ -100,28 +105,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Menu Items List */}
-        <nav className="px-3 space-y-1">
-          <span className="text-[10px] font-semibold text-slate-500 tracking-wider px-3 block mb-2 uppercase">主模块导航</span>
+        <nav className="space-y-0.5 px-2">
+          <span className="mb-1.5 block px-2.5 text-[9px] font-bold uppercase tracking-[0.12em] text-stone-500">主模块</span>
           {menuItems.map((item) => {
             const isActive = currentScreen === item.screen;
             return (
               <button
                 key={item.screen}
                 onClick={() => setScreen(item.screen)}
-                className={`w-full h-10 px-3 rounded-lg flex items-center justify-between font-medium text-sm cursor-pointer transition-all duration-150 group ${
+                className={`group flex h-9 w-full cursor-pointer items-center justify-between rounded-md px-2.5 text-left text-xs font-medium transition-all duration-150 ${
                   isActive
-                    ? 'bg-[#1e2d45] text-white'
-                    : 'text-slate-400 hover:bg-[#142337] hover:text-slate-200'
+                    ? 'bg-[#37322e] text-white'
+                    : 'text-stone-400 hover:bg-[#2a2724] hover:text-stone-100'
                 }`}
                 id={`menu-item-${item.screen.toLowerCase()}`}
               >
-                <div className="flex items-center gap-3">
-                  <span className={`material-symbols-outlined text-lg transition-colors ${
-                    isActive ? 'text-primary' : 'text-slate-500 group-hover:text-slate-400'
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className={`material-symbols-outlined text-[17px] transition-colors ${
+                    isActive ? 'text-primary' : 'text-stone-500 group-hover:text-stone-300'
                   }`}>
                     {item.icon}
                   </span>
-                  <span>{item.label}</span>
+                  <span className="truncate">{item.label}</span>
                 </div>
                 {isActive && (
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
@@ -132,24 +137,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
 
         {/* Shortcuts / Utilities */}
-        <div className="mt-6 px-3">
-          <span className="text-[10px] font-semibold text-slate-500 tracking-wider px-3 block mb-2 uppercase">快捷工具箱</span>
+        <div className="mt-5 px-2">
+          <span className="mb-1.5 block px-2.5 text-[9px] font-bold uppercase tracking-[0.12em] text-stone-500">快捷工具</span>
           <button
             onClick={openTransit}
-            className="w-full h-9 px-3 rounded-lg flex items-center gap-3 font-medium text-sm text-slate-400 hover:bg-[#142337] hover:text-slate-200 cursor-pointer transition-all duration-150"
+            className="flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-xs font-medium text-stone-400 transition-all duration-150 hover:bg-[#2a2724] hover:text-stone-100"
           >
-            <span className="material-symbols-outlined text-lg text-slate-500">grid_view</span>
+            <span className="material-symbols-outlined text-lg text-stone-500">grid_view</span>
             资源中心
           </button>
         </div>
       </div>
 
       {/* User Session Swapper Section */}
-      <div className="p-4 border-t border-slate-800/80 bg-[#081525]">
+      <div className="border-t border-[#302d29] bg-[#191816] p-3">
         <div className="relative">
           {showUserDropdown && (
-            <div className="absolute bottom-14 left-0 w-full bg-[#112239] border border-slate-800 rounded-xl p-2 shadow-xl z-50">
-              <span className="text-[10px] text-slate-500 block px-2 pb-1.5 border-b border-slate-800 mb-1">切换协作账号角色</span>
+            <div className="absolute bottom-12 left-0 z-50 w-full rounded-md border border-[#48423d] bg-[#302d29] p-2 shadow-xl">
+              <span className="mb-1 block border-b border-[#48423d] px-2 pb-1.5 text-[10px] text-stone-500">切换协作账号角色</span>
               {users.map((u) => (
                 <button
                   key={u.id}
@@ -158,13 +163,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     setShowUserDropdown(false);
                   }}
                   className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition-all ${
-                    currentUser.id === u.id ? 'bg-[#1e2d45] text-white' : 'hover:bg-[#182a42] text-slate-300'
+                    currentUser.id === u.id ? 'bg-[#403a35] text-white' : 'text-stone-300 hover:bg-[#403a35]'
                   }`}
                 >
                   <img src={u.avatar} alt={u.name} className="w-7 h-7 rounded-full object-cover" referrerPolicy="no-referrer" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold truncate">{u.name}</p>
-                    <p className="text-[10px] text-slate-500">{u.role}</p>
+                    <p className="text-[10px] text-stone-500">{u.role}</p>
                   </div>
                   {currentUser.id === u.id && (
                     <span className="material-symbols-outlined text-success text-sm font-bold">check</span>
@@ -176,27 +181,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <div
             onClick={() => setShowUserDropdown(!showUserDropdown)}
-            className="flex items-center gap-3 p-2 rounded-xl hover:bg-[#142337] cursor-pointer transition-all duration-150"
+            className="flex cursor-pointer items-center gap-2.5 rounded-md p-2 transition-all duration-150 hover:bg-[#2a2724]"
           >
             <div className="relative">
               <img
                 src={currentUser.avatar || undefined}
                 alt={currentUser.name}
-                className="w-9 h-9 rounded-full object-cover border border-slate-700"
+                className="h-8 w-8 rounded-full border border-[#48423d] object-cover"
                 referrerPolicy="no-referrer"
               />
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-success border-2 border-[#0B1C30]" />
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-bg-dark bg-success" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-white truncate leading-none mb-1">{currentUser.name}</p>
-                <span className="material-symbols-outlined text-slate-500 text-xs">unfold_more</span>
+                <p className="mb-1 truncate text-xs font-bold leading-none text-white">{currentUser.name}</p>
+                <span className="material-symbols-outlined text-xs text-stone-500">unfold_more</span>
               </div>
-              <p className="text-[10px] text-slate-400 leading-none truncate">{currentUser.role}</p>
+              <p className="truncate text-[10px] leading-none text-stone-400">{currentUser.role}</p>
             </div>
           </div>
         </div>
       </div>
     </aside>
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex h-[68px] items-center justify-around border-t border-border-main bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0px)] shadow-[0_-8px_24px_rgba(53,44,37,0.08)] backdrop-blur lg:hidden" aria-label="移动端主导航">
+      {mobileMenuItems.map((item) => {
+        const isActive = currentScreen === item.screen;
+        return (
+          <button
+            key={item.screen}
+            onClick={() => setScreen(item.screen)}
+            className={`flex min-w-14 flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] font-bold transition-colors ${
+              isActive ? 'text-primary' : 'text-stone-400'
+            }`}
+          >
+            <span className={`material-symbols-outlined text-[21px] ${isActive ? 'text-primary' : 'text-stone-500'}`}>
+              {item.icon}
+            </span>
+            {item.label.replace('工作台首页', '首页').replace('智能模板中心', '模板').replace('商品素材库', '素材')}
+          </button>
+        );
+      })}
+    </nav>
+    </>
   );
 };

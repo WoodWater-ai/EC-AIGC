@@ -62,7 +62,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Time Grain Selector and Analytics Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs gap-4">
         <div>
-          <h2 className="text-sm font-extrabold text-[#0B1C30] flex items-center gap-1.5">
+          <h2 className="flex items-center gap-1.5 text-sm font-extrabold text-text-main">
             <span className="material-symbols-outlined text-primary text-xl font-bold">monitoring</span>
             智能生成多维数据看板
           </h2>
@@ -77,7 +77,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               onClick={() => setTimeFilter(filter)}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
                 timeFilter === filter
-                  ? 'bg-white text-[#0B1C30] shadow-sm font-black'
+                  ? 'bg-white text-text-main shadow-sm font-black'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -100,7 +100,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </span>
             <span className="text-[9px] text-slate-400 block mt-1 font-medium">{activeMetrics.images.sub}</span>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-primary flex items-center justify-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
             <span className="material-symbols-outlined text-2xl">photo_library</span>
           </div>
         </div>
@@ -162,7 +162,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           
           {/* Active Generation Task Monitor */}
           {runningTasks.length > 0 && (
-            <div className="bg-gradient-to-r from-slate-900 via-[#0B1C30] to-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-xl relative overflow-hidden">
+            <div className="relative overflow-hidden rounded-2xl border border-stone-800 bg-gradient-to-r from-stone-900 via-bg-dark to-stone-900 p-5 text-white shadow-xl">
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -z-10" />
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
@@ -207,7 +207,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     {/* Progress Bar with Glow */}
                     <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mt-2 relative">
                       <div
-                        className="bg-gradient-to-r from-primary to-blue-400 h-full rounded-full transition-all duration-300"
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-orange-300 transition-all duration-300"
                         style={{ width: `${task.progress}%` }}
                       />
                     </div>
@@ -226,7 +226,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
             <div className="flex justify-between items-center mb-5">
               <div>
-                <h3 className="text-base font-bold text-[#0B1C30]">最近产出高保真广告素材</h3>
+                <h3 className="text-base font-bold text-text-main">最近产出高保真广告素材</h3>
                 <p className="text-xs text-slate-400 mt-1">此处展示已审核通过、并自动完成智能排版的素材。可随时加入资源中心。</p>
               </div>
               <button
@@ -262,7 +262,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                   <div className="flex-1 min-w-0 flex flex-col justify-between">
                     <div>
-                      <h4 className="text-xs font-bold text-[#0B1C30] truncate group-hover:text-primary transition-colors">{product.name}</h4>
+                      <h4 className="truncate text-xs font-bold text-text-main transition-colors group-hover:text-primary">{product.name}</h4>
                       <p className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: {product.sku}</p>
                     </div>
                     
@@ -287,7 +287,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Action Hub - ToDo List */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-bold text-[#0B1C30] flex items-center gap-1.5">
+              <h3 className="flex items-center gap-1.5 text-sm font-bold text-text-main">
                 <span className="material-symbols-outlined text-lg text-primary">playlist_add_check</span>
                 协作待办与提案
               </h3>
@@ -324,7 +324,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Prompt / Creative Suggestions Card */}
-          <div className="bg-gradient-to-br from-[#EBF2FF] to-white rounded-2xl p-5 border border-blue-100/80 shadow-sm relative overflow-hidden">
+          <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary-light to-white p-5 shadow-sm">
             <div className="absolute -bottom-10 -right-10 w-28 h-28 bg-primary/5 rounded-full blur-xl" />
             <h3 className="text-sm font-bold text-primary flex items-center gap-1.5 mb-2">
               <span className="material-symbols-outlined text-lg">lightbulb_circle</span>
