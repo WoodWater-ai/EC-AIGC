@@ -115,6 +115,81 @@ export interface GeneratedImageResult {
   sourceFileName?: string;
 }
 
+/** 模板营地中的媒体类型。图片与视频使用同一套模板资产和版本规则。 */
+export type TemplateMediaType = 'image' | 'video';
+
+export interface TemplateReferenceSnapshot {
+  id: string;
+  name: string;
+  url: string;
+  role: 'model' | 'style' | 'scene' | 'pose' | 'detail' | 'first_frame' | 'action';
+}
+
+/** 从已完成任务固化的不可变创作上下文，普通使用者不会直接编辑。 */
+export interface TemplateGenerationSnapshot {
+  prompt: string;
+  negativePrompt?: string;
+  references: TemplateReferenceSnapshot[];
+  ratio: string;
+  resolution: string;
+  count?: number;
+  imageType?: ImageGenerationType;
+  videoMode?: VideoTaskMode;
+  duration?: number;
+  motion?: '轻微' | '适中' | '强烈';
+  modelName?: string;
+  /** 爆款复刻模板固化的来源视频；使用模板时仅替换商品等可变素材。 */
+  trendingSource?: VideoSourceAsset;
+}
+
+export interface ResultTemplate {
+  id: string;
+  name: string;
+  mediaType: TemplateMediaType;
+  status: 'active' | 'disabled';
+  version: number;
+  coverUrl: string;
+  previewUrls: string[];
+  description: string;
+  category: string;
+  usage: string;
+  style: string;
+  creator: string;
+  usageCount: number;
+  /** 可公开展示的互动指标；正式环境由模板互动接口返回。 */
+  viewCount: number;
+  favoriteCount: number;
+  sourceTaskId: string;
+  sourceResultId?: string;
+  /** 发布模板时固化，供模板营地直接说明可替换的商品主体。 */
+  sourceProductName?: string;
+  /** 视频模板悬停播放的轻量预览；没有时使用静态封面。 */
+  hoverPreviewUrl?: string;
+  createdAt: string;
+  snapshot: TemplateGenerationSnapshot;
+}
+
+export interface PendingItem {
+  id: string;
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  category: 'task' | 'asset' | 'system';
+  time: string;
+  read: boolean;
+  taskId?: string;
+  groupId?: string;
+  mediaType?: TemplateMediaType;
+  targetScreen?: AppScreen;
+}
+
+/** 首页和待处理中心跳入既有任务详情抽屉的临时导航上下文。 */
+export interface TaskDetailNavigation {
+  taskId: string;
+  groupId?: string;
+  mediaType: TemplateMediaType;
+}
+
 /** 视频工作台的进入方式。只有审核通过图片入口可以预填素材。 */
 export type VideoTaskEntryContext =
   | { kind: 'blank' }
@@ -190,6 +265,7 @@ export interface GenerationTask {
   productName: string;
   productImg: string;
   templateName: string;
+  appliedTemplate?: { id: string; name: string; version: number };
   timestamp: string;
   creator: string;
   resultUrl?: string;

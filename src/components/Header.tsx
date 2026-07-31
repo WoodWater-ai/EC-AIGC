@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppScreen, SystemNotification, SystemUser } from '../types';
+import { AppScreen, PendingItem, SystemUser } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { toast } from 'sonner';
 
@@ -7,22 +7,27 @@ interface HeaderProps {
   currentScreen: AppScreen;
   setScreen: (screen: AppScreen) => void;
   currentUser: SystemUser;
-  notifications: SystemNotification[];
+  pendingItems: PendingItem[];
+  pendingPanelOpen: boolean;
+  setPendingPanelOpen: (open: boolean) => void;
   markAllAsRead: () => void;
+  onPendingItemClick: (item: PendingItem) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentScreen,
   setScreen,
   currentUser,
-  notifications,
-  markAllAsRead
+  pendingItems,
+  pendingPanelOpen,
+  setPendingPanelOpen,
+  markAllAsRead,
+  onPendingItemClick,
 }) => {
   const { logout } = useAuth();
-  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = pendingItems.filter((item) => !item.read).length;
 
   /**
    * 退出登录
@@ -73,16 +78,16 @@ export const Header: React.FC<HeaderProps> = ({
   const breadcrumb = getBreadcrumb();
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between select-none relative z-40">
+    <header className="relative z-40 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 select-none sm:h-16 sm:px-6">
       {/* Left: Breadcrumbs */}
       <div className="flex items-center gap-2 text-xs text-slate-400">
-        <span className="font-medium hover:text-slate-600 transition-colors cursor-pointer">{breadcrumb.parent}</span>
-        <span className="material-symbols-outlined text-xs">chevron_right</span>
+        <span className="hidden cursor-pointer font-medium transition-colors hover:text-slate-600 sm:inline">{breadcrumb.parent}</span>
+        <span className="material-symbols-outlined hidden text-xs sm:inline">chevron_right</span>
         <span className="text-[#0B1C30] font-bold text-sm tracking-tight">{breadcrumb.child}</span>
       </div>
 
       {/* Center & Right Area */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2 sm:gap-6">
 
         {/* Action icons */}
         <div className="flex items-center gap-1">
@@ -94,7 +99,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="px-3.5 py-1.5 rounded-lg bg-primary-light text-primary hover:bg-primary/15 active:scale-97 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all duration-150"
               >
                 <span className="material-symbols-outlined text-sm font-bold">add</span>
-                <span>新建任务</span>
+                <span className="hidden sm:inline">新建任务</span>
                 <span className="material-symbols-outlined text-xs">keyboard_arrow_down</span>
               </button>
 
@@ -135,19 +140,16 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           {/* Separation line */}
-          <span className="w-px h-5 bg-slate-200 mx-2" />
+          <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:mx-2 sm:inline" />
 
           {/* Notification Button */}
           <div className="relative">
             <button
               onClick={() => {
-                setShowNotificationPanel(!showNotificationPanel);
-                if (!showNotificationPanel && unreadCount > 0) {
-                  // Open
-                }
+                setPendingPanelOpen(!pendingPanelOpen);
               }}
               className={`w-9 h-9 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
-                showNotificationPanel ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                pendingPanelOpen ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
               }`}
             >
               <span className="material-symbols-outlined text-xl">notifications</span>
@@ -159,10 +161,10 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             {/* Notification Dropdown Panel */}
-            {showNotificationPanel && (
+            {pendingPanelOpen && (
               <div className="absolute right-0 mt-2 w-96 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                  <span className="text-sm font-bold text-[#0B1C30]">系统消息通知 ({unreadCount})</span>
+                  <span className="text-sm font-bold text-[#0B1C30]">待处理 ({unreadCount})</span>
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
@@ -173,28 +175,24 @@ export const Header: React.FC<HeaderProps> = ({
                   )}
                 </div>
                 <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
-                  {notifications.length === 0 ? (
-                    <div className="p-6 text-center text-slate-400 text-xs">目前暂无任何消息</div>
+                  {pendingItems.length === 0 ? (
+                    <div className="p-6 text-center text-slate-400 text-xs">目前没有待处理事项</div>
                   ) : (
-                    notifications.map((notif) => (
-                      <div key={notif.id} className={`p-3.5 transition-colors hover:bg-slate-50 ${!notif.read ? 'bg-blue-50/30' : ''}`}>
+                    pendingItems.map((item) => (
+                      <button type="button" onClick={() => onPendingItemClick(item)} key={item.id} className={`w-full p-3.5 text-left transition-colors hover:bg-slate-50 ${!item.read ? 'bg-blue-50/30' : ''}`}>
                         <div className="flex gap-2.5">
                           <span className={`material-symbols-outlined text-lg shrink-0 mt-0.5 ${
-                            notif.type === 'success' ? 'text-success' :
-                            notif.type === 'error' ? 'text-danger' :
-                            notif.type === 'warning' ? 'text-warning' : 'text-info'
+                            item.priority === 'high' ? 'text-danger' : item.priority === 'medium' ? 'text-warning' : 'text-info'
                           }`}>
-                            {notif.type === 'success' ? 'check_circle' :
-                             notif.type === 'error' ? 'error' :
-                             notif.type === 'warning' ? 'warning' : 'info'}
+                            {item.category === 'task' ? 'assignment_late' : item.category === 'asset' ? 'image_search' : 'info'}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-slate-800 leading-tight mb-1">{notif.title}</p>
-                            <p className="text-xs text-slate-500 leading-normal">{notif.content}</p>
-                            <span className="text-[10px] text-slate-400 block mt-1.5 font-mono">{notif.time}</span>
+                            <p className="text-xs font-bold text-slate-800 leading-tight mb-1">{item.title}</p>
+                            <p className="text-xs text-slate-500 leading-normal">{item.description}</p>
+                            <span className="text-[10px] text-slate-400 block mt-1.5 font-mono">{item.time}</span>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     ))
                   )}
                 </div>
@@ -202,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     onClick={() => {
                       setScreen(AppScreen.TASKS);
-                      setShowNotificationPanel(false);
+                      setPendingPanelOpen(false);
                     }}
                     className="text-xs text-slate-500 hover:text-slate-800 font-medium transition-colors cursor-pointer"
                   >

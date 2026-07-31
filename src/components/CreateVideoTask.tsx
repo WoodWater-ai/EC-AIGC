@@ -293,7 +293,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                     : 'text-[#424655] hover:text-[#0b1c30]'
                 }`}
               >
-                参考图生视频 ({selectedCount}/7)
+                真人图参考 ({selectedCount}/7)
               </button>
               <button 
                 onClick={() => setActiveTab('first')}

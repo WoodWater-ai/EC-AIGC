@@ -6,11 +6,13 @@ import {
   ImageGenerationType,
   IMAGE_GENERATION_TYPE_LABELS,
   ProductAsset,
+  ResultTemplate,
   VisualPromptTagOption,
 } from '../types';
 import { mockImagePromptVisualTags, mockModelChannels, mockReferenceAnalysisByFileId } from '../mockData';
 import type { AssetResourceItem } from '../api/modules/asset';
 import { ExecutionConfirmDialog } from './ExecutionConfirmDialog';
+import { TemplatePickerDrawer } from './TemplatePickerDrawer';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
@@ -19,6 +21,9 @@ interface CreateImageTaskProps {
   openTransit: (onConfirmSelection: (assets: AssetResourceItem[]) => void, targetSlot?: string) => void;
   selectedProduct: ProductAsset;
   setSelectedProduct: (product: ProductAsset) => void;
+  templates: ResultTemplate[];
+  selectedTemplate: ResultTemplate | null;
+  onTemplateApplied: () => void;
 }
 
 type ReferenceSlot = 'detail' | 'style' | 'scene' | 'pose' | 'model';
@@ -210,6 +215,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   openTransit,
   selectedProduct,
   setSelectedProduct,
+  templates,
+  selectedTemplate,
+  onTemplateApplied,
 }) => {
   const [selectedTypes, setSelectedTypes] = useState<ImageGenerationType[]>(['product_main']);
   const [typeCounts, setTypeCounts] = useState<Record<ImageGenerationType, number>>({
@@ -238,6 +246,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   const [executionConfirmOpen, setExecutionConfirmOpen] = useState(false);
   const [readinessIssue, setReadinessIssue] = useState('');
   const [factsCopyState, setFactsCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [appliedTemplateName, setAppliedTemplateName] = useState<string | null>(null);
 
   const channel = mockModelChannels.find((item) => item.id === channelId) ?? mockModelChannels[0];
   const model = channel.models.find((item) => item.id === modelId) ?? channel.models[0];
@@ -298,6 +308,36 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     setProductFacts(createProductFacts(asset, linkedProduct));
     clearPromptState();
   };
+
+  const applyTemplate = (template: ResultTemplate) => {
+    const snapshot = template.snapshot;
+    const imageType = snapshot.imageType ?? 'product_main';
+    const allowedReferences = snapshot.references.filter((reference): reference is typeof reference & { role: ReferenceSlot } => REFERENCE_SLOTS.some((slot) => slot.id === reference.role));
+    const nextReferences = Object.fromEntries(allowedReferences.map((reference) => [reference.role, {
+      id: reference.id, role: REFERENCE_SLOTS.find((slot) => slot.id === reference.role)?.role ?? '参考图', name: reference.name, thumbnailUrl: reference.url,
+    }])) as Partial<Record<ReferenceSlot, TaskReference>>;
+    const nextOrder = Object.fromEntries(allowedReferences.map((reference, index) => [reference.role, index + 1])) as Partial<Record<ReferenceSlot, number>>;
+    setSelectedTypes([imageType]);
+    setTypeCounts((current) => ({ ...current, [imageType]: Math.max(MIN_TYPE_COUNT, Math.min(MAX_TYPE_COUNT, snapshot.count ?? 1)) }));
+    setRatio(snapshot.ratio);
+    setResolution(snapshot.resolution);
+    setReferences(nextReferences);
+    setReferenceOrder(nextOrder);
+    setPromptOverrides({ [imageType]: snapshot.prompt });
+    setManualPromptTypes({ [imageType]: false });
+    setAiSuggestions({});
+    setOpenSuggestions({});
+    setAssistantState('ready');
+    setAppliedTemplateName(template.name);
+    setTemplatePickerOpen(false);
+    setReadinessIssue('');
+  };
+
+  useEffect(() => {
+    if (!selectedTemplate || selectedTemplate.mediaType !== 'image') return;
+    applyTemplate(selectedTemplate);
+    onTemplateApplied();
+  }, [selectedTemplate?.id]);
 
   const toOrderedReferences = (
     nextReferences: Partial<Record<ReferenceSlot, TaskReference>>,
@@ -531,7 +571,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
         progress: 0,
         productName: subjectName,
         productImg: mainAsset.thumbnailUrl ?? selectedMainProduct?.thumbnail ?? selectedProduct.thumbnail,
-        templateName: 'AI 商品图片工作流',
+        templateName: appliedTemplateName ?? 'AI 商品图片工作流',
         timestamp: now,
         creator: '陆永奇',
         modelChannel: `${channel.name} / ${model.name}`,
@@ -571,11 +611,13 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
         </div>
         <div className="flex items-center gap-4">
           <span className="text-xs text-slate-500">{selectedTypes.length} 个类型 · 共 {totalCount} 张</span>
+          <button onClick={() => setTemplatePickerOpen(true)} className="h-9 rounded-md border border-primary px-3 text-xs font-bold text-primary">模板</button>
           <button onClick={checkAndGenerate} className="h-9 rounded-md bg-primary px-4 text-xs font-bold text-white shadow-sm">生成</button>
         </div>
       </header>
 
       {readinessIssue && <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-6 py-2 text-[11px] font-bold text-amber-700"><span className="material-symbols-outlined mr-1 align-middle text-sm">error</span>{readinessIssue}</div>}
+      {appliedTemplateName && <div className="shrink-0 border-b border-blue-100 bg-blue-50 px-6 py-2 text-[11px] font-bold text-primary">已应用模板「{appliedTemplateName}」，请替换主体素材后生成。</div>}
 
       <main className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[260px_minmax(480px,1fr)_300px]">
         <section id="image-source-section" className="min-w-0 space-y-3">
@@ -665,6 +707,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
       </main>
 
       {executionConfirmOpen && <ExecutionConfirmDialog title={`确认生成 ${selectedTypes.length} 个图片类型`} description="已按当前 Prompt、模型能力与结构化输出参数完成预检。确认费用后，任务将进入排队。" estimatedCost={`¥ ${(model.cost * totalCount).toFixed(2)}`} estimatedDuration={`${Math.max(1, Math.ceil(totalCount / 2))}–${Math.max(2, Math.ceil(totalCount * 0.8))} 分钟`} healthLabel={channel.health === 'healthy' ? '服务健康' : '额度偏低'} healthDetail={channel.quotaText} fallbackPolicy="同配置最多自动重试 1 次；仍失败则停止并通知，不自动切换其他付费通道。" summary={[{ label: '图片类型', value: selectedTypes.map((type) => IMAGE_GENERATION_TYPE_LABELS[type]).join('、') }, { label: '主体素材', value: subjectName }, { label: '模型', value: model.name }, { label: '输出规格', value: `${ratio} · ${resolution} · ${totalCount} 张` }]} requestLines={[`参考图：${orderedReferences.length ? orderedReferences.map((item) => `${item.position}.${item.role}`).join('、') : '未使用参考图'}`, `参数：ratio=${ratio}，resolution=${resolution}，count=${totalCount}`]} onCancel={() => setExecutionConfirmOpen(false)} onConfirm={submitTasks} />}
+      <TemplatePickerDrawer open={templatePickerOpen} templates={templates} mediaType="image" onClose={() => setTemplatePickerOpen(false)} onSelect={applyTemplate} />
     </div>
   );
 };

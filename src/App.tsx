@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { AppScreen, GenerationTask, ModelProfile, ProductAsset, SystemUser, SystemNotification, VideoTaskEntryContext } from './types';
+import { toast } from 'sonner';
+import { templatePublishBlockReason } from './templateUtils';
+import { AppScreen, GenerationTask, ModelProfile, PendingItem, ProductAsset, ResultTemplate, SystemUser, TaskDetailNavigation, VideoTaskEntryContext } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -33,7 +35,8 @@ import type { AssetResourceItem } from './api/modules/asset';
 import {
   mockTasks,
   mockProducts,
-  mockNotifications,
+  mockPendingItems,
+  mockResultTemplates,
   mockAssetResources,
   mockModelProfiles,
 } from './mockData';
@@ -80,7 +83,7 @@ function adaptAuthUser(authUser: ReturnType<typeof useAuth>['user']): SystemUser
 }
 
 export default function App() {
-  const { user, isAuthenticated, initializing, logout } = useAuth();
+  const { user, isAuthenticated, initializing, logout, hasPermission } = useAuth();
 
   // 初次加载默认 DASHBOARD —— initializing=true 时显示 spinner 不进 switch；
   // initializing=false 后根据 isAuthenticated 决定 LOGIN 还是 DASHBOARD。
@@ -90,7 +93,13 @@ export default function App() {
   // Core local states
   const [tasks, setTasks] = useState<GenerationTask[]>(mockTasks);
   const [products, setProducts] = useState<ProductAsset[]>(mockProducts);
-  const [notifications, setNotifications] = useState<SystemNotification[]>(mockNotifications);
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>(mockPendingItems);
+  const [resultTemplates, setResultTemplates] = useState<ResultTemplate[]>(mockResultTemplates);
+  const [favoriteTemplateIds, setFavoriteTemplateIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [publishedTemplateTaskIds, setPublishedTemplateTaskIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [pendingTemplate, setPendingTemplate] = useState<ResultTemplate | null>(null);
+  const [taskDetailNavigation, setTaskDetailNavigation] = useState<TaskDetailNavigation | null>(null);
+  const [pendingPanelOpen, setPendingPanelOpen] = useState(false);
   const [modelProfiles, setModelProfiles] = useState<ModelProfile[]>(mockModelProfiles);
   const [runtimeAssets, setRuntimeAssets] = useState<AssetResourceItem[]>(mockAssetResources);
   const [isModelCreatorOpen, setIsModelCreatorOpen] = useState(false);
@@ -175,8 +184,112 @@ export default function App() {
     ));
   };
 
-  const handleMarkAllNotificationsAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const handleMarkAllPendingAsRead = () => {
+    setPendingItems((prev) => prev.map((item) => ({ ...item, read: true })));
+  };
+
+  const openTaskDetail = (target: TaskDetailNavigation) => {
+    setTaskDetailNavigation(target);
+    setCurrentScreen(AppScreen.TASKS);
+  };
+
+  const handlePendingItem = (item: PendingItem) => {
+    setPendingItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, read: true } : entry));
+    setPendingPanelOpen(false);
+    if (item.taskId && item.mediaType) {
+      openTaskDetail({ taskId: item.taskId, groupId: item.groupId, mediaType: item.mediaType });
+      return;
+    }
+    if (item.targetScreen) setCurrentScreen(item.targetScreen);
+  };
+
+  const useResultTemplate = (template: ResultTemplate) => {
+    setPendingTemplate(template);
+    setCurrentScreen(template.mediaType === 'image' ? AppScreen.CREATE_IMAGE_TASK : AppScreen.CREATE_VIDEO_TASK);
+  };
+
+  const toggleTemplateFavorite = (templateId: string) => {
+    const isFavorite = favoriteTemplateIds.has(templateId);
+    setFavoriteTemplateIds((current) => {
+      const next = new Set(current);
+      if (next.has(templateId)) next.delete(templateId);
+      else next.add(templateId);
+      return next;
+    });
+    setResultTemplates((current) => current.map((template) => template.id === templateId
+      ? { ...template, favoriteCount: Math.max(0, template.favoriteCount + (isFavorite ? -1 : 1)) }
+      : template));
+  };
+
+  const recordTemplateView = (templateId: string) => {
+    setResultTemplates((current) => current.map((template) => template.id === templateId
+      ? { ...template, viewCount: template.viewCount + 1 }
+      : template));
+  };
+
+  const publishResultAsTemplate = (task: GenerationTask) => {
+    if (publishedTemplateTaskIds.has(task.id)) {
+      toast.info('该作品已设为模板');
+      return;
+    }
+    const publishBlockReason = templatePublishBlockReason(task);
+    if (publishBlockReason) {
+      toast.error(publishBlockReason);
+      return;
+    }
+    const prompt = task.taskPrompt ?? task.params?.prompt;
+    if (!prompt) return;
+    const result = task.results?.at(-1);
+    const template: ResultTemplate = {
+      id: `result-template-${Date.now()}`,
+      name: `${task.productName} · ${task.type === 'image' ? '图片' : '视频'}模板`,
+      mediaType: task.type,
+      status: 'active',
+      version: 1,
+      coverUrl: result?.url ?? task.resultUrl ?? task.productImg,
+      previewUrls: [result?.url ?? task.resultUrl ?? task.productImg],
+      description: '由已完成作品一键固化，可替换主体商品素材后再次创作。',
+      category: '我的作品',
+      usage: task.type === 'image' ? '图片 / 结果复用' : '视频 / 结果复用',
+      style: '已验证结果',
+      creator: currentUser.name,
+      usageCount: 0,
+      viewCount: 0,
+      favoriteCount: 0,
+      sourceTaskId: task.id,
+      sourceResultId: result?.id,
+      sourceProductName: task.productName,
+      createdAt: new Date().toISOString(),
+      snapshot: {
+        prompt,
+        negativePrompt: task.negativePrompt ?? task.params?.negativePrompt,
+        references: [],
+        ratio: task.params?.ratio ?? (task.type === 'image' ? '4:5' : '9:16'),
+        resolution: task.params?.resolution ?? (task.type === 'image' ? '2048px' : '1080p'),
+        count: task.type === 'image' ? task.params?.count ?? 1 : undefined,
+        imageType: task.type === 'image' ? task.imageType ?? 'product_main' : undefined,
+        videoMode: task.type === 'video' ? task.params?.mode ?? 'img2video' : undefined,
+        duration: task.type === 'video' ? task.params?.duration ?? 8 : undefined,
+        motion: task.type === 'video' ? task.params?.motion ?? '适中' : undefined,
+        modelName: task.modelSnapshot?.modelName ?? task.modelChannel,
+      },
+    };
+    setResultTemplates((current) => [template, ...current]);
+    setPublishedTemplateTaskIds((current) => new Set(current).add(task.id));
+    toast.success('已加入模板营地');
+  };
+
+  const canPublishTemplate = hasPermission('*') || hasPermission('template:publish');
+  const canManageTemplate = hasPermission('*') || hasPermission('template:manage');
+  const getTemplateStatusForTask = (taskId: string): ResultTemplate['status'] | undefined => publishedTemplateTaskIds.has(taskId)
+    ? resultTemplates.find((template) => template.sourceTaskId === taskId)?.status
+    : undefined;
+  const toggleTemplateStatus = (taskId: string) => {
+    const template = resultTemplates.find((item) => item.sourceTaskId === taskId);
+    if (!template) return;
+    const nextStatus: ResultTemplate['status'] = template.status === 'active' ? 'disabled' : 'active';
+    setResultTemplates((current) => current.map((item) => item.id === template.id ? { ...item, status: nextStatus } : item));
+    toast.success(nextStatus === 'active' ? '模板已重新上架' : '模板已下架，不再允许新任务使用');
   };
 
   const openModelCreator = (origin: 'library' | 'picker') => {
@@ -234,10 +347,22 @@ export default function App() {
         return (
           <Dashboard
             tasks={tasks}
-            products={products}
+            templates={resultTemplates}
+            pendingItems={pendingItems}
+            currentUser={currentUser}
+            canPublishTemplate={canPublishTemplate}
+            canManageTemplate={canManageTemplate}
+            publishedTemplateTaskIds={publishedTemplateTaskIds}
             setScreen={setCurrentScreen}
-            setSelectedProduct={setSelectedProduct}
-            openProductDrawer={() => setIsProductDrawerOpen(true)}
+            onUseTemplate={useResultTemplate}
+            favoriteTemplateIds={favoriteTemplateIds}
+            onToggleTemplateFavorite={toggleTemplateFavorite}
+            onViewTemplate={recordTemplateView}
+            onPublishTemplate={publishResultAsTemplate}
+            getTemplateStatusForTask={getTemplateStatusForTask}
+            onToggleTemplateStatus={toggleTemplateStatus}
+            onViewTask={openTaskDetail}
+            onOpenPending={() => setPendingPanelOpen(true)}
           />
         );
       case AppScreen.TASKS:
@@ -247,6 +372,14 @@ export default function App() {
             products={products}
             onUpdateTask={handleUpdateTask}
             setScreen={navigateToScreen}
+            detailNavigation={taskDetailNavigation}
+            onDetailNavigationHandled={() => setTaskDetailNavigation(null)}
+            canPublishTemplate={canPublishTemplate}
+            canManageTemplate={canManageTemplate}
+            publishedTemplateTaskIds={publishedTemplateTaskIds}
+            onPublishTemplate={publishResultAsTemplate}
+            getTemplateStatusForTask={getTemplateStatusForTask}
+            onToggleTemplateStatus={toggleTemplateStatus}
             onCreateVideo={(source) => {
               const context: VideoTaskEntryContext = 'kind' in source ? source : {
                 kind: 'approved-image',
@@ -353,6 +486,9 @@ export default function App() {
           }}
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
+          templates={resultTemplates}
+          selectedTemplate={pendingTemplate?.mediaType === 'image' ? pendingTemplate : null}
+          onTemplateApplied={() => setPendingTemplate(null)}
         />
         {isTransitOpen && (
           <AssetTransitModal
@@ -395,6 +531,9 @@ export default function App() {
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
           entryContext={videoEntryContext}
+          templates={resultTemplates}
+          selectedTemplate={pendingTemplate?.mediaType === 'video' ? pendingTemplate : null}
+          onTemplateApplied={() => setPendingTemplate(null)}
         />
         {isTransitOpen && (
           <AssetTransitModal
@@ -475,12 +614,15 @@ export default function App() {
           currentScreen={currentScreen}
           setScreen={navigateToScreen}
           currentUser={currentUser}
-          notifications={notifications}
-          markAllAsRead={handleMarkAllNotificationsAsRead}
+          pendingItems={pendingItems}
+          pendingPanelOpen={pendingPanelOpen}
+          setPendingPanelOpen={setPendingPanelOpen}
+          markAllAsRead={handleMarkAllPendingAsRead}
+          onPendingItemClick={handlePendingItem}
         />
 
         {/* Scrollable Workspace panel */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8" id="main-content-scroll">
+        <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-5 sm:pb-24 lg:p-8" id="main-content-scroll">
           {renderScreenContent()}
         </main>
       </div>

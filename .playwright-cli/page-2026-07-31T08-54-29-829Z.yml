@@ -1,0 +1,280 @@
+- generic [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - complementary [ref=f1e4]:
+      - generic [ref=f1e5]:
+        - generic [ref=f1e7]:
+          - generic [ref=f1e8]: blur_on
+          - generic [ref=f1e10]:
+            - heading "达芬奇密码 AI" [level=1] [ref=f1e11]
+            - text: WORKBENCH
+        - button "add_circle 新建创作 keyboard_arrow_down" [ref=f1e13] [cursor=pointer]:
+          - generic [ref=f1e14]: add_circle
+          - text: 新建创作
+          - generic [ref=f1e15]: keyboard_arrow_down
+        - navigation [ref=f1e16]:
+          - generic [ref=f1e17]: 主模块
+          - button "dashboard 工作台首页" [ref=f1e18] [cursor=pointer]:
+            - generic [ref=f1e19]:
+              - generic [ref=f1e20]: dashboard
+              - generic [ref=f1e21]: 工作台首页
+          - button "auto_schedule 任务列表" [ref=f1e23] [cursor=pointer]:
+            - generic [ref=f1e24]:
+              - generic [ref=f1e25]: auto_schedule
+              - generic [ref=f1e26]: 任务列表
+          - button "dashboard_customize 智能模板中心" [ref=f1e27] [cursor=pointer]:
+            - generic [ref=f1e28]:
+              - generic [ref=f1e29]: dashboard_customize
+              - generic [ref=f1e30]: 智能模板中心
+          - button "inventory_2 商品素材库" [ref=f1e31] [cursor=pointer]:
+            - generic [ref=f1e32]:
+              - generic [ref=f1e33]: inventory_2
+              - generic [ref=f1e34]: 商品素材库
+          - button "face_3 模特资源库" [ref=f1e35] [cursor=pointer]:
+            - generic [ref=f1e36]:
+              - generic [ref=f1e37]: face_3
+              - generic [ref=f1e38]: 模特资源库
+          - button "insights 数据效能复盘" [ref=f1e39] [cursor=pointer]:
+            - generic [ref=f1e40]:
+              - generic [ref=f1e41]: insights
+              - generic [ref=f1e42]: 数据效能复盘
+          - button "settings_applications 系统配置模块" [ref=f1e43] [cursor=pointer]:
+            - generic [ref=f1e44]:
+              - generic [ref=f1e45]: settings_applications
+              - generic [ref=f1e46]: 系统配置模块
+          - button "sync_alt 通道异步任务" [ref=f1e47] [cursor=pointer]:
+            - generic [ref=f1e48]:
+              - generic [ref=f1e49]: sync_alt
+              - generic [ref=f1e50]: 通道异步任务
+          - button "account_tree 资源分类" [ref=f1e51] [cursor=pointer]:
+            - generic [ref=f1e52]:
+              - generic [ref=f1e53]: account_tree
+              - generic [ref=f1e54]: 资源分类
+        - generic [ref=f1e55]:
+          - generic [ref=f1e56]: 快捷工具
+          - button "grid_view 资源中心" [ref=f1e57] [cursor=pointer]:
+            - generic [ref=f1e58]: grid_view
+            - text: 资源中心
+          - button "face_3 模特资源库" [ref=f1e59] [cursor=pointer]:
+            - generic [ref=f1e60]: face_3
+            - text: 模特资源库
+        - generic [ref=f1e61]:
+          - generic [ref=f1e62]:
+            - generic [ref=f1e63]: 新流程
+            - generic [ref=f1e64]: BETA
+          - button "dashboard_customize 智能模版中心-新" [ref=f1e65] [cursor=pointer]:
+            - generic [ref=f1e66]:
+              - generic [ref=f1e67]: dashboard_customize
+              - generic [ref=f1e68]: 智能模版中心-新
+          - button "add_circle 新建任务-新" [ref=f1e69] [cursor=pointer]:
+            - generic [ref=f1e70]:
+              - generic [ref=f1e71]: add_circle
+              - generic [ref=f1e72]: 新建任务-新
+          - button "auto_schedule 任务列表-新" [ref=f1e73] [cursor=pointer]:
+            - generic [ref=f1e74]:
+              - generic [ref=f1e75]: auto_schedule
+              - generic [ref=f1e76]: 任务列表-新
+          - button "auto_awesome AI 帮我写 prompt-新" [ref=f1e77] [cursor=pointer]:
+            - generic [ref=f1e78]:
+              - generic [ref=f1e79]: auto_awesome
+              - generic [ref=f1e80]: AI 帮我写 prompt-新
+          - button "tune 推荐参数管理-新" [ref=f1e81] [cursor=pointer]:
+            - generic [ref=f1e82]:
+              - generic [ref=f1e83]: tune
+              - generic [ref=f1e84]: 推荐参数管理-新
+      - generic [ref=f1e87] [cursor=pointer]:
+        - img "陆永奇" [ref=f1e89]
+        - generic [ref=f1e91]:
+          - generic [ref=f1e92]:
+            - paragraph [ref=f1e93]: 陆永奇
+            - generic [ref=f1e94]: unfold_more
+          - paragraph [ref=f1e95]: 管理员
+    - generic [ref=f1e96]:
+      - banner [ref=f1e97]:
+        - generic [ref=f1e98]:
+          - generic [ref=f1e99] [cursor=pointer]: 达芬奇密码 AI
+          - generic [ref=f1e100]: chevron_right
+          - generic [ref=f1e101]: 工作台首页
+        - generic [ref=f1e103]:
+          - button "add 新建任务 keyboard_arrow_down" [ref=f1e105] [cursor=pointer]:
+            - generic [ref=f1e106]: add
+            - generic [ref=f1e107]: 新建任务
+            - generic [ref=f1e108]: keyboard_arrow_down
+          - button "notifications 3" [ref=f1e111] [cursor=pointer]:
+            - generic [ref=f1e112]: notifications
+            - generic [ref=f1e113]: "3"
+          - button "help" [ref=f1e114] [cursor=pointer]
+          - button "logout 退出" [ref=f1e116] [cursor=pointer]:
+            - generic [ref=f1e117]: logout
+            - generic [ref=f1e118]: 退出
+      - main [ref=f1e119]:
+        - generic [ref=f1e120]:
+          - region "生产状态" [ref=f1e121]:
+            - button "progress_activity 进行中2 个任务" [ref=f1e123]:
+              - generic [ref=f1e124]: progress_activity
+              - generic [ref=f1e125]: 进行中2 个任务
+            - button "notifications 待处理3 项需关注" [ref=f1e126]:
+              - generic [ref=f1e127]: notifications
+              - generic [ref=f1e128]: 待处理3 项需关注
+            - generic [ref=f1e129]: 模板成片可直接复用
+          - generic [ref=f1e130]:
+            - generic [ref=f1e132]:
+              - button "模板营地10" [ref=f1e133]
+              - button "我的作品3" [ref=f1e134]
+            - generic [ref=f1e136]:
+              - tablist "模板媒介" [ref=f1e137]:
+                - tab "image 图片 8" [selected] [ref=f1e138]:
+                  - generic [ref=f1e139]: image
+                  - text: 图片
+                  - generic [ref=f1e140]: "8"
+                - tab "play_circle 视频 2" [ref=f1e141]:
+                  - generic [ref=f1e142]: play_circle
+                  - text: 视频
+                  - generic [ref=f1e143]: "2"
+              - generic [ref=f1e144]:
+                - generic [ref=f1e145]: 风格
+                - button "全部" [ref=f1e146]
+                - button "静奢质感" [ref=f1e147]
+                - button "东方雅致" [ref=f1e148]
+                - button "甜酷暗黑" [ref=f1e149]
+                - button "多巴胺元气" [ref=f1e150]
+                - button "奶油柔光" [ref=f1e151]
+                - button "复古田园" [ref=f1e152]
+                - button "真实试穿" [ref=f1e153]
+              - generic [ref=f1e154]:
+                - generic [ref=f1e155]:
+                  - generic [ref=f1e156]: category
+                  - generic [ref=f1e157]: 品类
+                  - combobox "品类" [ref=f1e158]:
+                    - option "全部" [selected]
+                    - option "睡衣 / 轻奢女装"
+                    - option "轻熟女装 / 连衣裙"
+                    - option "潮流女装 / 吊带"
+                    - option "新中式 / 改良旗袍"
+                    - option "睡衣 / 少女家居服"
+                    - option "睡衣 / 家居服"
+                    - option "棉麻睡衣 / 家居服"
+                    - option "睡衣 / 日常女装"
+                - generic [ref=f1e159]:
+                  - generic [ref=f1e160]: sort
+                  - generic [ref=f1e161]: 排序
+                  - combobox "排序" [ref=f1e162]:
+                    - option "推荐" [selected]
+                    - option "最新"
+            - generic [ref=f1e163]:
+              - article [ref=f1e164]:
+                - generic [ref=f1e165]:
+                  - img "静奢缎面晨光" [ref=f1e166]
+                  - generic [ref=f1e167]: 图片模板
+                  - generic [ref=f1e169]:
+                    - generic [ref=f1e170]: arrow_forward
+                    - figure "主体图" [ref=f1e172]:
+                      - img "可替换的主体商品图" [ref=f1e173]
+                  - generic:
+                    - paragraph: 雾蓝紫碎花蕾丝睡裙
+                    - generic:
+                      - generic: 类型模特上身
+                      - generic: 风格静奢质感
+                      - generic: 场景窗边安静居家
+                      - generic: 姿势自然站姿
+                    - button "做同款 arrow_outward":
+                      - text: 做同款
+                      - generic: arrow_outward
+              - article [ref=f1e175]:
+                - generic [ref=f1e176]:
+                  - img "东方雅致轻熟" [ref=f1e177]
+                  - generic [ref=f1e178]: 图片模板
+                  - generic:
+                    - paragraph: 东方轻奢家居套装
+                    - generic:
+                      - generic: 类型模特上身
+                      - generic: 风格东方雅致
+                      - generic: 场景东方雅致空间
+                      - generic: 姿势自然站姿
+                    - button "做同款 arrow_outward":
+                      - text: 做同款
+                      - generic: arrow_outward
+              - article [ref=f1e180]:
+                - generic [ref=f1e181]:
+                  - img "甜酷暗黑辣妹" [ref=f1e182]
+                  - generic [ref=f1e183]: 图片模板
+                  - generic:
+                    - paragraph: 甜酷修身吊带连衣裙
+                    - generic:
+                      - generic: 类型模特上身
+                      - generic: 风格甜酷暗黑
+                      - generic: 场景纯白棚拍
+                      - generic: 姿势自然站姿
+                    - button "做同款 arrow_outward":
+                      - text: 做同款
+                      - generic: arrow_outward
+              - article [ref=f1e185]:
+                - generic [ref=f1e186]:
+                  - img "新中式庭院出片" [ref=f1e187]
+                  - generic [ref=f1e188]: 图片模板
+                  - generic:
+                    - paragraph: 新中式刺绣长裙
+                    - generic:
+                      - generic: 类型模特上身
+                      - generic: 风格东方雅致
+                      - generic: 场景新中式庭院
+                      - generic: 姿势自然站姿
+                    - button "做同款 arrow_outward":
+                      - text: 做同款
+                      - generic: arrow_outward
+              - article [ref=f1e190]:
+                - generic [ref=f1e191]:
+                  - img "多巴胺元气居家" [ref=f1e192]
+                  - generic [ref=f1e193]: 图片模板
+                  - generic:
+                    - paragraph: 少女印花家居裙
+                    - generic:
+                      - generic: 类型模特上身
+                      - generic: 风格多巴胺元气
+                      - generic: 场景明亮居家
+                      - generic: 姿势自然站姿
+                    - button "做同款 arrow_outward":
+                      - text: 做同款
+                      - generic: arrow_outward
+              - article [ref=f1e195]:
+                - generic [ref=f1e196]:
+                  - img "奶油甜妹卧室" [ref=f1e197]
+                  - generic [ref=f1e198]: 图片模板
+                  - generic:
+                    - paragraph: 蕾丝边家居睡裙
+                    - generic:
+                      - generic: 类型模特上身
+                      - generic: 风格奶油柔光
+                      - generic: 场景奶油甜妹卧室
+                      - generic: 姿势自然站姿
+                    - button "做同款 arrow_outward":
+                      - text: 做同款
+                      - generic: arrow_outward
+              - article [ref=f1e200]:
+                - generic [ref=f1e201]:
+                  - img "复古田园居家叙事" [ref=f1e202]
+                  - generic [ref=f1e203]: 图片模板
+                  - generic:
+                    - paragraph: 棉麻印花睡衣
+                    - generic:
+                      - generic: 类型场景细节
+                      - generic: 风格复古田园
+                      - generic: 场景复古田园空间
+                      - generic: 姿势自然站姿
+                    - button "做同款 arrow_outward":
+                      - text: 做同款
+                      - generic: arrow_outward
+              - article [ref=f1e205]:
+                - generic [ref=f1e206]:
+                  - img "高转化店主试穿" [ref=f1e207]
+                  - generic [ref=f1e208]: 图片模板
+                  - generic:
+                    - paragraph: 日常居家睡衣套装
+                    - generic:
+                      - generic: 类型模特上身
+                      - generic: 风格真实试穿
+                      - generic: 场景居家试穿
+                      - generic: 姿势正面试穿
+                    - button "做同款 arrow_outward":
+                      - text: 做同款
+                      - generic: arrow_outward
+  - region "Notifications alt+T"

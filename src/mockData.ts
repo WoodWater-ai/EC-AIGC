@@ -1,10 +1,13 @@
 import {
+  AppScreen,
   GenerationTask,
   ImageGenerationType,
   ChannelAsyncTask,
   MockModelChannel,
   ModelProfile,
   ProductAsset,
+  PendingItem,
+  ResultTemplate,
   SystemUser,
   SystemNotification,
   VisualPromptTagCatalog,
@@ -140,7 +143,7 @@ export const mockTemplateDicts: Record<string, DictItem[]> = {
     ['AUTUMN', '金秋自然风 (Autumn Natural)'],
     ['SILK', '奢华丝绸风 (Elegant Silk Satin)'],
   ]),
-  VIDEO_MODE: makeMockDictItems('VIDEO_MODE', [['IMG2VIDEO', '首帧图生视频'], ['REFERENCE2VIDEO', '参考图生视频'], ['TRENDING_REPLICATE', '爆款复刻']]),
+  VIDEO_MODE: makeMockDictItems('VIDEO_MODE', [['IMG2VIDEO', '首帧图生视频'], ['REFERENCE2VIDEO', '真人图参考'], ['TRENDING_REPLICATE', '爆款复刻']]),
   VIDEO_DURATION: makeMockDictItems('VIDEO_DURATION', [['5', '5 秒'], ['8', '8 秒'], ['15', '15 秒']]),
   VIDEO_MOTION: makeMockDictItems('VIDEO_MOTION', [['LIGHT', '轻微'], ['MEDIUM', '适中'], ['STRONG', '强烈']]),
   TASK_TYPE: makeMockDictItems('TASK_TYPE', [['PRODUCT_MAIN', '商品主图'], ['DETAIL_PAGE', '详情页'], ['CONTENT_SEEDING', '内容种草']]),
@@ -586,18 +589,87 @@ export const mockTasks: GenerationTask[] = [
   },
   {
     id: 'T-0995',
-    name: 'Nike 跑鞋酷炫旋转飞沙视频 (批次#1)',
+    name: '雾蓝紫碎花蕾丝睡裙 _ 静奢真人参考视频 (批次#1)',
     type: 'video',
     groupId: 'G-20260629-001', groupOrder: 1, submittedAt: '2026-06-29 11:00',
     status: 'completed',
     progress: 100,
-    productName: 'Nike Air Max Elite 2026 跑鞋',
-    productImg: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=150&q=80',
-    templateName: '动态爆破能量粒子环绕视频',
+    productName: sleepdressResultSource.productName,
+    productImg: sleepdressResultSource.productImg,
+    templateName: '静奢缎面慢镜头',
     timestamp: '2026-06-29 11:00',
-    creator: '张思豪',
-    resultUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80',
-    modelChannel: 'Kling AI 1.5 Pro Video Engine',
-    params: { ratio: '16:9', steps: 80, guidance: 9.5 }
+    creator: '陈美晴',
+    resultUrl: '/mock-assets/template-gallery/quiet-satin-video.jpg',
+    modelChannel: '中转站 / Vidu Q2 · 图生视频',
+    taskPrompt: '镜头稳定建立商品主体，轻微转身展示缎面垂感，结尾聚焦蕾丝和材质。',
+    negativePrompt: '商品漂移、面料闪烁、人物畸形、镜头突变',
+    params: { ratio: '9:16', duration: 8, resolution: '1080p', motion: '轻微', mode: 'reference2video', prompt: '镜头稳定建立商品主体，轻微转身展示缎面垂感，结尾聚焦蕾丝和材质。', negativePrompt: '商品漂移、面料闪烁、人物畸形、镜头突变' }
   }
+];
+
+/**
+ * 模板营地首发数据。预览均使用项目内 mock 或可公开加载的演示图；正式环境改为
+ * 后端返回的授权素材和不可变任务快照。
+ */
+const mockResultTemplateSeed: Omit<ResultTemplate, 'viewCount' | 'favoriteCount'>[] = [
+  {
+    id: 'I01', name: '静奢缎面晨光', mediaType: 'image', status: 'active', version: 1,
+    coverUrl: '/mock-assets/template-gallery/quiet-satin-morning.jpg', previewUrls: ['/mock-assets/template-gallery/quiet-satin-morning.jpg'],
+    description: '柔光、低饱和、材质清晰的室内成片。', category: '睡衣 / 轻奢女装', usage: '居家 / 商品图', style: '静奢质感', creator: '陈美晴', usageCount: 42,
+    sourceTaskId: 'T-1002', sourceResultId: 'T-1002-result-2', sourceProductName: '雾蓝紫碎花蕾丝睡裙', createdAt: '2026-07-02 14:24',
+    snapshot: {
+      prompt: '生成模特正面、侧面、背面上身展示，保持商品的蕾丝花型、吊带结构、裙长和面料质感准确可辨。',
+      negativePrompt: '服装款式改变、蕾丝花型错乱、颜色漂移、人物肢体异常、主体模糊', ratio: '3:4', resolution: '2048px', count: 3, imageType: 'on_model', modelName: 'GPT Image 2 · 保真优先',
+      references: [{ id: 'tpl-ref-model-pure', name: '清透温柔模特', url: '/mock-assets/reference/model-pure.jpg', role: 'model' }, { id: 'tpl-ref-window', name: '窗边安静居家', url: '/mock-assets/reference/scene-satin-home.jpg', role: 'scene' }],
+    },
+  },
+  {
+    id: 'I02', name: '东方雅致轻熟', mediaType: 'image', status: 'active', version: 1,
+    coverUrl: '/mock-assets/template-gallery/eastern-elegance.jpg', previewUrls: ['/mock-assets/template-gallery/eastern-elegance.jpg'],
+    description: '克制雅致的中式空间与留白构图。', category: '轻熟女装 / 连衣裙', usage: '女装 / 场景图', style: '东方雅致', creator: '陈美晴', usageCount: 37,
+    sourceTaskId: 'T-0996', sourceResultId: 'T-0996-result-1', sourceProductName: '东方轻奢家居套装', createdAt: '2026-06-30 14:12',
+    snapshot: {
+      prompt: '在克制雅致的中式空间中展示商品，保持主体完整可见，以低饱和日光和纵向留白突出版型。',
+      negativePrompt: '主体过小、颜色失真、人物肢体异常、错误文字', ratio: '4:5', resolution: '2048px', count: 4, imageType: 'on_model', modelName: 'GPT Image 2 · 保真优先',
+      references: [{ id: 'tpl-ref-eastern', name: '东方雅致空间', url: '/mock-assets/template-gallery/eastern-elegance.jpg', role: 'scene' }],
+    },
+  },
+  {
+    id: 'I04', name: '甜酷暗黑辣妹', mediaType: 'image', status: 'active', version: 1,
+    coverUrl: '/mock-assets/template-gallery/dark-sweet-cool.jpg', previewUrls: ['/mock-assets/template-gallery/dark-sweet-cool.jpg'],
+    description: '深色边光、利落近景与情绪张力。', category: '潮流女装 / 吊带', usage: '女装 / 场景图', style: '甜酷暗黑', creator: '陈美晴', usageCount: 35,
+    sourceTaskId: 'T-0995', sourceProductName: '甜酷修身吊带连衣裙', createdAt: '2026-06-29 11:00',
+    snapshot: {
+      prompt: '用深色侧光和利落近景展现商品轮廓，人物自然站立，保持商品材质与结构真实。', negativePrompt: '主体模糊、色彩漂移、人物畸形、错误配饰', ratio: '4:5', resolution: '2048px', count: 4, imageType: 'on_model', modelName: 'GPT Image 2 · 保真优先',
+      references: [{ id: 'tpl-ref-dark', name: '甜酷暗黑光线', url: '/mock-assets/template-gallery/dark-sweet-cool.jpg', role: 'style' }, { id: 'tpl-ref-dark-scene', name: '纯白棚拍', url: '/mock-assets/template-gallery/dark-sweet-cool.jpg', role: 'scene' }],
+    },
+  },
+  {
+    id: 'V01', name: '静奢缎面慢镜头', mediaType: 'video', status: 'active', version: 1, coverUrl: '/mock-assets/template-gallery/quiet-satin-video.jpg', hoverPreviewUrl: '/mock-assets/template-gallery/quiet-satin-video-preview.mp4', previewUrls: ['/mock-assets/template-gallery/quiet-satin-video.jpg'], description: '轻微转身，稳定展现缎面质感。', category: '缎面睡衣 / 家居服', usage: '居家 / 质感展示', style: '静奢质感', creator: '陈美晴', usageCount: 28, sourceTaskId: 'T-0995', sourceProductName: '雾蓝紫碎花蕾丝睡裙', createdAt: '2026-06-29 11:00', snapshot: { prompt: '镜头稳定建立商品主体，轻微转身展示缎面垂感，结尾聚焦蕾丝和材质。', negativePrompt: '商品漂移、面料闪烁、人物畸形、镜头突变', ratio: '9:16', resolution: '1080p', duration: 8, motion: '轻微', videoMode: 'reference2video', modelName: 'Vidu Q2 · 图生视频', references: [{ id: 'tpl-ref-quiet-video-model', name: '清透温柔真人', url: '/mock-assets/reference/model-pure.jpg', role: 'model' }, { id: 'tpl-ref-quiet-video-scene', name: '安静居家', url: '/mock-assets/template-gallery/quiet-satin-video.jpg', role: 'scene' }] } },
+  {
+    id: 'I03', name: '新中式庭院出片', mediaType: 'image', status: 'active', version: 1, coverUrl: '/mock-assets/template-gallery/new-chinese-garden.jpg', previewUrls: ['/mock-assets/template-gallery/new-chinese-garden.jpg'], description: '庭院自然光、木质肌理与纵向留白。', category: '新中式 / 改良旗袍', usage: '女装 / 场景图', style: '东方雅致', creator: '陆永奇', usageCount: 26, sourceTaskId: 'T-0996', sourceProductName: '新中式刺绣长裙', createdAt: '2026-06-28 10:00', snapshot: { prompt: '庭院自然光与木质空间中展示商品，保留纵向留白和清晰版型。', ratio: '4:5', resolution: '2048px', count: 4, imageType: 'on_model', references: [{ id: 'tpl-ref-garden', name: '新中式庭院', url: '/mock-assets/template-gallery/new-chinese-garden.jpg', role: 'scene' }] } },
+  {
+    id: 'I05', name: '多巴胺元气居家', mediaType: 'image', status: 'active', version: 1, coverUrl: '/mock-assets/template-gallery/dopamine-home.jpg', previewUrls: ['/mock-assets/template-gallery/dopamine-home.jpg'], description: '明快纯色与自然抓拍感。', category: '睡衣 / 少女家居服', usage: '居家 / 商品图', style: '多巴胺元气', creator: '陈美晴', usageCount: 24, sourceTaskId: 'T-1002', sourceProductName: '少女印花家居裙', createdAt: '2026-06-27 10:00', snapshot: { prompt: '在明快居家空间中自然抓拍商品，保留商品结构并突出轻松日常感。', ratio: '4:5', resolution: '2048px', count: 4, imageType: 'on_model', references: [{ id: 'tpl-ref-dopamine', name: '多巴胺居家', url: '/mock-assets/template-gallery/dopamine-home.jpg', role: 'style' }, { id: 'tpl-ref-dopamine-scene', name: '明亮居家', url: '/mock-assets/template-gallery/dopamine-home.jpg', role: 'scene' }] } },
+  {
+    id: 'I06', name: '奶油甜妹卧室', mediaType: 'image', status: 'active', version: 1, coverUrl: '/mock-assets/template-gallery/creamy-bedroom.jpg', previewUrls: ['/mock-assets/template-gallery/creamy-bedroom.jpg'], description: '奶油柔光、亲近日常与温柔氛围。', category: '睡衣 / 家居服', usage: '居家 / 商品图', style: '奶油柔光', creator: '陈美晴', usageCount: 22, sourceTaskId: 'T-1002', sourceProductName: '蕾丝边家居睡裙', createdAt: '2026-06-26 10:00', snapshot: { prompt: '在奶油柔光卧室中展示商品，人物自然放松，商品完整可见。', ratio: '4:5', resolution: '2048px', count: 4, imageType: 'on_model', references: [{ id: 'tpl-ref-creamy', name: '奶油甜妹卧室', url: '/mock-assets/template-gallery/creamy-bedroom.jpg', role: 'scene' }] } },
+  {
+    id: 'I07', name: '复古田园居家叙事', mediaType: 'image', status: 'active', version: 1, coverUrl: '/mock-assets/template-gallery/vintage-home.jpg', previewUrls: ['/mock-assets/template-gallery/vintage-home.jpg'], description: '窗边自然光与细节穿插的故事感。', category: '棉麻睡衣 / 家居服', usage: '居家 / 叙事图', style: '复古田园', creator: '陆永奇', usageCount: 19, sourceTaskId: 'T-0996', sourceProductName: '棉麻印花睡衣', createdAt: '2026-06-25 10:00', snapshot: { prompt: '窗边自然光下以细节穿插展示商品，形成真实居家故事感。', ratio: '4:5', resolution: '2048px', count: 4, imageType: 'scene_detail', references: [{ id: 'tpl-ref-vintage', name: '复古田园空间', url: '/mock-assets/template-gallery/vintage-home.jpg', role: 'scene' }] } },
+  {
+    id: 'I08', name: '高转化店主试穿', mediaType: 'image', status: 'active', version: 1, coverUrl: '/mock-assets/template-gallery/owner-tryon.jpg', previewUrls: ['/mock-assets/template-gallery/owner-tryon.jpg'], description: '商品清晰、版型可见的真实试穿视角。', category: '睡衣 / 日常女装', usage: '试穿 / 商品图', style: '真实试穿', creator: '陆永奇', usageCount: 17, sourceTaskId: 'T-0996', sourceProductName: '日常居家睡衣套装', createdAt: '2026-06-24 10:00', snapshot: { prompt: '用真实店主试穿视角展示商品版型与细节，商品保持清晰完整。', ratio: '4:5', resolution: '1536px', count: 4, imageType: 'on_model', references: [{ id: 'tpl-ref-tryon', name: '正面试穿', url: '/mock-assets/template-gallery/owner-tryon.jpg', role: 'pose' }, { id: 'tpl-ref-tryon-scene', name: '居家试穿', url: '/mock-assets/template-gallery/owner-tryon.jpg', role: 'scene' }] } },
+  {
+    id: 'V02', name: '多巴胺元气动态', mediaType: 'video', status: 'active', version: 1, coverUrl: '/mock-assets/template-gallery/dopamine-video.jpg', hoverPreviewUrl: '/mock-assets/template-gallery/dopamine-video-preview.mp4', previewUrls: ['/mock-assets/template-gallery/dopamine-video.jpg'], description: '轻快转身与明亮居家节奏。', category: '少女睡衣 / 家居服', usage: '居家 / 节奏展示', style: '多巴胺元气', creator: '陈美晴', usageCount: 15, sourceTaskId: 'T-0995', sourceProductName: '雾蓝紫碎花蕾丝睡裙', createdAt: '2026-06-23 10:00', snapshot: { prompt: '在明亮居家空间轻快转身，商品主体稳定可见，保持元气节奏。', negativePrompt: '商品漂移、动作僵硬、画面闪烁、错误文字', ratio: '9:16', resolution: '1080p', duration: 8, motion: '适中', videoMode: 'trending_replicate', modelName: 'Vidu Q2 · 图生视频', trendingSource: { id: 'tpl-video-source-dopamine', name: '元气居家高转化节奏样片', url: '/mock-assets/template-gallery/dopamine-video-preview.mp4', thumbnailUrl: '/mock-assets/template-gallery/dopamine-video.jpg', source: '内部模板样片', durationSec: 8, licenseText: '内部授权模板', importStatus: 'ready' }, references: [{ id: 'tpl-ref-dopamine-video', name: '元气动态节奏', url: '/mock-assets/template-gallery/dopamine-video.jpg', role: 'action' }, { id: 'tpl-ref-dopamine-video-scene', name: '明亮居家', url: '/mock-assets/template-gallery/dopamine-video.jpg', role: 'scene' }] } },
+];
+
+export const mockResultTemplates: ResultTemplate[] = mockResultTemplateSeed.map((template, index) => ({
+  ...template,
+  viewCount: 328 - index * 23,
+  favoriteCount: 32 - Math.min(index * 2, 18),
+}));
+
+/** 待处理中心由任务异常和站内消息归并；后端接入后替换为统一待处理接口。 */
+export const mockPendingItems: PendingItem[] = [
+  { id: 'pending-review-1', title: '评分审核待处理', description: '雾蓝紫碎花蕾丝睡裙的细节图等待评分。', priority: 'high', category: 'task', time: '10 分钟前', read: false, taskId: 'T-0996', groupId: 'G-20260702-001', mediaType: 'image' },
+  { id: 'pending-failed-1', title: '生成失败需要处理', description: '极地防寒羽绒服场景图渲染超时，可查看详情后重试。', priority: 'high', category: 'task', time: '1 小时前', read: false, taskId: 'T-1003', groupId: 'G-20260703-002', mediaType: 'image' },
+  { id: 'pending-asset-1', title: '补充商品主体图', description: '轻便防风羽绒服缺少侧面去背素材。', priority: 'medium', category: 'asset', time: '今天', read: false, targetScreen: AppScreen.ASSETS },
+  { id: 'pending-budget-1', title: '算力额度预警', description: '本月企业算力点数已使用 78.4%。', priority: 'low', category: 'system', time: '1 小时前', read: true },
 ];

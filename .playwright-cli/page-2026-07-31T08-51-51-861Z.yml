@@ -1,0 +1,148 @@
+- generic [ref=e2]:
+  - generic [ref=e313]:
+    - banner [ref=e314]:
+      - generic [ref=e315]:
+        - button "arrow_back" [ref=e316]
+        - generic [ref=e318]:
+          - paragraph [ref=e319]: 视频任务工作台
+          - heading "新建视频任务" [level=1] [ref=e320]
+      - generic [ref=e321]:
+        - generic [ref=e322]:
+          - generic [ref=e323]: 生成准备度 2/3
+          - generic [ref=e324]: 8 秒 · 9:16
+        - button "模板" [ref=e325]
+        - button "auto_awesome AI 助手" [ref=e326]:
+          - generic [ref=e327]: auto_awesome
+          - text: AI 助手
+        - button "检查并生成" [ref=e328]
+    - generic [ref=e330]:
+      - button "首帧图生视频" [ref=e331]
+      - button "真人图参考" [ref=e332]
+      - button "爆款复刻" [ref=e333]
+    - main [ref=e334]:
+      - generic [ref=e335]:
+        - generic [ref=e336]:
+          - generic [ref=e337]:
+            - generic [ref=e338]:
+              - paragraph [ref=e339]: 输入素材
+              - heading "视频首帧" [level=2] [ref=e340]
+            - button "资源中心" [ref=e341]
+          - button "add 添加首帧素材" [ref=e342]:
+            - generic [ref=e343]: add
+            - generic [ref=e344]: 添加首帧素材
+        - generic [ref=e434]:
+          - generic [ref=e435]:
+            - generic [ref=e436]:
+              - paragraph [ref=e437]: 参考图片组
+              - heading "为每张图片标记用途" [level=2] [ref=e438]
+              - paragraph [ref=e439]: 模特也是参考图角色。当前模型最多 3 张输入图。
+            - button "资源中心" [disabled] [ref=e440]
+          - generic [ref=e441]:
+            - button "add" [disabled] [ref=e442]
+            - generic [ref=e444]:
+              - img "清透温柔真人" [ref=e445]
+              - button "close" [ref=e446]
+              - combobox [ref=e448]:
+                - option "商品"
+                - option "模特" [selected]
+                - option "风格"
+                - option "动作/镜头"
+                - option "场景"
+              - paragraph [ref=e449]: 清透温柔真人
+            - generic [ref=e450]:
+              - img "静奢居家光线" [ref=e451]
+              - button "close" [ref=e452]
+              - combobox [ref=e454]:
+                - option "商品"
+                - option "模特"
+                - option "风格" [selected]
+                - option "动作/镜头"
+                - option "场景"
+              - paragraph [ref=e455]: 静奢居家光线
+            - generic [ref=e456]:
+              - img "安静居家" [ref=e457]
+              - button "close" [ref=e458]
+              - combobox [ref=e460]:
+                - option "商品"
+                - option "模特"
+                - option "风格"
+                - option "动作/镜头"
+                - option "场景" [selected]
+              - paragraph [ref=e461]: 安静居家
+        - generic [ref=e345]:
+          - generic [ref=e346]:
+            - paragraph [ref=e347]: 输入依据
+            - heading "商品事实" [level=2] [ref=e348]
+          - paragraph [ref=e349]: 选择关联商品的首帧后，将在这里展示商品颜色、材质和卖点。
+      - generic [ref=e350]:
+        - generic [ref=e351]:
+          - paragraph [ref=e352]: 任务配置
+          - heading "真人图参考" [level=2] [ref=e462]
+          - paragraph [ref=e354]: 以商品首帧为主体，并带入真人、风格或场景参考。
+        - generic [ref=e355]:
+          - generic [ref=e356]:
+            - generic [ref=e357]:
+              - paragraph [ref=e358]: 内容
+              - heading "本次视频 Prompt" [level=2] [ref=e359]
+              - paragraph [ref=e360]: 先确认本次视频表达；生成后才按时长拆分为可编辑分镜。
+            - combobox "模板已锁定时长" [disabled] [ref=e463]:
+              - option "5 秒"
+              - option "8 秒" [selected]
+              - option "15 秒"
+          - paragraph [ref=e464]: 已应用「静奢缎面慢镜头」，时长和镜头节奏已锁定；只需替换商品素材。
+          - generic [ref=e362]:
+            - text: 最终 Prompt
+            - textbox "最终 Prompt" [ref=e363]:
+              - /placeholder: 描述商品、动作、场景和镜头目标
+              - text: 镜头稳定建立商品主体，轻微转身展示缎面垂感，结尾聚焦蕾丝和材质。
+          - generic [ref=e364]:
+            - paragraph [ref=e365]: 生成提示词后，系统将按时长拆分分镜。
+            - button "auto_fix_high 生成提示词" [ref=e366]:
+              - generic [ref=e367]: auto_fix_high
+              - text: 生成提示词
+          - generic [ref=e368]:
+            - text: 负面约束
+            - textbox "负面约束" [ref=e369]: 商品漂移、面料闪烁、人物畸形、镜头突变
+          - generic [ref=e370]:
+            - button "AI 助手建议" [ref=e371]
+            - button "内容已确认" [ref=e465]
+      - complementary [ref=e373]:
+        - generic [ref=e374]:
+          - paragraph [ref=e375]: 模型通道与模型能力
+          - heading "可用视频规格" [level=2] [ref=e376]
+          - generic [ref=e377]:
+            - text: 模型通道
+            - combobox "模型通道" [ref=e378]:
+              - option "云端 API"
+              - option "中转站" [selected]
+          - generic [ref=e379]:
+            - text: 模型版本
+            - combobox "模型版本" [ref=e380]:
+              - option "Vidu Q2 · 图生视频" [selected]
+          - generic [ref=e381]:
+            - generic [ref=e382]:
+              - text: 比例
+              - combobox "比例" [ref=e383]:
+                - option "9:16" [selected]
+                - option "16:9"
+                - option "1:1"
+            - generic [ref=e384]:
+              - text: 分辨率
+              - combobox "分辨率" [ref=e385]:
+                - option "720p"
+                - option "1080p" [selected]
+            - generic [ref=e386]:
+              - text: 运动幅度
+              - combobox "运动幅度" [ref=e387]:
+                - option "轻微" [selected]
+                - option "适中"
+                - option "强烈"
+          - generic [ref=e388]:
+            - paragraph [ref=e389]: 支持时长：5 / 8 / 15 秒
+            - paragraph [ref=e390]: 参考图上限：3 张
+            - paragraph [ref=e391]:
+              - text: 预估成本：
+              - generic [ref=e392]: 18.0 元
+            - paragraph [ref=e393]: 剩余低于 20%，提交前请确认成本
+    - generic [ref=e466]: 已应用模板「静奢缎面慢镜头」，请替换视频首帧或商品素材。
+  - region "Notifications alt+T"

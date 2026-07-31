@@ -8,3 +8,6 @@ coverage/
 !.env.example
 .idea/
 *.txt
+
+# Local Netlify folder
+.netlify

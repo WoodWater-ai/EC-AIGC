@@ -1,0 +1,205 @@
+- generic [ref=e2]:
+  - generic [ref=e57]:
+    - complementary [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e61]:
+          - generic [ref=e62]: blur_on
+          - generic [ref=e64]:
+            - heading "达芬奇密码 AI" [level=1] [ref=e65]
+            - text: WORKBENCH
+        - generic [ref=e66]:
+          - button "add_circle 新建创作 keyboard_arrow_down" [active] [ref=e67] [cursor=pointer]:
+            - generic [ref=e68]: add_circle
+            - text: 新建创作
+            - generic [ref=e69]: keyboard_arrow_down
+          - generic [ref=e302]:
+            - button "image 新建图片生成任务 多维智能模板背景融合合成" [ref=e303] [cursor=pointer]:
+              - generic [ref=e304]: image
+              - generic [ref=e305]:
+                - paragraph [ref=e306]: 新建图片生成任务
+                - paragraph [ref=e307]: 多维智能模板背景融合合成
+            - button "video_library 新建视频生成任务 分镜脚本多层轨道动感视频" [ref=e308] [cursor=pointer]:
+              - generic [ref=e309]: video_library
+              - generic [ref=e310]:
+                - paragraph [ref=e311]: 新建视频生成任务
+                - paragraph [ref=e312]: 分镜脚本多层轨道动感视频
+        - navigation [ref=e70]:
+          - generic [ref=e71]: 主模块
+          - button "dashboard 工作台首页" [ref=e72] [cursor=pointer]:
+            - generic [ref=e73]:
+              - generic [ref=e74]: dashboard
+              - generic [ref=e75]: 工作台首页
+          - button "auto_schedule 任务列表" [ref=e77] [cursor=pointer]:
+            - generic [ref=e78]:
+              - generic [ref=e79]: auto_schedule
+              - generic [ref=e80]: 任务列表
+          - button "dashboard_customize 智能模板中心" [ref=e81] [cursor=pointer]:
+            - generic [ref=e82]:
+              - generic [ref=e83]: dashboard_customize
+              - generic [ref=e84]: 智能模板中心
+          - button "inventory_2 商品素材库" [ref=e85] [cursor=pointer]:
+            - generic [ref=e86]:
+              - generic [ref=e87]: inventory_2
+              - generic [ref=e88]: 商品素材库
+          - button "face_3 模特资源库" [ref=e89] [cursor=pointer]:
+            - generic [ref=e90]:
+              - generic [ref=e91]: face_3
+              - generic [ref=e92]: 模特资源库
+          - button "insights 数据效能复盘" [ref=e93] [cursor=pointer]:
+            - generic [ref=e94]:
+              - generic [ref=e95]: insights
+              - generic [ref=e96]: 数据效能复盘
+          - button "settings_applications 系统配置模块" [ref=e97] [cursor=pointer]:
+            - generic [ref=e98]:
+              - generic [ref=e99]: settings_applications
+              - generic [ref=e100]: 系统配置模块
+          - button "sync_alt 通道异步任务" [ref=e101] [cursor=pointer]:
+            - generic [ref=e102]:
+              - generic [ref=e103]: sync_alt
+              - generic [ref=e104]: 通道异步任务
+          - button "account_tree 资源分类" [ref=e105] [cursor=pointer]:
+            - generic [ref=e106]:
+              - generic [ref=e107]: account_tree
+              - generic [ref=e108]: 资源分类
+        - generic [ref=e109]:
+          - generic [ref=e110]: 快捷工具
+          - button "grid_view 资源中心" [ref=e111] [cursor=pointer]:
+            - generic [ref=e112]: grid_view
+            - text: 资源中心
+          - button "face_3 模特资源库" [ref=e113] [cursor=pointer]:
+            - generic [ref=e114]: face_3
+            - text: 模特资源库
+        - generic [ref=e115]:
+          - generic [ref=e116]:
+            - generic [ref=e117]: 新流程
+            - generic [ref=e118]: BETA
+          - button "dashboard_customize 智能模版中心-新" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]:
+              - generic [ref=e121]: dashboard_customize
+              - generic [ref=e122]: 智能模版中心-新
+          - button "add_circle 新建任务-新" [ref=e123] [cursor=pointer]:
+            - generic [ref=e124]:
+              - generic [ref=e125]: add_circle
+              - generic [ref=e126]: 新建任务-新
+          - button "auto_schedule 任务列表-新" [ref=e127] [cursor=pointer]:
+            - generic [ref=e128]:
+              - generic [ref=e129]: auto_schedule
+              - generic [ref=e130]: 任务列表-新
+          - button "auto_awesome AI 帮我写 prompt-新" [ref=e131] [cursor=pointer]:
+            - generic [ref=e132]:
+              - generic [ref=e133]: auto_awesome
+              - generic [ref=e134]: AI 帮我写 prompt-新
+          - button "tune 推荐参数管理-新" [ref=e135] [cursor=pointer]:
+            - generic [ref=e136]:
+              - generic [ref=e137]: tune
+              - generic [ref=e138]: 推荐参数管理-新
+      - generic [ref=e141] [cursor=pointer]:
+        - img "陆永奇" [ref=e143]
+        - generic [ref=e145]:
+          - generic [ref=e146]:
+            - paragraph [ref=e147]: 陆永奇
+            - generic [ref=e148]: unfold_more
+          - paragraph [ref=e149]: 管理员
+    - generic [ref=e150]:
+      - banner [ref=e151]:
+        - generic [ref=e152]:
+          - generic [ref=e153] [cursor=pointer]: 达芬奇密码 AI
+          - generic [ref=e154]: chevron_right
+          - generic [ref=e155]: 工作台首页
+        - generic [ref=e157]:
+          - button "add 新建任务 keyboard_arrow_down" [ref=e159] [cursor=pointer]:
+            - generic [ref=e160]: add
+            - generic [ref=e161]: 新建任务
+            - generic [ref=e162]: keyboard_arrow_down
+          - button "notifications 3" [ref=e165] [cursor=pointer]:
+            - generic [ref=e166]: notifications
+            - generic [ref=e167]: "3"
+          - button "help" [ref=e168] [cursor=pointer]
+          - button "logout 退出" [ref=e170] [cursor=pointer]:
+            - generic [ref=e171]: logout
+            - generic [ref=e172]: 退出
+      - main [ref=e173]:
+        - generic [ref=e174]:
+          - region "生产状态" [ref=e175]:
+            - button "progress_activity 进行中2 个任务" [ref=e177]:
+              - generic [ref=e178]: progress_activity
+              - generic [ref=e179]: 进行中2 个任务
+            - button "notifications 待处理3 项需关注" [ref=e180]:
+              - generic [ref=e181]: notifications
+              - generic [ref=e182]: 待处理3 项需关注
+            - generic [ref=e183]: 模板成片可直接复用
+          - generic [ref=e184]:
+            - generic [ref=e186]:
+              - button "模板营地10" [ref=e187]
+              - button "我的作品3" [ref=e188]
+            - generic [ref=e190]:
+              - tablist "模板媒介" [ref=e191]:
+                - tab "image 图片 8" [ref=e192]:
+                  - generic [ref=e193]: image
+                  - text: 图片
+                  - generic [ref=e194]: "8"
+                - tab "play_circle 视频 2" [selected] [ref=e195]:
+                  - generic [ref=e196]: play_circle
+                  - text: 视频
+                  - generic [ref=e197]: "2"
+              - generic [ref=e198]:
+                - generic [ref=e199]: 风格
+                - button "全部" [ref=e200]
+                - button "静奢质感" [ref=e201]
+                - button "多巴胺元气" [ref=e204]
+              - generic [ref=e208]:
+                - generic [ref=e209]:
+                  - generic [ref=e210]: category
+                  - generic [ref=e211]: 品类
+                  - combobox "品类" [ref=e212]:
+                    - option "全部" [selected]
+                    - option "缎面睡衣 / 家居服"
+                    - option "少女睡衣 / 家居服"
+                - generic [ref=e213]:
+                  - generic [ref=e214]: sort
+                  - generic [ref=e215]: 排序
+                  - combobox "排序" [ref=e216]:
+                    - option "推荐" [selected]
+                    - option "最新"
+            - generic [ref=e217]:
+              - article [ref=e273]:
+                - generic [ref=e274]:
+                  - img "静奢缎面慢镜头" [ref=e275]
+                  - generic [ref=e277]:
+                    - generic [ref=e278]: 视频模板
+                    - generic [ref=e279]: play_arrow
+                  - generic [ref=e281]:
+                    - generic [ref=e282]: arrow_forward
+                    - figure "主体图" [ref=e284]:
+                      - img "可替换的主体商品图" [ref=e285]
+                  - generic:
+                    - paragraph: 雾蓝紫碎花蕾丝睡裙
+                    - generic:
+                      - generic: 类型真人图参考
+                      - generic: 风格静奢质感
+                      - generic: 场景安静居家
+                      - generic: 镜头轻微运镜
+                    - button "做同款 arrow_outward":
+                      - text: 做同款
+                      - generic: arrow_outward
+              - article [ref=e287]:
+                - generic [ref=e288]:
+                  - img "多巴胺元气动态" [ref=e289]
+                  - generic [ref=e291]:
+                    - generic [ref=e292]: 视频模板
+                    - generic [ref=e293]: play_arrow
+                  - generic [ref=e295]:
+                    - generic [ref=e296]: arrow_forward
+                    - figure "主体图" [ref=e298]:
+                      - img "可替换的主体商品图" [ref=e299]
+                  - generic:
+                    - paragraph: 雾蓝紫碎花蕾丝睡裙
+                    - generic:
+                      - generic: 类型爆款复刻
+                      - generic: 风格多巴胺元气
+                      - generic: 场景明亮居家
+                      - generic: 镜头适中运镜
+                    - button "做同款 arrow_outward":
+                      - text: 做同款
+                      - generic: arrow_outward
+  - region "Notifications alt+T"

@@ -1,0 +1,111 @@
+- generic [ref=e2]:
+  - generic [ref=e352]:
+    - banner [ref=e353]:
+      - generic [ref=e354]:
+        - button "arrow_back" [ref=e355]
+        - generic [ref=e357]:
+          - paragraph [ref=e358]: 图片任务
+          - heading "新建图片任务" [level=1] [ref=e359]
+      - generic [ref=e360]:
+        - generic [ref=e361]: 1 个类型 · 共 3 张
+        - button "模板" [ref=e362]
+        - button "生成" [ref=e363]
+    - generic [ref=e364]: 已应用模板「静奢缎面晨光」，请替换主体素材后生成。
+    - main [ref=e365]:
+      - generic [ref=e366]:
+        - generic [ref=e367]:
+          - generic [ref=e368]:
+            - heading "主体素材" [level=2] [ref=e369]
+            - button "资源中心" [ref=e370]
+          - button "add_photo_alternate 选择主体素材" [ref=e371]:
+            - generic [ref=e372]: add_photo_alternate
+            - generic [ref=e373]: 选择主体素材
+        - generic [ref=e374]:
+          - generic [ref=e375]:
+            - heading "参考图" [level=2] [ref=e376]
+            - generic [ref=e377]: 自动识别标签
+          - generic [ref=e378]:
+            - generic [ref=e379]:
+              - button [ref=e380]:
+                - img "模特" [ref=e381]
+              - paragraph [ref=e382]: 模特
+            - generic [ref=e383]:
+              - button [ref=e384]:
+                - img "场景" [ref=e385]
+              - paragraph [ref=e386]: 场景
+            - generic [ref=e387]:
+              - button "palette" [ref=e388]
+              - paragraph [ref=e390]: 风格
+            - generic [ref=e391]:
+              - button "accessibility_new" [ref=e392]
+              - paragraph [ref=e394]: 姿势
+            - generic [ref=e395]:
+              - button "zoom_in" [ref=e396]
+              - paragraph [ref=e398]: 细节
+      - generic [ref=e399]:
+        - generic [ref=e400]:
+          - generic [ref=e401]:
+            - paragraph [ref=e402]: 内容
+            - heading "最终 Prompt" [level=2] [ref=e403]
+          - button "auto_awesome 重新生成" [ref=e404]:
+            - generic [ref=e405]: auto_awesome
+            - text: 重新生成
+        - generic [ref=e406]:
+          - generic [ref=e407]:
+            - button "inventory_2 主图" [ref=e408]:
+              - generic [ref=e409]: inventory_2
+              - generic [ref=e410]: 主图
+            - button "add" [ref=e411]
+          - generic [ref=e413]:
+            - button "landscape 场景图" [ref=e414]:
+              - generic [ref=e415]: landscape
+              - generic [ref=e416]: 场景图
+            - button "add" [ref=e417]
+          - generic [ref=e419]:
+            - button "zoom_in 细节图" [ref=e420]:
+              - generic [ref=e421]: zoom_in
+              - generic [ref=e422]: 细节图
+            - button "add" [ref=e423]
+          - generic [ref=e425]:
+            - button "check_circle 三视图" [pressed] [ref=e426]:
+              - generic [ref=e427]: check_circle
+              - generic [ref=e428]: 三视图
+            - generic [ref=e429]:
+              - button "−" [ref=e430]
+              - generic [ref=e431]: "3"
+              - button "+" [ref=e432]
+        - generic [ref=e433]:
+          - generic [ref=e434]:
+            - button "风格奶油甜妹卧室" [ref=e436]
+            - button "场景奶油柔光卧室" [ref=e442]
+            - button "姿势自然站姿" [ref=e448]
+          - paragraph [ref=e453]: 切换风格会自动保留兼容的场景与姿势；不兼容时回到该风格的推荐组合。
+        - generic [ref=e455]:
+          - generic [ref=e456]:
+            - generic [ref=e457]:
+              - generic [ref=e458]: accessibility_new
+              - generic [ref=e459]: 上身/三视图
+              - generic [ref=e460]: tryon_three_view · 3 张
+            - generic [ref=e461]: AI 生成
+          - textbox "选择主体素材后，点击 AI 助手生成 Prompt" [disabled] [ref=e462]: 生成模特正面、侧面、背面上身展示，保持商品的蕾丝花型、吊带结构、裙长和面料质感准确可辨。
+        - paragraph [ref=e463]: 图片类型支持多选，所有已选类型的 Prompt 会依次显示。点击“生成”即接受当前 Prompt，并进入预检与费用确认。
+      - generic [ref=e464]:
+        - generic [ref=e465]:
+          - paragraph [ref=e466]: 执行
+          - heading "模型与输出" [level=2] [ref=e467]
+          - generic [ref=e468]:
+            - text: 模型
+            - combobox "模型" [ref=e469]:
+              - option "GPT Image 2 · 保真优先" [selected]
+              - option "Imagen · 稳定出图"
+          - paragraph [ref=e470]: 适合商品主体、局部修改和参考图一致性。
+          - generic [ref=e471]:
+            - paragraph [ref=e472]: 本次任务总生成图片数
+            - paragraph [ref=e473]: 3张
+            - paragraph [ref=e474]: 按图片类型分别生成
+          - button "高级设置 3:4 · 2048px expand_more" [ref=e475]:
+            - generic [ref=e476]: 高级设置
+            - generic [ref=e477]: 3:4 · 2048px
+            - generic [ref=e478]: expand_more
+        - paragraph [ref=e479]: 费用、耗时、通道健康度和失败兜底策略将在预检通过后的费用确认中展示。
+  - region "Notifications alt+T"

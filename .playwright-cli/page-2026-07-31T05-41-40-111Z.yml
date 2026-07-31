@@ -1,0 +1,311 @@
+- generic [ref=e2]:
+  - generic [ref=e57]:
+    - complementary [ref=e480]:
+      - generic [ref=e481]:
+        - generic [ref=e483]:
+          - generic [ref=e484]: blur_on
+          - generic [ref=e486]:
+            - heading "达芬奇密码 AI" [level=1] [ref=e487]
+            - text: DaVinci Code v2.0
+        - button "add_circle 开始智能创作 keyboard_arrow_down" [ref=e489] [cursor=pointer]:
+          - generic [ref=e490]: add_circle
+          - text: 开始智能创作
+          - generic [ref=e491]: keyboard_arrow_down
+        - navigation [ref=e492]:
+          - generic [ref=e493]: 主模块导航
+          - button "dashboard 工作台首页" [active] [ref=e494] [cursor=pointer]:
+            - generic [ref=e495]:
+              - generic [ref=e496]: dashboard
+              - generic [ref=e497]: 工作台首页
+          - button "auto_schedule 任务列表" [ref=e498] [cursor=pointer]:
+            - generic [ref=e499]:
+              - generic [ref=e500]: auto_schedule
+              - generic [ref=e501]: 任务列表
+          - button "dashboard_customize 智能模板中心" [ref=e503] [cursor=pointer]:
+            - generic [ref=e504]:
+              - generic [ref=e505]: dashboard_customize
+              - generic [ref=e506]: 智能模板中心
+          - button "inventory_2 商品素材库" [ref=e507] [cursor=pointer]:
+            - generic [ref=e508]:
+              - generic [ref=e509]: inventory_2
+              - generic [ref=e510]: 商品素材库
+          - button "face_3 模特资源库" [ref=e511] [cursor=pointer]:
+            - generic [ref=e512]:
+              - generic [ref=e513]: face_3
+              - generic [ref=e514]: 模特资源库
+          - button "insights 数据效能复盘" [ref=e515] [cursor=pointer]:
+            - generic [ref=e516]:
+              - generic [ref=e517]: insights
+              - generic [ref=e518]: 数据效能复盘
+          - button "settings_applications 系统配置模块" [ref=e519] [cursor=pointer]:
+            - generic [ref=e520]:
+              - generic [ref=e521]: settings_applications
+              - generic [ref=e522]: 系统配置模块
+          - button "sync_alt 通道异步任务" [ref=e523] [cursor=pointer]:
+            - generic [ref=e524]:
+              - generic [ref=e525]: sync_alt
+              - generic [ref=e526]: 通道异步任务
+          - button "account_tree 资源分类" [ref=e527] [cursor=pointer]:
+            - generic [ref=e528]:
+              - generic [ref=e529]: account_tree
+              - generic [ref=e530]: 资源分类
+        - generic [ref=e531]:
+          - generic [ref=e532]: 快捷工具箱
+          - button "grid_view 资源中心" [ref=e533] [cursor=pointer]:
+            - generic [ref=e534]: grid_view
+            - text: 资源中心
+          - button "face_3 模特资源库" [ref=e535] [cursor=pointer]:
+            - generic [ref=e536]: face_3
+            - text: 模特资源库
+        - generic [ref=e537]:
+          - generic [ref=e538]:
+            - generic [ref=e539]: 新流程尝试
+            - generic [ref=e540]: BETA
+          - button "dashboard_customize 智能模版中心-新" [ref=e541] [cursor=pointer]:
+            - generic [ref=e542]:
+              - generic [ref=e543]: dashboard_customize
+              - generic [ref=e544]: 智能模版中心-新
+          - button "add_circle 新建任务-新" [ref=e545] [cursor=pointer]:
+            - generic [ref=e546]:
+              - generic [ref=e547]: add_circle
+              - generic [ref=e548]: 新建任务-新
+          - button "auto_schedule 任务列表-新" [ref=e549] [cursor=pointer]:
+            - generic [ref=e550]:
+              - generic [ref=e551]: auto_schedule
+              - generic [ref=e552]: 任务列表-新
+          - button "auto_awesome AI 帮我写 prompt-新" [ref=e553] [cursor=pointer]:
+            - generic [ref=e554]:
+              - generic [ref=e555]: auto_awesome
+              - generic [ref=e556]: AI 帮我写 prompt-新
+          - button "tune 推荐参数管理-新" [ref=e557] [cursor=pointer]:
+            - generic [ref=e558]:
+              - generic [ref=e559]: tune
+              - generic [ref=e560]: 推荐参数管理-新
+      - generic [ref=e563] [cursor=pointer]:
+        - img "陆永奇" [ref=e565]
+        - generic [ref=e567]:
+          - generic [ref=e568]:
+            - paragraph [ref=e569]: 陆永奇
+            - generic [ref=e570]: unfold_more
+          - paragraph [ref=e571]: 管理员
+    - generic [ref=e572]:
+      - banner [ref=e573]:
+        - generic [ref=e574]:
+          - generic [ref=e575] [cursor=pointer]: 达芬奇密码 AI
+          - generic [ref=e576]: chevron_right
+          - generic [ref=e577]: 工作台首页
+        - generic [ref=e579]:
+          - button "add 新建任务 keyboard_arrow_down" [ref=e581] [cursor=pointer]:
+            - generic [ref=e582]: add
+            - generic [ref=e583]: 新建任务
+            - generic [ref=e584]: keyboard_arrow_down
+          - button "notifications 3" [ref=e587] [cursor=pointer]:
+            - generic [ref=e588]: notifications
+            - generic [ref=e589]: "3"
+          - button "help" [ref=e590] [cursor=pointer]
+          - button "logout 退出" [ref=e592] [cursor=pointer]:
+            - generic [ref=e593]: logout
+            - generic [ref=e594]: 退出
+      - main [ref=e595]:
+        - generic [ref=e692]:
+          - generic [ref=e694]:
+            - generic [ref=e695]:
+              - paragraph [ref=e696]: 创作工作台
+              - heading "灵感从结果开始" [level=1] [ref=e697]
+            - generic [ref=e698]:
+              - button "add 新建图片 从模板或素材开始" [ref=e699]:
+                - generic [ref=e700]: add
+                - generic [ref=e701]:
+                  - generic [ref=e702]: 新建图片
+                  - generic [ref=e703]: 从模板或素材开始
+              - button "movie 新建视频 首帧驱动生成" [ref=e704]:
+                - generic [ref=e705]: movie
+                - generic [ref=e706]:
+                  - generic [ref=e707]: 新建视频
+                  - generic [ref=e708]: 首帧驱动生成
+              - button "progress_activity 进行中 2 个任务" [ref=e709]:
+                - generic [ref=e710]: progress_activity
+                - generic [ref=e711]:
+                  - generic [ref=e712]: 进行中
+                  - generic [ref=e713]: 2 个任务
+              - button "notifications 待处理 3 项需要关注" [ref=e714]:
+                - generic [ref=e715]: notifications
+                - generic [ref=e716]:
+                  - generic [ref=e717]: 待处理
+                  - generic [ref=e718]: 3 项需要关注
+          - generic [ref=e719]:
+            - generic [ref=e720]:
+              - generic [ref=e721]:
+                - button "模板营地10" [ref=e722]
+                - button "我的作品2" [ref=e723]
+              - generic [ref=e724]:
+                - combobox [ref=e725]:
+                  - option "全部媒介" [selected]
+                  - option "图片"
+                  - option "视频"
+                - combobox [ref=e726]:
+                  - option "全部" [selected]
+                  - option "睡衣 / 轻奢女装"
+                  - option "轻熟女装 / 连衣裙"
+                  - option "潮流女装 / 吊带"
+                  - option "缎面睡衣 / 家居服"
+                  - option "新中式 / 改良旗袍"
+                  - option "睡衣 / 少女家居服"
+                  - option "睡衣 / 家居服"
+                  - option "棉麻睡衣 / 家居服"
+                  - option "睡衣 / 日常女装"
+                  - option "少女睡衣 / 家居服"
+                - combobox [ref=e727]:
+                  - option "全部" [selected]
+                  - option "静奢质感"
+                  - option "东方雅致"
+                  - option "甜酷暗黑"
+                  - option "多巴胺元气"
+                  - option "奶油柔光"
+                  - option "复古田园"
+                  - option "真实试穿"
+                - combobox [ref=e728]:
+                  - option "推荐排序" [selected]
+                  - option "最新发布"
+            - generic [ref=e729]:
+              - article [ref=e730]:
+                - generic [ref=e731]:
+                  - img "静奢缎面晨光" [ref=e732]
+                  - generic [ref=e733]: 图片
+                - generic [ref=e734]:
+                  - generic [ref=e735]:
+                    - generic [ref=e736]:
+                      - heading "静奢缎面晨光" [level=2] [ref=e737]
+                      - paragraph [ref=e738]: 居家 / 商品图
+                    - generic [ref=e739]: V1
+                  - paragraph [ref=e740]: 柔光、低饱和、材质清晰的室内成片。
+                  - generic [ref=e741]:
+                    - generic [ref=e742]: 陈美晴 · 已用 42
+                    - button "使用此模板" [ref=e743]
+              - article [ref=e744]:
+                - generic [ref=e745]:
+                  - img "东方雅致轻熟" [ref=e746]
+                  - generic [ref=e747]: 图片
+                - generic [ref=e748]:
+                  - generic [ref=e749]:
+                    - generic [ref=e750]:
+                      - heading "东方雅致轻熟" [level=2] [ref=e751]
+                      - paragraph [ref=e752]: 女装 / 场景图
+                    - generic [ref=e753]: V1
+                  - paragraph [ref=e754]: 克制雅致的中式空间与留白构图。
+                  - generic [ref=e755]:
+                    - generic [ref=e756]: 陈美晴 · 已用 37
+                    - button "使用此模板" [ref=e757]
+              - article [ref=e758]:
+                - generic [ref=e759]:
+                  - img "甜酷暗黑辣妹" [ref=e760]
+                  - generic [ref=e761]: 图片
+                - generic [ref=e762]:
+                  - generic [ref=e763]:
+                    - generic [ref=e764]:
+                      - heading "甜酷暗黑辣妹" [level=2] [ref=e765]
+                      - paragraph [ref=e766]: 女装 / 场景图
+                    - generic [ref=e767]: V1
+                  - paragraph [ref=e768]: 深色边光、利落近景与情绪张力。
+                  - generic [ref=e769]:
+                    - generic [ref=e770]: 陈美晴 · 已用 35
+                    - button "使用此模板" [ref=e771]
+              - article [ref=e772]:
+                - generic [ref=e773]:
+                  - img "静奢缎面慢镜头" [ref=e774]
+                  - generic [ref=e775]: 视频
+                - generic [ref=e776]:
+                  - generic [ref=e777]:
+                    - generic [ref=e778]:
+                      - heading "静奢缎面慢镜头" [level=2] [ref=e779]
+                      - paragraph [ref=e780]: 居家 / 轻运动视频
+                    - generic [ref=e781]: V1
+                  - paragraph [ref=e782]: 轻微转身，稳定展现缎面质感。
+                  - generic [ref=e783]:
+                    - generic [ref=e784]: 陈美晴 · 已用 28
+                    - button "使用此模板" [ref=e785]
+              - article [ref=e786]:
+                - generic [ref=e787]:
+                  - img "新中式庭院出片" [ref=e788]
+                  - generic [ref=e789]: 图片
+                - generic [ref=e790]:
+                  - generic [ref=e791]:
+                    - generic [ref=e792]:
+                      - heading "新中式庭院出片" [level=2] [ref=e793]
+                      - paragraph [ref=e794]: 女装 / 场景图
+                    - generic [ref=e795]: V1
+                  - paragraph [ref=e796]: 庭院自然光、木质肌理与纵向留白。
+                  - generic [ref=e797]:
+                    - generic [ref=e798]: 陆永奇 · 已用 26
+                    - button "使用此模板" [ref=e799]
+              - article [ref=e800]:
+                - generic [ref=e801]:
+                  - img "多巴胺元气居家" [ref=e802]
+                  - generic [ref=e803]: 图片
+                - generic [ref=e804]:
+                  - generic [ref=e805]:
+                    - generic [ref=e806]:
+                      - heading "多巴胺元气居家" [level=2] [ref=e807]
+                      - paragraph [ref=e808]: 居家 / 商品图
+                    - generic [ref=e809]: V1
+                  - paragraph [ref=e810]: 明快纯色与自然抓拍感。
+                  - generic [ref=e811]:
+                    - generic [ref=e812]: 陈美晴 · 已用 24
+                    - button "使用此模板" [ref=e813]
+              - article [ref=e814]:
+                - generic [ref=e815]:
+                  - img "奶油甜妹卧室" [ref=e816]
+                  - generic [ref=e817]: 图片
+                - generic [ref=e818]:
+                  - generic [ref=e819]:
+                    - generic [ref=e820]:
+                      - heading "奶油甜妹卧室" [level=2] [ref=e821]
+                      - paragraph [ref=e822]: 居家 / 商品图
+                    - generic [ref=e823]: V1
+                  - paragraph [ref=e824]: 奶油柔光、亲近日常与温柔氛围。
+                  - generic [ref=e825]:
+                    - generic [ref=e826]: 陈美晴 · 已用 22
+                    - button "使用此模板" [ref=e827]
+              - article [ref=e828]:
+                - generic [ref=e829]:
+                  - img "复古田园居家叙事" [ref=e830]
+                  - generic [ref=e831]: 图片
+                - generic [ref=e832]:
+                  - generic [ref=e833]:
+                    - generic [ref=e834]:
+                      - heading "复古田园居家叙事" [level=2] [ref=e835]
+                      - paragraph [ref=e836]: 居家 / 叙事图
+                    - generic [ref=e837]: V1
+                  - paragraph [ref=e838]: 窗边自然光与细节穿插的故事感。
+                  - generic [ref=e839]:
+                    - generic [ref=e840]: 陆永奇 · 已用 19
+                    - button "使用此模板" [ref=e841]
+              - article [ref=e842]:
+                - generic [ref=e843]:
+                  - img "高转化店主试穿" [ref=e844]
+                  - generic [ref=e845]: 图片
+                - generic [ref=e846]:
+                  - generic [ref=e847]:
+                    - generic [ref=e848]:
+                      - heading "高转化店主试穿" [level=2] [ref=e849]
+                      - paragraph [ref=e850]: 试穿 / 商品图
+                    - generic [ref=e851]: V1
+                  - paragraph [ref=e852]: 商品清晰、版型可见的真实试穿视角。
+                  - generic [ref=e853]:
+                    - generic [ref=e854]: 陆永奇 · 已用 17
+                    - button "使用此模板" [ref=e855]
+              - article [ref=e856]:
+                - generic [ref=e857]:
+                  - img "多巴胺元气动态" [ref=e858]
+                  - generic [ref=e859]: 视频
+                - generic [ref=e860]:
+                  - generic [ref=e861]:
+                    - generic [ref=e862]:
+                      - heading "多巴胺元气动态" [level=2] [ref=e863]
+                      - paragraph [ref=e864]: 居家 / 轻运动视频
+                    - generic [ref=e865]: V1
+                  - paragraph [ref=e866]: 轻快转身与明亮居家节奏。
+                  - generic [ref=e867]:
+                    - generic [ref=e868]: 陈美晴 · 已用 15
+                    - button "使用此模板" [ref=e869]
+  - region "Notifications alt+T"

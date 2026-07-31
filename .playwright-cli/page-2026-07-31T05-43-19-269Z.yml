@@ -1,0 +1,230 @@
+- generic [ref=e2]:
+  - generic [ref=e57]:
+    - complementary [ref=e480]:
+      - generic [ref=e481]:
+        - generic [ref=e483]:
+          - generic [ref=e484]: blur_on
+          - generic [ref=e486]:
+            - heading "达芬奇密码 AI" [level=1] [ref=e487]
+            - text: DaVinci Code v2.0
+        - button "add_circle 开始智能创作 keyboard_arrow_down" [ref=e489] [cursor=pointer]:
+          - generic [ref=e490]: add_circle
+          - text: 开始智能创作
+          - generic [ref=e491]: keyboard_arrow_down
+        - navigation [ref=e492]:
+          - generic [ref=e493]: 主模块导航
+          - button "dashboard 工作台首页" [ref=e494] [cursor=pointer]:
+            - generic [ref=e495]:
+              - generic [ref=e496]: dashboard
+              - generic [ref=e497]: 工作台首页
+          - button "auto_schedule 任务列表" [ref=e498] [cursor=pointer]:
+            - generic [ref=e499]:
+              - generic [ref=e500]: auto_schedule
+              - generic [ref=e501]: 任务列表
+          - button "dashboard_customize 智能模板中心" [ref=e503] [cursor=pointer]:
+            - generic [ref=e504]:
+              - generic [ref=e505]: dashboard_customize
+              - generic [ref=e506]: 智能模板中心
+          - button "inventory_2 商品素材库" [ref=e507] [cursor=pointer]:
+            - generic [ref=e508]:
+              - generic [ref=e509]: inventory_2
+              - generic [ref=e510]: 商品素材库
+          - button "face_3 模特资源库" [ref=e511] [cursor=pointer]:
+            - generic [ref=e512]:
+              - generic [ref=e513]: face_3
+              - generic [ref=e514]: 模特资源库
+          - button "insights 数据效能复盘" [ref=e515] [cursor=pointer]:
+            - generic [ref=e516]:
+              - generic [ref=e517]: insights
+              - generic [ref=e518]: 数据效能复盘
+          - button "settings_applications 系统配置模块" [ref=e519] [cursor=pointer]:
+            - generic [ref=e520]:
+              - generic [ref=e521]: settings_applications
+              - generic [ref=e522]: 系统配置模块
+          - button "sync_alt 通道异步任务" [ref=e523] [cursor=pointer]:
+            - generic [ref=e524]:
+              - generic [ref=e525]: sync_alt
+              - generic [ref=e526]: 通道异步任务
+          - button "account_tree 资源分类" [ref=e527] [cursor=pointer]:
+            - generic [ref=e528]:
+              - generic [ref=e529]: account_tree
+              - generic [ref=e530]: 资源分类
+        - generic [ref=e531]:
+          - generic [ref=e532]: 快捷工具箱
+          - button "grid_view 资源中心" [ref=e533] [cursor=pointer]:
+            - generic [ref=e534]: grid_view
+            - text: 资源中心
+          - button "face_3 模特资源库" [ref=e535] [cursor=pointer]:
+            - generic [ref=e536]: face_3
+            - text: 模特资源库
+        - generic [ref=e537]:
+          - generic [ref=e538]:
+            - generic [ref=e539]: 新流程尝试
+            - generic [ref=e540]: BETA
+          - button "dashboard_customize 智能模版中心-新" [ref=e541] [cursor=pointer]:
+            - generic [ref=e542]:
+              - generic [ref=e543]: dashboard_customize
+              - generic [ref=e544]: 智能模版中心-新
+          - button "add_circle 新建任务-新" [ref=e545] [cursor=pointer]:
+            - generic [ref=e546]:
+              - generic [ref=e547]: add_circle
+              - generic [ref=e548]: 新建任务-新
+          - button "auto_schedule 任务列表-新" [ref=e549] [cursor=pointer]:
+            - generic [ref=e550]:
+              - generic [ref=e551]: auto_schedule
+              - generic [ref=e552]: 任务列表-新
+          - button "auto_awesome AI 帮我写 prompt-新" [ref=e553] [cursor=pointer]:
+            - generic [ref=e554]:
+              - generic [ref=e555]: auto_awesome
+              - generic [ref=e556]: AI 帮我写 prompt-新
+          - button "tune 推荐参数管理-新" [ref=e557] [cursor=pointer]:
+            - generic [ref=e558]:
+              - generic [ref=e559]: tune
+              - generic [ref=e560]: 推荐参数管理-新
+      - generic [ref=e563] [cursor=pointer]:
+        - img "陆永奇" [ref=e565]
+        - generic [ref=e567]:
+          - generic [ref=e568]:
+            - paragraph [ref=e569]: 陆永奇
+            - generic [ref=e570]: unfold_more
+          - paragraph [ref=e571]: 管理员
+    - generic [ref=e572]:
+      - banner [ref=e573]:
+        - generic [ref=e574]:
+          - generic [ref=e575] [cursor=pointer]: 批次素材生产
+          - generic [ref=e576]: chevron_right
+          - generic [ref=e577]: 任务列表
+        - generic [ref=e579]:
+          - button "add 新建任务 keyboard_arrow_down" [ref=e581] [cursor=pointer]:
+            - generic [ref=e582]: add
+            - generic [ref=e583]: 新建任务
+            - generic [ref=e584]: keyboard_arrow_down
+          - generic [ref=e586]:
+            - button "notifications 3" [active] [ref=e587] [cursor=pointer]:
+              - generic [ref=e588]: notifications
+              - generic [ref=e589]: "3"
+            - generic [ref=e1048]:
+              - generic [ref=e1049]:
+                - generic [ref=e1050]: 待处理 (3)
+                - button "全部标为已读" [ref=e1051] [cursor=pointer]
+              - generic [ref=e1052]:
+                - button "assignment_late 评分审核待处理 雾蓝紫碎花蕾丝睡裙的细节图等待评分。 10 分钟前" [ref=e1053]:
+                  - generic [ref=e1054]:
+                    - generic [ref=e1055]: assignment_late
+                    - generic [ref=e1056]:
+                      - paragraph [ref=e1057]: 评分审核待处理
+                      - paragraph [ref=e1058]: 雾蓝紫碎花蕾丝睡裙的细节图等待评分。
+                      - generic [ref=e1059]: 10 分钟前
+                - button "assignment_late 生成失败需要处理 极地防寒羽绒服场景图渲染超时，可查看详情后重试。 1 小时前" [ref=e1060]:
+                  - generic [ref=e1061]:
+                    - generic [ref=e1062]: assignment_late
+                    - generic [ref=e1063]:
+                      - paragraph [ref=e1064]: 生成失败需要处理
+                      - paragraph [ref=e1065]: 极地防寒羽绒服场景图渲染超时，可查看详情后重试。
+                      - generic [ref=e1066]: 1 小时前
+                - button "image_search 补充商品主体图 轻便防风羽绒服缺少侧面去背素材。 今天" [ref=e1067]:
+                  - generic [ref=e1068]:
+                    - generic [ref=e1069]: image_search
+                    - generic [ref=e1070]:
+                      - paragraph [ref=e1071]: 补充商品主体图
+                      - paragraph [ref=e1072]: 轻便防风羽绒服缺少侧面去背素材。
+                      - generic [ref=e1073]: 今天
+                - button "info 算力额度预警 本月企业算力点数已使用 78.4%。 1 小时前" [ref=e1074]:
+                  - generic [ref=e1075]:
+                    - generic [ref=e1076]: info
+                    - generic [ref=e1077]:
+                      - paragraph [ref=e1078]: 算力额度预警
+                      - paragraph [ref=e1079]: 本月企业算力点数已使用 78.4%。
+                      - generic [ref=e1080]: 1 小时前
+              - button "查看全部生产任务历史" [ref=e1082] [cursor=pointer]
+          - button "help" [ref=e590] [cursor=pointer]
+          - button "logout 退出" [ref=e592] [cursor=pointer]:
+            - generic [ref=e593]: logout
+            - generic [ref=e594]: 退出
+      - main [ref=e595]:
+        - generic [ref=e895]:
+          - generic [ref=e896]:
+            - generic [ref=e897]:
+              - paragraph [ref=e898]: 生成与评分审核闭环
+              - heading "任务列表" [level=2] [ref=e899]
+              - paragraph [ref=e900]: 每次提交为一个批次；展开后按图片类型查看子任务和对应产物。
+            - generic [ref=e901]:
+              - button "新建图片任务" [ref=e902]
+              - button "新建视频任务" [ref=e903]
+          - generic [ref=e904]:
+            - button "图片批次 (3)" [ref=e905]
+            - button "视频批次 (3)" [ref=e906]
+          - generic [ref=e907]:
+            - generic [ref=e908]:
+              - button "全部 3" [ref=e909]
+              - button "排队中 0" [ref=e910]
+              - button "生成中 1" [ref=e911]
+              - button "待评分审核 1" [ref=e912]
+              - button "审核通过 0" [ref=e913]
+              - button "生成失败 1" [ref=e914]
+              - button "已打回 0" [ref=e915]
+            - generic [ref=e916]:
+              - generic [ref=e917]: search
+              - textbox "搜索批次、任务、商品或编号" [ref=e918]
+          - table [ref=e921]:
+            - rowgroup [ref=e922]:
+              - row [ref=e923]:
+                - columnheader "批次 / 商品" [ref=e924]
+                - columnheader "模板" [ref=e925]
+                - columnheader "提交时间" [ref=e926]
+                - columnheader "批次状态" [ref=e927]
+                - columnheader "任务与产物" [ref=e928]
+                - columnheader "操作" [ref=e929]
+            - rowgroup [ref=e930]:
+              - row [ref=e931]:
+                - cell [ref=e932]:
+                  - generic [ref=e933]:
+                    - button "chevron_right" [ref=e934]
+                    - generic [ref=e936]:
+                      - paragraph [ref=e937]: G-20260703-001
+                      - paragraph [ref=e938]: Nike Air Max Elite 2026 跑鞋
+                - cell [ref=e939]:
+                  - paragraph [ref=e940]: 3D 赛博虚拟炫彩展示架
+                  - paragraph [ref=e941]: 陈美晴
+                - cell "2026-07-03 17:42" [ref=e942]
+                - cell [ref=e943]
+                - cell [ref=e946]:
+                  - paragraph [ref=e947]: 2 个子任务 · 1 个产物
+                  - paragraph [ref=e948]: 商品主图、详情/场景图
+                - cell [ref=e949]:
+                  - button "详情" [ref=e951]
+              - row [ref=e952]:
+                - cell [ref=e953]:
+                  - generic [ref=e954]:
+                    - button "chevron_right" [ref=e955]
+                    - generic [ref=e957]:
+                      - paragraph [ref=e958]: G-20260703-002
+                      - paragraph [ref=e959]: 超轻便透气抗撕裂防风羽绒服
+                - cell [ref=e960]:
+                  - paragraph [ref=e961]: 冬季风雪覆盖深色岩石展示
+                  - paragraph [ref=e962]: 陆永奇
+                - cell "2026-07-03 16:10" [ref=e963]
+                - cell "生成失败" [ref=e964]
+                - cell [ref=e965]:
+                  - paragraph [ref=e966]: 2 个子任务 · 1 个产物
+                  - paragraph [ref=e967]: 详情/场景图、细节图
+                - cell [ref=e968]:
+                  - button "详情" [ref=e970]
+              - row [ref=e971]:
+                - cell [ref=e972]:
+                  - generic [ref=e973]:
+                    - button "chevron_right" [ref=e974]
+                    - generic [ref=e976]:
+                      - paragraph [ref=e977]: G-20260702-001
+                      - paragraph [ref=e978]: 雾蓝紫碎花蕾丝睡裙
+                - cell [ref=e979]:
+                  - paragraph [ref=e980]: 商品上身三视图
+                  - paragraph [ref=e981]: 陈美晴
+                - cell "2026-07-02 14:05" [ref=e982]
+                - cell "待评分审核" [ref=e983]
+                - cell [ref=e984]:
+                  - paragraph [ref=e985]: 3 个子任务 · 4 个产物
+                  - paragraph [ref=e986]: 上身/三视图、详情/场景图、细节图
+                - cell [ref=e987]:
+                  - button "详情" [ref=e989]
+  - region "Notifications alt+T"
