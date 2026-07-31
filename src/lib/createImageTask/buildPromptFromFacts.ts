@@ -35,7 +35,7 @@ export function buildPromptFromFacts(
   // 3. 风格 / 场景 / 姿势(仅模特展示需要姿势)
   if (style) segments.push(`风格：${style}。`);
   if (scene) segments.push(`场景：${scene}。`);
-  if (pose && type === 'model_front') segments.push(`动作/姿势：${pose}。`);
+  if (pose && type === 'model_triple_view') segments.push(`动作/姿势：${pose}。`);
   // 4. 参考图解析(按序号拼接)
   if (referenceInsights.length > 0) {
     const refLines = referenceInsights.map(
@@ -61,10 +61,8 @@ function typeTargetSentence(type: ImageGenerationType): string {
       return '商品融入指定场景，强化氛围、使用感和商业叙事；中景镜头突出商品与人物/场景的互动关系，主体占比 40-60%。';
     case 'detail_closeup':
       return '聚焦材质、工艺与关键卖点，使用微距镜头（85mm+ 微距/特写光圈）和局部光影；展示纹理、缝线、印花、配件等细节部位。';
-    case 'model_front':
-      // 注:本期 model_front 是单张模特正面展示图(非真三视图)。
-      // 真正的三视图(正/侧/背)需另起 P,前端拆 3 个子任务。
-      return '模特自然展示商品，**正面视角**拍摄为主；确保上身比例、姿态和商品细节真实可信；统一构图居中、人物姿态协调。';
+    case 'model_triple_view':
+      return '生成一张服装电商模特三视图，横向三联依次展示同一位成年模特的正面、严格 90 度侧面和背面；三个视图保持人物、发型、身材比例、服装、机位高度、光线和背景完全一致，完整清晰展示商品结构，不遮挡领口、袖口、腰头和下摆，不凭空增加图案、配饰、文字或水印。';
     default:
       // 兜底:防御性,不应触发(enum 限制 4 值)
       return '商品展示图。';

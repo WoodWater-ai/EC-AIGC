@@ -39,7 +39,7 @@ const REFERENCE_SLOT_MAP: Record<ReferenceSlot, TaskAssetSlot> = {
 };
 
 /**
- * 前端 UI 的小写 imageType(product_main / scene_detail / detail_closeup / model_front)
+ * 前端 UI 的小写 imageType(product_main / scene_detail / detail_closeup / model_triple_view)
  * → 后端 EnumImageTaskType 大写枚举值。
  */
 function mapImageGenerationType(t: string): ImageTaskType {
@@ -47,7 +47,7 @@ function mapImageGenerationType(t: string): ImageTaskType {
     case 'product_main': return 'PRODUCT_MAIN';
     case 'scene_detail': return 'SCENE_DETAIL';
     case 'detail_closeup': return 'DETAIL_CLOSEUP';
-    case 'model_front': return 'MODEL_FRONT';
+    case 'model_triple_view': return 'MODEL_TRIPLE_VIEW';
     default:
       throw new Error(`unknown image type: ${t}`);
   }
@@ -205,7 +205,7 @@ export function useCreateImageTaskState(
   // ---------- state ----------
   const [selectedTypes, setSelectedTypes] = useState<ImageGenerationType[]>(['product_main']);
   const [typeCounts, setTypeCounts] = useState<Record<ImageGenerationType, number>>({
-    product_main: 1, scene_detail: 1, detail_closeup: 1, model_front: 1,
+    product_main: 1, scene_detail: 1, detail_closeup: 1, model_triple_view: 1,
   });
   const [template, setTemplateName] = useState<string>(opts.templateName);
   const [style, setStyle] = useState<string>('');
@@ -249,18 +249,23 @@ export function useCreateImageTaskState(
   // ---------- hydrate from sessionStorage ----------
   useEffect(() => {
     try {
+      const VALID_TYPES: ImageGenerationType[] = [
+        'product_main',
+        'scene_detail',
+        'detail_closeup',
+        'model_triple_view',
+      ];
       const raw = sessionStorage.getItem(DRAFT_KEY);
       if (raw) {
         const data = JSON.parse(raw) as PersistedDraft;
         // 过滤掉已废弃的 imageType 键(如 on_model)避免渲染空卡片
-        const VALID_TYPES: ImageGenerationType[] = ['product_main','scene_detail','detail_closeup','model_front'];
         if (data.selectedTypes) {
           const validSelected = data.selectedTypes.filter((t): t is ImageGenerationType => VALID_TYPES.includes(t as ImageGenerationType));
           setSelectedTypes(validSelected);
         }
         if (data.typeCounts) {
           const tc = data.typeCounts as Record<string, number>;
-          const validCounts: Record<ImageGenerationType, number> = { product_main: 1, scene_detail: 1, detail_closeup: 1, model_front: 1 };
+          const validCounts: Record<ImageGenerationType, number> = { product_main: 1, scene_detail: 1, detail_closeup: 1, model_triple_view: 1 };
           (Object.keys(tc) as ImageGenerationType[]).forEach((k) => {
             if (VALID_TYPES.includes(k)) validCounts[k] = tc[k] ?? 1;
           });
@@ -340,8 +345,8 @@ export function useCreateImageTaskState(
 
   const prompts = useMemo<AllTypePrompts>(() => {
     const facts = productFacts ?? extractProductFacts(formInput);
-    const result: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_front: '' };
-    (['product_main', 'scene_detail', 'detail_closeup', 'model_front'] as ImageGenerationType[]).forEach((t) => {
+    const result: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_triple_view: '' };
+    (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[]).forEach((t) => {
       result[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
     });
     return result;
@@ -608,8 +613,8 @@ export function useCreateImageTaskState(
 
   const applyAiOptimizeToSelected = useCallback((selected: ImageGenerationType[]) => {
     const facts = productFacts ?? extractProductFacts(formInput);
-    const basePrompts: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_front: '' };
-    (['product_main', 'scene_detail', 'detail_closeup', 'model_front'] as ImageGenerationType[]).forEach((t) => {
+    const basePrompts: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_triple_view: '' };
+    (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[]).forEach((t) => {
       basePrompts[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
     });
     const optimized = applyAiOptimizePerType(basePrompts, selected);

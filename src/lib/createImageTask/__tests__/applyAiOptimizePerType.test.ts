@@ -6,7 +6,7 @@ const P = {
   product_main:   '商品基础',
   scene_detail:   '场景基础',
   detail_closeup: '细节基础',
-  model_front:    '模特基础',
+  model_triple_view: '三视图基础',
 };
 
 test('selectedTypes only product_main → only product_main wrapped', () => {
@@ -15,15 +15,15 @@ test('selectedTypes only product_main → only product_main wrapped', () => {
   assert.ok(out.product_main.includes('商品基础'));
   assert.equal(out.scene_detail, '场景基础');
   assert.equal(out.detail_closeup, '细节基础');
-  assert.equal(out.model_front, '模特基础');
+  assert.equal(out.model_triple_view, '三视图基础');
 });
 
 test('selectedTypes all → all 4 wrapped', () => {
-  const out = applyAiOptimizePerType(P, ['product_main','scene_detail','detail_closeup','model_front']);
+  const out = applyAiOptimizePerType(P, ['product_main','scene_detail','detail_closeup','model_triple_view']);
   assert.ok(out.product_main.startsWith('[画质增强] 电影级背光'));
   assert.ok(out.scene_detail.startsWith('[画质增强] 电影级背光'));
   assert.ok(out.detail_closeup.startsWith('[画质增强] 电影级背光'));
-  assert.ok(out.model_front.startsWith('[画质增强] 电影级背光'));
+  assert.ok(out.model_triple_view.startsWith('[画质增强] 电影级背光'));
 });
 
 test('wrap is idempotent → wrapping twice still yields single prefix', () => {

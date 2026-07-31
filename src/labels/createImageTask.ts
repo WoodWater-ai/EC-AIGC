@@ -33,7 +33,7 @@ export const messages = {
     product_main: '商品主图',
     scene_detail: '场景图',
     detail_closeup: '细节图',
-    model_front: '模特展示图',
+    model_triple_view: '三视图',
     labelHelper: '可多选',
   },
   template: {
@@ -46,7 +46,7 @@ export const messages = {
     product_main: 'inventory_2',
     scene_detail: 'landscape',
     detail_closeup: 'zoom_in',
-    model_front: 'accessibility_new',
+    model_triple_view: 'accessibility_new',
   } as const,
   refSlot: {
     detail: '细节', style: '风格', scene: '场景', pose: '姿势', model: '模特',
@@ -101,4 +101,3 @@ export const messages = {
     fix: '请调整比例、尺寸或选择其他模型。',
   },
 };
-

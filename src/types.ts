@@ -505,9 +505,9 @@ export interface SystemBuiltinChannelItem {
 }
 
 // [2026-07-21 重构 create-image-task 复刻 demo] 图片生成任务类型
-// - imageType: 与 demo 主版对齐 — product_main / scene_detail / detail_closeup / model_front
+// - imageType: product_main / scene_detail / detail_closeup / model_triple_view
 // - ReferenceSlot: 5 个参考图槽位
-export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'model_front';
+export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'model_triple_view';
 export type ReferenceSlot = 'detail' | 'style' | 'scene' | 'pose' | 'model';
 
 // ============================================================================
@@ -520,7 +520,7 @@ export type ImageTaskType =
   | 'PRODUCT_MAIN'
   | 'SCENE_DETAIL'
   | 'DETAIL_CLOSEUP'
-  | 'MODEL_FRONT';
+  | 'MODEL_TRIPLE_VIEW';
 
 /** 任务资产槽位(对齐后端 EnumTaskAssetSlot) */
 export type TaskAssetSlot =
@@ -633,7 +633,7 @@ export interface VideoTaskSubmitResponse {
 // ============================================================================
 // [2026-07-26 图片任务规划] 对齐后端 ImagePlanAnalyzeRequest / Response
 // 后端 Map<EnumImageTaskType, String> 经 Fastjson2 序列化为全大写 enum name()
-// (PRODUCT_MAIN / SCENE_DETAIL / DETAIL_CLOSEUP / MODEL_FRONT),前端 Record 用同样 key。
+// (PRODUCT_MAIN / SCENE_DETAIL / DETAIL_CLOSEUP / MODEL_TRIPLE_VIEW),前端 Record 用同样 key。
 // ============================================================================
 
 /** 参考图槽位(对齐后端 EnumReferenceSlot,大写形式) */
@@ -664,7 +664,7 @@ export interface ImagePlanAnalyzeRequest {
 export interface ImagePlanAnalyzeResponse {
   productFacts: ProductFactsInput;
   /**
-   * key: 后端 enum name() 全大写(PRODUCT_MAIN / SCENE_DETAIL / DETAIL_CLOSEUP / MODEL_FRONT)。
+   * key: 后端 enum name() 全大写(PRODUCT_MAIN / SCENE_DETAIL / DETAIL_CLOSEUP / MODEL_TRIPLE_VIEW)。
    * 故意用 `Record<string, string>` 而非小写 `ImageGenerationType`,避免类型陷阱
    * (TypeScript 不会捕获运行时大写 key 错误)。调用方需用 `t.toLowerCase() as ImageGenerationType` 转小写后写入 UI 状态。
    */
