@@ -1,0 +1,154 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e8]:
+        - strong [ref=e9]: 达芬奇密码 AI
+        - generic [ref=e10]: DA VINCI CODE / WORKBENCH
+      - button "新建任务" [ref=e11] [cursor=pointer]
+      - generic [ref=e13]: 主模块导航
+      - navigation [ref=e14]:
+        - button "首页总览" [ref=e15] [cursor=pointer]
+        - button "生成任务" [ref=e21] [cursor=pointer]
+        - button "任务列表" [ref=e25] [cursor=pointer]
+        - button "商品素材库" [ref=e29] [cursor=pointer]
+        - button "模板中心" [ref=e35] [cursor=pointer]
+        - button "数据复盘" [ref=e40] [cursor=pointer]
+      - generic [ref=e43]: 新流程尝试
+      - navigation [ref=e44]:
+        - button "灵感模板 BETA" [ref=e45] [cursor=pointer]:
+          - text: 灵感模板
+          - generic [ref=e48]: BETA
+      - generic [ref=e49]:
+        - text: 当前工作空间
+        - generic [ref=e50]:
+          - generic [ref=e51]: 林
+          - generic [ref=e52]:
+            - generic [ref=e53]: 林可心
+            - generic [ref=e54]: 运营 / 任务创建人
+    - generic [ref=e55]:
+      - banner [ref=e56]:
+        - generic [ref=e57]:
+          - generic [ref=e58]: 生成任务
+          - strong [ref=e61]: 灵感模板
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - text: 本月预算
+            - generic [ref=e68]: 62%
+          - button "通知" [ref=e69] [cursor=pointer]
+          - button "帮助" [ref=e74] [cursor=pointer]
+      - main [ref=e78]:
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - text: RESULT-FIRST TEMPLATE LIBRARY
+            - heading "先选你想要的成片效果" [level=1] [ref=e81]
+            - paragraph [ref=e82]: 不用写提示词。选择一个模板，换成你的商品素材，确认后即可生成。
+          - generic [ref=e83]: 模板只定义画面规律，不复用竞品人物、商品或品牌元素
+        - region "模板筛选" [ref=e88]:
+          - generic [ref=e89]:
+            - button "全部 10" [ref=e90] [cursor=pointer]:
+              - text: 全部
+              - generic [ref=e95]: "10"
+            - button "图片 8" [ref=e96] [cursor=pointer]:
+              - text: 图片
+              - generic [ref=e102]: "8"
+            - button "视频 2" [active] [ref=e103] [cursor=pointer]:
+              - text: 视频
+              - generic [ref=e107]: "2"
+          - generic [ref=e108]:
+            - generic [ref=e109]: 用途
+            - combobox [ref=e110]:
+              - option "全部用途" [selected]
+              - option "居家上新"
+              - option "女装种草"
+              - option "店主试穿"
+          - generic [ref=e111]:
+            - generic [ref=e112]: 风格
+            - combobox [ref=e113]:
+              - option "全部风格" [selected]
+              - option "静奢质感"
+              - option "东方雅致"
+              - option "甜酷暗黑"
+              - option "多巴胺元气"
+          - textbox "搜索模板名称" [ref=e118]
+        - generic [ref=e119]:
+          - generic [ref=e120]:
+            - generic [ref=e121]:
+              - heading "推荐给你" [level=2] [ref=e122]
+              - generic [ref=e123]: 根据最近使用的睡衣 / 家居服素材
+            - button "按推荐排序" [ref=e124] [cursor=pointer]
+          - article [ref=e425]:
+            - generic [ref=e426]:
+              - img "静奢缎面慢镜头 预览" [ref=e427]
+              - generic [ref=e428]: 视频模板
+              - generic [ref=e432]: 6 秒
+              - generic [ref=e433]: V01
+            - generic [ref=e434]:
+              - generic [ref=e435]:
+                - heading "静奢缎面慢镜头" [level=3] [ref=e436]
+                - generic [ref=e437]: 轻运动
+              - paragraph [ref=e438]: 轻微转身，稳定展现缎面质感
+              - generic [ref=e439]:
+                - generic [ref=e440]: 适合：缎面睡衣 / 家居服
+                - button "使用" [ref=e441] [cursor=pointer]
+        - generic [ref=e196]:
+          - generic [ref=e198]:
+            - heading "全部模板" [level=2] [ref=e199]
+            - generic [ref=e200]: 共 2 个已发布模板
+          - article [ref=e445]:
+            - generic [ref=e446]:
+              - img "多巴胺元气动态 预览" [ref=e447]
+              - generic [ref=e448]: 视频模板
+              - generic [ref=e452]: 6 秒
+              - generic [ref=e453]: V02
+            - generic [ref=e454]:
+              - generic [ref=e455]:
+                - heading "多巴胺元气动态" [level=3] [ref=e456]
+                - generic [ref=e457]: 轻运动
+              - paragraph [ref=e458]: 轻快转身与明亮居家节奏
+              - generic [ref=e459]:
+                - generic [ref=e460]: 适合：少女睡衣 / 家居服
+                - button "使用" [ref=e461] [cursor=pointer]
+  - complementary "模板素材替换抽屉" [ref=e302]:
+    - generic [ref=e303]:
+      - img "模板预览" [ref=e304]
+      - generic [ref=e305]:
+        - text: 图片模板 / I01
+        - heading "静奢缎面晨光" [level=2] [ref=e306]
+        - paragraph [ref=e307]: 柔和侧光、低饱和留白，突出面料光泽和商品版型。
+    - generic [ref=e312]:
+      - button "关闭" [ref=e313] [cursor=pointer]
+      - generic [ref=e317]:
+        - text: 使用此模板
+        - heading "用你的商品替换素材" [level=2] [ref=e318]
+        - paragraph [ref=e319]: 只需要一张主体商品图。系统会在提交前检查图片是否适合此模板。
+      - generic [ref=e320]:
+        - heading "主体商品图 *" [level=3] [ref=e321]
+        - paragraph [ref=e322]: 建议白底、正面、商品完整可见
+        - generic [ref=e323]:
+          - img "已选商品素材" [ref=e324]
+          - generic [ref=e325]:
+            - generic [ref=e326]: 真丝家居服白底图.jpg
+            - generic [ref=e327]: 2048 x 2560 · 商品素材库 · 已通过基础校验
+        - generic [ref=e331]:
+          - button "从素材库选择" [ref=e332] [cursor=pointer]
+          - button "上传图片" [ref=e335] [cursor=pointer]
+      - generic [ref=e339]:
+        - heading "可选补充" [level=3] [ref=e340]
+        - paragraph [ref=e341]: 补充素材会提升细节表现，不上传也可以继续。
+        - generic [ref=e342]: 建议补充一张面料细节图。系统会优先保留缎面光泽、领口和袖口结构。
+        - button "添加面料细节图" [ref=e347] [cursor=pointer]
+      - generic [ref=e349]:
+        - heading "本次输出" [level=3] [ref=e350]
+        - generic [ref=e351]:
+          - generic [ref=e352]:
+            - generic [ref=e353]: 默认数量
+            - generic [ref=e354]: 4 张
+          - generic [ref=e355]:
+            - generic [ref=e356]: 画面比例
+            - generic [ref=e357]: 4:5
+          - generic [ref=e358]:
+            - generic [ref=e359]: 预计完成
+            - generic [ref=e360]: 约 2 分钟
+      - generic [ref=e361]:
+        - button "取消" [ref=e362] [cursor=pointer]
+        - button "查看并生成" [ref=e363] [cursor=pointer]

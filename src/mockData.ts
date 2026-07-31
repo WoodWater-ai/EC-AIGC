@@ -7,11 +7,49 @@ import {
   ProductAsset,
   SystemUser,
   SystemNotification,
+  VisualPromptTagCatalog,
 } from './types';
 import type { AssetResourceItem } from './api/modules/asset';
 import type { AssetCategoryNode } from './api/modules/assetCategory';
 import type { TemplateDTO } from './api/modules/template';
 import type { DictItem } from './api/modules/dict';
+
+/**
+ * 来自已采集风格样本的可视化选择配置。
+ * 每个枚举均使用项目内自有的效果提示图，避免将外部参考素材带入产品界面。
+ */
+export const mockImagePromptVisualTags: VisualPromptTagCatalog = {
+  styles: [
+    { id: 'SWEET_CREAMY', label: '奶油甜妹卧室', description: '柔光、浅色床品与轻松生活感', previewImage: '/mock-assets/tag-icons/style-sweet-creamy.png', defaultSceneId: 'CREAMY_BEDROOM', defaultPoseId: 'NATURAL_STAND', sceneIds: ['CREAMY_BEDROOM', 'QUIET_WINDOW'], poseIds: ['NATURAL_STAND', 'BED_EDGE_SIT', 'LOOK_BACK'] },
+    { id: 'QUIET_LUXURY', label: '静奢深睡品质感', description: '灰绿低饱和、垂感面料与窗边漫反射', previewImage: '/mock-assets/tag-icons/style-quiet-luxury.png', defaultSceneId: 'QUIET_WINDOW', defaultPoseId: 'WINDOW_WALK', sceneIds: ['QUIET_WINDOW', 'LIGHT_HOME', 'DARK_HOME'], poseIds: ['NATURAL_STAND', 'BED_EDGE_SIT', 'WINDOW_WALK'] },
+    { id: 'VINTAGE_HOME', label: '复古田园居家', description: '旧木、奶油织物与柔和晨光', previewImage: '/mock-assets/tag-icons/style-vintage-home.png', defaultSceneId: 'VINTAGE_WOOD', defaultPoseId: 'BED_EDGE_SIT', sceneIds: ['VINTAGE_WOOD', 'QUIET_WINDOW'], poseIds: ['BED_EDGE_SIT', 'WINDOW_WALK', 'SLEEVE_ADJUST'] },
+    { id: 'EASTERN_MATURE', label: '东方雅致轻熟', description: '雾蓝米白、端庄实穿与温和日光', previewImage: '/mock-assets/tag-icons/style-eastern-mature.png', defaultSceneId: 'LIGHT_HOME', defaultPoseId: 'THREE_QUARTER', sceneIds: ['LIGHT_HOME', 'QUIET_WINDOW', 'CHINESE_MINIMAL'], poseIds: ['NATURAL_STAND', 'THREE_QUARTER', 'SLEEVE_ADJUST'] },
+    { id: 'NEW_CHINESE_MINIMAL', label: '新中式雅致', description: '留白、木质与低饱和东方线条', previewImage: '/mock-assets/tag-icons/style-new-chinese-minimal.png', defaultSceneId: 'CHINESE_MINIMAL', defaultPoseId: 'SLEEVE_ADJUST', sceneIds: ['CHINESE_MINIMAL', 'LIGHT_HOME'], poseIds: ['NATURAL_STAND', 'THREE_QUARTER', 'SLEEVE_ADJUST'] },
+    { id: 'DOPAMINE_PLAYFUL', label: '多巴胺元气居家', description: '粉橘黄绿的明快生活氛围', previewImage: '/mock-assets/tag-icons/style-dopamine-playful.png', defaultSceneId: 'COLORFUL_ROOM', defaultPoseId: 'TURN_BACK', sceneIds: ['COLORFUL_ROOM', 'CREAMY_BEDROOM'], poseIds: ['NATURAL_STAND', 'TURN_BACK', 'LOOK_BACK'] },
+    { id: 'DARK_GOTHIC', label: '甜酷暗黑辣妹', description: '黑银侧光、修身线条与画册感', previewImage: '/mock-assets/tag-icons/style-dark-gothic.png', defaultSceneId: 'DARK_HOME', defaultPoseId: 'LOOK_BACK', sceneIds: ['DARK_HOME', 'WHITE_STUDIO'], poseIds: ['NATURAL_STAND', 'THREE_QUARTER', 'LOOK_BACK'] },
+    { id: 'SWEET_COOL_STREET', label: '甜酷美式街头', description: '低角度直给、轻松反差与个性细节', previewImage: '/mock-assets/tag-icons/style-sweet-cool-street.png', defaultSceneId: 'WHITE_STUDIO', defaultPoseId: 'THREE_QUARTER', sceneIds: ['WHITE_STUDIO', 'COLORFUL_ROOM'], poseIds: ['NATURAL_STAND', 'THREE_QUARTER', 'TURN_BACK'] },
+    { id: 'FRENCH_FEMININE', label: '法式轻奢裙装', description: '柔和轮廓、自然光与轻盈浪漫', previewImage: '/mock-assets/tag-icons/style-french-feminine.png', defaultSceneId: 'VINTAGE_WOOD', defaultPoseId: 'LOOK_BACK', sceneIds: ['VINTAGE_WOOD', 'QUIET_WINDOW', 'LIGHT_HOME'], poseIds: ['NATURAL_STAND', 'THREE_QUARTER', 'LOOK_BACK'] },
+  ],
+  scenes: [
+    { id: 'CREAMY_BEDROOM', label: '奶油柔光卧室', description: '浅色床品、柔和散射光', previewImage: '/mock-assets/tag-icons/scene-creamy-bedroom.png' },
+    { id: 'QUIET_WINDOW', label: '窗边安静居家', description: '自然窗光、留白与真实景深', previewImage: '/mock-assets/tag-icons/scene-quiet-window.png' },
+    { id: 'VINTAGE_WOOD', label: '旧木田园空间', description: '木质、织物与温暖晨光', previewImage: '/mock-assets/tag-icons/scene-vintage-wood.png' },
+    { id: 'LIGHT_HOME', label: '浅色质感家居', description: '米白雾蓝、干净生活空间', previewImage: '/mock-assets/tag-icons/scene-light-home.png' },
+    { id: 'CHINESE_MINIMAL', label: '留白新中式', description: '木质屏风、淡墨绿色与留白', previewImage: '/mock-assets/tag-icons/scene-chinese-minimal.png' },
+    { id: 'COLORFUL_ROOM', label: '元气彩色房间', description: '克制彩色道具与明快日光', previewImage: '/mock-assets/tag-icons/scene-colorful-room.png' },
+    { id: 'DARK_HOME', label: '暗调缎面居家', description: '深灰暗红、局部高光与私域感', previewImage: '/mock-assets/tag-icons/scene-dark-home.png' },
+    { id: 'WHITE_STUDIO', label: '明亮低干扰影棚', description: '商品优先、背景克制、轮廓清晰', previewImage: '/mock-assets/tag-icons/scene-white-studio.png' },
+  ],
+  poses: [
+    { id: 'NATURAL_STAND', label: '自然站姿', description: '全身完整，手部不遮挡商品', previewImage: '/mock-assets/tag-icons/pose-natural-stand.svg' },
+    { id: 'THREE_QUARTER', label: '45 度微侧身', description: '兼顾版型轮廓与正面信息', previewImage: '/mock-assets/tag-icons/pose-three-quarter.svg' },
+    { id: 'BED_EDGE_SIT', label: '床边自然坐姿', description: '松弛居家，衣摆自然展开', previewImage: '/mock-assets/tag-icons/pose-bed-edge-sit.svg' },
+    { id: 'WINDOW_WALK', label: '窗边缓步', description: '展示垂感与衣摆动态', previewImage: '/mock-assets/tag-icons/pose-window-walk.svg' },
+    { id: 'SLEEVE_ADJUST', label: '轻整理袖口', description: '突出袖口细节，不遮挡主体', previewImage: '/mock-assets/tag-icons/pose-sleeve-adjust.svg' },
+    { id: 'TURN_BACK', label: '轻转身', description: '展示侧背面轮廓与松量', previewImage: '/mock-assets/tag-icons/pose-turn-back.svg' },
+    { id: 'LOOK_BACK', label: '侧身回望', description: '保留人物神态，同时保持商品可见', previewImage: '/mock-assets/tag-icons/pose-look-back.svg' },
+  ],
+};
 
 export const mockModelChannels: MockModelChannel[] = [
   {
@@ -76,9 +114,9 @@ export const mockModelChannels: MockModelChannel[] = [
 ];
 
 export const mockModelProfiles: ModelProfile[] = [
-  { id: 'model-1', name: '林澈 · 清冷通勤', image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80', source: '虚拟模特', tags: ['通勤', '高级脸', '轻熟'], suitableFor: ['product_main', 'scene_detail', 'on_model'], reason: '适合极简通勤和轻奢女装表达。' },
-  { id: 'model-2', name: '周野 · 运动街头', image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=300&q=80', source: '授权参考', tags: ['运动', '街头', '力量感'], suitableFor: ['scene_detail', 'on_model'], reason: '适合鞋服和运动配件的动态场景。' },
-  { id: 'model-3', name: '顾南 · 自然生活', image: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=300&q=80', source: '内部素材', tags: ['自然', '亲和', '生活方式'], suitableFor: ['product_main', 'scene_detail'], reason: '适合美妆和生活方式类商品。' },
+  { id: 'model-senior', name: '银发居家', image: '/mock-assets/reference/model-senior.jpg', source: '内部素材', tags: ['成熟', '居家', '松弛'], suitableFor: ['scene_detail', 'on_model'], reason: '来自飞书参考图，适合成熟舒适的居家睡衣场景。', status: 'active', sourceMode: 'reference', faceAnchor: { assetId: 'model-senior-face', url: '/mock-assets/reference/model-senior.jpg', position: 1, role: 'face_anchor' }, appearanceAnchor: { assetId: 'model-senior-appearance', url: '/mock-assets/reference/model-senior.jpg', position: 1, role: 'appearance_anchor' } },
+  { id: 'model-pure', name: '清透温柔', image: '/mock-assets/reference/model-pure.jpg', source: '内部素材', tags: ['清透', '温柔', '居家'], suitableFor: ['product_main', 'scene_detail', 'on_model'], reason: '来自飞书参考图，适合轻柔缎面与蕾丝细节表达。', status: 'active', sourceMode: 'reference', faceAnchor: { assetId: 'model-pure-face', url: '/mock-assets/reference/model-pure.jpg', position: 1, role: 'face_anchor' }, appearanceAnchor: { assetId: 'model-pure-appearance', url: '/mock-assets/reference/model-pure.jpg', position: 1, role: 'appearance_anchor' } },
+  { id: 'model-sweet', name: '年轻甜美', image: '/mock-assets/reference/model-sweet.jpg', source: '内部素材', tags: ['甜美', '元气', '居家'], suitableFor: ['scene_detail', 'on_model'], reason: '来自飞书参考图，适合绿色爱心睡衣套装。', status: 'active', sourceMode: 'reference', faceAnchor: { assetId: 'model-sweet-face', url: '/mock-assets/reference/model-sweet.jpg', position: 1, role: 'face_anchor' }, appearanceAnchor: { assetId: 'model-sweet-appearance', url: '/mock-assets/reference/model-sweet.jpg', position: 1, role: 'appearance_anchor' } },
 ];
 
 const mockTemplateTime = '2026-07-15 10:00:00';
@@ -170,92 +208,76 @@ export const mockNotifications: SystemNotification[] = [
 
 export const mockProducts: ProductAsset[] = [
   {
-    id: 'p1',
-    name: 'MW Series 7 智联运动手表',
-    sku: 'SKU-MW7-BLK',
-    category: '智能硬件',
-    imageCount: 12,
-    videoCount: 3,
-    thumbnail: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=500&q=80',
-    addedTime: '2026-06-15',
+    id: 'p-lark-sleepdress-senior',
+    larkRecordId: 'rec8NpdFuP',
+    name: '藏青碎花蕾丝吊带睡裙',
+    sku: 'LARK-rec8NpdFuP',
+    category: '服饰家居',
+    imageCount: 3,
+    videoCount: 0,
+    thumbnail: '/mock-assets/lark/sleepdress-senior.jpg',
+    addedTime: '2026-06-11',
     specs: {
-      brand: 'MatrixWear',
-      color: ['曜石黑', '极光银', '深海蓝'],
-      material: '航天级钛金属 + 氟橡胶表带',
-      weight: '48.5g',
-      sellingPoints: ['双频多星GPS定位', '14天极致续航', '动态血氧/心率深度监测', '50米专业防水']
+      brand: '飞书睡衣素材演示',
+      color: ['藏青色', '黑色碎花', '黑色蕾丝'],
+      material: '仿真丝缎面 + 睫毛蕾丝',
+      weight: '未标注',
+      sellingPoints: ['V 领细肩带', '黑色睫毛蕾丝拼接', '修身微 A 中长版型', '缎面自然光泽']
     },
     files: [
-      { id: 'f1_1', name: '手表主体_正面免抠.png', url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', size: '2.4 MB', type: 'image' },
-      { id: 'f1_2', name: '手表右侧按键微距.png', url: 'https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?auto=format&fit=crop&w=400&q=80', size: '4.1 MB', type: 'image' },
-      { id: 'f1_3', name: '钛金属表盘拉丝质感.png', url: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=400&q=80', size: '3.8 MB', type: 'image' },
-      { id: 'f1_4', name: '表带卡扣与人体工学.mov', url: 'https://assets.mixkit.co/videos/preview/mixkit-smartwatch-on-a-desk-close-up-34440-large.mp4', size: '28.5 MB', type: 'video' }
-    ]
+      { id: 'f-senior-main', larkRecordId: 'rec8NpdFuP', name: '飞书白底图_藏青碎花蕾丝吊带睡裙.jpg', url: '/mock-assets/lark/sleepdress-senior.jpg', size: '176 KB', type: 'image' },
+    ],
+    fabric: '仿真丝缎面，黑色睫毛蕾丝拼接',
+    forbiddenChanges: ['藏青底色', '黑色碎花', 'V 领与细肩带', '领口和下摆的黑色睫毛蕾丝位置'],
   },
   {
-    id: 'p2',
-    name: 'Nike Air Max Elite 2026 跑鞋',
-    sku: 'SKU-NK-AM26-RED',
-    category: '户外服饰',
-    imageCount: 18,
-    videoCount: 5,
-    thumbnail: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80',
-    addedTime: '2026-06-20',
+    id: 'p-source-green-pajama-set',
+    larkRecordId: 'recvlvuL9f9t4A',
+    name: '绿色小爱心蕾丝缎面睡衣三件套',
+    sku: 'LARK-recvlvuL9f9t4A',
+    category: '服饰家居',
+    imageCount: 3,
+    videoCount: 0,
+    thumbnail: '/mock-assets/source/green-pajama-top.jpg',
+    addedTime: '2026-06-11',
     specs: {
-      brand: 'Nike',
-      color: ['火焰红', '荧光绿', '极简白'],
-      material: 'Flyknit 编织鞋面 + 氮气缓震大底',
-      weight: '240g',
-      sellingPoints: ['全掌蜂窝氮气气垫', '超透气编织纤维包裹', '抗扭碳纤维支撑片', '夜间反光安全涂层']
+      brand: '原始资料 / 飞书导入样本',
+      color: ['牛油果绿', '黑色爱心', '黑色蕾丝'],
+      material: '冰感仿真丝缎面',
+      weight: '未标注',
+      sellingPoints: ['同色竖条纹肌理', '黑色爱心满印', '蕾丝拼接细节', '宽松居家版型']
     },
     files: [
-      { id: 'f2_1', name: '跑鞋免抠主图.png', url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80', size: '1.9 MB', type: 'image' },
-      { id: 'f2_2', name: '气垫避震拉丝微距.png', url: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&w=400&q=80', size: '3.2 MB', type: 'image' },
-      { id: 'f2_3', name: '编织鞋面特写.png', url: 'https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?auto=format&fit=crop&w=400&q=80', size: '2.7 MB', type: 'image' }
-    ]
+      { id: 'f-green-top', larkRecordId: 'recvlvuL9f9t4A', name: 'DSC09265_绿色小爱心蕾丝缎面睡衣上衣.jpg', url: '/mock-assets/source/green-pajama-top.jpg', size: '150 KB', type: 'image' },
+      { id: 'f-green-shorts', larkRecordId: 'recvlvuMhMPTNx', name: 'DSC09267_绿色小爱心蕾丝缎面睡衣短裤.jpg', url: '/mock-assets/source/green-pajama-shorts.jpg', size: '140 KB', type: 'image' },
+      { id: 'f-green-pants', larkRecordId: 'recvlvuNkjWwLx', name: 'DSC09266_绿色小爱心蕾丝缎面睡衣长裤.jpg', url: '/mock-assets/source/green-pajama-pants.jpg', size: '150 KB', type: 'image' },
+    ],
+    fabric: '冰感仿真丝缎面，黑色蕾丝拼接',
+    forbiddenChanges: ['牛油果绿色', '黑色爱心印花', '竖条纹肌理', '黑色蕾丝边与松紧腰结构'],
   },
   {
-    id: 'p3',
-    name: '极致臻颜草本精华保湿乳',
-    sku: 'SKU-SKN-ESS-100',
-    category: '美妆护肤',
-    imageCount: 8,
-    videoCount: 2,
-    thumbnail: 'https://images.unsplash.com/photo-1608248597481-496100c8c836?auto=format&fit=crop&w=500&q=80',
-    addedTime: '2026-06-25',
+    id: 'p-lark-sleepdress-pure',
+    larkRecordId: 'recvkTkZ6L8rlL',
+    name: '雾蓝紫碎花蕾丝缎面睡裙',
+    sku: 'LARK-recvkTkZ6L8rlL',
+    category: '服饰家居',
+    imageCount: 2,
+    videoCount: 0,
+    thumbnail: '/mock-assets/lark/sleepdress-pure.jpg',
+    addedTime: '2026-06-11',
     specs: {
-      brand: 'PhytoGlow',
-      color: ['乳白色'],
-      material: '磨砂防紫外线玻璃瓶',
-      weight: '100ml',
-      sellingPoints: ['95% 天然草本精萃', '72小时角质层长效锁水', '清爽不粘腻配方', '敏感肌无添加安全认证']
+      brand: '飞书睡衣素材演示',
+      color: ['雾感蓝紫', '黑色碎花', '黑色蕾丝'],
+      material: '丝滑缎面 + 睫毛蕾丝',
+      weight: '未标注',
+      sellingPoints: ['修身中长吊带版型', 'V 领蕾丝拼接', '双层睫毛蕾丝下摆', '居家与外穿场景适配']
     },
     files: [
-      { id: 'f3_1', name: '精华乳白色去背.png', url: 'https://images.unsplash.com/photo-1608248597481-496100c8c836?auto=format&fit=crop&w=400&q=80', size: '1.5 MB', type: 'image' },
-      { id: 'f3_2', name: '瓶盖磨砂奢华细节.png', url: 'https://images.unsplash.com/photo-1617897903246-719242758050?auto=format&fit=crop&w=400&q=80', size: '2.9 MB', type: 'image' }
-    ]
+      { id: 'f-pure-main', larkRecordId: 'recvkTkZ6L8rlL', name: '飞书白底图_雾蓝紫碎花蕾丝缎面睡裙.jpg', url: '/mock-assets/lark/sleepdress-pure.jpg', size: '159 KB', type: 'image' },
+    ],
+    fabric: '雾感蓝紫碎花缎面，黑色睫毛蕾丝拼接',
+    forbiddenChanges: ['雾蓝紫底色', '黑色碎花', '细肩带和 V 领', '下摆双层黑色睫毛蕾丝'],
   },
-  {
-    id: 'p4',
-    name: '超轻便透气抗撕裂防风羽绒服',
-    sku: 'SKU-OUT-JKT-GRY',
-    category: '户外服饰',
-    imageCount: 14,
-    videoCount: 4,
-    thumbnail: 'https://images.unsplash.com/photo-1544923246-77307dd654cb?auto=format&fit=crop&w=500&q=80',
-    addedTime: '2026-06-30',
-    specs: {
-      brand: 'PeakTech',
-      color: ['火山灰', '极夜黑', '苔原绿'],
-      material: 'DWR防泼水涂层 + 800蓬松白鸭绒',
-      weight: '310g',
-      sellingPoints: ['极轻量可收纳设计', '防风透湿Gore-Tex结构', '抗撕裂格纹编织面料', '智能恒温蓄热里布']
-    },
-    files: [
-      { id: 'f4_1', name: '羽绒服正面模特展示.png', url: 'https://images.unsplash.com/photo-1544923246-77307dd654cb?auto=format&fit=crop&w=400&q=80', size: '3.6 MB', type: 'image' },
-      { id: 'f4_2', name: '防泼水面料荷叶效应.png', url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80', size: '4.2 MB', type: 'image' }
-    ]
-  }
 ];
 
 /** 资源中心在 mock 模式下使用的 Demo 分类与素材，可直接替换为多维表格/API 数据源。 */
@@ -287,6 +309,7 @@ export const mockAssetResources: AssetResourceItem[] = [
     fileSize: Number.parseFloat(file.size) * 1024 * 1024,
     tags: fileIndex === 0 ? '商品原图,商品主体' : '细节参考图,商品细节',
     productAssetId: product.id,
+    larkRecordId: file.larkRecordId ?? product.larkRecordId,
     uploadUserId: 1,
     status: 'NORMAL' as const,
     categoryIds: [fileIndex === 0 ? 11 : 12],
@@ -306,34 +329,34 @@ export const mockAssetResources: AssetResourceItem[] = [
     createTime: '2026-07-13T10:00:00',
   })),
   {
-    id: 301, fileResourceId: 1301, name: '奢华丝绸光影风格板.jpg', assetKind: 'IMAGE',
-    originalUrl: 'https://images.unsplash.com/photo-1523779917675-b6ed3a42a561?auto=format&fit=crop&w=600&q=80',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1523779917675-b6ed3a42a561?auto=format&fit=crop&w=600&q=80',
-    tags: '风格参考,奢华丝绸风', uploadUserId: 1, status: 'NORMAL', categoryIds: [21], createTime: '2026-07-13T10:00:00',
+    id: 301, fileResourceId: 1301, name: '奶油甜妹卧室风格参考.jpg', assetKind: 'IMAGE',
+    originalUrl: '/mock-assets/reference/style-creamy-bedroom.jpg',
+    thumbnailUrl: '/mock-assets/reference/style-creamy-bedroom.jpg',
+    tags: '风格参考,甜美网红风,奶油甜妹卧室,原始资料', uploadUserId: 1, status: 'NORMAL', categoryIds: [21], createTime: '2026-07-28T10:00:00',
   },
   {
-    id: 302, fileResourceId: 1302, name: '自然影棚柔光台面.jpg', assetKind: 'IMAGE',
-    originalUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=600&q=80',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=600&q=80',
-    tags: '场景参考,自然影棚', uploadUserId: 1, status: 'NORMAL', categoryIds: [22], createTime: '2026-07-13T10:00:00',
+    id: 302, fileResourceId: 1302, name: '轻奢缎面居家场景参考.jpg', assetKind: 'IMAGE',
+    originalUrl: '/mock-assets/reference/scene-satin-home.jpg',
+    thumbnailUrl: '/mock-assets/reference/scene-satin-home.jpg',
+    tags: '场景参考,窗边生活场景,轻奢缎面居家,原始资料', uploadUserId: 1, status: 'NORMAL', categoryIds: [22], createTime: '2026-07-28T10:00:00',
   },
   {
-    id: 303, fileResourceId: 1303, name: '自然正面站姿参考.jpg', assetKind: 'IMAGE',
-    originalUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&q=80',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&q=80',
-    tags: '姿势参考,自然正面', uploadUserId: 1, status: 'NORMAL', categoryIds: [23], createTime: '2026-07-13T10:00:00',
+    id: 303, fileResourceId: 1303, name: '店主试穿自然站姿参考.jpg', assetKind: 'IMAGE',
+    originalUrl: '/mock-assets/reference/pose-tryon.jpg',
+    thumbnailUrl: '/mock-assets/reference/pose-tryon.jpg',
+    tags: '姿势参考,自然站姿,原始资料', uploadUserId: 1, status: 'NORMAL', categoryIds: [23], createTime: '2026-07-28T10:00:00',
   },
   {
-    id: 304, fileResourceId: 1304, name: '奶油白针织上衣.png', assetKind: 'IMAGE',
-    originalUrl: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=600&q=80',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=600&q=80',
-    tags: '上衣,服饰搭配', uploadUserId: 1, status: 'NORMAL', categoryIds: [41], createTime: '2026-07-13T10:00:00',
+    id: 304, fileResourceId: 1304, name: 'DSC09265_绿色小爱心睡衣上衣.jpg', assetKind: 'IMAGE',
+    originalUrl: '/mock-assets/source/green-pajama-top.jpg',
+    thumbnailUrl: '/mock-assets/source/green-pajama-top.jpg',
+    tags: '上衣,服饰搭配,商品原图,绿色小爱心', productAssetId: 'p-source-green-pajama-set', larkRecordId: 'recvlvuL9f9t4A', uploadUserId: 1, status: 'NORMAL', categoryIds: [41], createTime: '2026-06-11T10:00:00',
   },
   {
-    id: 305, fileResourceId: 1305, name: '直筒牛仔下装.png', assetKind: 'IMAGE',
-    originalUrl: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=600&q=80',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=600&q=80',
-    tags: '下装,服饰搭配', uploadUserId: 1, status: 'NORMAL', categoryIds: [42], createTime: '2026-07-13T10:00:00',
+    id: 305, fileResourceId: 1305, name: 'DSC09267_绿色小爱心睡衣短裤.jpg', assetKind: 'IMAGE',
+    originalUrl: '/mock-assets/source/green-pajama-shorts.jpg',
+    thumbnailUrl: '/mock-assets/source/green-pajama-shorts.jpg',
+    tags: '下装,服饰搭配,商品原图,绿色小爱心', productAssetId: 'p-source-green-pajama-set', larkRecordId: 'recvlvuMhMPTNx', uploadUserId: 1, status: 'NORMAL', categoryIds: [42], createTime: '2026-06-11T10:00:00',
   },
   {
     id: 401, fileResourceId: 1401, name: '春季通勤针织衫爆款节奏参考.mp4', assetKind: 'VIDEO',
@@ -355,20 +378,31 @@ export const mockReferenceAnalysisByFileId: Record<number, {
   pose?: string;
   promptHint: string;
 }> = {
-  1001: { promptHint: '突出表冠、按键与金属边缘的微距细节，避免过度锐化。' },
-  1011: { promptHint: '突出气垫纹理和缓震层次，保持材质的真实反光。' },
-  1021: { promptHint: '突出磨砂瓶盖与玻璃材质，保留瓶身文字的可读性。' },
-  1031: { promptHint: '突出防泼水面料和水珠接触细节，保留织物纹理。' },
-  1301: { style: '奢华丝绸风 (Elegant Silk Satin)', promptHint: '参考丝绸的低饱和光泽、柔和渐变与精致陈列质感。' },
-  1302: { scene: '自然影棚', promptHint: '使用干净的柔光台面、克制阴影和明确的商品轮廓。' },
-  1303: { pose: '自然正面', promptHint: '保持自然正面站姿，手部不遮挡商品主体。' },
+  1000: { style: 'QUIET_LUXURY', scene: 'QUIET_WINDOW', pose: 'BED_EDGE_SIT', promptHint: '保留藏青碎花缎面与睫毛蕾丝，使用安静温暖的居家叙事。' },
+  1010: { style: 'SWEET_CREAMY', scene: 'CREAMY_BEDROOM', pose: 'NATURAL_STAND', promptHint: '保留牛油果绿爱心印花和蕾丝拼接，突出宽松睡衣上衣版型。' },
+  1011: { style: 'SWEET_CREAMY', scene: 'CREAMY_BEDROOM', pose: 'BED_EDGE_SIT', promptHint: '突出短裤的松紧腰、宽松裤腿和黑色蕾丝裤脚。' },
+  1012: { style: 'SWEET_CREAMY', scene: 'QUIET_WINDOW', pose: 'NATURAL_STAND', promptHint: '突出长裤的阔腿垂坠与黑色爱心印花，不改变裤脚蕾丝。' },
+  1020: { style: 'VINTAGE_HOME', scene: 'VINTAGE_WOOD', pose: 'THREE_QUARTER', promptHint: '保留雾蓝紫碎花缎面、V 领细肩带与双层睫毛蕾丝下摆。' },
+  1200: { pose: 'BED_EDGE_SIT', promptHint: '采用成熟、松弛的居家人物状态。' },
+  1201: { pose: 'NATURAL_STAND', promptHint: '采用清透柔和的模特姿态，避免遮挡商品。' },
+  1202: { pose: 'NATURAL_STAND', promptHint: '采用年轻甜美的居家试穿姿态，避免夸张动作。' },
+  1301: { style: 'SWEET_CREAMY', promptHint: '参考奶油色卧室的柔和光线与甜美生活感。' },
+  1302: { scene: 'QUIET_WINDOW', promptHint: '使用轻奢缎面居家场景，保持商品是视觉中心。' },
+  1303: { pose: 'NATURAL_STAND', promptHint: '保持自然站姿，手部不遮挡商品主体。' },
 };
+
+const sleepdressResultSource = {
+  recordId: 'recvkTkZ6L8rlL',
+  productName: '雾蓝紫碎花蕾丝睡裙',
+  productImg: '/mock-assets/lark/sleepdress-pure.jpg',
+} as const;
 
 export const mockTasks: GenerationTask[] = [
   {
     id: 'T-1004',
     name: 'Nike Air Max _ 3D赛博炫彩展示 (批次#1)',
     type: 'image',
+    groupId: 'G-20260703-001', groupOrder: 1, submittedAt: '2026-07-03 17:42', imageType: 'product_main',
     status: 'running',
     progress: 68,
     productName: 'Nike Air Max Elite 2026 跑鞋',
@@ -383,6 +417,7 @@ export const mockTasks: GenerationTask[] = [
     id: 'T-1003',
     name: '轻便防风羽绒服 _ 动态风雪覆盖 (批次#4)',
     type: 'image',
+    groupId: 'G-20260703-002', groupOrder: 1, submittedAt: '2026-07-03 16:10', imageType: 'scene_detail',
     status: 'failed',
     progress: 100,
     productName: '超轻便透气抗撕裂防风羽绒服',
@@ -396,16 +431,36 @@ export const mockTasks: GenerationTask[] = [
   },
   {
     id: 'T-1002',
-    name: '精华保湿乳 _ 极简北欧大理石展示 (批次#1)',
+    name: '雾蓝紫碎花蕾丝睡裙 _ 模特上身三视图 (批次#1)',
     type: 'image',
-    status: 'completed',
+    groupId: 'G-20260702-001', groupOrder: 1, submittedAt: '2026-07-02 14:05', imageType: 'on_model',
+    status: 'archived',
     progress: 100,
-    productName: '极致臻颜草本精华保湿乳',
-    productImg: 'https://images.unsplash.com/photo-1608248597481-496100c8c836?auto=format&fit=crop&w=150&q=80',
-    templateName: '极简北欧冷淡风大理石',
-    timestamp: '2026-07-03 15:30',
+    productName: sleepdressResultSource.productName,
+    productImg: sleepdressResultSource.productImg,
+    templateName: '商品上身三视图',
+    timestamp: '2026-07-02 14:05',
     creator: '陈美晴',
-    resultUrl: 'https://images.unsplash.com/photo-1608248597481-496100c8c836?auto=format&fit=crop&w=600&q=80',
+    taskPrompt: '生成模特正面、侧面、背面上身展示，保持雾蓝紫睡裙的蕾丝花型、吊带结构、裙长和面料质感准确可辨。',
+    negativePrompt: '服装款式改变、蕾丝花型错乱、颜色漂移、人物肢体异常、主体模糊',
+    results: [
+      {
+        id: 'T-1002-result-1', url: '/mock-assets/results/sleepdress-three-view.png', version: 1, reviewStage: 'approved',
+        sourceRecordId: sleepdressResultSource.recordId, sourceFileName: '1782441429457_0.png',
+        aestheticReview: { reviewer: '陈美晴 · 设计/美工', timestamp: '2026-07-02 14:22', rating: 5, tags: ['商业可用'], comment: 'mock 审核：三视图完整，款式和蕾丝细节符合商品事实。', decision: 'approved' },
+      },
+      {
+        id: 'T-1002-result-2', url: '/mock-assets/results/sleepdress-three-view-bedroom.png', version: 2, reviewStage: 'approved', parentImageId: 'T-1002-result-1',
+        editInstruction: '保持三视图完整，并调整为柔和居家光线。',
+        sourceRecordId: sleepdressResultSource.recordId, sourceFileName: '1782444142221_0.png',
+        revisionContext: {
+          rootResultId: 'T-1002-result-1', sourceTaskId: 'T-1002', basePrompt: '生成模特正面、侧面、背面上身展示，保持雾蓝紫睡裙的蕾丝花型、吊带结构、裙长和面料质感准确可辨。',
+          negativePrompt: '服装款式改变、蕾丝花型错乱、颜色漂移、人物肢体异常、主体模糊', fidelityRules: ['保持睡裙款式、蕾丝花型和雾蓝紫颜色不变', '未标记区域保持原图构图和视觉关系'],
+          turns: [{ id: 'edit-demo-1', role: 'user', content: '保持三视图完整，并调整为柔和居家光线。', timestamp: '2026-07-02 14:20', sourceResultId: 'T-1002-result-1' }],
+        },
+        aestheticReview: { reviewer: '陈美晴 · 设计/美工', timestamp: '2026-07-02 14:24', rating: 4, tags: ['细节质感', '商业可用'], comment: 'mock 审核：居家光线自然，可作为上身展示补充图。', decision: 'approved' },
+      },
+    ],
     modelChannel: 'DaVinci Vision v3.5 (自研推荐)',
     params: { ratio: '3:4', steps: 35, guidance: 8.0 }
   },
@@ -413,6 +468,7 @@ export const mockTasks: GenerationTask[] = [
     id: 'T-1001',
     name: 'MW Series 7 _ 能量粒子环绕动态视频 (批次#1)',
     type: 'video',
+    groupId: 'G-20260703-003', groupOrder: 1, submittedAt: '2026-07-03 11:15',
     status: 'completed',
     progress: 100,
     productName: 'MW Series 7 智联运动手表',
@@ -426,16 +482,26 @@ export const mockTasks: GenerationTask[] = [
   },
   {
     id: 'T-1000',
-    name: '精华保湿乳 _ 高奢丝绸漂浮 (批次#2)',
+    name: '雾蓝紫碎花蕾丝睡裙 _ 卧室场景图 (批次#2)',
     type: 'image',
+    groupId: 'G-20260702-001', groupOrder: 2, submittedAt: '2026-07-02 14:05', imageType: 'scene_detail',
     status: 'rejected',
     progress: 100,
-    productName: '极致臻颜草本精华保湿乳',
-    productImg: 'https://images.unsplash.com/photo-1608248597481-496100c8c836?auto=format&fit=crop&w=150&q=80',
-    templateName: '高奢丝绸缎面优雅漂浮场景',
+    productName: sleepdressResultSource.productName,
+    productImg: sleepdressResultSource.productImg,
+    templateName: '柔光卧室场景展示',
     timestamp: '2026-07-02 14:05',
     creator: '陈美晴',
-    feedback: '高光部分过曝，文字反差度不够，已拒绝。需要调整模型引导系数 (CFG) 到 6.5 以下，重渲染。',
+    taskPrompt: '在柔和卧室环境中展示模特自然站姿，睡裙主体完整可见，保持蕾丝领口、吊带和雾蓝紫花型不变。',
+    negativePrompt: '服装遮挡、商品主体过小、颜色失真、裙长变化、人物肢体异常',
+    feedback: 'mock 审核：场景留白偏多，需提升商品主体在画面中的占比。',
+    results: [
+      {
+        id: 'T-1000-result-1', url: '/mock-assets/results/sleepdress-bedroom.png', version: 1, reviewStage: 'rejected',
+        sourceRecordId: sleepdressResultSource.recordId, sourceFileName: '1782444082176_0.png',
+        aestheticReview: { reviewer: '陈美晴 · 设计/美工', timestamp: '2026-07-02 14:28', rating: 3, tags: ['构图问题', '商业可用'], comment: 'mock 审核：场景留白偏多，需提升商品主体在画面中的占比。', decision: 'rejected' },
+      },
+    ],
     modelChannel: 'Midjourney v6.1 High-Res Proxy',
     params: { ratio: '1:1', steps: 40, guidance: 12.0 }
   },
@@ -443,6 +509,7 @@ export const mockTasks: GenerationTask[] = [
     id: 'T-0999',
     name: 'Nike Air Max 炫彩户外海报 (批次#3)',
     type: 'image',
+    groupId: 'G-20260703-001', groupOrder: 2, submittedAt: '2026-07-03 17:42', imageType: 'scene_detail',
     status: 'completed',
     progress: 100,
     productName: 'Nike Air Max Elite 2026 跑鞋',
@@ -450,6 +517,8 @@ export const mockTasks: GenerationTask[] = [
     templateName: '盛夏户外阳光与椰影沙滩',
     timestamp: '2026-07-02 09:30',
     creator: '陆永奇',
+    taskPrompt: '展示商品局部材质与结构细节，保持原始颜色和边缘清晰。',
+    negativePrompt: '细节模糊、材质替换、错误标识',
     resultUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80',
     modelChannel: 'DaVinci Vision v3.5 (自研推荐)',
     params: { ratio: '16:9', steps: 30, guidance: 7.0 }
@@ -458,6 +527,7 @@ export const mockTasks: GenerationTask[] = [
     id: 'T-0998',
     name: '智能运动手表概念渲染短视频 (批次#2)',
     type: 'video',
+    groupId: 'G-20260701-001', groupOrder: 1, submittedAt: '2026-07-01 16:40',
     status: 'running',
     progress: 45,
     productName: 'MW Series 7 智联运动手表',
@@ -472,6 +542,7 @@ export const mockTasks: GenerationTask[] = [
     id: 'T-0997',
     name: '防风羽绒服 _ 极地探险图 (批次#1)',
     type: 'image',
+    groupId: 'G-20260703-002', groupOrder: 2, submittedAt: '2026-07-03 16:10', imageType: 'detail_closeup',
     status: 'completed',
     progress: 100,
     productName: '超轻便透气抗撕裂防风羽绒服',
@@ -485,16 +556,31 @@ export const mockTasks: GenerationTask[] = [
   },
   {
     id: 'T-0996',
-    name: '极致草本精华白色背景主图 (批次#1)',
+    name: '雾蓝紫碎花蕾丝睡裙 _ 蕾丝细节图 (批次#3)',
     type: 'image',
-    status: 'completed',
+    groupId: 'G-20260702-001', groupOrder: 3, submittedAt: '2026-07-02 14:05', imageType: 'detail_closeup',
+    status: 'candidate',
     progress: 100,
-    productName: '极致臻颜草本精华保湿乳',
-    productImg: 'https://images.unsplash.com/photo-1608248597481-496100c8c836?auto=format&fit=crop&w=150&q=80',
-    templateName: '极简北欧冷淡风大理石',
+    productName: sleepdressResultSource.productName,
+    productImg: sleepdressResultSource.productImg,
+    templateName: '蕾丝与面料细节特写',
     timestamp: '2026-06-30 14:12',
     creator: '陆永奇',
-    resultUrl: 'https://images.unsplash.com/photo-1608248597481-496100c8c836?auto=format&fit=crop&w=600&q=80',
+    taskPrompt: '近距离展示睡裙蕾丝领口、雾蓝紫提花面料和吊带连接处，保持真实纹理、颜色和花型。',
+    negativePrompt: '蕾丝边缘融化、花型错乱、颜色偏移、过度磨皮、局部模糊',
+    results: [
+      {
+        id: 'T-0996-result-1', url: '/mock-assets/results/sleepdress-lace-detail.png', version: 1, reviewStage: 'candidate',
+        sourceRecordId: sleepdressResultSource.recordId, sourceFileName: '1782444206149_0.png',
+        revisionContext: {
+          rootResultId: 'T-0996-result-1', sourceTaskId: 'T-0996',
+          basePrompt: '近距离展示睡裙蕾丝领口、雾蓝紫提花面料和吊带连接处，保持真实纹理、颜色和花型。',
+          negativePrompt: '蕾丝边缘融化、花型错乱、颜色偏移、过度磨皮、局部模糊',
+          fidelityRules: ['保持睡裙款式、蕾丝花型和雾蓝紫颜色不变', '未标记区域保持原图构图和视觉关系'],
+          turns: [],
+        },
+      },
+    ],
     modelChannel: 'DaVinci Vision v3.5 (自研推荐)',
     params: { ratio: '1:1', steps: 25, guidance: 6.5 }
   },
@@ -502,6 +588,7 @@ export const mockTasks: GenerationTask[] = [
     id: 'T-0995',
     name: 'Nike 跑鞋酷炫旋转飞沙视频 (批次#1)',
     type: 'video',
+    groupId: 'G-20260629-001', groupOrder: 1, submittedAt: '2026-06-29 11:00',
     status: 'completed',
     progress: 100,
     productName: 'Nike Air Max Elite 2026 跑鞋',

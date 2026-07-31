@@ -1,0 +1,260 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e8]:
+        - strong [ref=e9]: 达芬奇密码 AI
+        - generic [ref=e10]: DA VINCI CODE / WORKBENCH
+      - button "新建任务" [ref=e11] [cursor=pointer]
+      - generic [ref=e13]: 主模块导航
+      - navigation [ref=e14]:
+        - button "首页总览" [ref=e15] [cursor=pointer]
+        - button "生成任务" [ref=e21] [cursor=pointer]
+        - button "任务列表" [ref=e25] [cursor=pointer]
+        - button "商品素材库" [ref=e29] [cursor=pointer]
+        - button "模板中心" [ref=e35] [cursor=pointer]
+        - button "数据复盘" [ref=e40] [cursor=pointer]
+      - generic [ref=e43]: 新流程尝试
+      - navigation [ref=e44]:
+        - button "灵感模板 BETA" [ref=e45] [cursor=pointer]:
+          - text: 灵感模板
+          - generic [ref=e48]: BETA
+      - generic [ref=e49]:
+        - text: 当前工作空间
+        - generic [ref=e50]:
+          - generic [ref=e51]: 林
+          - generic [ref=e52]:
+            - generic [ref=e53]: 林可心
+            - generic [ref=e54]: 运营 / 任务创建人
+    - generic [ref=e55]:
+      - banner [ref=e56]:
+        - generic [ref=e57]:
+          - generic [ref=e58]: 生成任务
+          - strong [ref=e61]: 灵感模板
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - text: 本月预算
+            - generic [ref=e68]: 62%
+          - button "通知" [ref=e69] [cursor=pointer]
+          - button "帮助" [ref=e74] [cursor=pointer]
+      - main [ref=e78]:
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - text: RESULT-FIRST TEMPLATE LIBRARY
+            - heading "先选你想要的成片效果" [level=1] [ref=e81]
+            - paragraph [ref=e82]: 不用写提示词。选择一个模板，换成你的商品素材，确认后即可生成。
+          - generic [ref=e83]: 模板只定义画面规律，不复用竞品人物、商品或品牌元素
+        - region "模板筛选" [ref=e88]:
+          - generic [ref=e89]:
+            - button "全部 10" [ref=e90] [cursor=pointer]:
+              - text: 全部
+              - generic [ref=e95]: "10"
+            - button "图片 8" [ref=e96] [cursor=pointer]:
+              - text: 图片
+              - generic [ref=e102]: "8"
+            - button "视频 2" [ref=e103] [cursor=pointer]:
+              - text: 视频
+              - generic [ref=e107]: "2"
+          - generic [ref=e108]:
+            - generic [ref=e109]: 用途
+            - combobox [ref=e110]:
+              - option "全部用途" [selected]
+              - option "居家上新"
+              - option "女装种草"
+              - option "店主试穿"
+          - generic [ref=e111]:
+            - generic [ref=e112]: 风格
+            - combobox [ref=e113]:
+              - option "全部风格" [selected]
+              - option "静奢质感"
+              - option "东方雅致"
+              - option "甜酷暗黑"
+              - option "多巴胺元气"
+          - textbox "搜索模板名称" [ref=e118]
+        - generic [ref=e119]:
+          - generic [ref=e120]:
+            - generic [ref=e121]:
+              - heading "推荐给你" [level=2] [ref=e122]
+              - generic [ref=e123]: 根据最近使用的睡衣 / 家居服素材
+            - button "按推荐排序" [ref=e124] [cursor=pointer]
+          - generic [ref=e127]:
+            - article [ref=e128]:
+              - generic [ref=e129]:
+                - img "静奢缎面晨光 预览" [ref=e130]
+                - generic [ref=e131]: 图片模板
+                - generic [ref=e132]: I01
+              - generic [ref=e133]:
+                - generic [ref=e134]:
+                  - heading "静奢缎面晨光" [level=3] [ref=e135]
+                  - generic [ref=e136]: 4:5
+                - paragraph [ref=e137]: 柔光、低饱和、材质清晰的室内成片
+                - generic [ref=e138]:
+                  - generic [ref=e139]: 适合：睡衣 / 轻奢女装
+                  - button "使用" [ref=e140] [cursor=pointer]
+            - article [ref=e144]:
+              - generic [ref=e145]:
+                - img "东方雅致轻熟 预览" [ref=e146]
+                - generic [ref=e147]: 图片模板
+                - generic [ref=e148]: I02
+              - generic [ref=e149]:
+                - generic [ref=e150]:
+                  - heading "东方雅致轻熟" [level=3] [ref=e151]
+                  - generic [ref=e152]: 4:5
+                - paragraph [ref=e153]: 克制雅致的中式空间与留白构图
+                - generic [ref=e154]:
+                  - generic [ref=e155]: 适合：轻熟女装 / 连衣裙
+                  - button "使用" [ref=e156] [cursor=pointer]
+            - article [ref=e160]:
+              - generic [ref=e161]:
+                - img "甜酷暗黑辣妹 预览" [ref=e162]
+                - generic [ref=e163]: 图片模板
+                - generic [ref=e164]: I04
+              - generic [ref=e165]:
+                - generic [ref=e166]:
+                  - heading "甜酷暗黑辣妹" [level=3] [ref=e167]
+                  - generic [ref=e168]: 4:5
+                - paragraph [ref=e169]: 深色边光、利落近景与情绪张力
+                - generic [ref=e170]:
+                  - generic [ref=e171]: 适合：潮流女装 / 吊带
+                  - button "使用" [ref=e172] [cursor=pointer]
+            - article [ref=e176]:
+              - generic [ref=e177]:
+                - img "静奢缎面慢镜头 预览" [ref=e178]
+                - generic [ref=e179]: 视频模板
+                - generic [ref=e183]: 6 秒
+                - generic [ref=e184]: V01
+              - generic [ref=e185]:
+                - generic [ref=e186]:
+                  - heading "静奢缎面慢镜头" [level=3] [ref=e187]
+                  - generic [ref=e188]: 轻运动
+                - paragraph [ref=e189]: 轻微转身，稳定展现缎面质感
+                - generic [ref=e190]:
+                  - generic [ref=e191]: 适合：缎面睡衣 / 家居服
+                  - button "使用" [ref=e192] [cursor=pointer]
+        - generic [ref=e196]:
+          - generic [ref=e198]:
+            - heading "全部模板" [level=2] [ref=e199]
+            - generic [ref=e200]: 共 10 个已发布模板
+          - generic [ref=e201]:
+            - article [ref=e202]:
+              - generic [ref=e203]:
+                - img "新中式庭院出片 预览" [ref=e204]
+                - generic [ref=e205]: 图片模板
+                - generic [ref=e206]: I03
+              - generic [ref=e207]:
+                - generic [ref=e208]:
+                  - heading "新中式庭院出片" [level=3] [ref=e209]
+                  - generic [ref=e210]: 4:5
+                - paragraph [ref=e211]: 庭院自然光、木质肌理与纵向留白
+                - generic [ref=e212]:
+                  - generic [ref=e213]: 适合：新中式 / 改良旗袍
+                  - button "使用" [ref=e214] [cursor=pointer]
+            - article [ref=e218]:
+              - generic [ref=e219]:
+                - img "多巴胺元气居家 预览" [ref=e220]
+                - generic [ref=e221]: 图片模板
+                - generic [ref=e222]: I05
+              - generic [ref=e223]:
+                - generic [ref=e224]:
+                  - heading "多巴胺元气居家" [level=3] [ref=e225]
+                  - generic [ref=e226]: 4:5
+                - paragraph [ref=e227]: 明快纯色与自然抓拍感
+                - generic [ref=e228]:
+                  - generic [ref=e229]: 适合：睡衣 / 少女家居服
+                  - button "使用" [ref=e230] [cursor=pointer]
+            - article [ref=e234]:
+              - generic [ref=e235]:
+                - img "奶油甜妹卧室 预览" [ref=e236]
+                - generic [ref=e237]: 图片模板
+                - generic [ref=e238]: I06
+              - generic [ref=e239]:
+                - generic [ref=e240]:
+                  - heading "奶油甜妹卧室" [level=3] [ref=e241]
+                  - generic [ref=e242]: 4:5
+                - paragraph [ref=e243]: 奶油柔光、亲近日常与温柔氛围
+                - generic [ref=e244]:
+                  - generic [ref=e245]: 适合：睡衣 / 家居服
+                  - button "使用" [ref=e246] [cursor=pointer]
+            - article [ref=e250]:
+              - generic [ref=e251]:
+                - img "复古田园居家叙事 预览" [ref=e252]
+                - generic [ref=e253]: 图片模板
+                - generic [ref=e254]: I07
+              - generic [ref=e255]:
+                - generic [ref=e256]:
+                  - heading "复古田园居家叙事" [level=3] [ref=e257]
+                  - generic [ref=e258]: 4:5
+                - paragraph [ref=e259]: 窗边自然光与细节穿插的故事感
+                - generic [ref=e260]:
+                  - generic [ref=e261]: 适合：棉麻睡衣 / 家居服
+                  - button "使用" [ref=e262] [cursor=pointer]
+            - article [ref=e266]:
+              - generic [ref=e267]:
+                - img "高转化店主试穿 预览" [ref=e268]
+                - generic [ref=e269]: 图片模板
+                - generic [ref=e270]: I08
+              - generic [ref=e271]:
+                - generic [ref=e272]:
+                  - heading "高转化店主试穿" [level=3] [ref=e273]
+                  - generic [ref=e274]: 4:5
+                - paragraph [ref=e275]: 商品清晰、版型可见的真实试穿视角
+                - generic [ref=e276]:
+                  - generic [ref=e277]: 适合：睡衣 / 日常女装
+                  - button "使用" [ref=e278] [cursor=pointer]
+            - article [ref=e282]:
+              - generic [ref=e283]:
+                - img "多巴胺元气动态 预览" [ref=e284]
+                - generic [ref=e285]: 视频模板
+                - generic [ref=e289]: 6 秒
+                - generic [ref=e290]: V02
+              - generic [ref=e291]:
+                - generic [ref=e292]:
+                  - heading "多巴胺元气动态" [level=3] [ref=e293]
+                  - generic [ref=e294]: 轻运动
+                - paragraph [ref=e295]: 轻快转身与明亮居家节奏
+                - generic [ref=e296]:
+                  - generic [ref=e297]: 适合：少女睡衣 / 家居服
+                  - button "使用" [ref=e298] [cursor=pointer]
+  - complementary "模板素材替换抽屉" [ref=e302]:
+    - generic [ref=e303]:
+      - img "模板预览" [ref=e304]
+      - generic [ref=e305]:
+        - text: 图片模板 / I01
+        - heading "静奢缎面晨光" [level=2] [ref=e306]
+        - paragraph [ref=e307]: 柔和侧光、低饱和留白，突出面料光泽和商品版型。
+    - generic [ref=e312]:
+      - button "关闭" [ref=e313] [cursor=pointer]
+      - generic [ref=e317]:
+        - text: 使用此模板
+        - heading "用你的商品替换素材" [level=2] [ref=e318]
+        - paragraph [ref=e319]: 只需要一张主体商品图。系统会在提交前检查图片是否适合此模板。
+      - generic [ref=e320]:
+        - heading "主体商品图 *" [level=3] [ref=e321]
+        - paragraph [ref=e322]: 建议白底、正面、商品完整可见
+        - generic [ref=e323]:
+          - img "已选商品素材" [ref=e324]
+          - generic [ref=e325]:
+            - generic [ref=e326]: 真丝家居服白底图.jpg
+            - generic [ref=e327]: 2048 x 2560 · 商品素材库 · 已通过基础校验
+        - generic [ref=e331]:
+          - button "从素材库选择" [ref=e332] [cursor=pointer]
+          - button "上传图片" [ref=e335] [cursor=pointer]
+      - generic [ref=e339]:
+        - heading "可选补充" [level=3] [ref=e340]
+        - paragraph [ref=e341]: 补充素材会提升细节表现，不上传也可以继续。
+        - generic [ref=e342]: 建议补充一张面料细节图。系统会优先保留缎面光泽、领口和袖口结构。
+        - button "添加面料细节图" [ref=e347] [cursor=pointer]
+      - generic [ref=e349]:
+        - heading "本次输出" [level=3] [ref=e350]
+        - generic [ref=e351]:
+          - generic [ref=e352]:
+            - generic [ref=e353]: 默认数量
+            - generic [ref=e354]: 4 张
+          - generic [ref=e355]:
+            - generic [ref=e356]: 画面比例
+            - generic [ref=e357]: 4:5
+          - generic [ref=e358]:
+            - generic [ref=e359]: 预计完成
+            - generic [ref=e360]: 约 2 分钟
+      - generic [ref=e361]:
+        - button "取消" [ref=e362] [cursor=pointer]
+        - button "查看并生成" [ref=e363] [cursor=pointer]

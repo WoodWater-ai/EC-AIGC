@@ -95,6 +95,7 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
   const [trendingAssets, setTrendingAssets] = useState<VideoInputAsset[]>([]);
   const [linkedProduct, setLinkedProduct] = useState<ProductAsset | null>(null);
   const [segments, setSegments] = useState<Record<string, string>>({});
+  const [storyboardGenerated, setStoryboardGenerated] = useState(false);
   const [taskPrompt, setTaskPrompt] = useState('镜头稳定呈现商品主体，突出材质、动作和核心卖点。');
   const [negativePrompt, setNegativePrompt] = useState('商品漂移、面料闪烁、人物畸形、镜头突变、文字变化');
   const [analysis, setAnalysis] = useState<TrendingReplicateAnalysis | null>(null);
@@ -119,7 +120,7 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
     : mode === 'reference2video'
       ? (!firstFrame ? '请选择一张首帧图' : references.length === 0 ? '请至少添加一张参考图' : firstFrame && references.length + 1 > maxReferences ? `当前模型最多支持 ${maxReferences} 张输入图` : '')
       : (!trendingSource ? '请选择复刻源视频' : trendingSource.importStatus === 'importing' ? '视频链接导入中' : !trendingAssets.some((asset) => asset.role === 'product') ? '请选择至少一张商品替换图' : !analysis ? '请先分析分镜与爆点' : '');
-  const promptComplete = taskPrompt.trim().length > 0 && shots.every((shot) => (segments[shot.key] ?? '').trim().length > 0);
+  const promptComplete = taskPrompt.trim().length > 0;
   const readinessChecks = [
     { complete: !inputIssue, message: inputIssue || '请补充有效来源素材。', targetId: 'video-input-section' },
     { complete: promptConfirmed && promptComplete, message: '请检查镜头内容并确认本次视频 Prompt。', targetId: 'video-content-section' },
@@ -131,6 +132,7 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
   useEffect(() => {
     setPromptConfirmed(false);
     setReadinessIssue('');
+    setStoryboardGenerated(false);
     if (entryContext.kind === 'approved-image') {
       setFirstFrame({ id: entryContext.sourceResult.id, name: `审核通过图片 v${entryContext.sourceResult.version}`, url: entryContext.sourceResult.url, thumbnailUrl: entryContext.sourceResult.url, source: '审核通过结果', role: 'first_frame', position: 1 });
       setLinkedProduct(selectedProduct);
@@ -143,15 +145,34 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
     setTaskPrompt('镜头稳定呈现商品主体，突出材质、动作和核心卖点。');
   }, [entryContext]);
 
-  useEffect(() => {
-    setSegments((previous) => {
-      const next = { ...previous };
-      shotsForDuration(duration).forEach((shot, index) => {
-        if (!next[shot.key]) next[shot.key] = index === 0 ? '镜头缓慢建立，焦点锁定在商品主体。' : '保持商品主体稳定，展示材质、动作和细节。';
-      });
-      return next;
-    });
-  }, [duration]);
+  const invalidateStoryboard = () => {
+    setSegments({});
+    setStoryboardGenerated(false);
+    setPromptConfirmed(false);
+  };
+
+  const defaultTaskPrompt = () => {
+    if (linkedProduct) {
+      const sellingPoints = linkedProduct.specs.sellingPoints.slice(0, 2).join('、');
+      return `以${linkedProduct.name}为主体，突出${linkedProduct.specs.color.join('、') || '商品原有'}色彩、${linkedProduct.specs.material || '可见材质'}${sellingPoints ? `和${sellingPoints}` : ''}，保持商品结构稳定并自然展示。`;
+    }
+    return firstFrame
+      ? `以首帧中的${firstFrame.name}为主体，保持构图和商品结构稳定，突出材质、动作和核心卖点。`
+      : '保持商品主体稳定，突出材质、动作和核心卖点。';
+  };
+
+  const generateStoryboard = () => {
+    const masterPrompt = taskPrompt.trim() || defaultTaskPrompt();
+    const guidance = [
+      '镜头缓慢建立，焦点锁定在商品主体和整体轮廓。',
+      '以自然动作展示材质、版型与使用场景，保持主体稳定。',
+      '用清晰特写收束商品核心卖点，画面干净稳定。',
+    ];
+    setTaskPrompt(masterPrompt);
+    setSegments(Object.fromEntries(shots.map((shot, index) => [shot.key, `${masterPrompt}\n${guidance[index]}`])));
+    setStoryboardGenerated(true);
+    setPromptConfirmed(false);
+  };
 
   const selectFirstFrame = (assets: AssetResourceItem[]) => {
     const source = assets[0];
@@ -159,7 +180,7 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
     const asset = toVideoInputAsset(source, 'first_frame');
     if (!asset) return;
     setFirstFrame(asset);
-    setPromptConfirmed(false);
+    invalidateStoryboard();
     const product = asset.productAssetId ? products.find((item) => item.id === asset.productAssetId) : undefined;
     if (product) {
       setLinkedProduct(product);
@@ -169,13 +190,13 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
 
   const addReferences = (assets: AssetResourceItem[]) => {
     setReferences((current) => normalizePositions([...current, ...assets.map((asset, index) => toVideoInputAsset(asset, inferRole(asset), current.length + index + 2)).filter((asset) => !current.some((item) => item.id === asset.id))].slice(0, Math.max(0, maxReferences - 1))));
-    setPromptConfirmed(false);
+    invalidateStoryboard();
   };
 
   const addTrendingAssets = (assets: AssetResourceItem[]) => {
     setTrendingAssets((current) => normalizePositions([...current, ...assets.map((asset, index) => toVideoInputAsset(asset, inferRole(asset), current.length + index + 1)).filter((asset) => !current.some((item) => item.id === asset.id))].slice(0, 7)));
     setAnalysis(null);
-    setPromptConfirmed(false);
+    invalidateStoryboard();
   };
 
   const chooseModel = (nextChannelId: string, nextModelId: string) => {
@@ -213,7 +234,7 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
     if (!source) return;
     setTrendingSource(toVideoSourceAsset(source));
     setAnalysis(null);
-    setPromptConfirmed(false);
+    invalidateStoryboard();
   };
 
   const importTrendingUrl = (value: string) => {
@@ -232,7 +253,7 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
     const id = `temporary-video-${Date.now()}`;
     setTrendingSource({ id, name: `${parsed.hostname} 视频链接`, url: value.trim(), thumbnailUrl: 'https://images.unsplash.com/photo-1492724441997-5dc865305da7?auto=format&fit=crop&w=640&q=80', source: '视频链接暂存', licenseText: '来源待确认', temporary: true, importStatus: 'importing', originalUrl: value.trim() });
     setAnalysis(null);
-    setPromptConfirmed(false);
+    invalidateStoryboard();
     window.setTimeout(() => setTrendingSource((current) => current?.id === id ? { ...current, importStatus: 'ready', durationSec: 8 } : current), 700);
   };
 
@@ -240,7 +261,7 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
     if (!trendingSource || !trendingAssets.some((asset) => asset.role === 'product')) return;
     setAnalysis(mockTrendingAnalysis);
     setTaskPrompt(mockTrendingAnalysis.generatedPrompt);
-    setPromptConfirmed(false);
+    invalidateStoryboard();
   };
 
   const submit = () => {
@@ -248,14 +269,16 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
     setExecutionConfirmOpen(false);
     const productName = linkedProduct?.name ?? (mode === 'trending_replicate' ? '爆款复刻商品' : '未关联商品');
     const cover = mode === 'trending_replicate' ? trendingAssets.find((asset) => asset.role === 'product')?.url ?? '' : firstFrame?.url ?? '';
-    const segmentPrompt = shots.map((shot) => `${shot.label}：${segments[shot.key] ?? ''}`).join(' | ');
+    const segmentPrompt = storyboardGenerated ? shots.map((shot) => `${shot.label}：${segments[shot.key] ?? ''}`).join(' | ') : '';
     const context = mode === 'trending_replicate'
-      ? `复刻目标：${replicateGoal}；替换素材：${trendingAssets.map((asset) => `${ROLE_LABELS[asset.role]}-${asset.name}`).join('、')}；${segmentPrompt}`
-      : `首帧：${firstFrame?.name ?? ''}；参考图：${references.map((asset) => `${ROLE_LABELS[asset.role]}-${asset.name}`).join('、')}；${segmentPrompt}`;
+      ? `复刻目标：${replicateGoal}；替换素材：${trendingAssets.map((asset) => `${ROLE_LABELS[asset.role]}-${asset.name}`).join('、')}${segmentPrompt ? `；${segmentPrompt}` : ''}`
+      : `首帧：${firstFrame?.name ?? ''}；参考图：${references.map((asset) => `${ROLE_LABELS[asset.role]}-${asset.name}`).join('、')}${segmentPrompt ? `；${segmentPrompt}` : ''}`;
     const prompt = `${taskPrompt} ${context}`;
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
     const task: GenerationTask = {
       id: `V-${Date.now()}`, name: `${MODE_META[mode].label} · ${productName}`, type: 'video', status: 'pending', progress: 0,
-      productName, productImg: cover, templateName: MODE_META[mode].label, timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16), creator: '陆永奇',
+      groupId: `G-${Date.now()}`, groupOrder: 1, submittedAt: now,
+      productName, productImg: cover, templateName: MODE_META[mode].label, timestamp: now, creator: '陆永奇',
       modelChannel: `${channel.name} / ${model.name}`, taskPrompt: prompt, negativePrompt,
       modelSnapshot: { accessType: channel.accessType, channelId: channel.id, channelName: channel.name, modelId: model.id, modelName: model.name, supportedRatios: model.capability.ratios, maxCount: model.capability.maxCount, supportedResolutions: model.capability.resolutions, estimatedCost: model.cost },
       videoInputs: mode === 'trending_replicate'
@@ -285,30 +308,33 @@ export const CreateVideoTaskV2: React.FC<CreateVideoTaskProps> = ({
       <div className="flex items-center gap-2"><div className="mr-1 text-right"><span className="block text-[10px] font-bold text-slate-400">生成准备度 {readinessCount}/3</span><span className="text-[10px] text-slate-500">{duration} 秒 · {ratio}</span></div><button onClick={() => setAssistantOpen(true)} className="h-9 rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-primary"><span className="material-symbols-outlined mr-1 align-middle text-base">auto_awesome</span>AI 助手</button><button onClick={checkAndGenerate} className="h-9 px-4 rounded-md bg-primary text-white text-xs font-bold">检查并生成</button></div>
     </header>
     {readinessIssue && <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-6 py-2 text-[11px] font-bold text-amber-700"><span className="material-symbols-outlined mr-1 align-middle text-sm">error</span>{readinessIssue}</div>}
-    <div className="bg-white border-b border-slate-200 px-6"><div className="max-w-[1440px] mx-auto flex gap-6 overflow-x-auto">{(Object.keys(MODE_META) as VideoTaskMode[]).map((item) => <button key={item} onClick={() => { setMode(item); setPromptConfirmed(false); setReadinessIssue(''); }} className={`h-12 shrink-0 text-xs font-bold border-b-2 ${mode === item ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}>{MODE_META[item].label}</button>)}</div></div>
+    <div className="bg-white border-b border-slate-200 px-6"><div className="max-w-[1440px] mx-auto flex gap-6 overflow-x-auto">{(Object.keys(MODE_META) as VideoTaskMode[]).map((item) => <button key={item} onClick={() => { setMode(item); invalidateStoryboard(); setReadinessIssue(''); }} className={`h-12 shrink-0 text-xs font-bold border-b-2 ${mode === item ? 'border-primary text-primary' : 'border-transparent text-slate-500'}`}>{MODE_META[item].label}</button>)}</div></div>
     <main className="flex-1 overflow-y-auto p-5 grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)_380px] gap-5 max-w-[1440px] mx-auto w-full">
       <section id="video-input-section" className="space-y-4">
         {mode === 'trending_replicate'
-          ? <TrendingInputs source={trendingSource} assets={trendingAssets} urlError={sourceUrlError} onPickSource={() => openTransit(selectTrendingSource, 'trending-source-video')} onImportUrl={importTrendingUrl} onPickAssets={() => openTransit(addTrendingAssets, 'trending-replacement', true)} onRemoveSource={() => { setTrendingSource(null); setAnalysis(null); setSourceUrlError(''); setPromptConfirmed(false); }} onRemoveAsset={(id) => { setTrendingAssets((items) => normalizePositions(items.filter((item) => item.id !== id))); setAnalysis(null); setPromptConfirmed(false); }} onRoleChange={(id, role) => { setTrendingAssets((items) => normalizePositions(items.map((item) => item.id === id ? { ...item, role } : item))); setAnalysis(null); setPromptConfirmed(false); }} />
-          : <ImageVideoInputs firstFrame={firstFrame} references={references} maxReferences={maxReferences} linkedProduct={linkedProduct} entrySource={entryContext.kind === 'approved-image'} onPickFirstFrame={() => openTransit(selectFirstFrame, 'video-first-frame')} onRemoveFirstFrame={() => { setFirstFrame(null); setLinkedProduct(null); setPromptConfirmed(false); }} onPickReferences={() => openTransit(addReferences, 'video-reference', true)} onRemoveReference={(id) => { setReferences((items) => normalizePositions(items.filter((item) => item.id !== id))); setPromptConfirmed(false); }} onRoleChange={(id, role) => { setReferences((items) => normalizePositions(items.map((item) => item.id === id ? { ...item, role } : item))); setPromptConfirmed(false); }} showReferences={mode === 'reference2video'} />}
+          ? <TrendingInputs source={trendingSource} assets={trendingAssets} urlError={sourceUrlError} onPickSource={() => openTransit(selectTrendingSource, 'trending-source-video')} onImportUrl={importTrendingUrl} onPickAssets={() => openTransit(addTrendingAssets, 'trending-replacement', true)} onRemoveSource={() => { setTrendingSource(null); setAnalysis(null); setSourceUrlError(''); invalidateStoryboard(); }} onRemoveAsset={(id) => { setTrendingAssets((items) => normalizePositions(items.filter((item) => item.id !== id))); setAnalysis(null); invalidateStoryboard(); }} onRoleChange={(id, role) => { setTrendingAssets((items) => normalizePositions(items.map((item) => item.id === id ? { ...item, role } : item))); setAnalysis(null); invalidateStoryboard(); }} />
+          : <ImageVideoInputs firstFrame={firstFrame} references={references} maxReferences={maxReferences} linkedProduct={linkedProduct} entrySource={entryContext.kind === 'approved-image'} onPickFirstFrame={() => openTransit(selectFirstFrame, 'video-first-frame')} onRemoveFirstFrame={() => { setFirstFrame(null); setLinkedProduct(null); invalidateStoryboard(); }} onPickReferences={() => openTransit(addReferences, 'video-reference', true)} onRemoveReference={(id) => { setReferences((items) => normalizePositions(items.filter((item) => item.id !== id))); invalidateStoryboard(); }} onRoleChange={(id, role) => { setReferences((items) => normalizePositions(items.map((item) => item.id === id ? { ...item, role } : item))); invalidateStoryboard(); }} showReferences={mode === 'reference2video'} />}
+        <ProductFactsPanel product={linkedProduct} />
       </section>
       <section className="space-y-4">
         <div className="bg-white border border-slate-200 rounded-lg p-5"><p className="text-[11px] font-bold text-primary">任务配置</p><h2 className="mt-1 font-black">{MODE_META[mode].label}</h2><p className="mt-2 text-xs text-slate-500 leading-5">{MODE_META[mode].description}</p>{mode === 'trending_replicate' && <TrendingAnalysisPanel goal={replicateGoal} setGoal={setReplicateGoal} analysis={analysis} onAnalyze={runAnalysis} disabled={!trendingSource || !trendingAssets.some((asset) => asset.role === 'product')} />}</div>
-        <div id="video-content-section" className="bg-white border border-slate-200 rounded-lg p-5"><div className="flex justify-between items-start gap-3"><div><p className="text-[11px] font-bold text-primary">时长驱动分镜</p><h2 className="mt-1 font-black">镜头 Prompt</h2><p className="mt-2 text-[11px] text-slate-400">切换时长只补充缺失建议，已编辑内容不会覆盖。</p></div><select value={duration} onChange={(event) => { setDuration(Number(event.target.value)); setPromptConfirmed(false); }} className="h-9 px-2 rounded border border-slate-200 text-xs">{model.capability.durations?.map((item) => <option key={item} value={item}>{item} 秒</option>)}</select></div><div className="mt-4 space-y-3">{shots.map((shot) => <label key={shot.key} className="block text-xs font-bold">{shot.label}<textarea value={segments[shot.key] ?? ''} onChange={(event) => { setSegments((items) => ({ ...items, [shot.key]: event.target.value })); setPromptConfirmed(false); }} className="mt-1.5 h-20 w-full resize-none border border-slate-200 rounded-md p-2 text-xs font-normal leading-5" /></label>)}</div><label className="block mt-4 text-xs font-bold">任务级 Prompt<textarea value={taskPrompt} onChange={(event) => { setTaskPrompt(event.target.value); setPromptConfirmed(false); }} className="mt-1.5 h-24 w-full resize-none border border-slate-200 rounded-md p-2 text-xs font-normal leading-5" /></label><label className="block mt-3 text-xs font-bold">负面约束<input value={negativePrompt} onChange={(event) => { setNegativePrompt(event.target.value); setPromptConfirmed(false); }} className="mt-1.5 h-9 w-full border border-slate-200 rounded-md px-2 text-xs font-normal" /></label><div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4"><button onClick={() => setAssistantOpen(true)} className="h-8 px-3 rounded border border-primary text-primary text-xs font-bold">AI 助手建议</button><button onClick={() => { setPromptConfirmed(true); setReadinessIssue(''); }} disabled={!promptComplete} className={`h-8 rounded-md border px-3 text-xs font-bold ${promptConfirmed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-primary bg-white text-primary disabled:border-slate-200 disabled:text-slate-300'}`}>{promptConfirmed ? '内容与 Prompt 已确认' : '确认内容与 Prompt'}</button></div></div>
+        <div id="video-content-section" className="bg-white border border-slate-200 rounded-lg p-5"><div className="flex justify-between items-start gap-3"><div><p className="text-[11px] font-bold text-primary">内容</p><h2 className="mt-1 font-black">本次视频 Prompt</h2><p className="mt-2 text-[11px] text-slate-400">先确认本次视频表达；生成后才按时长拆分为可编辑分镜。</p></div><select value={duration} onChange={(event) => { setDuration(Number(event.target.value)); invalidateStoryboard(); }} className="h-9 px-2 rounded border border-slate-200 text-xs">{model.capability.durations?.map((item) => <option key={item} value={item}>{item} 秒</option>)}</select></div><label className="mt-4 block text-xs font-bold">最终 Prompt<textarea value={taskPrompt} onChange={(event) => { setTaskPrompt(event.target.value); invalidateStoryboard(); }} className="mt-1.5 h-28 w-full resize-none border border-slate-200 rounded-md p-3 text-xs font-normal leading-5" placeholder="描述商品、动作、场景和镜头目标" /></label><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p className="text-[10px] text-slate-400">{storyboardGenerated ? `已按 ${duration} 秒生成 ${shots.length} 个可编辑分镜` : '生成提示词后，系统将按时长拆分分镜。'}</p><button onClick={generateStoryboard} className="flex h-8 items-center gap-1.5 rounded-md border border-primary bg-white px-3 text-[11px] font-bold text-primary"><span className="material-symbols-outlined text-base">auto_fix_high</span>{storyboardGenerated ? '重新生成提示词' : '生成提示词'}</button></div>{storyboardGenerated && <details open className="mt-4 border border-slate-200"><summary className="cursor-pointer bg-slate-50 px-3 py-2 text-xs font-black text-slate-800">分镜提示词 · {shots.length} 镜</summary><div className="space-y-3 p-3">{shots.map((shot) => <label key={shot.key} className="block text-xs font-bold">{shot.label}<textarea value={segments[shot.key] ?? ''} onChange={(event) => { setSegments((items) => ({ ...items, [shot.key]: event.target.value })); setPromptConfirmed(false); }} className="mt-1.5 h-20 w-full resize-none border border-slate-200 rounded-md p-2 text-xs font-normal leading-5" /></label>)}</div></details>}<label className="mt-3 block text-xs font-bold">负面约束<input value={negativePrompt} onChange={(event) => { setNegativePrompt(event.target.value); setPromptConfirmed(false); }} className="mt-1.5 h-9 w-full border border-slate-200 rounded-md px-2 text-xs font-normal" /></label><div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4"><button onClick={() => setAssistantOpen(true)} className="h-8 rounded border border-primary px-3 text-xs font-bold text-primary">AI 助手建议</button><button onClick={() => { setPromptConfirmed(true); setReadinessIssue(''); }} disabled={!promptComplete} className={`h-8 rounded-md border px-3 text-xs font-bold ${promptConfirmed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-primary bg-white text-primary disabled:border-slate-200 disabled:text-slate-300'}`}>{promptConfirmed ? '内容已确认' : '确认内容'}</button></div></div>
       </section>
       <aside className="space-y-4">
         <div id="video-settings-section" className="bg-white border border-slate-200 rounded-lg p-5"><p className="text-[11px] font-bold text-primary">模型通道与模型能力</p><h2 className="mt-1 font-black">可用视频规格</h2><label className="block mt-4 text-xs font-bold">模型通道<select value={channel.id} onChange={(event) => { const next = videoChannels.find((item) => item.id === event.target.value)!; chooseModel(next.id, next.models[0].id); }} className="mt-1.5 h-9 w-full border border-slate-200 rounded px-2">{videoChannels.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label className="block mt-3 text-xs font-bold">模型版本<select value={model.id} onChange={(event) => chooseModel(channel.id, event.target.value)} className="mt-1.5 h-9 w-full border border-slate-200 rounded px-2">{channel.models.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><div className="grid grid-cols-2 gap-3 mt-3"><SelectField label="比例" value={ratio} onChange={setRatio} values={model.capability.ratios} /><SelectField label="分辨率" value={resolution} onChange={setResolution} values={model.capability.resolutions} /><SelectField label="运动幅度" value={motion} onChange={(value) => setMotion(value as typeof motion)} values={model.capability.motions ?? []} /></div><div className="mt-4 p-3 rounded bg-slate-50 text-xs leading-6"><p>支持时长：{model.capability.durations?.join(' / ') ?? '—'} 秒</p><p>参考图上限：{maxReferences} 张</p><p>预估成本：<b>{model.cost.toFixed(1)} 元</b></p><p className={channel.health === 'healthy' ? 'text-emerald-700' : 'text-amber-700'}>{channel.quotaText}</p></div>{!supportsSpec && <p className="mt-3 text-[11px] text-red-600">当前模型不支持已选规格，请确认后调整。</p>}</div>
         {mode === 'trending_replicate' && <TrendingPreview source={trendingSource} analysis={analysis} />}
       </aside>
     </main>
-    {executionConfirmOpen && <ExecutionConfirmDialog title={`确认生成 ${duration} 秒视频`} description="系统已按当前来源素材、内容与 Prompt、模型能力和预算完成预检。确认后任务会先进入排队中。" estimatedCost={`¥ ${model.cost.toFixed(2)}`} estimatedDuration="约 3–6 分钟" healthLabel={channel.health === 'healthy' ? '服务健康' : '额度偏低'} healthDetail={channel.quotaText} fallbackPolicy="同配置最多自动重试 1 次；仍失败则停止并通知，不自动切换到其他付费通道，也不复用历史视频伪装生成成功。" summary={[{ label: '任务模式', value: MODE_META[mode].label }, { label: '模型通道', value: `${channel.name} / ${model.name}` }, { label: '输出规格', value: `${duration} 秒 · ${ratio} · ${resolution} · ${motion}` }, { label: '内容结构', value: `${shots.length} 个动态镜头 · Prompt 已确认` }]} requestLines={[`Prompt：${taskPrompt}`, `来源素材：${mode === 'trending_replicate' ? `源视频 1 个，替换图 ${trendingAssets.length} 张` : `首帧 1 张，参考图 ${references.length} 张`}`, `参考顺序：${mode === 'trending_replicate' ? trendingAssets.map((asset) => `${asset.position}.${ROLE_LABELS[asset.role]}`).join('、') : [firstFrame, ...references].filter((asset): asset is VideoInputAsset => Boolean(asset)).map((asset, index) => `${index + 1}.${ROLE_LABELS[asset.role]}`).join('、')}`, `参数：duration=${duration}，ratio=${ratio}，resolution=${resolution}，motion=${motion}`]} onCancel={() => setExecutionConfirmOpen(false)} onConfirm={submit} />}
-    {assistantOpen && <AssistantDrawer onClose={() => setAssistantOpen(false)} onApply={() => { setTaskPrompt((value) => `${value} 使用稳定运动和清晰商品边缘，重点突出核心卖点。`); setPromptConfirmed(false); setAssistantOpen(false); }} />}
+    {executionConfirmOpen && <ExecutionConfirmDialog title={`确认生成 ${duration} 秒视频`} description="系统已按当前来源素材、模型能力和预算完成预检。确认后任务会先进入排队中。" estimatedCost={`¥ ${model.cost.toFixed(2)}`} estimatedDuration="约 3–6 分钟" healthLabel={channel.health === 'healthy' ? '服务健康' : '额度偏低'} healthDetail={channel.quotaText} fallbackPolicy="同配置最多自动重试 1 次；仍失败则停止并通知，不自动切换到其他付费通道，也不复用历史视频伪装生成成功。" summary={[{ label: '任务模式', value: MODE_META[mode].label }, { label: '模型通道', value: `${channel.name} / ${model.name}` }, { label: '输出规格', value: `${duration} 秒 · ${ratio} · ${resolution} · ${motion}` }, { label: '内容结构', value: storyboardGenerated ? `${shots.length} 个动态镜头` : '单段视频 Prompt' }]} requestLines={[`来源素材：${mode === 'trending_replicate' ? `源视频 1 个，替换图 ${trendingAssets.length} 张` : `首帧 1 张，参考图 ${references.length} 张`}`, `参考顺序：${mode === 'trending_replicate' ? trendingAssets.map((asset) => `${asset.position}.${ROLE_LABELS[asset.role]}`).join('、') : [firstFrame, ...references].filter((asset): asset is VideoInputAsset => Boolean(asset)).map((asset, index) => `${index + 1}.${ROLE_LABELS[asset.role]}`).join('、')}`, `参数：duration=${duration}，ratio=${ratio}，resolution=${resolution}，motion=${motion}`]} onCancel={() => setExecutionConfirmOpen(false)} onConfirm={submit} />}
+    {assistantOpen && <AssistantDrawer onClose={() => setAssistantOpen(false)} onApply={() => { setTaskPrompt((value) => `${value} 使用稳定运动和清晰商品边缘，重点突出核心卖点。`); invalidateStoryboard(); setAssistantOpen(false); }} />}
     {pendingModel && <ModelConflictDialog onCancel={() => setPendingModel(null)} onConfirm={confirmModelChange} />}
   </div>;
 };
 
-const ImageVideoInputs: React.FC<{ firstFrame: VideoInputAsset | null; references: VideoInputAsset[]; maxReferences: number; linkedProduct: ProductAsset | null; entrySource: boolean; onPickFirstFrame: () => void; onRemoveFirstFrame: () => void; onPickReferences: () => void; onRemoveReference: (id: string) => void; onRoleChange: (id: string, role: VideoAssetRole) => void; showReferences: boolean }> = ({ firstFrame, references, maxReferences, linkedProduct, entrySource, onPickFirstFrame, onRemoveFirstFrame, onPickReferences, onRemoveReference, onRoleChange, showReferences }) => <>
-  <div className="bg-white border border-slate-200 rounded-lg p-4"><div className="flex justify-between"><div><p className="text-[11px] font-bold text-primary">输入素材</p><h2 className="mt-1 text-sm font-black">视频首帧</h2></div><button onClick={onPickFirstFrame} className="text-xs text-primary font-bold">资源中心</button></div>{firstFrame ? <AssetCard asset={firstFrame} onReplace={onPickFirstFrame} onRemove={onRemoveFirstFrame} /> : <EmptyAssetButton label="添加首帧素材" onClick={onPickFirstFrame} />}{entrySource && <p className="mt-3 text-[11px] text-emerald-700">已从审核通过图片预填，可替换为资源中心素材。</p>}<p className="mt-3 text-xs leading-6 text-slate-500"><b className="text-slate-700">商品：</b>{linkedProduct?.name ?? '未关联商品'}</p></div>
+const ProductFactsPanel: React.FC<{ product: ProductAsset | null }> = ({ product }) => <section className="border border-slate-200 bg-white p-4"><div><p className="text-[11px] font-bold text-primary">输入依据</p><h2 className="mt-1 text-sm font-black">商品事实</h2></div>{product ? <div className="mt-3 space-y-3 text-[11px] leading-5 text-slate-600"><div><p className="font-bold text-slate-800">{product.name}</p><p className="text-slate-400">{product.category} · {product.sku}</p></div><div className="grid grid-cols-2 gap-x-3 gap-y-2 border-y border-slate-100 py-3"><p><span className="block text-[10px] text-slate-400">颜色</span>{product.specs.color.join('、') || '未记录'}</p><p><span className="block text-[10px] text-slate-400">材质</span>{(product.fabric ?? product.specs.material) || '未记录'}</p></div><div><p className="text-[10px] text-slate-400">核心卖点</p><p>{product.specs.sellingPoints.join('、') || '未记录'}</p></div></div> : <p className="mt-3 text-[11px] leading-5 text-slate-400">选择关联商品的首帧后，将在这里展示商品颜色、材质和卖点。</p>}</section>;
+
+const ImageVideoInputs: React.FC<{ firstFrame: VideoInputAsset | null; references: VideoInputAsset[]; maxReferences: number; linkedProduct: ProductAsset | null; entrySource: boolean; onPickFirstFrame: () => void; onRemoveFirstFrame: () => void; onPickReferences: () => void; onRemoveReference: (id: string) => void; onRoleChange: (id: string, role: VideoAssetRole) => void; showReferences: boolean }> = ({ firstFrame, references, maxReferences, entrySource, onPickFirstFrame, onRemoveFirstFrame, onPickReferences, onRemoveReference, onRoleChange, showReferences }) => <>
+  <div className="bg-white border border-slate-200 rounded-lg p-4"><div className="flex justify-between"><div><p className="text-[11px] font-bold text-primary">输入素材</p><h2 className="mt-1 text-sm font-black">视频首帧</h2></div><button onClick={onPickFirstFrame} className="text-xs text-primary font-bold">资源中心</button></div>{firstFrame ? <AssetCard asset={firstFrame} onReplace={onPickFirstFrame} onRemove={onRemoveFirstFrame} /> : <EmptyAssetButton label="添加首帧素材" onClick={onPickFirstFrame} />}{entrySource && <p className="mt-3 text-[11px] text-emerald-700">已从审核通过图片预填，可替换为资源中心素材。</p>}</div>
   {showReferences && <div className="bg-white border border-slate-200 rounded-lg p-4"><div className="flex justify-between"><div><p className="text-[11px] font-bold text-primary">参考图片组</p><h2 className="mt-1 text-sm font-black">为每张图片标记用途</h2><p className="mt-1 text-[11px] text-slate-400">模特也是参考图角色。当前模型最多 {maxReferences} 张输入图。</p></div><button onClick={onPickReferences} disabled={references.length + 1 >= maxReferences} className="text-xs text-primary font-bold disabled:text-slate-300">资源中心</button></div><div className="grid grid-cols-3 gap-2 mt-4"><button onClick={onPickReferences} disabled={references.length + 1 >= maxReferences} className="aspect-square rounded-md border-2 border-dashed border-slate-300 text-slate-400 disabled:opacity-40"><span className="material-symbols-outlined text-2xl">add</span></button>{references.map((asset) => <ReferenceTile key={asset.id} asset={asset} onRemove={() => onRemoveReference(asset.id)} onRoleChange={(role) => onRoleChange(asset.id, role)} roles={['product', 'model', 'style', 'action', 'scene']} />)}</div></div>}
 </>;
 

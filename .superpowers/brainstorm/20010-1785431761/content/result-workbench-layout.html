@@ -1,0 +1,62 @@
+<style>
+  .wireframe { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color:#172033; }
+  .wf-header { display:flex; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #cbd5e1; background:#f8fafc; }
+  .wf-layout { display:grid; grid-template-columns:210px 1fr; min-height:430px; }
+  .wf-side { border-right:1px solid #cbd5e1; padding:12px; background:#f8fafc; }
+  .wf-main { padding:14px; }
+  .wf-row { border:1px solid #cbd5e1; border-radius:4px; padding:9px; margin-bottom:7px; font-size:12px; }
+  .wf-row.active { border-color:#2563eb; background:#eff6ff; }
+  .wf-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; margin-top:12px; }
+  .wf-image { height:110px; background:repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 8px,#f8fafc 8px,#f8fafc 16px); border:1px solid #cbd5e1; }
+  .wf-card { border:1px solid #cbd5e1; border-radius:4px; overflow:hidden; }
+  .wf-card p { margin:7px 8px; font-size:11px; }
+  .wf-chip { display:inline-block; padding:2px 5px; margin-left:5px; font-size:10px; border:1px solid #93c5fd; color:#1d4ed8; background:#eff6ff; }
+  .wf-toolbar { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:9px; font-size:12px; }
+  .wf-button { border:1px solid #94a3b8; padding:4px 7px; background:white; font-size:11px; }
+  .wf-panel { margin-top:12px; padding:10px; border:1px solid #bfdbfe; background:#eff6ff; font-size:11px; line-height:1.7; }
+  .wf-tabs { display:flex; gap:10px; border-bottom:1px solid #cbd5e1; padding:8px 12px; font-size:11px; }
+  .wf-tabs b { color:#2563eb; border-bottom:2px solid #2563eb; padding-bottom:7px; }
+  .wf-empty { height:80px; border:1px dashed #94a3b8; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:11px; }
+</style>
+
+<h2>批次详情：哪种结构更符合查看与修订结果的任务？</h2>
+<p class="subtitle">点击一项选择。重点看信息是否围绕“当前图片类型的全部结果”组织。</p>
+
+<div class="cards">
+  <div class="card" data-choice="result-workbench" onclick="toggleSelect(this)">
+    <div class="card-image wireframe">
+      <div class="wf-header"><b>G-20260702-001 · 睡衣多图素材包</b><span>×</span></div>
+      <div class="wf-layout">
+        <aside class="wf-side">
+          <b style="font-size:12px">图片类型</b>
+          <div class="wf-row active">商品主图 <span class="wf-chip">2 张</span><br><small>待审核</small></div>
+          <div class="wf-row">场景图 <span class="wf-chip">4 张</span><br><small>已打回</small></div>
+          <div class="wf-row">细节图 <span class="wf-chip">3 张</span><br><small>已完成</small></div>
+          <div class="wf-row">批次信息<br><small>提交时间 / 模板 / 成本</small></div>
+        </aside>
+        <main class="wf-main">
+          <div class="wf-toolbar"><b>商品主图 · 2 个版本</b><span><button class="wf-button">输入与 Prompt</button> <button class="wf-button">审核记录</button></span></div>
+          <div class="wf-grid">
+            <div class="wf-card"><div class="wf-image"></div><p>v1 <span class="wf-chip">通过</span><br><small>点击放大</small></p></div>
+            <div class="wf-card"><div class="wf-image"></div><p>v2 <span class="wf-chip">待审核</span><br><small>点击放大 · 二次编辑</small></p></div>
+          </div>
+          <div class="wf-panel"><b>本次输入与最终 Prompt</b><br>主体图、参考图、负面约束、最终 Prompt 均随当前图片类型切换。<br><b>已继承修订对话</b>：v1 的审核意见 → v2 编辑要求 → 本轮编辑。</div>
+        </main>
+      </div>
+    </div>
+    <div class="card-body"><h3>方案 A：结果工作台（推荐）</h3><p>左侧选图片类型，右侧完成查看、放大、比较、审核和二次编辑；输入与 Prompt 作为当前类型的上下文面板，不单独占一个常驻页面。</p></div>
+  </div>
+
+  <div class="card" data-choice="reduced-tabs" onclick="toggleSelect(this)">
+    <div class="card-image wireframe">
+      <div class="wf-header"><b>G-20260702-001 · 睡衣多图素材包</b><span>×</span></div>
+      <div class="wf-tabs"><b>产物</b><span>输入与 Prompt</span><span>批次信息</span></div>
+      <main class="wf-main">
+        <div class="wf-toolbar"><b>全部图片类型</b><span>筛选：商品主图</span></div>
+        <p style="font-size:11px">商品主图</p><div class="wf-grid"><div class="wf-card"><div class="wf-image"></div><p>v1 · 点击放大</p></div><div class="wf-card"><div class="wf-image"></div><p>v2 · 二次编辑</p></div></div>
+        <p style="font-size:11px">场景图</p><div class="wf-empty">无结果：已打回，只显示原因与“再次编辑”</div>
+      </main>
+    </div>
+    <div class="card-body"><h3>方案 B：精简三 Tab</h3><p>保留页面切换，降低当前五个 Tab 的冗余，但查看结果、看 Prompt 和改图仍需要来回切换。</p></div>
+  </div>
+</div>

@@ -1,0 +1,61 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]: encrypted
+        - generic [ref=e8]:
+          - paragraph [ref=e9]: 达芬奇密码 AI
+          - paragraph [ref=e10]: DaVinci Code · Asset Studio
+      - generic [ref=e11]:
+        - heading "让 AI 解锁 商业创意的密码" [level=1] [ref=e12]: 让 AI 解锁商业创意的密码
+        - paragraph [ref=e13]: 一站式 AI 素材生产工作台 · 智能模板 · 商品场景融合 · 多模型调度 · 批量化渲染
+        - list [ref=e14]:
+          - listitem [ref=e15]:
+            - generic [ref=e16]: auto_awesome
+            - text: AI 智能模板 — 30 秒生成专业素材
+          - listitem [ref=e17]:
+            - generic [ref=e18]: layers
+            - text: 多模型调度 — 主流模型统一接入
+          - listitem [ref=e19]:
+            - generic [ref=e20]: groups
+            - text: 协同评审 — 审核流闭环管理
+      - generic [ref=e21]:
+        - generic [ref=e22]: © 2026 达芬奇密码 AI
+        - generic [ref=e24]: v1.0.0
+        - generic [ref=e26]: ICP 备案中
+    - main [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - heading "欢迎登录" [level=2] [ref=e31]
+            - paragraph [ref=e32]: 管理后台 · 请使用账号密码继续
+          - generic [ref=e33]:
+            - generic [ref=e34]:
+              - generic [ref=e35]: 用户名
+              - generic [ref=e36]:
+                - generic: person
+                - textbox "用户名" [ref=e37]:
+                  - /placeholder: 请输入用户名
+            - generic [ref=e38]:
+              - generic [ref=e39]: 密码
+              - generic [ref=e40]:
+                - generic: lock
+                - textbox "密码" [ref=e41]:
+                  - /placeholder: 请输入密码
+                - button "显示密码" [ref=e42] [cursor=pointer]:
+                  - generic [ref=e43]: visibility
+            - generic [ref=e44]:
+              - generic [ref=e45] [cursor=pointer]:
+                - checkbox "30 天内自动登录" [checked] [ref=e46]
+                - generic [ref=e47]: 30 天内自动登录
+              - button "忘记密码？" [ref=e48] [cursor=pointer]
+            - button "登录 arrow_forward" [ref=e49] [cursor=pointer]:
+              - generic [ref=e50]: 登录
+              - generic [ref=e51]: arrow_forward
+        - paragraph [ref=e53]:
+          - text: 默认账号
+          - code [ref=e54]: admin
+          - text: ，默认密码
+          - code [ref=e55]: "123456"
+        - paragraph [ref=e56]: 登录即代表同意《用户协议》和《隐私政策》
+  - region "Notifications alt+T"

@@ -1,0 +1,304 @@
+- generic [ref=e2]:
+  - generic [ref=e57]:
+    - complementary [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e61]:
+          - generic [ref=e62]: blur_on
+          - generic [ref=e64]:
+            - heading "达芬奇密码 AI" [level=1] [ref=e65]
+            - text: DaVinci Code v2.0
+        - button "add_circle 开始智能创作 keyboard_arrow_down" [ref=e67] [cursor=pointer]:
+          - generic [ref=e68]: add_circle
+          - text: 开始智能创作
+          - generic [ref=e69]: keyboard_arrow_down
+        - navigation [ref=e70]:
+          - generic [ref=e71]: 主模块导航
+          - button "dashboard 工作台首页" [ref=e72] [cursor=pointer]:
+            - generic [ref=e73]:
+              - generic [ref=e74]: dashboard
+              - generic [ref=e75]: 工作台首页
+          - button "auto_schedule 任务列表" [ref=e77] [cursor=pointer]:
+            - generic [ref=e78]:
+              - generic [ref=e79]: auto_schedule
+              - generic [ref=e80]: 任务列表
+          - button "dashboard_customize 智能模板中心" [ref=e81] [cursor=pointer]:
+            - generic [ref=e82]:
+              - generic [ref=e83]: dashboard_customize
+              - generic [ref=e84]: 智能模板中心
+          - button "inventory_2 商品素材库" [ref=e85] [cursor=pointer]:
+            - generic [ref=e86]:
+              - generic [ref=e87]: inventory_2
+              - generic [ref=e88]: 商品素材库
+          - button "insights 数据效能复盘" [ref=e89] [cursor=pointer]:
+            - generic [ref=e90]:
+              - generic [ref=e91]: insights
+              - generic [ref=e92]: 数据效能复盘
+          - button "settings_applications 系统配置模块" [ref=e93] [cursor=pointer]:
+            - generic [ref=e94]:
+              - generic [ref=e95]: settings_applications
+              - generic [ref=e96]: 系统配置模块
+          - button "sync_alt 通道异步任务" [ref=e97] [cursor=pointer]:
+            - generic [ref=e98]:
+              - generic [ref=e99]: sync_alt
+              - generic [ref=e100]: 通道异步任务
+          - button "account_tree 资源分类" [ref=e101] [cursor=pointer]:
+            - generic [ref=e102]:
+              - generic [ref=e103]: account_tree
+              - generic [ref=e104]: 资源分类
+        - generic [ref=e105]:
+          - generic [ref=e106]: 快捷工具箱
+          - button "grid_view 资源中心" [ref=e107] [cursor=pointer]:
+            - generic [ref=e108]: grid_view
+            - text: 资源中心
+          - button "face_3 模特素材" [ref=e109] [cursor=pointer]:
+            - generic [ref=e110]: face_3
+            - text: 模特素材
+        - generic [ref=e111]:
+          - generic [ref=e112]:
+            - generic [ref=e113]: 新流程尝试
+            - generic [ref=e114]: BETA
+          - button "dashboard_customize 智能模版中心-新" [ref=e115] [cursor=pointer]:
+            - generic [ref=e116]:
+              - generic [ref=e117]: dashboard_customize
+              - generic [ref=e118]: 智能模版中心-新
+          - button "add_circle 新建任务-新" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]:
+              - generic [ref=e121]: add_circle
+              - generic [ref=e122]: 新建任务-新
+          - button "auto_schedule 任务列表-新" [ref=e123] [cursor=pointer]:
+            - generic [ref=e124]:
+              - generic [ref=e125]: auto_schedule
+              - generic [ref=e126]: 任务列表-新
+          - button "auto_awesome AI 帮我写 prompt-新" [ref=e127] [cursor=pointer]:
+            - generic [ref=e128]:
+              - generic [ref=e129]: auto_awesome
+              - generic [ref=e130]: AI 帮我写 prompt-新
+          - button "tune 推荐参数管理-新" [ref=e131] [cursor=pointer]:
+            - generic [ref=e132]:
+              - generic [ref=e133]: tune
+              - generic [ref=e134]: 推荐参数管理-新
+      - generic [ref=e137] [cursor=pointer]:
+        - img "陆永奇" [ref=e139]
+        - generic [ref=e141]:
+          - generic [ref=e142]:
+            - paragraph [ref=e143]: 陆永奇
+            - generic [ref=e144]: unfold_more
+          - paragraph [ref=e145]: 管理员
+    - generic [ref=e146]:
+      - banner [ref=e147]:
+        - generic [ref=e148]:
+          - generic [ref=e149] [cursor=pointer]: 达芬奇密码 AI
+          - generic [ref=e150]: chevron_right
+          - generic [ref=e151]: 工作台首页
+        - generic [ref=e153]:
+          - button "add 新建任务 keyboard_arrow_down" [ref=e155] [cursor=pointer]:
+            - generic [ref=e156]: add
+            - generic [ref=e157]: 新建任务
+            - generic [ref=e158]: keyboard_arrow_down
+          - button "notifications 2" [ref=e161] [cursor=pointer]:
+            - generic [ref=e162]: notifications
+            - generic [ref=e163]: "2"
+          - button "help" [ref=e164] [cursor=pointer]
+          - button "logout 退出" [ref=e166] [cursor=pointer]:
+            - generic [ref=e167]: logout
+            - generic [ref=e168]: 退出
+      - main [ref=e169]:
+        - generic [ref=e170]:
+          - generic [ref=e171]:
+            - generic [ref=e172]:
+              - heading "monitoring 智能生成多维数据看板" [level=2] [ref=e173]:
+                - generic [ref=e174]: monitoring
+                - text: 智能生成多维数据看板
+              - paragraph [ref=e175]: 根据日、周、月统计口径动态计算图片/视频生成数以及可用折合单价成本，契合财务与效能双重闭环审计。
+            - generic [ref=e176]:
+              - button "按日统计" [ref=e177] [cursor=pointer]
+              - button "按周统计" [ref=e178] [cursor=pointer]
+              - button "按月统计" [ref=e179] [cursor=pointer]
+          - generic [ref=e180]:
+            - generic [ref=e181]:
+              - generic [ref=e182]:
+                - generic [ref=e183]: 本周图片生成数
+                - heading "312 张" [level=3] [ref=e184]
+                - generic [ref=e185]:
+                  - generic [ref=e186]: trending_up
+                  - text: 较上周 +12%
+                - generic [ref=e187]: 达芬奇通道利用率 88%
+              - generic [ref=e188]: photo_library
+            - generic [ref=e190]:
+              - generic [ref=e191]:
+                - generic [ref=e192]: 本周视频生成数
+                - heading "84 段" [level=3] [ref=e193]
+                - generic [ref=e194]:
+                  - generic [ref=e195]: trending_up
+                  - text: 较上周 +24%
+                - generic [ref=e196]: 算力首帧加速提升
+              - generic [ref=e197]: video_library
+            - generic [ref=e199]:
+              - generic [ref=e200]:
+                - generic [ref=e201]: 单图可用成本
+                - heading "￥0.95 /张" [level=3] [ref=e202]
+                - generic [ref=e203]:
+                  - generic [ref=e204]: trending_down
+                  - text: 较上周 -14% (可用效能)
+                - generic [ref=e205]: 高复用性模板降低摊销
+              - generic [ref=e206]: payments
+            - generic [ref=e208]:
+              - generic [ref=e209]:
+                - generic [ref=e210]: 单条视频可用成本
+                - heading "￥3.80 /条" [level=3] [ref=e211]
+                - generic [ref=e212]:
+                  - generic [ref=e213]: trending_down
+                  - text: 较上周 -8% (算法调优)
+                - generic [ref=e214]: 排版脚本复用减少算力
+              - generic [ref=e215]: universal_currency_alt
+          - generic [ref=e217]:
+            - generic [ref=e218]:
+              - generic [ref=e219]:
+                - generic [ref=e221]:
+                  - generic [ref=e222]: DaVinci GPU Core 实时渲染中
+                  - generic [ref=e227]: 批次生图进度
+                - generic [ref=e228]:
+                  - generic [ref=e229]:
+                    - img "Nike Air Max Elite 2026 跑鞋" [ref=e230]
+                    - generic [ref=e231]: sync
+                  - generic [ref=e233]:
+                    - generic [ref=e234]:
+                      - generic [ref=e235]:
+                        - heading "Nike Air Max _ 3D赛博炫彩展示 (批次#1)" [level=4] [ref=e236]
+                        - paragraph [ref=e237]:
+                          - generic [ref=e238]: "关联产品: Nike Air Max Elite 2026 跑鞋"
+                          - generic [ref=e239]: "|"
+                          - generic [ref=e240]: "选用模板: 3D 赛博虚拟炫彩展示架"
+                      - generic [ref=e241]: 68%
+                    - generic [ref=e244]:
+                      - generic [ref=e245]: 已用时 12s · 预估剩余 6s
+                      - generic [ref=e246]: "线路通道: DaVinci Vision v3.5 (自研推荐)"
+                - generic [ref=e247]:
+                  - generic [ref=e248]:
+                    - img "MW Series 7 智联运动手表" [ref=e249]
+                    - generic [ref=e250]: sync
+                  - generic [ref=e252]:
+                    - generic [ref=e253]:
+                      - generic [ref=e254]:
+                        - heading "智能运动手表概念渲染短视频 (批次#2)" [level=4] [ref=e255]
+                        - paragraph [ref=e256]:
+                          - generic [ref=e257]: "关联产品: MW Series 7 智联运动手表"
+                          - generic [ref=e258]: "|"
+                          - generic [ref=e259]: "选用模板: 动态爆破能量粒子环绕视频"
+                      - generic [ref=e260]: 45%
+                    - generic [ref=e263]:
+                      - generic [ref=e264]: 已用时 12s · 预估剩余 6s
+                      - generic [ref=e265]: "线路通道: Runway Gen-3 Alpha Video API"
+              - generic [ref=e266]:
+                - generic [ref=e267]:
+                  - generic [ref=e268]:
+                    - heading "最近产出高保真广告素材" [level=3] [ref=e269]
+                    - paragraph [ref=e270]: 此处展示已审核通过、并自动完成智能排版的素材。可随时加入资源中心。
+                  - button "查看全部 arrow_forward" [ref=e271] [cursor=pointer]:
+                    - text: 查看全部
+                    - generic [ref=e272]: arrow_forward
+                - generic [ref=e273]:
+                  - generic [ref=e274] [cursor=pointer]:
+                    - generic [ref=e275]:
+                      - img "MW Series 7 智联运动手表" [ref=e276]
+                      - generic [ref=e277]: 智能硬件
+                    - generic [ref=e278]:
+                      - generic [ref=e279]:
+                        - heading "MW Series 7 智联运动手表" [level=4] [ref=e280]
+                        - paragraph [ref=e281]: "SKU: SKU-MW7-BLK"
+                      - generic [ref=e282]:
+                        - generic [ref=e283]:
+                          - generic [ref=e284]: folder
+                          - text: 12张素材 / 3段视频
+                        - generic [ref=e285]:
+                          - text: 详细
+                          - generic [ref=e286]: arrow_forward
+                  - generic [ref=e287] [cursor=pointer]:
+                    - generic [ref=e288]:
+                      - img "Nike Air Max Elite 2026 跑鞋" [ref=e289]
+                      - generic [ref=e290]: 户外服饰
+                    - generic [ref=e291]:
+                      - generic [ref=e292]:
+                        - heading "Nike Air Max Elite 2026 跑鞋" [level=4] [ref=e293]
+                        - paragraph [ref=e294]: "SKU: SKU-NK-AM26-RED"
+                      - generic [ref=e295]:
+                        - generic [ref=e296]:
+                          - generic [ref=e297]: folder
+                          - text: 18张素材 / 5段视频
+                        - generic [ref=e298]:
+                          - text: 详细
+                          - generic [ref=e299]: arrow_forward
+                  - generic [ref=e300] [cursor=pointer]:
+                    - generic [ref=e301]:
+                      - img "极致臻颜草本精华保湿乳" [ref=e302]
+                      - generic [ref=e303]: 美妆护肤
+                    - generic [ref=e304]:
+                      - generic [ref=e305]:
+                        - heading "极致臻颜草本精华保湿乳" [level=4] [ref=e306]
+                        - paragraph [ref=e307]: "SKU: SKU-SKN-ESS-100"
+                      - generic [ref=e308]:
+                        - generic [ref=e309]:
+                          - generic [ref=e310]: folder
+                          - text: 8张素材 / 2段视频
+                        - generic [ref=e311]:
+                          - text: 详细
+                          - generic [ref=e312]: arrow_forward
+                  - generic [ref=e313] [cursor=pointer]:
+                    - generic [ref=e314]:
+                      - img "超轻便透气抗撕裂防风羽绒服" [ref=e315]
+                      - generic [ref=e316]: 户外服饰
+                    - generic [ref=e317]:
+                      - generic [ref=e318]:
+                        - heading "超轻便透气抗撕裂防风羽绒服" [level=4] [ref=e319]
+                        - paragraph [ref=e320]: "SKU: SKU-OUT-JKT-GRY"
+                      - generic [ref=e321]:
+                        - generic [ref=e322]:
+                          - generic [ref=e323]: folder
+                          - text: 14张素材 / 4段视频
+                        - generic [ref=e324]:
+                          - text: 详细
+                          - generic [ref=e325]: arrow_forward
+            - generic [ref=e326]:
+              - generic [ref=e327]:
+                - generic [ref=e328]:
+                  - heading "playlist_add_check 协作待办与提案" [level=3] [ref=e329]:
+                    - generic [ref=e330]: playlist_add_check
+                    - text: 协作待办与提案
+                  - generic [ref=e331]: 3 件待处理
+                - generic [ref=e332]:
+                  - generic [ref=e333]:
+                    - generic [ref=e334]:
+                      - generic [ref=e335]: gavel
+                      - generic [ref=e336]:
+                        - paragraph [ref=e337]: 审核“MW Series 7”生成宣传海报
+                        - paragraph [ref=e338]: 陈美晴 提交 · 等待二审确认
+                    - generic [ref=e339]:
+                      - button "忽略" [ref=e340] [cursor=pointer]
+                      - button "立即處理" [ref=e341] [cursor=pointer]
+                  - generic [ref=e342]:
+                    - generic [ref=e343]:
+                      - generic [ref=e344]: cloud_upload
+                      - generic [ref=e345]:
+                        - paragraph [ref=e346]: 补充“轻便防风羽绒服”侧面去背底图
+                        - paragraph [ref=e347]: 运营 提报 · 素材分辨率不足
+                    - generic [ref=e348]:
+                      - button "忽略" [ref=e349] [cursor=pointer]
+                      - button "立即處理" [ref=e350] [cursor=pointer]
+                  - generic [ref=e351]:
+                    - generic [ref=e352]:
+                      - generic [ref=e353]: build
+                      - generic [ref=e354]:
+                        - paragraph [ref=e355]: 复制修复“极地防寒羽绒服_动态飞雪”超时任务
+                        - paragraph [ref=e356]: 系统建议 · 调降为中等画质重试
+                    - generic [ref=e357]:
+                      - button "忽略" [ref=e358] [cursor=pointer]
+                      - button "立即處理" [ref=e359] [cursor=pointer]
+              - generic [ref=e360]:
+                - heading "lightbulb_circle 达芬奇 AI 灵感库" [level=3] [ref=e362]:
+                  - generic [ref=e363]: lightbulb_circle
+                  - text: 达芬奇 AI 灵感库
+                - paragraph [ref=e364]: 检测到本周“美妆护肤”类别需求大增。系统为您自动推荐“极简北欧冷淡风大理石”模板，点击下方即可一键应用于“臻颜精华乳”。
+                - button "一键采用并开始 chevron_right" [ref=e365] [cursor=pointer]:
+                  - text: 一键采用并开始
+                  - generic [ref=e366]: chevron_right
+  - region "Notifications alt+T"

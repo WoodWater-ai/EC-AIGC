@@ -150,13 +150,13 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 
 ### 2.3 五阶段业务状态
 
-五阶段用于约束接口顺序、确认快照和失效规则，不要求映射为五个页面或顶部 Stepper。前端保留图片/视频三栏工作台：用户在原区域编辑素材、事实、Prompt 和模型参数；点击“检查并生成”时按阶段顺序核验，失败则定位原区域，成功才运行 Preflight 并打开最终付费确认弹窗。AI 助手是独立内容辅助入口，不参与 Preflight、费用确认或 Submit。
+五阶段用于约束接口顺序、确认快照和失效规则，不要求映射为五个页面或顶部 Stepper。前端保留图片/视频三栏工作台。图片页只让用户操作素材、标签、最终 Prompt 和模型参数，自动上下文快照不展示；视频保留事实与冲突处理。点击“生成”时按阶段顺序核验，图片页同时隐式确认当前 Prompt，成功才运行 Preflight 并打开最终付费确认弹窗。AI 助手是独立内容辅助入口，不参与 Preflight、费用确认或 Submit。
 
 | 步骤 | 前端允许动作 | 完成条件 |
 | --- | --- | --- |
 | 1 来源素材与 Profile | 选商品/来源图、图片多选 Profile 或视频模式、保存草稿 | 已返回任务组和全部子任务 |
-| 2 商品/来源事实确认 | 运行分析、编辑事实、处理视频素材冲突、确认 | 已返回有效上下文快照 |
-| 3 Prompt 内容确认 | 展示各子任务方案、编辑 Prompt、调整有序参考图；视频使用默认通道 Prompt Profile 初始化并展示 Profile/版本；整组确认 | 全部子任务具有同批次 Prompt 快照，视频具有已确认内容方案快照 |
+| 2 自动上下文/来源事实 | 图片调用分析后自动保存上下文快照和参考图标签；视频处理来源冲突并人工确认 | 已返回有效上下文快照 |
+| 3 最终 Prompt | 图片展示当前类型的最终 Prompt，点击「生成」时隐式确认整组；视频展示方案、编辑 Prompt、调整有序参考图并确认 | 全部子任务具有同批次 Prompt 快照，视频具有已确认内容方案快照 |
 | 4 通道参数与 Preflight | 选通道/模型后调用通道编译、展示 Prompt 差异、刷新动态参数，再运行 Preflight | 编译兼容且组级 `valid=true`、未过期 |
 | 5 付费执行确认 | 展示请求、成本、耗时、健康度和兜底策略，确认执行并 Submit | Submit 返回全部子任务 `queued` |
 
@@ -176,17 +176,20 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 | `src/components/PreflightSummary.tsx` | 组总成本/耗时/健康度、逐子任务请求预览、警告和错误 |
 | `src/components/TaskStatusBadge.tsx` | 唯一正式任务状态映射 |
 | `src/components/ResultSourceBadge.tsx` | `generated/reused` 与 `spec_mismatch` 展示 |
+| `src/components/ModelProfileCreator.tsx` | 模特资源库与模特参考选择器共用的候选生成弹窗：文本、参考图、换脸三种模式；图片统一打开资源中心选择，候选张数按模型能力步进选择，一次费用确认后选择候选图保存 |
 
 ### 3.2 图片创建页
 
-`CreateImageTask.tsx` 保留现有三栏任务工作台，并接入五阶段业务状态：
+`CreateImageTask.tsx` 保留三栏任务工作台，但采用极简图片路径：
 
-- 素材区支持多选图片 Profile，但只调用一次 `createTaskGroup`。
-- 内容区为每个子任务保留独立 Prompt 编辑区、就地确认和参考图顺序；AI 助手继续负责解析与改写。
-- 设置区共享通道、模型、动态参数和兜底策略；通道选择不依赖 AI 助手。
-- 顶部主操作改为“检查并生成”；缺失或失效时展示准备度问题并滚动定位第一个问题区域。
+- 主体素材必选，`product_asset_id` 可空；关联商品/SKU 只读显示一行，未关联时仍可创建任务组、生成结果并后续补关联。
+- 左栏保留主体素材、五类参考图和轻量商品事实。`analyze-context` 返回商品事实副本；用户可编辑名称、卖点、品类、颜色、图案/材质和版型/结构，并一键复制。编辑通过任务组工作副本保存，不需要确认，不展示节点日志。
+- 中栏首屏固定多选图片类型、紧凑标签、AI 助手和所有已选类型纵向叠加的最终 Prompt。多类型属于一个组，每个类型保留独立 Prompt 和张数。AI 助手按当前素材、事实、标签和类型生成或重生成 Prompt，不参与付费链路；未手动编辑的 Prompt 自动应用更新，手动编辑的 Prompt 显示变更来源、AI 建议、差异查看、覆盖和保留操作。
+- 右栏只保留一个可用模型下拉、各类型张数和任务总张数。比例、分辨率使用能力默认值并在“高级设置”中弱化呈现；后端过滤不可用模型。
+- 顶部主操作改为“生成”；它调用 `confirm-prompts` 隐式接受当前 Prompt，随后运行 Preflight。缺失或失效时定位原区域，Preflight 通过后才打开最终付费确认弹窗。
+- 创建页不显示商品事实确认、保真规则、工作流节点/日志、审核策略、平台规格推荐、成本、健康度或额度。成本、耗时、健康度和兜底策略只出现在 Preflight 后的费用确认弹窗；审核策略由组织或模板默认值决定。
 - Preflight 通过后打开付费确认弹窗，汇总逐子任务请求、成本、耗时、健康度和兜底策略。
-- 删除直接创建 `running` 任务和所有模拟生成完成的 `setTimeout`。
+- 删除直接创建 `running` 任务和所有模拟 Provider 生成完成的 `setTimeout`；mock 中允许仅用于 AI 助手加载态的短暂延迟，真实 Adapter 不得依赖该延迟。
 
 ### 3.3 视频创建页
 
@@ -220,7 +223,7 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 | 文件 | 改造内容 |
 | --- | --- |
 | `src/components/ExecutionConfirmDialog.tsx` | 图片/视频共用的最终付费确认弹窗，不包含 AI 助手能力 |
-| `src/components/CreateImageTask.tsx` | 原页面就地确认、生成准备度核验、问题定位和最终付费确认 |
+| `src/components/CreateImageTask.tsx` | 极简图片创建：可空商品关联、参考图自动标签、AI Prompt、按类型张数、弱化高级规格与最终费用确认 |
 | `src/components/CreateVideoTaskV2.tsx` | 默认 Profile 初始化、动态镜头、通道切换编译状态、Prompt diff、兼容回退、动态参数刷新 |
 | `src/components/CreateVideoTask.tsx` | 仅处理兼容入口；不得形成另一套 Prompt 编译和阶段状态 |
 | `src/components/TemplateCenter.tsx` | 保持五类模板和通道共性内容，不新增 Profile Tab，不写入 Vidu 专有语法 |
@@ -229,6 +232,8 @@ Adapter 选择读取可选的 `VITE_GENERATION_API_MODE=mock|real`，缺省为 `
 | `src/api/modules/prompt.ts` | 实现 `promptApi.compileForChannel` 的 mock/real 统一入口和幂等参数 |
 | `src/api/modules/channel.ts` | 返回默认通道、能力版本、Profile 映射和有序动态字段 |
 | `src/components/__tests__/CreateVideoTaskV2.test.tsx` | 后续引入测试框架后覆盖通道切换和动态镜头；当前阶段按项目约定先列为验收用例，不强制新增测试依赖 |
+| `src/components/ModelLibrary.tsx` | 模特资源库唯一入口，按人物风格属性筛选 active 档案；不使用商品图片类型作为资源库筛选，不向商品图片类型增加“模特生成” |
+| `src/components/AssetTransitModal.tsx` | `reference-model` 槽位展示“新建 AI 模特”；发布后自动回填当前槽位 |
 
 ## 4. 实施顺序
 

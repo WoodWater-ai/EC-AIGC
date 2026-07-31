@@ -1,0 +1,137 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: EC-AIGC / MANAGEMENT BRIEF
+      - heading "八月 AI 素材工作台推进方案" [level=1] [ref=e6]
+      - paragraph [ref=e7]: 先补齐设计师的生产闭环，再把审核通过的优质成片沉淀为模板资产；本地视频通道通过公司硬件投入降低长期生成成本。
+    - complementary [ref=e8]:
+      - generic [ref=e9]: 八月总目标
+      - strong [ref=e10]: 提效 · 降本 · 资产沉淀
+      - text: 让优质素材从个人经验，变成团队可复刻的生产能力。
+  - region "八月交付目标" [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]: 8/7
+      - text: 设计师可稳定出图并进入审核
+    - generic [ref=e14]:
+      - generic [ref=e15]: 8 个
+      - text: 首批发布模板：图 5 / 视频 3
+    - generic [ref=e16]:
+      - generic [ref=e17]: ≥ 50%
+      - text: 本地视频相对云端的可变成本降幅
+    - generic [ref=e18]:
+      - generic [ref=e19]: 20 人
+      - text: 5 人试点签收后内部开放
+  - region "三项核心工作" [ref=e20]:
+    - article [ref=e21]:
+      - generic [ref=e22]:
+        - generic [ref=e23]: "01"
+        - generic [ref=e24]: PRODUCT
+      - heading "产品闭环收尾" [level=2] [ref=e25]
+      - list [ref=e26]:
+        - listitem [ref=e27]: 素材、生成任务、异步结果、审核可稳定使用
+        - listitem [ref=e28]: 审核通过结果可直接“设为模板”
+        - listitem [ref=e29]: 普通用户替换素材后受控复刻
+      - generic [ref=e30]: 设计师先能高效出图
+    - article [ref=e31]:
+      - generic [ref=e32]:
+        - generic [ref=e33]: "02"
+        - generic [ref=e34]: TEMPLATE
+      - heading "模板广场与复刻" [level=2] [ref=e35]
+      - list [ref=e36]:
+        - listitem [ref=e37]: 成片、Prompt、模型与参数继承为版本快照
+        - listitem [ref=e38]: 设计师审核发布，模板广场统一展示
+        - listitem [ref=e39]: 图 5 + 视频 3，沉淀可复用样式资产
+      - generic [ref=e40]: 从个人经验到团队资产
+    - article [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e43]: "03"
+        - generic [ref=e44]: LOCAL VIDEO
+      - heading "本地视频生成降本" [level=2] [ref=e45]
+      - list [ref=e46]:
+        - listitem [ref=e47]: 公司采购高显存工作站、存储与网络环境
+        - listitem [ref=e48]: 大哥 / 新工程师部署 ComfyUI 并提供服务 API
+        - listitem [ref=e49]: 后端封装 Provider，前端继续走统一任务接口
+      - generic [ref=e50]: 本地与云端可比较、可切换
+  - region "统一工作台能力" [ref=e51]:
+    - generic [ref=e52]: 统一任务工作台
+    - generic [ref=e53]: 模板复刻
+    - generic [ref=e54]: ·
+    - generic [ref=e55]: 通道切换确认
+    - generic [ref=e56]: ·
+    - generic [ref=e57]: 审核
+    - generic [ref=e58]: ·
+    - generic [ref=e59]: 成本复盘
+  - region "八月甘特图" [ref=e60]:
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - generic [ref=e63]: AUGUST ROADMAP
+        - heading "八月关键路径与甘特图" [level=2] [ref=e64]
+      - generic [ref=e65]: 产品主链路优先保障设计师出图；模板供给与本地视频并行推进，但本地环境延期不阻塞模板和全员开放。
+    - generic [ref=e66]:
+      - generic [ref=e67]: 工作流 / 负责人
+      - generic [ref=e69]:
+        - generic [ref=e70]: 第 1 周
+        - text: 8/3 - 8/7
+      - generic [ref=e71]:
+        - generic [ref=e72]: 第 2 周
+        - text: 8/10 - 8/14
+      - generic [ref=e73]:
+        - generic [ref=e74]: 第 3 周
+        - text: 8/17 - 8/21
+      - generic [ref=e75]:
+        - generic [ref=e76]: 第 4 周
+        - text: 8/24 - 8/28
+      - generic [ref=e77]:
+        - generic [ref=e78]: 产品生产基础
+        - text: 前端 + 后端
+      - generic [ref=e79]: 任务、结果、审核收尾
+      - generic [ref=e81]: 图片模板闭环上线
+      - generic [ref=e83]: 视频模板机制复用
+      - generic [ref=e85]: 试点问题收口
+      - generic [ref=e87]:
+        - generic [ref=e88]: 模板供给与发布
+        - text: 设计师 + 审核负责人
+      - generic [ref=e89]: 设计师用真实任务出图
+      - generic [ref=e91]: 图模板 5 个审核发布
+      - generic [ref=e93]: 视频模板 3 个发布
+      - generic [ref=e95]: 模板质量复盘
+      - generic [ref=e97]:
+        - generic [ref=e98]: 硬件与本地视频服务
+        - text: 公司 + 大哥 / 新工程师
+      - generic [ref=e99]: 硬件规格确认、采购、API Mock
+      - generic [ref=e101]: GPU / 网络 / 存储环境部署
+      - generic [ref=e103]: ComfyUI、Provider、结果回收联调
+      - generic [ref=e105]: 云端 / 本地效果与成本对照
+      - generic [ref=e107]:
+        - generic [ref=e108]: 试点与开放
+        - text: 产品 + 运营 + 设计
+      - generic [ref=e111]: 5 人试点准备
+      - generic [ref=e113]: 5 人签收 → 20 人开放
+  - generic [ref=e115]:
+    - article [ref=e116]:
+      - generic [ref=e117]: RESOURCE & OWNERSHIP
+      - heading "资源与协作边界" [level=2] [ref=e118]
+      - generic [ref=e119]:
+        - generic [ref=e120]:
+          - generic [ref=e121]: 公司
+          - generic [ref=e122]: 硬件与运行环境
+          - paragraph [ref=e123]: 采购高显存 GPU 工作站，保障存储、网络与运维支持。
+        - generic [ref=e124]:
+          - generic [ref=e125]: 大哥 / 新工程师
+          - generic [ref=e126]: 本地视频服务
+          - paragraph [ref=e127]: 部署 ComfyUI、模型工作流和服务 API，配合后端联调。
+        - generic [ref=e128]:
+          - generic [ref=e129]: 产品团队
+          - generic [ref=e130]: 闭环与模板资产
+          - paragraph [ref=e131]: 后端接 Provider / 队列；前端做工作台 / 模板广场；设计师生成、审核、发布。
+    - complementary [ref=e132]:
+      - generic [ref=e133]: MANAGEMENT DECISIONS
+      - heading "本周需确认" [level=2] [ref=e134]
+      - list [ref=e135]:
+        - listitem [ref=e136]: 批准采购高显存 GPU 工作站及配套环境。
+        - listitem [ref=e137]:
+          - text: 确认大哥 / 新工程师在
+          - strong [ref=e138]: 8/7 前
+          - text: 交付本地服务 API 文档与 Mock。
+        - listitem [ref=e139]: 指定模板发布审核负责人，保证模板质量可控。
+  - paragraph [ref=e140]: 说明：用户切换云端 / 本地通道时，系统将展示 Prompt 与参数差异、预估成本和时延，并要求确认后提交；不会静默降级或绕过统一任务链路。

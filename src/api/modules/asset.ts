@@ -53,6 +53,11 @@ export interface AssetResourceItem {
    * mock 商品资产使用字符串主键，不能再用文件名反推商品归属。
    */
   productAssetId?: string;
+  /**
+   * 仅用于飞书数据导入和 mock 核对。真实 API 完成迁移后由服务端返回；
+   * 浏览器不得根据文件名推导该关系。
+   */
+  larkRecordId?: string;
   recognitionId?: number;
   /** 关联 file_resource.id(Spec-B 主路径) */
   fileResourceId?: number;

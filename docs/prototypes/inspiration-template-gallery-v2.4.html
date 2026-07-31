@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>灵感模板 - 达芬奇密码 AI 素材工作台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet" />
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <style>
+      :root {
+        --ink: #132238;
+        --muted: #66758a;
+        --line: #dfe5ed;
+        --canvas: #f5f7fa;
+        --paper: #ffffff;
+        --navy: #0b1c30;
+        --navy-soft: #122941;
+        --blue: #0256ff;
+        --blue-soft: #edf3ff;
+        --green: #13795b;
+        --amber: #a96817;
+        --rose: #a84e67;
+        --shadow: 0 18px 44px rgba(25, 45, 74, 0.1);
+      }
+
+      * { box-sizing: border-box; }
+      html { min-width: 1180px; background: var(--canvas); }
+      body { margin: 0; color: var(--ink); background: var(--canvas); font: 13px/1.5 "Noto Sans SC", "PingFang SC", sans-serif; }
+      button, input { font: inherit; }
+      button { cursor: pointer; }
+      button:focus-visible, input:focus-visible { outline: 2px solid #85adff; outline-offset: 2px; }
+      h1, h2, h3, p { margin: 0; }
+      svg { width: 18px; height: 18px; stroke-width: 1.8; }
+
+      .app { min-height: 100vh; display: grid; grid-template-columns: 232px minmax(0, 1fr); }
+      .sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 19px 13px 15px; color: #a9b9ca; background: var(--navy); }
+      .brand { display: flex; align-items: center; gap: 10px; padding: 1px 9px 21px; border-bottom: 1px solid rgba(223, 236, 255, 0.1); }
+      .brand-mark { width: 33px; height: 33px; display: grid; place-items: center; color: white; background: var(--blue); border-radius: 7px; box-shadow: 0 7px 16px rgba(2, 86, 255, 0.28); }
+      .brand strong { display: block; color: #fff; font-size: 14px; line-height: 1.2; }
+      .brand small { display: block; margin-top: 3px; color: #7289a2; font-size: 9px; }
+      .create { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; height: 39px; margin: 19px 0 20px; border: 0; border-radius: 6px; color: white; background: var(--blue); font-weight: 700; box-shadow: 0 7px 15px rgba(2, 86, 255, 0.2); }
+      .nav-caption { padding: 0 10px 7px; color: #71879e; font-size: 10px; }
+      .nav { display: grid; gap: 3px; }
+      .nav button { display: flex; align-items: center; gap: 11px; height: 39px; border: 0; border-radius: 6px; color: #9cafc1; background: transparent; padding: 0 11px; text-align: left; }
+      .nav button:hover { color: #d8e5f2; background: rgba(255,255,255,0.04); }
+      .nav button.active { color: #fff; background: var(--navy-soft); box-shadow: inset 2px 0 0 var(--blue); }
+      .nav button.active svg { color: #7da9ff; }
+      .nav .beta { margin-left: auto; padding: 2px 5px; border-radius: 3px; color: #ffb2c7; background: rgba(235, 95, 141, 0.12); font-size: 9px; }
+      .side-footer { margin-top: auto; padding: 15px 9px 2px; border-top: 1px solid rgba(223,236,255,.1); color: #7f94aa; font-size: 10px; }
+      .user { display: flex; align-items: center; gap: 9px; margin-top: 11px; color: #d7e2ed; }
+      .avatar { width: 27px; height: 27px; display: grid; place-items: center; border: 1px solid #5e7791; border-radius: 50%; color: #e8f0f7; background: #28405a; font-size: 10px; }
+      .user b { display: block; color: #eef4f9; font-size: 11px; }
+      .user span { display: block; color: #8096ad; font-size: 9px; }
+
+      .shell { min-width: 0; }
+      .topbar { height: 65px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.93); }
+      .crumb { display: flex; align-items: center; gap: 7px; color: #8793a4; font-size: 11px; }
+      .crumb strong { color: var(--ink); font-size: 12px; }
+      .top-tools { display: flex; align-items: center; gap: 13px; }
+      .budget { display: flex; align-items: center; gap: 7px; color: #5b6b7d; font-size: 11px; }
+      .budget b { color: var(--amber); }
+      .tool-icon { position: relative; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 5px; color: #5d6c7d; background: transparent; }
+      .tool-icon:hover { background: #f2f5f8; }
+      .notice { position: absolute; top: 5px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: #ed526c; }
+
+      .main { max-width: 1700px; margin: 0 auto; padding: 28px 32px 54px; }
+      .intro { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; }
+      .eyebrow { color: var(--blue); font-size: 10px; font-weight: 700; }
+      .intro h1 { margin-top: 5px; font: 600 30px/1.2 "Noto Serif SC", serif; }
+      .intro p { max-width: 590px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+      .hint { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-left: 2px solid #a6c0fb; color: #55708f; background: #f5f8ff; font-size: 11px; }
+      .hint svg { flex: 0 0 auto; color: var(--blue); width: 16px; }
+
+      .filters { display: flex; align-items: center; gap: 9px; margin: 25px 0 19px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+      .segmented { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 6px; background: white; }
+      .segmented button { display: flex; align-items: center; gap: 6px; height: 30px; border: 0; border-radius: 4px; padding: 0 12px; color: #687688; background: transparent; font-size: 11px; font-weight: 600; }
+      .segmented button.active { color: #1143ad; background: var(--blue-soft); }
+      .filter { display: flex; align-items: center; gap: 7px; height: 36px; border: 1px solid var(--line); border-radius: 5px; padding: 0 10px; color: #59697c; background: white; font-size: 11px; }
+      .filter label { color: #8a96a6; }
+      .filter select { border: 0; color: #33465e; background: transparent; outline: 0; font-size: 11px; font-weight: 600; }
+      .search { position: relative; width: 240px; margin-left: auto; }
+      .search svg { position: absolute; top: 9px; left: 10px; width: 16px; height: 16px; color: #8796a9; }
+      .search input { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 5px; padding: 0 10px 0 33px; color: var(--ink); background: white; font-size: 11px; }
+
+      .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 13px; }
+      .section-title { display: flex; align-items: baseline; gap: 9px; }
+      .section-title h2 { font-size: 16px; }
+      .section-title span { color: #8994a4; font-size: 11px; }
+      .sort { border: 0; color: #647488; background: transparent; font-size: 11px; }
+      .template-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+      .template-card { overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); box-shadow: 0 2px 3px rgba(29,49,73,.02); transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease; }
+      .template-card:hover { transform: translateY(-4px); border-color: #b9c9df; box-shadow: var(--shadow); }
+      .card-media { position: relative; height: 290px; overflow: hidden; background: #e2e8ed; }
+      .card-media img { width: 100%; height: 100%; object-fit: cover; transition: transform .45s ease; }
+      .template-card:hover .card-media img { transform: scale(1.04); }
+      .card-media::after { content: ""; position: absolute; inset: 42% 0 0; background: linear-gradient(transparent, rgba(7,20,35,.26)); pointer-events: none; }
+      .card-badge { position: absolute; z-index: 1; top: 10px; left: 10px; padding: 4px 6px; border-radius: 3px; color: #31465b; background: rgba(255,255,255,.88); font-size: 9px; font-weight: 700; }
+      .card-index { position: absolute; z-index: 1; right: 11px; bottom: 9px; color: rgba(255,255,255,.9); font: 600 10px "Noto Serif SC", serif; }
+      .card-body { min-height: 128px; padding: 13px 14px 14px; }
+      .card-top { display: flex; align-items: start; justify-content: space-between; gap: 9px; }
+      .card-top h3 { font-size: 14px; line-height: 1.25; }
+      .tag { flex: 0 0 auto; padding: 3px 5px; border-radius: 3px; color: #5c6978; background: #f1f4f7; font-size: 9px; }
+      .card-body p { min-height: 34px; margin: 6px 0 11px; color: #6d798a; font-size: 10px; line-height: 1.65; }
+      .card-foot { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+      .fit { color: #738095; font-size: 9px; }
+      .use { display: inline-flex; align-items: center; gap: 5px; height: 27px; border: 1px solid #c2d2eb; border-radius: 4px; padding: 0 8px; color: #0f51c3; background: white; font-size: 10px; font-weight: 700; }
+      .use:hover { color: white; border-color: var(--blue); background: var(--blue); }
+      .use svg { width: 13px; height: 13px; }
+      .all-section { margin-top: 32px; }
+
+      .video-card .card-media { background: #1a2f43; }
+      .video-card .card-media img { opacity: .88; animation: slow-zoom 8s ease-in-out infinite alternate; }
+      .play { position: absolute; z-index: 2; top: 50%; left: 50%; width: 42px; height: 42px; display: grid; place-items: center; transform: translate(-50%, -50%); border: 1px solid rgba(255,255,255,.82); border-radius: 50%; color: white; background: rgba(8,20,34,.26); backdrop-filter: blur(3px); }
+      .play svg { width: 18px; height: 18px; fill: currentColor; }
+      .duration { position: absolute; z-index: 2; right: 10px; bottom: 9px; padding: 3px 5px; color: white; background: rgba(5,16,29,.65); font-size: 9px; }
+      @keyframes slow-zoom { to { transform: scale(1.08); } }
+
+      .overlay { position: fixed; z-index: 20; inset: 0; display: none; background: rgba(8,20,35,.46); backdrop-filter: blur(2px); }
+      .overlay.open { display: block; }
+      .drawer { position: fixed; z-index: 21; top: 0; right: 0; width: min(920px, 78vw); height: 100vh; display: grid; grid-template-columns: 43% 57%; transform: translateX(104%); background: white; box-shadow: -18px 0 46px rgba(13,30,50,.2); transition: transform .32s cubic-bezier(.2,.8,.2,1); }
+      .drawer.open { transform: translateX(0); }
+      .visual-pane { position: relative; display: flex; flex-direction: column; justify-content: flex-end; min-height: 0; padding: 27px; color: white; background: #233346; overflow: hidden; }
+      .visual-pane img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .82; }
+      .visual-pane::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(7,16,27,.12), rgba(7,16,27,.84)); }
+      .visual-content { position: relative; z-index: 1; }
+      .visual-content small { color: #c5d5e9; }
+      .visual-content h2 { margin-top: 5px; font: 600 26px/1.25 "Noto Serif SC", serif; }
+      .visual-content p { max-width: 260px; margin-top: 10px; color: #e3ebf4; font-size: 11px; line-height: 1.75; }
+      .preview-dots { display: flex; gap: 6px; margin-top: 19px; }
+      .preview-dots i { width: 22px; height: 3px; background: rgba(255,255,255,.35); }
+      .preview-dots i:first-child { background: white; }
+      .form-pane { position: relative; min-width: 0; padding: 25px 28px; overflow-y: auto; }
+      .drawer-close { position: absolute; top: 18px; right: 20px; display: grid; place-items: center; width: 31px; height: 31px; border: 0; border-radius: 4px; color: #68778a; background: #f2f5f7; }
+      .drawer-close:hover { color: var(--ink); background: #e7edf2; }
+      .form-pane header { padding-right: 42px; border-bottom: 1px solid var(--line); padding-bottom: 17px; }
+      .form-pane header span { color: var(--blue); font-size: 10px; font-weight: 700; }
+      .form-pane header h2 { margin-top: 4px; font-size: 19px; }
+      .form-pane header p { margin-top: 5px; color: #718094; font-size: 11px; }
+      .form-section { padding: 20px 0; border-bottom: 1px solid #edf0f3; }
+      .form-section h3 { font-size: 12px; }
+      .form-section > p { margin-top: 4px; color: #7a8696; font-size: 10px; }
+      .asset-option { display: grid; grid-template-columns: 64px minmax(0,1fr) auto; gap: 10px; align-items: center; margin-top: 12px; padding: 8px; border: 1px solid #9abaf1; border-radius: 5px; background: #f8fbff; }
+      .asset-option img { width: 64px; height: 64px; border-radius: 3px; object-fit: cover; }
+      .asset-option b { display: block; font-size: 11px; }
+      .asset-option span { display: block; margin-top: 3px; color: #6b7a8f; font-size: 9px; }
+      .checkmark { display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; color: white; background: var(--blue); }
+      .checkmark svg { width: 12px; height: 12px; }
+      .asset-actions { display: flex; gap: 8px; margin-top: 9px; }
+      .secondary { height: 30px; border: 1px solid var(--line); border-radius: 4px; padding: 0 9px; color: #526276; background: white; font-size: 10px; font-weight: 600; }
+      .secondary:hover { border-color: #aebdd0; background: #fafbfd; }
+      .need { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding: 9px; border-left: 2px solid #e3bf80; color: #745829; background: #fff9ef; font-size: 10px; }
+      .need svg { flex: 0 0 auto; width: 15px; height: 15px; color: var(--amber); }
+      .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 11px; }
+      .summary div { padding: 8px; background: #f6f8fa; }
+      .summary span { display: block; color: #7b8795; font-size: 9px; }
+      .summary b { display: block; margin-top: 3px; font-size: 12px; }
+      .drawer-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 22px; }
+      .primary { display: inline-flex; align-items: center; gap: 6px; height: 34px; border: 0; border-radius: 4px; padding: 0 12px; color: white; background: var(--blue); font-size: 11px; font-weight: 700; }
+      .primary:hover { background: #0049dc; }
+      .primary svg { width: 15px; height: 15px; }
+
+      @media (max-width: 1330px) {
+        html { min-width: 1060px; }
+        .app { grid-template-columns: 196px minmax(0, 1fr); }
+        .sidebar { padding-inline: 9px; }
+        .main { padding-inline: 22px; }
+        .template-grid { gap: 12px; }
+        .card-media { height: 250px; }
+        .filter:nth-of-type(4) { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand"><div class="brand-mark"><i data-lucide="sparkles"></i></div><div><strong>达芬奇密码 AI</strong><small>DA VINCI CODE / WORKBENCH</small></div></div>
+        <button class="create"><i data-lucide="plus"></i>新建任务</button>
+        <span class="nav-caption">主模块导航</span>
+        <nav class="nav">
+          <button title="首页总览"><i data-lucide="layout-dashboard"></i>首页总览</button>
+          <button class="active" title="生成任务"><i data-lucide="wand-sparkles"></i>生成任务</button>
+          <button title="任务列表"><i data-lucide="list-checks"></i>任务列表</button>
+          <button title="商品素材库"><i data-lucide="images"></i>商品素材库</button>
+          <button title="模板中心"><i data-lucide="layers-3"></i>模板中心</button>
+          <button title="数据复盘"><i data-lucide="chart-no-axes-combined"></i>数据复盘</button>
+        </nav>
+        <span class="nav-caption" style="margin-top: 23px">新流程尝试</span>
+        <nav class="nav"><button class="active" title="灵感模板"><i data-lucide="gallery-vertical-end"></i>灵感模板 <span class="beta">BETA</span></button></nav>
+        <div class="side-footer">当前工作空间<div class="user"><div class="avatar">林</div><div><b>林可心</b><span>运营 / 任务创建人</span></div></div></div>
+      </aside>
+
+      <div class="shell">
+        <header class="topbar">
+          <div class="crumb"><span>生成任务</span><i data-lucide="chevron-right" style="width:14px"></i><strong>灵感模板</strong></div>
+          <div class="top-tools"><div class="budget"><i data-lucide="wallet-cards" style="width:15px"></i>本月预算 <b>62%</b></div><button class="tool-icon" title="通知"><i data-lucide="bell"></i><i class="notice"></i></button><button class="tool-icon" title="帮助"><i data-lucide="circle-help"></i></button></div>
+        </header>
+
+        <main class="main">
+          <section class="intro">
+            <div><span class="eyebrow">RESULT-FIRST TEMPLATE LIBRARY</span><h1>先选你想要的成片效果</h1><p>不用写提示词。选择一个模板，换成你的商品素材，确认后即可生成。</p></div>
+            <div class="hint"><i data-lucide="shield-check"></i><span>模板只定义画面规律，不复用竞品人物、商品或品牌元素</span></div>
+          </section>
+
+          <section class="filters" aria-label="模板筛选">
+            <div class="segmented"><button class="active" data-mode="all"><i data-lucide="image"></i>全部 <span id="count-all">10</span></button><button data-mode="image"><i data-lucide="images"></i>图片 <span>8</span></button><button data-mode="video"><i data-lucide="video"></i>视频 <span>2</span></button></div>
+            <div class="filter"><label>用途</label><select id="purpose"><option value="all">全部用途</option><option value="居家">居家上新</option><option value="女装">女装种草</option><option value="试穿">店主试穿</option></select></div>
+            <div class="filter"><label>风格</label><select id="style"><option value="all">全部风格</option><option value="静奢">静奢质感</option><option value="中式">东方雅致</option><option value="甜酷">甜酷暗黑</option><option value="元气">多巴胺元气</option></select></div>
+            <div class="filter"><label>画面</label><select><option>全部画面</option><option>室内情境</option><option>店主试穿</option><option>轻运动视频</option></select></div>
+            <div class="search"><i data-lucide="search"></i><input id="search" placeholder="搜索模板名称" aria-label="搜索模板名称" /></div>
+          </section>
+
+          <section id="recommend-section">
+            <div class="section-head"><div class="section-title"><h2>推荐给你</h2><span>根据最近使用的睡衣 / 家居服素材</span></div><button class="sort">按推荐排序 <i data-lucide="chevron-down" style="width:13px;vertical-align:middle"></i></button></div>
+            <div class="template-grid" id="recommend-grid"></div>
+          </section>
+
+          <section class="all-section" id="all-section">
+            <div class="section-head"><div class="section-title"><h2>全部模板</h2><span id="result-count">共 10 个已发布模板</span></div></div>
+            <div class="template-grid" id="all-grid"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <aside class="drawer" id="drawer" aria-label="模板素材替换抽屉">
+      <section class="visual-pane"><img id="drawer-image" alt="模板预览" /><div class="visual-content"><small id="drawer-kind">图片模板 / I01</small><h2 id="drawer-title">静奢缎面晨光</h2><p id="drawer-description">柔和侧光、低饱和留白，突出面料光泽和商品版型。</p><div class="preview-dots"><i></i><i></i><i></i></div></div></section>
+      <section class="form-pane">
+        <button class="drawer-close" title="关闭" id="drawer-close"><i data-lucide="x"></i></button>
+        <header><span>使用此模板</span><h2>用你的商品替换素材</h2><p>只需要一张主体商品图。系统会在提交前检查图片是否适合此模板。</p></header>
+        <section class="form-section"><h3>主体商品图 <span style="color:#d34a5c">*</span></h3><p>建议白底、正面、商品完整可见</p><div class="asset-option"><img id="asset-image" alt="已选商品素材" /><div><b>真丝家居服白底图.jpg</b><span>2048 x 2560 · 商品素材库 · 已通过基础校验</span></div><span class="checkmark"><i data-lucide="check"></i></span></div><div class="asset-actions"><button class="secondary"><i data-lucide="folder-open" style="width:13px;vertical-align:middle"></i> 从素材库选择</button><button class="secondary"><i data-lucide="upload" style="width:13px;vertical-align:middle"></i> 上传图片</button></div></section>
+        <section class="form-section"><h3>可选补充</h3><p>补充素材会提升细节表现，不上传也可以继续。</p><div class="need"><i data-lucide="lightbulb"></i><span>建议补充一张面料细节图。系统会优先保留缎面光泽、领口和袖口结构。</span></div><div class="asset-actions"><button class="secondary"><i data-lucide="plus" style="width:13px;vertical-align:middle"></i> 添加面料细节图</button></div></section>
+        <section class="form-section"><h3>本次输出</h3><div class="summary"><div><span>默认数量</span><b id="output-count">4 张</b></div><div><span>画面比例</span><b>4:5</b></div><div><span>预计完成</span><b>约 2 分钟</b></div></div></section>
+        <div class="drawer-actions"><button class="secondary" id="drawer-cancel">取消</button><button class="primary"><i data-lucide="sparkles"></i>查看并生成</button></div>
+      </section>
+    </aside>
+
+    <script>
+      const imageRoot = location.protocol === 'file:'
+        ? 'file:///Users/jay/Desktop/02-projects/AIGC/原始资料/模版图片/淘宝参考图/'
+        : 'http://localhost:4174/淘宝参考图/';
+      document.getElementById('asset-image').src = imageRoot + '静奢深睡品质感/静韵旗舰店.jpg';
+      const templates = [
+        { id: 'I01', name: '静奢缎面晨光', kind: 'image', purpose: '居家', style: '静奢', image: imageRoot + '静奢深睡品质感/曼系旗舰店.jpg', description: '柔光、低饱和、材质清晰的室内成片', fit: '睡衣 / 轻奢女装', output: '4 张' },
+        { id: 'I02', name: '东方雅致轻熟', kind: 'image', purpose: '女装', style: '中式', image: imageRoot + '东方雅致轻熟/1.jpg', description: '克制雅致的中式空间与留白构图', fit: '轻熟女装 / 连衣裙', output: '4 张' },
+        { id: 'I04', name: '甜酷暗黑辣妹', kind: 'image', purpose: '女装', style: '甜酷', image: imageRoot + '甜酷暗黑辣妹/1.jpg', description: '深色边光、利落近景与情绪张力', fit: '潮流女装 / 吊带', output: '4 张' },
+        { id: 'V01', name: '静奢缎面慢镜头', kind: 'video', purpose: '居家', style: '静奢', image: imageRoot + '静奢深睡品质感/静韵旗舰店.jpg', description: '轻微转身，稳定展现缎面质感', fit: '缎面睡衣 / 家居服', output: '6 秒' },
+        { id: 'I03', name: '新中式庭院出片', kind: 'image', purpose: '女装', style: '中式', image: imageRoot + '新中式国风出片/1.jpg', description: '庭院自然光、木质肌理与纵向留白', fit: '新中式 / 改良旗袍', output: '4 张' },
+        { id: 'I05', name: '多巴胺元气居家', kind: 'image', purpose: '居家', style: '元气', image: imageRoot + '多巴胺元气居家/1.jpg', description: '明快纯色与自然抓拍感', fit: '睡衣 / 少女家居服', output: '4 张' },
+        { id: 'I06', name: '奶油甜妹卧室', kind: 'image', purpose: '居家', style: '元气', image: imageRoot + '奶油甜妹卧室店主/1.jpg', description: '奶油柔光、亲近日常与温柔氛围', fit: '睡衣 / 家居服', output: '4 张' },
+        { id: 'I07', name: '复古田园居家叙事', kind: 'image', purpose: '居家', style: '中式', image: imageRoot + '复古田园居家叙事/1.jpg', description: '窗边自然光与细节穿插的故事感', fit: '棉麻睡衣 / 家居服', output: '4 张' },
+        { id: 'I08', name: '高转化店主试穿', kind: 'image', purpose: '试穿', style: 'all', image: imageRoot + '高转化店主试穿/1.jpg', description: '商品清晰、版型可见的真实试穿视角', fit: '睡衣 / 日常女装', output: '4 张' },
+        { id: 'V02', name: '多巴胺元气动态', kind: 'video', purpose: '居家', style: '元气', image: imageRoot + '多巴胺元气居家/2.jpg', description: '轻快转身与明亮居家节奏', fit: '少女睡衣 / 家居服', output: '6 秒' }
+      ];
+
+      let mode = 'all';
+      const recommended = ['I01', 'I02', 'I04', 'V01'];
+      const allGrid = document.getElementById('all-grid');
+      const recommendGrid = document.getElementById('recommend-grid');
+      const purpose = document.getElementById('purpose');
+      const style = document.getElementById('style');
+      const search = document.getElementById('search');
+
+      function card(template) {
+        const video = template.kind === 'video';
+        return `<article class="template-card ${video ? 'video-card' : ''}" data-id="${template.id}">
+          <div class="card-media"><img src="${template.image}" alt="${template.name} 预览" />
+            <span class="card-badge">${video ? '视频模板' : '图片模板'}</span>${video ? '<span class="play"><i data-lucide="play"></i></span><span class="duration">' + template.output + '</span>' : ''}<span class="card-index">${template.id}</span>
+          </div>
+          <div class="card-body"><div class="card-top"><h3>${template.name}</h3><span class="tag">${video ? '轻运动' : '4:5'}</span></div><p>${template.description}</p><div class="card-foot"><span class="fit">适合：${template.fit}</span><button class="use" data-open="${template.id}">使用 <i data-lucide="arrow-up-right"></i></button></div></div>
+        </article>`;
+      }
+
+      function filtered() {
+        const keyword = search.value.trim().toLowerCase();
+        return templates.filter((t) => (mode === 'all' || t.kind === mode) && (purpose.value === 'all' || t.purpose === purpose.value) && (style.value === 'all' || t.style === style.value) && (!keyword || t.name.toLowerCase().includes(keyword)));
+      }
+
+      function render() {
+        const list = filtered();
+        const recs = list.filter((t) => recommended.includes(t.id));
+        recommendGrid.innerHTML = recs.map(card).join('');
+        allGrid.innerHTML = list.filter((t) => !recommended.includes(t.id)).map(card).join('');
+        document.getElementById('result-count').textContent = `共 ${list.length} 个已发布模板`;
+        document.getElementById('recommend-section').style.display = recs.length ? '' : 'none';
+        document.getElementById('all-section').style.marginTop = recs.length ? '32px' : '0';
+        lucide.createIcons();
+        document.querySelectorAll('[data-open]').forEach((button) => button.addEventListener('click', () => openDrawer(templates.find((t) => t.id === button.dataset.open))));
+      }
+
+      function openDrawer(template) {
+        document.getElementById('drawer-image').src = template.image;
+        document.getElementById('drawer-title').textContent = template.name;
+        document.getElementById('drawer-description').textContent = template.description;
+        document.getElementById('drawer-kind').textContent = `${template.kind === 'video' ? '视频模板' : '图片模板'} / ${template.id}`;
+        document.getElementById('output-count').textContent = template.output;
+        document.getElementById('overlay').classList.add('open');
+        document.getElementById('drawer').classList.add('open');
+      }
+
+      function closeDrawer() { document.getElementById('overlay').classList.remove('open'); document.getElementById('drawer').classList.remove('open'); }
+      document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => { mode = button.dataset.mode; document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b === button)); render(); }));
+      [purpose, style, search].forEach((item) => item.addEventListener(item === search ? 'input' : 'change', render));
+      document.getElementById('overlay').addEventListener('click', closeDrawer);
+      document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+      document.getElementById('drawer-cancel').addEventListener('click', closeDrawer);
+      render();
+    </script>
+  </body>
+</html>

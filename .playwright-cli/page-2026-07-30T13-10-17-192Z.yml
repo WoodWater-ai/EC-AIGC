@@ -1,0 +1,107 @@
+- generic [ref=e2]:
+  - generic [ref=e370]:
+    - banner [ref=e371]:
+      - generic [ref=e372]:
+        - button "arrow_back" [ref=e373]
+        - generic [ref=e375]:
+          - paragraph [ref=e376]: 图片任务
+          - heading "新建图片任务" [level=1] [ref=e377]
+      - generic [ref=e378]:
+        - generic [ref=e379]: 1 个类型 · 共 1 张
+        - button "生成" [ref=e380]
+    - main [ref=e381]:
+      - generic [ref=e382]:
+        - generic [ref=e383]:
+          - generic [ref=e384]:
+            - heading "主体素材" [level=2] [ref=e385]
+            - button "资源中心" [ref=e386]
+          - button "add_photo_alternate 选择主体素材" [ref=e387]:
+            - generic [ref=e388]: add_photo_alternate
+            - generic [ref=e389]: 选择主体素材
+        - generic [ref=e390]:
+          - generic [ref=e391]:
+            - heading "参考图" [level=2] [ref=e392]
+            - generic [ref=e393]: 自动识别标签
+          - generic [ref=e394]:
+            - generic [ref=e395]:
+              - button "face_3" [ref=e396]
+              - paragraph [ref=e398]: 模特
+            - generic [ref=e399]:
+              - button "landscape" [ref=e400]
+              - paragraph [ref=e402]: 场景
+            - generic [ref=e403]:
+              - button "palette" [ref=e404]
+              - paragraph [ref=e406]: 风格
+            - generic [ref=e407]:
+              - button "accessibility_new" [ref=e408]
+              - paragraph [ref=e410]: 姿势
+            - generic [ref=e411]:
+              - button "zoom_in" [ref=e412]
+              - paragraph [ref=e414]: 细节
+      - generic [ref=e415]:
+        - generic [ref=e416]:
+          - generic [ref=e417]:
+            - paragraph [ref=e418]: 内容
+            - heading "最终 Prompt" [level=2] [ref=e419]
+          - button "auto_fix_high 生成提示词" [ref=e420]:
+            - generic [ref=e421]: auto_fix_high
+            - text: 生成提示词
+        - generic [ref=e422]:
+          - generic [ref=e423]:
+            - button "check_circle 主图" [pressed] [ref=e424]:
+              - generic [ref=e425]: check_circle
+              - generic [ref=e426]: 主图
+            - generic [ref=e427]:
+              - button "−" [disabled] [ref=e428]
+              - generic [ref=e429]: "1"
+              - button "+" [ref=e430]
+          - generic [ref=e431]:
+            - button "landscape 场景图" [ref=e432]:
+              - generic [ref=e433]: landscape
+              - generic [ref=e434]: 场景图
+            - button "add" [ref=e435]
+          - generic [ref=e437]:
+            - button "zoom_in 细节图" [ref=e438]:
+              - generic [ref=e439]: zoom_in
+              - generic [ref=e440]: 细节图
+            - button "add" [ref=e441]
+          - generic [ref=e443]:
+            - button "accessibility_new 三视图" [ref=e444]:
+              - generic [ref=e445]: accessibility_new
+              - generic [ref=e446]: 三视图
+            - button "add" [ref=e447]
+        - generic [ref=e449]:
+          - generic [ref=e450]:
+            - button "风格奶油甜妹卧室" [ref=e452]
+            - button "场景奶油柔光卧室" [ref=e458]
+            - button "姿势自然站姿" [ref=e464]
+          - paragraph [ref=e469]: 切换风格会自动保留兼容的场景与姿势；不兼容时回到该风格的推荐组合。
+        - generic [ref=e471]:
+          - generic [ref=e472]:
+            - generic [ref=e473]:
+              - generic [ref=e474]: inventory_2
+              - generic [ref=e475]: 商品主图
+              - generic [ref=e476]: main_image · 1 张
+            - generic [ref=e477]: AI 生成
+          - textbox "选择主体素材后，点击 AI 助手生成 Prompt" [disabled] [ref=e478]
+        - paragraph [ref=e479]: 图片类型支持多选，所有已选类型的 Prompt 会依次显示。点击“生成”即接受当前 Prompt，并进入预检与费用确认。
+      - generic [ref=e480]:
+        - generic [ref=e481]:
+          - paragraph [ref=e482]: 执行
+          - heading "模型与输出" [level=2] [ref=e483]
+          - generic [ref=e484]:
+            - text: 模型
+            - combobox "模型" [ref=e485]:
+              - option "GPT Image 2 · 保真优先" [selected]
+              - option "Imagen · 稳定出图"
+          - paragraph [ref=e486]: 适合商品主体、局部修改和参考图一致性。
+          - generic [ref=e487]:
+            - paragraph [ref=e488]: 本次任务总生成图片数
+            - paragraph [ref=e489]: 1张
+            - paragraph [ref=e490]: 按图片类型分别生成
+          - button "高级设置 1:1 · 2048px expand_more" [ref=e491]:
+            - generic [ref=e492]: 高级设置
+            - generic [ref=e493]: 1:1 · 2048px
+            - generic [ref=e494]: expand_more
+        - paragraph [ref=e495]: 费用、耗时、通道健康度和失败兜底策略将在预检通过后的费用确认中展示。
+  - region "Notifications alt+T"

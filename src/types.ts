@@ -20,7 +20,8 @@ export enum AppScreen {
   /** AI Prompt 辅助新流程 */
   PROMPT_ASSIST_NEW = 'PROMPT_ASSIST_NEW',
   /** 推荐参数管理新流程 */
-  RECOMMEND_PARAMS_MANAGE_NEW = 'RECOMMEND_PARAMS_MANAGE_NEW'
+  RECOMMEND_PARAMS_MANAGE_NEW = 'RECOMMEND_PARAMS_MANAGE_NEW',
+  MODEL_LIBRARY = 'MODEL_LIBRARY',
 }
 
 export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'on_model';
@@ -31,6 +32,27 @@ export const IMAGE_GENERATION_TYPE_LABELS: Record<ImageGenerationType, string> =
   detail_closeup: '细节图',
   on_model: '上身/三视图',
 };
+
+/** 图片生成页可视化标签。ID 用于任务快照，文案和缩略图可独立迭代。 */
+export interface VisualPromptTagOption {
+  id: string;
+  label: string;
+  description: string;
+  previewImage: string;
+}
+
+export interface VisualPromptStyleOption extends VisualPromptTagOption {
+  defaultSceneId: string;
+  defaultPoseId: string;
+  sceneIds: string[];
+  poseIds: string[];
+}
+
+export interface VisualPromptTagCatalog {
+  styles: VisualPromptStyleOption[];
+  scenes: VisualPromptTagOption[];
+  poses: VisualPromptTagOption[];
+}
 
 export type TaskStatus =
   | 'pending'
@@ -55,6 +77,28 @@ export interface ResultReview {
   decision?: 'approved' | 'rejected' | 'unavailable' | 'pending';
 }
 
+export interface ImageRevisionTurn {
+  id: string;
+  role: 'user' | 'review';
+  content: string;
+  timestamp: string;
+  sourceResultId?: string;
+  maskDataUrl?: string;
+}
+
+/**
+ * 局部编辑必须继承的不可变上下文。每个新版本复制快照，避免后续任务配置变化
+ * 影响已经开始的编辑对话。
+ */
+export interface ImageRevisionContext {
+  rootResultId: string;
+  sourceTaskId: string;
+  basePrompt: string;
+  negativePrompt?: string;
+  fidelityRules: string[];
+  turns: ImageRevisionTurn[];
+}
+
 export interface GeneratedImageResult {
   id: string;
   url: string;
@@ -63,8 +107,12 @@ export interface GeneratedImageResult {
   parentImageId?: string;
   editInstruction?: string;
   maskDataUrl?: string;
+  revisionContext?: ImageRevisionContext;
   aestheticReview?: ResultReview;
   listingReview?: ResultReview;
+  /** mock 导入溯源；正式接口由后端资产/结果 ID 承载。 */
+  sourceRecordId?: string;
+  sourceFileName?: string;
 }
 
 /** 视频工作台的进入方式。只有审核通过图片入口可以预填素材。 */
@@ -163,6 +211,10 @@ export interface GenerationTask {
     negativePrompt?: string;
   };
   groupId?: string;
+  /** 同一提交批次内的任务排序，从 1 开始。 */
+  groupOrder?: number;
+  /** 仅在执行确认后写入，未提交任务保持为空。 */
+  submittedAt?: string;
   imageType?: ImageGenerationType;
   parentResultId?: string;
   editInstruction?: string;
@@ -227,10 +279,31 @@ export interface ModelProfile {
   id: string;
   name: string;
   image: string;
-  source: '虚拟模特' | '授权参考' | '内部素材';
+  source: '虚拟模特' | '授权参考' | '内部素材' | '用户授权上传';
   tags: string[];
   suitableFor: ImageGenerationType[];
   reason: string;
+  /** 草稿不可被商品任务选择，只有发布后才进入模特素材库。 */
+  status: 'draft' | 'active' | 'disabled';
+  sourceMode: 'text' | 'reference' | 'face_swap';
+  faceAnchor: ModelProfileAnchor;
+  appearanceAnchor?: ModelProfileAnchor;
+  declaration?: ModelRightsDeclaration;
+}
+
+export interface ModelProfileAnchor {
+  assetId: string;
+  url: string;
+  position: number;
+  role: 'face_anchor' | 'appearance_anchor' | 'style_reference';
+}
+
+export interface ModelRightsDeclaration {
+  accepted: true;
+  version: string;
+  operator: string;
+  declaredAt: string;
+  sourceDescription: string;
 }
 
 // 模板类型已迁移到 src/api/modules/template.ts 的 TemplateDTO
@@ -238,9 +311,11 @@ export interface ModelProfile {
 
 export interface ProductAsset {
   id: string;
+  /** 飞书商品记录 ID；仅 mock 导入核对使用，真实环境由后端商品主键承载。 */
+  larkRecordId?: string;
   name: string;
   sku: string;
-  category: '智能硬件' | '美妆护肤' | '户外服饰' | '箱包配饰' | '珠饰轻奢';
+  category: '智能硬件' | '美妆护肤' | '户外服饰' | '服饰家居' | '箱包配饰' | '珠饰轻奢';
   imageCount: number;
   videoCount: number;
   thumbnail: string;
@@ -254,6 +329,8 @@ export interface ProductAsset {
   };
   files: {
     id: string;
+    /** 素材在飞书多维表格中的来源记录，用于导入核对。 */
+    larkRecordId?: string;
     name: string;
     url: string;
     size: string;

@@ -1,0 +1,118 @@
+- generic [ref=e2]:
+  - generic [ref=e379]:
+    - banner [ref=e380]:
+      - generic [ref=e381]:
+        - button "arrow_back" [ref=e382]
+        - generic [ref=e384]:
+          - paragraph [ref=e385]: 图片任务
+          - heading "新建图片任务" [level=1] [ref=e386]
+      - generic [ref=e387]:
+        - generic [ref=e388]: 1 个类型 · 共 1 张
+        - button "生成" [ref=e389]
+    - main [ref=e390]:
+      - generic [ref=e391]:
+        - generic [ref=e392]:
+          - generic [ref=e393]:
+            - heading "主体素材" [level=2] [ref=e394]
+            - button "资源中心" [ref=e395]
+          - button "add_photo_alternate 选择主体素材" [ref=e396]:
+            - generic [ref=e397]: add_photo_alternate
+            - generic [ref=e398]: 选择主体素材
+        - generic [ref=e399]:
+          - generic [ref=e400]:
+            - heading "参考图" [level=2] [ref=e401]
+            - generic [ref=e402]: 自动识别标签
+          - generic [ref=e403]:
+            - generic [ref=e404]:
+              - button "zoom_in" [ref=e405]
+              - paragraph [ref=e407]: 细节
+            - generic [ref=e408]:
+              - button "palette" [ref=e409]
+              - paragraph [ref=e411]: 风格
+            - generic [ref=e412]:
+              - button "landscape" [ref=e413]
+              - paragraph [ref=e415]: 场景
+            - generic [ref=e416]:
+              - button "accessibility_new" [ref=e417]
+              - paragraph [ref=e419]: 姿势
+            - generic [ref=e420]:
+              - button "face_3" [ref=e421]
+              - paragraph [ref=e423]: 模特
+      - generic [ref=e424]:
+        - generic [ref=e425]:
+          - generic [ref=e426]:
+            - paragraph [ref=e427]: 内容
+            - heading "最终 Prompt" [level=2] [ref=e428]
+          - button "auto_fix_high 生成提示词" [ref=e429]:
+            - generic [ref=e430]: auto_fix_high
+            - text: 生成提示词
+        - generic [ref=e431]:
+          - generic [ref=e432]:
+            - button "inventory_2 主图" [ref=e433]:
+              - generic [ref=e434]: inventory_2
+              - generic [ref=e435]: 主图
+            - generic [ref=e436]:
+              - button "−" [disabled] [ref=e437]
+              - generic [ref=e438]: "1"
+              - button "+" [ref=e439]
+          - generic [ref=e440]:
+            - button "landscape 场景图" [ref=e441]:
+              - generic [ref=e442]: landscape
+              - generic [ref=e443]: 场景图
+            - button "add" [ref=e444]
+          - generic [ref=e446]:
+            - button "zoom_in 细节图" [ref=e447]:
+              - generic [ref=e448]: zoom_in
+              - generic [ref=e449]: 细节图
+            - button "add" [ref=e450]
+          - generic [ref=e452]:
+            - button "accessibility_new 三视图" [ref=e453]:
+              - generic [ref=e454]: accessibility_new
+              - generic [ref=e455]: 三视图
+            - button "add" [ref=e456]
+        - generic [ref=e458]:
+          - generic [ref=e459]: 当前标签
+          - generic [ref=e460]:
+            - text: 风格
+            - combobox "风格" [ref=e461]:
+              - option "无"
+              - option "甜美网红风" [selected]
+              - option "极简北欧风"
+              - option "科技赛博风"
+              - option "金秋自然风"
+              - option "奢华丝绸风"
+          - generic [ref=e462]:
+            - text: 场景
+            - combobox "场景" [ref=e463]:
+              - option "无"
+              - option "自然影棚" [selected]
+              - option "窗边生活场景"
+              - option "精品陈列台"
+              - option "户外自然光"
+        - generic [ref=e464]:
+          - generic [ref=e465]:
+            - generic [ref=e466]:
+              - generic [ref=e467]: 商品主图
+              - generic [ref=e468]: main_image
+            - generic [ref=e469]: 可直接编辑
+          - textbox "选择主体素材后，点击 AI 助手生成 Prompt" [disabled] [ref=e470]
+        - paragraph [ref=e471]: 变更素材、标签或图片类型会刷新该类型的 Prompt。点击“生成”即接受当前 Prompt，并进入预检与费用确认。
+      - generic [ref=e472]:
+        - generic [ref=e473]:
+          - paragraph [ref=e474]: 执行
+          - heading "模型与输出" [level=2] [ref=e475]
+          - generic [ref=e476]:
+            - text: 模型
+            - combobox "模型" [ref=e477]:
+              - option "GPT Image 2 · 保真优先 · 适合商品主体、局部修改和参考图一致性。" [selected]
+              - option "Imagen · 稳定出图 · 适合高频商品主图与场景图。"
+          - generic [ref=e478]:
+            - paragraph [ref=e479]: 本次任务总生成图片数
+            - paragraph [ref=e480]: 1张
+            - paragraph [ref=e481]: 按图片类型分别生成
+          - button "高级设置 1:1 · 2048px expand_more" [ref=e482]:
+            - generic [ref=e483]: 高级设置
+            - generic [ref=e484]: 1:1 · 2048px
+            - generic [ref=e485]: expand_more
+        - paragraph [ref=e486]: 费用、耗时、通道健康度和失败兜底策略将在预检通过后的费用确认中展示。
+  - region "Notifications alt+T"

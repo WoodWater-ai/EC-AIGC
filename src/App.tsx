@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AppScreen, GenerationTask, ProductAsset, SystemUser, SystemNotification, VideoTaskEntryContext } from './types';
+import { AppScreen, GenerationTask, ModelProfile, ProductAsset, SystemUser, SystemNotification, VideoTaskEntryContext } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -20,6 +20,8 @@ import { CreateTaskNew } from './components/beta/CreateTaskNew';
 import { TaskListNew } from './components/beta/TaskListNew';
 import { PromptAssistNew } from './components/beta/PromptAssistNew';
 import { RecommendParamsManageNew } from './components/beta/RecommendParamsManageNew';
+import { ModelLibrary } from './components/ModelLibrary';
+import { ModelProfileCreator, type ModelCreatorAssetTarget } from './components/ModelProfileCreator';
 
 import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
@@ -31,7 +33,9 @@ import type { AssetResourceItem } from './api/modules/asset';
 import {
   mockTasks,
   mockProducts,
-  mockNotifications
+  mockNotifications,
+  mockAssetResources,
+  mockModelProfiles,
 } from './mockData';
 
 /**
@@ -87,6 +91,10 @@ export default function App() {
   const [tasks, setTasks] = useState<GenerationTask[]>(mockTasks);
   const [products, setProducts] = useState<ProductAsset[]>(mockProducts);
   const [notifications, setNotifications] = useState<SystemNotification[]>(mockNotifications);
+  const [modelProfiles, setModelProfiles] = useState<ModelProfile[]>(mockModelProfiles);
+  const [runtimeAssets, setRuntimeAssets] = useState<AssetResourceItem[]>(mockAssetResources);
+  const [isModelCreatorOpen, setIsModelCreatorOpen] = useState(false);
+  const [modelCreatorOrigin, setModelCreatorOrigin] = useState<'library' | 'picker'>('library');
 
   // 用户列表(Phase 1.5) —— 从真接口 /v1/admin/user/list 拉,SystemUser 映射供 Sidebar 切换协作账号下拉用
   // 注意:useServiceQuery.data 初始为 null,如果用 `data ?? []` 作为 useEffect 依赖,每次渲染会创建新 [] 引用,触发死循环。
@@ -171,6 +179,54 @@ export default function App() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
+  const openModelCreator = (origin: 'library' | 'picker') => {
+    setModelCreatorOrigin(origin);
+    setIsModelCreatorOpen(true);
+  };
+
+  const openModelCreatorAssetPicker = (
+    target: ModelCreatorAssetTarget,
+    onSelected: (asset: { id: string; name: string; url: string }) => void,
+  ) => {
+    setTransitSelectionHandler(() => (assets) => {
+      const asset = assets[0];
+      if (!asset) return;
+      onSelected({
+        id: String(asset.id),
+        name: asset.name,
+        url: asset.originalUrl ?? asset.thumbnailUrl,
+      });
+    });
+    setTransitTargetSlot(`model-profile-${target}`);
+    setTransitMultiSelect(false);
+    setIsTransitOpen(true);
+  };
+
+  const handleModelProfilePublished = (profile: ModelProfile) => {
+    const assetId = Date.now();
+    const asset: AssetResourceItem = {
+      id: assetId,
+      fileResourceId: assetId + 1,
+      name: `${profile.name} 模特参考图`,
+      assetKind: 'IMAGE',
+      originalUrl: profile.image,
+      thumbnailUrl: profile.image,
+      tags: `模特,${profile.source},${profile.tags.join(',')}`,
+      uploadUserId: 1,
+      status: 'NORMAL',
+      categoryIds: [30],
+      createTime: new Date().toISOString(),
+    };
+    setModelProfiles((current) => [profile, ...current]);
+    setRuntimeAssets((current) => [asset, ...current]);
+    setIsModelCreatorOpen(false);
+    if (modelCreatorOrigin === 'picker') {
+      transitSelectionHandler?.([asset]);
+      setTransitSelectionHandler(null);
+      setIsTransitOpen(false);
+    }
+  };
+
   // Render Core content wrapper switcher
   const renderScreenContent = () => {
     switch (currentScreen) {
@@ -189,7 +245,6 @@ export default function App() {
           <TaskList
             tasks={tasks}
             products={products}
-            onAddTask={handleAddTask}
             onUpdateTask={handleUpdateTask}
             setScreen={navigateToScreen}
             onCreateVideo={(source) => {
@@ -229,6 +284,8 @@ export default function App() {
             setScreen={navigateToScreen}
           />
         );
+      case AppScreen.MODEL_LIBRARY:
+        return <ModelLibrary profiles={modelProfiles} onCreateProfile={() => openModelCreator('library')} />;
       case AppScreen.ANALYTICS:
         return <DataAnalytics />;
       case AppScreen.SYSTEM_CONFIG:
@@ -302,6 +359,8 @@ export default function App() {
             purpose="OTHER"
             targetSlot={transitTargetSlot}
             multiSelect={transitMultiSelect}
+            mockAssets={runtimeAssets}
+            onCreateModel={transitTargetSlot === 'reference-model' ? () => openModelCreator('picker') : undefined}
             onConfirmSelection={(assets) => {
               transitSelectionHandler?.(assets);
               setTransitSelectionHandler(null);
@@ -310,6 +369,12 @@ export default function App() {
             onClose={() => setIsTransitOpen(false)}
           />
         )}
+        <ModelProfileCreator
+          open={isModelCreatorOpen}
+          onClose={() => setIsModelCreatorOpen(false)}
+          onPublished={handleModelProfilePublished}
+          onRequestAsset={openModelCreatorAssetPicker}
+        />
       </div>
     );
   }
@@ -336,6 +401,7 @@ export default function App() {
             purpose="OTHER"
             targetSlot={transitTargetSlot}
             multiSelect={transitMultiSelect}
+            mockAssets={runtimeAssets}
             onConfirmSelection={(assets) => {
               transitSelectionHandler?.(assets);
               setTransitSelectionHandler(null);
@@ -423,7 +489,10 @@ export default function App() {
       {isTransitOpen && (
         <AssetTransitModal
           purpose="OTHER"
-          mode="manager"
+          mode={transitSelectionHandler ? 'picker' : 'manager'}
+          targetSlot={transitTargetSlot}
+          multiSelect={transitMultiSelect}
+          mockAssets={runtimeAssets}
           onConfirmSelection={(assets) => {
             transitSelectionHandler?.(assets);
             setTransitSelectionHandler(null);
@@ -432,6 +501,13 @@ export default function App() {
           onClose={() => setIsTransitOpen(false)}
         />
       )}
+
+      <ModelProfileCreator
+        open={isModelCreatorOpen}
+        onClose={() => setIsModelCreatorOpen(false)}
+        onPublished={handleModelProfilePublished}
+        onRequestAsset={openModelCreatorAssetPicker}
+      />
 
     </div>
   );

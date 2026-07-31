@@ -26,6 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { screen: AppScreen.TASKS, label: '任务列表', icon: 'auto_schedule' },
     { screen: AppScreen.TEMPLATES, label: '智能模板中心', icon: 'dashboard_customize' },
     { screen: AppScreen.ASSETS, label: '商品素材库', icon: 'inventory_2' },
+    { screen: AppScreen.MODEL_LIBRARY, label: '模特资源库', icon: 'face_3' },
     { screen: AppScreen.ANALYTICS, label: '数据效能复盘', icon: 'insights' },
     { screen: AppScreen.SYSTEM_CONFIG, label: '系统配置模块', icon: 'settings_applications' },
     ...(currentUser.role === '管理员' ? [
@@ -151,11 +152,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             资源中心
           </button>
           <button
-            onClick={() => openTransit('model-library')}
+            onClick={() => setScreen(AppScreen.MODEL_LIBRARY)}
             className="mt-1 w-full h-9 px-3 rounded-lg flex items-center gap-3 font-medium text-sm text-slate-400 hover:bg-[#142337] hover:text-slate-200 cursor-pointer transition-all duration-150"
           >
             <span className="material-symbols-outlined text-lg text-slate-500">face_3</span>
-            模特素材
+            模特资源库
           </button>
         </div>
 

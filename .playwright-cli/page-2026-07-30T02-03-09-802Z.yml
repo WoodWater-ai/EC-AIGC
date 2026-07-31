@@ -1,0 +1,167 @@
+- generic [ref=e2]:
+  - generic [ref=e379]:
+    - banner [ref=e380]:
+      - generic [ref=e381]:
+        - button "arrow_back" [ref=e382]
+        - generic [ref=e384]:
+          - paragraph [ref=e385]: 图片任务
+          - heading "新建图片任务" [level=1] [ref=e386]
+      - generic [ref=e387]:
+        - generic [ref=e388]: 1 个类型 · 共 1 张
+        - button "生成" [active] [ref=e389]
+    - main [ref=e390]:
+      - generic [ref=e391]:
+        - generic [ref=e392]:
+          - generic [ref=e393]:
+            - heading "主体素材" [level=2] [ref=e394]
+            - button "资源中心" [ref=e395]
+          - button [ref=e646]:
+            - img "手表主体_正面免抠.png" [ref=e647]
+            - paragraph [ref=e648]: 手表主体_正面免抠.png
+          - generic [ref=e649]:
+            - generic [ref=e650]: inventory_2
+            - generic [ref=e651]: MW Series 7 智联运动手表 · SKU-MW7-BLK
+        - generic [ref=e399]:
+          - generic [ref=e400]:
+            - heading "参考图" [level=2] [ref=e401]
+            - generic [ref=e402]: 自动识别标签
+          - generic [ref=e403]:
+            - generic [ref=e404]:
+              - button "zoom_in" [ref=e405]
+              - paragraph [ref=e407]: 细节
+            - generic [ref=e408]:
+              - button "palette" [ref=e409]
+              - paragraph [ref=e411]: 风格
+            - generic [ref=e412]:
+              - button "landscape" [ref=e413]
+              - paragraph [ref=e415]: 场景
+            - generic [ref=e416]:
+              - button "accessibility_new" [ref=e417]
+              - paragraph [ref=e419]: 姿势
+            - generic [ref=e420]:
+              - button "face_3" [ref=e421]
+              - paragraph [ref=e423]: 模特
+      - generic [ref=e424]:
+        - generic [ref=e425]:
+          - generic [ref=e426]:
+            - paragraph [ref=e427]: 内容
+            - heading "最终 Prompt" [level=2] [ref=e428]
+          - button "auto_awesome 重新生成" [ref=e652]:
+            - generic [ref=e430]: auto_awesome
+            - text: 重新生成
+        - generic [ref=e431]:
+          - generic [ref=e432]:
+            - button "inventory_2 主图" [ref=e433]:
+              - generic [ref=e434]: inventory_2
+              - generic [ref=e435]: 主图
+            - generic [ref=e436]:
+              - button "−" [disabled] [ref=e437]
+              - generic [ref=e438]: "1"
+              - button "+" [ref=e439]
+          - generic [ref=e440]:
+            - button "landscape 场景图" [ref=e441]:
+              - generic [ref=e442]: landscape
+              - generic [ref=e443]: 场景图
+            - button "add" [ref=e444]
+          - generic [ref=e446]:
+            - button "zoom_in 细节图" [ref=e447]:
+              - generic [ref=e448]: zoom_in
+              - generic [ref=e449]: 细节图
+            - button "add" [ref=e450]
+          - generic [ref=e452]:
+            - button "accessibility_new 三视图" [ref=e453]:
+              - generic [ref=e454]: accessibility_new
+              - generic [ref=e455]: 三视图
+            - button "add" [ref=e456]
+        - generic [ref=e458]:
+          - generic [ref=e459]: 当前标签
+          - generic [ref=e460]:
+            - text: 风格
+            - combobox "风格" [ref=e461]:
+              - option "无"
+              - option "甜美网红风" [selected]
+              - option "极简北欧风"
+              - option "科技赛博风"
+              - option "金秋自然风"
+              - option "奢华丝绸风"
+          - generic [ref=e462]:
+            - text: 场景
+            - combobox "场景" [ref=e463]:
+              - option "无"
+              - option "自然影棚" [selected]
+              - option "窗边生活场景"
+              - option "精品陈列台"
+              - option "户外自然光"
+        - generic [ref=e464]:
+          - generic [ref=e465]:
+            - generic [ref=e466]:
+              - generic [ref=e467]: 商品主图
+              - generic [ref=e468]: main_image
+            - generic [ref=e469]: 可直接编辑
+          - textbox "选择主体素材后，点击 AI 助手生成 Prompt" [ref=e470]: 为「MW Series 7 智联运动手表」生成干净的电商主图。商品完整居中，轮廓和可见材质清晰，自然影棚环境保持低干扰；甜美网红风，柔和商业光线与克制阴影。 仅以主体素材为商品依据。 保持主体素材中可见的颜色、图案、结构和品牌信息，不新增未提供的商品、文字或配饰。避免模糊、商品漂移、错误文字和材质失真。
+        - paragraph [ref=e471]: 变更素材、标签或图片类型会刷新该类型的 Prompt。点击“生成”即接受当前 Prompt，并进入预检与费用确认。
+      - generic [ref=e472]:
+        - generic [ref=e473]:
+          - paragraph [ref=e474]: 执行
+          - heading "模型与输出" [level=2] [ref=e475]
+          - generic [ref=e476]:
+            - text: 模型
+            - combobox "模型" [ref=e477]:
+              - option "GPT Image 2 · 保真优先 · 适合商品主体、局部修改和参考图一致性。" [selected]
+              - option "Imagen · 稳定出图 · 适合高频商品主图与场景图。"
+          - generic [ref=e478]:
+            - paragraph [ref=e479]: 本次任务总生成图片数
+            - paragraph [ref=e480]: 1张
+            - paragraph [ref=e481]: 按图片类型分别生成
+          - button "高级设置 1:1 · 2048px expand_more" [ref=e482]:
+            - generic [ref=e483]: 高级设置
+            - generic [ref=e484]: 1:1 · 2048px
+            - generic [ref=e485]: expand_more
+        - paragraph [ref=e486]: 费用、耗时、通道健康度和失败兜底策略将在预检通过后的费用确认中展示。
+    - dialog [ref=e653]:
+      - button "关闭执行确认" [ref=e654]
+      - generic [ref=e655]:
+        - generic [ref=e656]:
+          - generic [ref=e657]:
+            - paragraph [ref=e658]: 付费执行确认
+            - heading "确认生成 1 个图片类型" [level=2] [ref=e659]
+            - paragraph [ref=e660]: 已按当前 Prompt、模型能力与结构化输出参数完成预检。确认费用后，任务将进入排队。
+          - button "close" [ref=e661]
+        - generic [ref=e663]:
+          - generic [ref=e664]:
+            - generic [ref=e665]:
+              - paragraph [ref=e666]: 预计费用
+              - paragraph [ref=e667]: ¥ 8.80
+            - generic [ref=e668]:
+              - paragraph [ref=e669]: 预计耗时
+              - paragraph [ref=e670]: 1–2 分钟
+            - generic [ref=e671]:
+              - paragraph [ref=e672]: 通道健康度
+              - paragraph [ref=e673]: 服务健康
+              - paragraph [ref=e674]: 本月可用额度 68%
+          - generic [ref=e675]:
+            - heading "本次执行摘要" [level=3] [ref=e676]
+            - generic [ref=e677]:
+              - generic [ref=e678]:
+                - term [ref=e679]: 图片类型
+                - definition [ref=e680]: 商品主图
+              - generic [ref=e681]:
+                - term [ref=e682]: 主体素材
+                - definition [ref=e683]: MW Series 7 智联运动手表
+              - generic [ref=e684]:
+                - term [ref=e685]: 模型
+                - definition [ref=e686]: GPT Image 2 · 保真优先
+              - generic [ref=e687]:
+                - term [ref=e688]: 输出规格
+                - definition [ref=e689]: 1:1 · 2048px · 1 张
+          - group [ref=e690]:
+            - generic "查看请求摘要" [ref=e691] [cursor=pointer]
+          - generic [ref=e692]:
+            - generic [ref=e693]: shield
+            - generic [ref=e694]:
+              - paragraph [ref=e695]: 失败与兜底策略
+              - paragraph [ref=e696]: 同配置最多自动重试 1 次；仍失败则停止并通知，不自动切换其他付费通道。
+        - generic [ref=e697]:
+          - button "返回修改" [ref=e698]
+          - button "确认费用并生成" [ref=e699]
+  - region "Notifications alt+T"

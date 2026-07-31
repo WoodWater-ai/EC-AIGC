@@ -418,13 +418,13 @@ Workflow Engine 使用蓝图定义的 5 个 Skills：
 
 #### 4.4A `model_profiles`
 
-P0 轻量版虚拟/授权模特参考库。不支持任意联网抓取真人图片，不做真人身份复刻。
+模特资源库不支持联网抓取或自动身份识别。前端以文本、参考图或换脸方式创建候选图；所有图片输入从资源中心选择，换脸输入必须有脸部来源、目标形象、肖像及生成使用授权声明和完整审计留痕。候选数量由模型能力 Schema 约束，服务端必须在 Preflight、成本计算和提交时使用同一 `candidate_count` 快照。内部可继续使用锚点字段追溯来源，但不得要求浏览器暴露两阶段建档流程。
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `id` | uuid | 是 | 模特资源 ID |
 | `name` | varchar | 是 | 模特名称或内部代号 |
-| `model_type` | enum | 是 | `virtual`、`licensed_real_reference`、`internal_asset` |
+| `model_type` | enum | 是 | `virtual`、`licensed_real_reference`、`internal_asset`、`authorized_uploaded_face` |
 | `license_status` | enum | 是 | `approved`、`pending_confirm`、`unavailable` |
 | `source_note` | text | 否 | 来源和授权说明 |
 | `style_tags` | json/array | 否 | 甜美、清冷、高级、轻熟、东方、欧美、中老年等 |
@@ -434,9 +434,12 @@ P0 轻量版虚拟/授权模特参考库。不支持任意联网抓取真人图�
 | `body_ratio` | varchar/json | 否 | 高挑、标准、微胖、中老年体型等 |
 | `head_body_ratio` | varchar | 否 | 7 头身、8 头身、自然比例等 |
 | `applicable_categories` | json/array | 否 | 适用品类 |
-| `applicable_task_profiles` | json/array | 否 | `main_image`、`tryon_three_view`、`reference2video`、`img2video` |
-| `reference_assets` | json/array | 否 | 模特参考素材，元素为 `{asset_id, role, position}` |
-| `status` | enum | 是 | `active`、`disabled` |
+| `applicable_task_profiles` | json/array | 否 | 可用于商品任务的 `main_image`、`scene_image`、`detail_image`、`tryon_three_view`、`reference2video`、`img2video`；不包含内部建档 Profile |
+| `face_anchor_assets` | json/array | 否 | 有序脸部锚点，元素为 `{asset_id, role:"face_anchor", position}` |
+| `appearance_anchor_assets` | json/array | 否 | 有序形象锚点，元素为 `{asset_id, role:"appearance_anchor", position}` |
+| `reference_assets` | json/array | 否 | 形象/风格参考，元素为 `{asset_id, role:"style_reference", position}` |
+| `declaration_audit` | json | 否 | 上传人脸必填：来源资产、声明版本、声明时间、操作人、来源说明 |
+| `status` | enum | 是 | `draft`、`active`、`disabled`；仅 `active` 可被商品任务选择 |
 | `stats` | json | 否 | 使用次数、平均审美分、通过率 |
 
 索引建议：`model_type`、`license_status`、`status`。
@@ -463,7 +466,7 @@ P0 轻量版虚拟/授权模特参考库。不支持任意联网抓取真人图�
 | --- | --- | --- | --- |
 | `id` | uuid | 是 | 任务组 ID |
 | `group_no` | varchar | 是 | 业务可读编号，唯一 |
-| `product_asset_id` | uuid | 是 | 关联商品资产 |
+| `product_asset_id` | uuid | 条件必填 | 普通商品图片/视频任务关联商品；仅 `model_face_anchor`、`model_identity_transfer` 可为空 |
 | `media_type` | enum | 是 | `image`、`video` |
 | `title` | varchar | 是 | 任务组名称 |
 | `shared_model_channel_id` | uuid | 否 | 当前选择的主通道；提交前允许为空 |
@@ -484,10 +487,10 @@ P0 轻量版虚拟/授权模特参考库。不支持任意联网抓取真人图�
 | `task_no` | varchar | 是 | 业务可读编号，如 `T-20260615-001` |
 | `task_group_id` | uuid | 是 | 关联任务组 |
 | `group_order` | int | 是 | 组内顺序，从 1 开始且唯一 |
-| `product_asset_id` | uuid | 是 | 关联商品资产 |
+| `product_asset_id` | uuid | 条件必填 | 普通商品任务必填；内部模特资产 Profile 可为空 |
 | `title` | varchar | 是 | 任务名称 |
 | `media_type` | enum | 是 | `image`、`video` |
-| `task_profile` | enum | 是 | 六类正式 Profile 之一 |
+| `task_profile` | enum | 是 | 八类正式 Profile 之一；其中 `model_face_anchor`、`model_identity_transfer` 仅限模特资产流程 |
 | `status` | enum | 是 | 任务状态 |
 | `style_preset` | varchar | 否 | 风格，如甜美网红风 |
 | `scene_preset` | varchar | 否 | 场景，如室内、室外 |
@@ -982,7 +985,7 @@ generation_tasks 1..1 model_profile_recommendations
 ```json
 {
   "media_types": ["image", "video"],
-  "task_profiles": ["main_image", "scene_image", "detail_image", "tryon_three_view", "img2video", "reference2video"],
+  "task_profiles": ["main_image", "scene_image", "detail_image", "tryon_three_view", "img2video", "reference2video", "model_face_anchor", "model_identity_transfer"],
   "input_asset_types": ["product_original", "composite_white_bg", "style_reference", "model_pose_reference"],
   "parameter_schema": {
     "schema_version": 1,

@@ -280,7 +280,7 @@ ResultReviewStatus = pending | approved | returned | unusable | archived
 
 ## 4A. 模特资源库
 
-P0 只做虚拟/授权模特参考库，不做任意联网抓取真人图片。
+模特资源库不提供联网抓取或自动身份识别。允许用户上传人脸建立授权模特档案，但必须提交肖像及生成使用授权声明并留下审计记录。
 
 ### `GET /model-profiles`
 
@@ -290,7 +290,7 @@ P0 只做虚拟/授权模特参考库，不做任意联网抓取真人图片。
 
 ### `POST /model-profiles`
 
-新增模特资源。仅设计/美工和管理员可用。
+创建模特档案草稿。仅设计/美工和管理员可用；草稿不可用于商品任务选择。普通上传/维护仍可使用此接口，AI 候选图生成使用下方候选任务组接口。
 
 ```json
 {
@@ -316,7 +316,38 @@ P0 只做虚拟/授权模特参考库，不做任意联网抓取真人图片。
 
 ### `PATCH /model-profiles/{model_profile_id}`
 
-编辑模特标签、授权状态、适用品类、启用状态。
+编辑草稿或已发布档案的标签、授权状态、适用品类、启用状态。修改未发布档案的脸部或形象参考后，当前阶段 Prompt、Preflight 与执行确认全部失效。
+
+### AI 模特候选生成
+
+模特创建页只展示“输入 -> 生成候选 -> 保存”三步，不展示内部锚点或任务组。`model_face_anchor` 与 `model_identity_transfer` 仍是后端内部资产生成 Profile，不属于用户可选的商品图片类型。
+
+### `POST /model-profile-candidate-groups`
+
+创建一个内部任务组并准备指定数量的模特候选图，不调用付费 Provider。`candidate_count` 必填，取值范围由已选模型能力返回（当前能力为 `1-4`）。`mode` 为 `text`、`reference` 或 `face_swap`：文本模式需要 `prompt`；参考图模式需要一张从资源中心选择的 `reference_asset`；换脸模式需要有序的 `face_source` 和 `target_appearance`，且必须携带授权声明。服务端将不同模式映射到内部 Profile、Prompt、参考图角色和能力约束。
+
+```json
+{
+  "mode": "face_swap",
+  "candidate_count": 3,
+  "face_source": {"asset_id": "asset_face", "position": 1},
+  "target_appearance": {"asset_id": "asset_target", "position": 2},
+  "prompt": "自然全身站姿，干净商业人像",
+  "rights_declaration": {
+    "accepted": true,
+    "version": "portrait-generation-consent-v1.0",
+    "source_description": "已取得模特肖像及生成使用授权"
+  }
+}
+```
+
+返回内部 `generation_task_group_id` 和脱敏候选请求预览。浏览器随后按该组调用已有 `preflight -> confirm-execution -> submit` 门禁；确认费用前不得生成候选图。
+
+### `POST /model-profile-candidate-groups/{group_id}/save`
+
+用户从结果中选定一张候选图后创建并发布 `active` 模特档案。请求必须包含 `generation_result_id`、`name` 和可选标签；服务端保存结果、输入素材、授权声明和执行快照作为档案血缘。未保存的候选图不进入模特资源库，也不可被商品任务选择。
+
+上传人脸的审计字段固定为 `source_asset_id`、`declaration_version`、`declaration_accepted_at`、`declared_by`、`source_description`。系统不抓取外部真人图，也不自动推断或验证人物身份。
 
 ### `POST /model-profiles/recommend`
 
@@ -342,7 +373,7 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 
 ### `POST /generation-task-groups`
 
-创建任务组和子任务草稿。该接口不调用 AI Skill 或付费模型。
+创建任务组和子任务草稿。该接口不调用 AI Skill 或付费模型。普通图片任务的 `input_assets` 中主体素材（`role=product`）必填；`product_asset_id` 可省略或为 `null`，未关联商品不阻断创建、Preflight 或 Submit，后续可补关联用于 SKU 归档。仅内部 `model_face_anchor`、`model_identity_transfer` 可无 `role=product` 和 `product_asset_id`；后者必须包含脸部锚点和有序形象/风格参考图。
 
 ```json
 {
@@ -386,11 +417,11 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 
 ### `PATCH /generation-task-groups/{group_id}`
 
-编辑尚未 Submit 的任务组共享内容或子任务列表。删除已生成结果的子任务不允许通过该接口完成。修改已确认的上游内容时，服务端按失效规则废弃下游快照。
+编辑尚未 Submit 的任务组共享内容或子任务列表。删除已生成结果的子任务不允许通过该接口完成。图片任务可提交 `product_facts_override`，字段包含 `name/selling_points/category/color/material_and_pattern/structure`；它是任务组的可编辑工作副本，不覆盖 `analyze-context` 写入的自动上下文快照，也不要求独立确认。修改已确认的上游内容时，服务端按失效规则废弃下游快照。
 
 ### `POST /generation-task-groups/{group_id}/analyze-context`
 
-由 Workflow Engine 调用 `visual-understanding`。图片任务分析商品事实；视频任务分析来源图片、角色冲突和运动风险。接口返回分析草稿、置信度、冲突和 `workflow_node_run_id`，不自动确认内容。
+由 Workflow Engine 调用 `visual-understanding`。图片任务分析主体素材和参考图，自动保存不可变上下文快照，并返回可编辑的商品事实副本、参考图角色建议与 `style`、`scene`、`pose` 标签建议；浏览器不展示节点过程。视频任务分析来源图片、角色冲突和运动风险，仍返回待人工处理的分析结果。
 
 ```json
 {
@@ -406,8 +437,10 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
       "confidence": 0.92,
       "conflicts": []
     },
+    "context_snapshot_id": "context_snapshot_1",
+    "reference_tag_suggestions": {"style": "极简北欧风", "scene": "自然影棚", "pose": "自然站姿"},
     "workflow_node_run_id": "node_run_1",
-    "next_action": "confirm_context"
+    "next_action": "prepare_content"
   },
   "request_id": "req_2"
 }
@@ -431,13 +464,13 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 }
 ```
 
-图片任务确认后子任务进入 `pending_prompt_confirmation`。视频任务在素材无冲突时从 `assets_ready` 进入 `pending_prompt_confirmation`；存在冲突时保持 `asset_conflict`。
+此接口仅用于视频和后台人工纠偏。图片任务不得向浏览器暴露人工事实确认，`analyze-context` 已自动生成上下文快照并使子任务进入 `pending_prompt_confirmation`。视频任务在素材无冲突时从 `assets_ready` 进入 `pending_prompt_confirmation`；存在冲突时保持 `asset_conflict`。
 
 响应返回 `context_snapshot_id`、版本、确认人、确认时间和 `next_action: prepare_content`。
 
 ### `POST /generation-task-groups/{group_id}/prepare-content`
 
-由 Workflow Engine 按子任务调用 `creative-planning` 和 `prompt-composer`，返回每个子任务的内容方案、Prompt 草稿、负面约束、参考图建议和节点运行 ID。视频任务必须读取管理员配置的默认通道，并使用其 `provider + model + task_profile + version` Prompt Profile 初始化 Prompt；该动作不调用生图或生视频 Provider。
+由 Workflow Engine 按子任务调用 `creative-planning` 和 `prompt-composer`，返回每个子任务的内容方案、Prompt 草稿、负面约束、参考图建议和节点运行 ID。图片任务使用自动上下文快照或 `product_facts_override`、当前 `style/scene/pose` 标签、参考图顺序和任务类型生成最终 Prompt 草稿；素材、事实、标签、参考图或任务类型变更后，旧 Prompt、Preflight 与执行确认失效。对于已手动编辑的 Prompt，接口返回带变更来源的候选建议，浏览器必须等待用户明确覆盖后才替换该 Prompt。视频任务必须读取管理员配置的默认通道，并使用其 `provider + model + task_profile + version` Prompt Profile 初始化 Prompt；该动作不调用生图或生视频 Provider。
 
 ```json
 {
@@ -476,7 +509,7 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 
 ### `POST /generation-task-groups/{group_id}/confirm-prompts`
 
-一次确认任务组中全部子任务的内容和 Prompt，生成同一个 `confirmation_batch_id` 下的独立 Prompt 快照。请求必须包含任务组全部有效子任务。
+一次确认任务组中全部子任务的内容和 Prompt，生成同一个 `confirmation_batch_id` 下的独立 Prompt 快照。请求必须包含任务组全部有效子任务。图片页点击「生成」时由浏览器隐式调用本接口，表示用户接受当前最终 Prompt；页面不单独显示「确认 Prompt」操作。
 
 ```json
 {
@@ -737,6 +770,8 @@ API 对应的数据对象为 `generation_task_groups`、`generation_tasks`、`ge
 ```
 
 Submit 必须验证：任务组完整性、全部内容方案和 Prompt 快照有效、最终通道编译批次与 Prompt Profile 匹配、全部 Preflight 未过期且已确认、能力版本未失效、预算允许、幂等键有效。重复幂等键返回首次提交结果，不重复创建 attempt 或计费；同一键对应不同确认批次时返回 `GROUP_SUBMIT_CONFLICT`。通道临时不可用时，仅能执行用户已确认且已完成目标 Profile 重新编译与 Preflight 的兜底策略，否则拒绝提交并要求重新 Preflight。
+
+Submit 不接收浏览器传入的 `reviewStrategy`。服务端按组织或模板默认 `review_policy` 写入执行快照，并在生成后进入既定审核生命周期。
 
 ```json
 {

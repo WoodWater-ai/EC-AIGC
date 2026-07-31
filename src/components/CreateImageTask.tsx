@@ -1,12 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
 import {
   AppScreen,
   GenerationTask,
   ImageGenerationType,
   IMAGE_GENERATION_TYPE_LABELS,
   ProductAsset,
+  VisualPromptTagOption,
 } from '../types';
-import { imageTypePromptHints, mockModelChannels, mockReferenceAnalysisByFileId } from '../mockData';
+import { mockImagePromptVisualTags, mockModelChannels, mockReferenceAnalysisByFileId } from '../mockData';
 import type { AssetResourceItem } from '../api/modules/asset';
 import { ExecutionConfirmDialog } from './ExecutionConfirmDialog';
 
@@ -19,12 +21,13 @@ interface CreateImageTaskProps {
   setSelectedProduct: (product: ProductAsset) => void;
 }
 
+type ReferenceSlot = 'detail' | 'style' | 'scene' | 'pose' | 'model';
+type AssistantState = 'idle' | 'processing' | 'ready' | 'failed';
+
 interface TaskReference {
   id: string;
   role: string;
   name: string;
-  source: string;
-  active: boolean;
   thumbnailUrl?: string;
   productAssetId?: string;
 }
@@ -34,40 +37,32 @@ interface ProductFacts {
   sellingPoints: string;
   category: string;
   color: string;
-  patternAndMaterial: string;
+  materialAndPattern: string;
   structure: string;
 }
 
-type ReferenceSlot = 'detail' | 'style' | 'scene' | 'pose' | 'model';
+interface AiPromptSuggestion {
+  prompt: string;
+  reason: string;
+}
 
-const REFERENCE_SLOTS: { id: ReferenceSlot; label: string; role: string; transitSlot: string; icon: string }[] = [
-  { id: 'detail', label: '细节', role: '细节参考', transitSlot: 'reference-detail', icon: 'zoom_in' },
-  { id: 'style', label: '风格', role: '风格参考', transitSlot: 'reference-style', icon: 'palette' },
-  { id: 'scene', label: '场景', role: '场景参考', transitSlot: 'reference-scene', icon: 'landscape' },
-  { id: 'pose', label: '姿势', role: '姿势参考', transitSlot: 'reference-pose', icon: 'accessibility_new' },
-  { id: 'model', label: '模特', role: '模特参考', transitSlot: 'reference-model', icon: 'face_3' },
-];
+interface VisualTagPickerProps {
+  label: string;
+  value: string;
+  options: VisualPromptTagOption[];
+  onChange: (value: string) => void;
+}
 
 const TYPE_ORDER: ImageGenerationType[] = ['product_main', 'scene_detail', 'detail_closeup', 'on_model'];
 const MIN_TYPE_COUNT = 1;
 const MAX_TYPE_COUNT = 5;
-const PRESETS = [
-  { name: '电商主图推荐', ratio: '1:1', resolution: '2048px' },
-  { name: '详情页长图', ratio: '3:4', resolution: '1536px' },
-  { name: '内容种草竖图', ratio: '4:5', resolution: '1536px' },
-];
-const STYLE_OPTIONS = [
-  '甜美网红风 (Sweet Influencer)',
-  '极简北欧风 (Minimalist Nordic)',
-  '科技赛博风 (Cyberpunk Cyber)',
-  '金秋自然风 (Autumn Natural)',
-  '奢华丝绸风 (Elegant Silk Satin)',
-];
-const POSE_OPTIONS = ['自然站姿', '正面站姿', '轻松坐姿', '行走动态'];
-const TASK_TEMPLATES = [
-  { name: '商品商业展示模板 v2.1', description: '适合商品主图与详情场景，优先保持主体准确。' },
-  { name: '服装上身展示模板', description: '适合服饰上身和三视图，强调版型与穿着关系。' },
-  { name: '细节材质强化模板', description: '适合局部细节与材质展示，突出纹理和工艺。' },
+
+const REFERENCE_SLOTS: Array<{ id: ReferenceSlot; label: string; role: string; transitSlot: string; icon: string }> = [
+  { id: 'model', label: '模特', role: '模特参考', transitSlot: 'reference-model', icon: 'face_3' },
+  { id: 'scene', label: '场景', role: '场景参考', transitSlot: 'reference-scene', icon: 'landscape' },
+  { id: 'style', label: '风格', role: '风格参考', transitSlot: 'reference-style', icon: 'palette' },
+  { id: 'pose', label: '姿势', role: '姿势参考', transitSlot: 'reference-pose', icon: 'accessibility_new' },
+  { id: 'detail', label: '细节', role: '细节参考', transitSlot: 'reference-detail', icon: 'zoom_in' },
 ];
 
 const typeIcon: Record<ImageGenerationType, string> = {
@@ -84,32 +79,129 @@ const typeCompactLabel: Record<ImageGenerationType, string> = {
   on_model: '三视图',
 };
 
+const taskProfileByType: Record<ImageGenerationType, string> = {
+  product_main: 'main_image',
+  scene_detail: 'scene_image',
+  detail_closeup: 'detail_image',
+  on_model: 'tryon_three_view',
+};
+
 const EMPTY_PRODUCT_FACTS: ProductFacts = {
   name: '',
   sellingPoints: '',
   category: '',
   color: '',
-  patternAndMaterial: '',
+  materialAndPattern: '',
   structure: '',
 };
 
-const PRODUCT_FACT_FIELDS: { key: keyof ProductFacts; label: string }[] = [
-  { key: 'name', label: '商品名称' },
-  { key: 'sellingPoints', label: '核心卖点' },
-  { key: 'category', label: '品类' },
-  { key: 'color', label: '颜色' },
-  { key: 'patternAndMaterial', label: '图案 / 材质' },
-  { key: 'structure', label: '版型 / 结构' },
-];
-
-const extractProductFacts = (product: ProductAsset): ProductFacts => ({
-  name: product.name,
-  sellingPoints: product.specs.sellingPoints.join(' · '),
-  category: product.category,
-  color: product.specs.color.join(' · '),
-  patternAndMaterial: product.fabric ?? product.specs.material,
-  structure: product.category === '户外服饰' ? '以来源素材中的版型和剪裁为准' : '以来源素材中的商品结构为准',
+const createProductFacts = (asset: AssetResourceItem, product: ProductAsset | null): ProductFacts => ({
+  name: product?.name ?? asset.name.replace(/\.[^.]+$/, ''),
+  sellingPoints: product?.specs.sellingPoints.join('、') ?? asset.tags ?? '待补充',
+  category: product?.category ?? '待 AI 识别',
+  color: product?.specs.color.join('、') ?? '待 AI 识别',
+  materialAndPattern: product?.fabric ?? product?.specs.material ?? '待 AI 识别',
+  structure: product?.category === '户外服饰' || product?.category === '服饰家居'
+    ? '以主体素材可见版型和剪裁为准'
+    : '以主体素材可见结构为准',
 });
+
+const buildPrompt = (
+  type: ImageGenerationType,
+  facts: ProductFacts,
+  style: string,
+  scene: string,
+  pose: string,
+  references: Array<TaskReference & { position: number }>,
+) => {
+  const referenceLine = references.length
+    ? `参考图按顺序使用：${references.map((reference) => `${reference.position}.${reference.role}`).join('、')}。`
+    : '仅以主体素材为商品依据。';
+  const directions: Record<ImageGenerationType, string> = {
+    product_main: `为「${facts.name}」生成干净的电商主图。商品完整居中，轮廓和可见材质清晰，${scene}环境保持低干扰；${style}，柔和商业光线与克制阴影。`,
+    scene_detail: `为「${facts.name}」生成有使用感的场景图。商品始终是画面中心，${scene}只承担氛围和尺度参照；${style}，自然层次与真实景深。`,
+    detail_closeup: `为「${facts.name}」生成可核验的细节图。微距聚焦主体素材可见的材质、纹理或工艺，单一焦点锐利，背景干净虚化；${style}。`,
+    on_model: `为「${facts.name}」生成三视图。相同人物、相同光线和机位依次呈现正面、侧面与背面，采用${pose}，不得遮挡商品关键结构；${style}。`,
+  };
+  const factLine = [facts.category, facts.color, facts.materialAndPattern, facts.structure, facts.sellingPoints]
+    .filter((value) => value && value !== '待 AI 识别' && value !== '待补充')
+    .join('；');
+  return `${directions[type]}\n\n商品事实：${factLine || '以主体素材可见信息为准。'}\n\n${referenceLine}\n\n保持主体素材中可见的颜色、图案、结构和品牌信息，不新增未提供的商品、文字或配饰。避免模糊、商品漂移、错误文字和材质失真。`;
+};
+
+const VisualTagPicker: React.FC<VisualTagPickerProps> = ({ label, value, options, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const selected = options.find((option) => option.id === value) ?? options[0];
+
+  useEffect(() => {
+    const closeOnOutsidePress = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsidePress);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsidePress);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, []);
+
+  if (!selected) return null;
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={`flex h-9 items-center gap-2 rounded-full border bg-white py-1 pl-1 pr-2 text-left transition-colors ${open ? 'border-primary ring-2 ring-primary/10' : 'border-slate-200 hover:border-slate-300'}`}
+      >
+        <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-slate-100">
+          <img src={selected.previewImage} alt="" className="h-full w-full object-cover" />
+        </span>
+        <span className="min-w-0">
+          <span className="mr-1 text-[10px] font-bold text-slate-400">{label}</span>
+          <span className="text-[11px] font-bold text-slate-700">{selected.label}</span>
+        </span>
+        <ChevronDown size={14} strokeWidth={2.2} className={`shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 z-30 mt-2 max-h-80 w-[280px] overflow-y-auto rounded-md border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10" role="listbox" aria-label={`${label}选项`}>
+          {options.map((option) => {
+            const active = option.id === value;
+            return (
+              <button
+                type="button"
+                key={option.id}
+                role="option"
+                aria-selected={active}
+                onClick={() => {
+                  onChange(option.id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-2.5 rounded p-1.5 text-left transition-colors ${active ? 'bg-primary-light' : 'hover:bg-slate-50'}`}
+              >
+                <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded bg-slate-100">
+                  <img src={option.previewImage} alt="" className="h-full w-full object-cover" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-bold text-slate-700">{option.label}</span>
+                  <span className="mt-0.5 block truncate text-[10px] text-slate-400">{option.description}</span>
+                </span>
+                {active && <Check size={15} strokeWidth={2.5} className="shrink-0 text-primary" aria-hidden="true" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   products,
@@ -120,250 +212,331 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   setSelectedProduct,
 }) => {
   const [selectedTypes, setSelectedTypes] = useState<ImageGenerationType[]>(['product_main']);
-  const [style, setStyle] = useState(STYLE_OPTIONS[0]);
-  const [scene, setScene] = useState('自然影棚');
-  const [pose, setPose] = useState(POSE_OPTIONS[0]);
-  const [template, setTemplate] = useState('商品商业展示模板 v2.1');
-  const [negativePrompt, setNegativePrompt] = useState('模糊、商品漂移、错误文字、材质失真');
-  const [ratio, setRatio] = useState('1:1');
   const [typeCounts, setTypeCounts] = useState<Record<ImageGenerationType, number>>({
     product_main: 1,
     scene_detail: 1,
     detail_closeup: 1,
     on_model: 1,
   });
-  const [resolution, setResolution] = useState('2048px');
-  const [reviewEnabled, setReviewEnabled] = useState(true);
+  const [mainAsset, setMainAsset] = useState<TaskReference | null>(null);
+  const [references, setReferences] = useState<Partial<Record<ReferenceSlot, TaskReference>>>({});
+  const [referenceOrder, setReferenceOrder] = useState<Partial<Record<ReferenceSlot, number>>>({});
+  const [productFacts, setProductFacts] = useState<ProductFacts>(EMPTY_PRODUCT_FACTS);
+  const [style, setStyle] = useState(mockImagePromptVisualTags.styles[0].id);
+  const [scene, setScene] = useState(mockImagePromptVisualTags.styles[0].defaultSceneId);
+  const [pose, setPose] = useState(mockImagePromptVisualTags.styles[0].defaultPoseId);
+  const [promptOverrides, setPromptOverrides] = useState<Partial<Record<ImageGenerationType, string>>>({});
+  const [manualPromptTypes, setManualPromptTypes] = useState<Partial<Record<ImageGenerationType, boolean>>>({});
+  const [aiSuggestions, setAiSuggestions] = useState<Partial<Record<ImageGenerationType, AiPromptSuggestion>>>({});
+  const [openSuggestions, setOpenSuggestions] = useState<Partial<Record<ImageGenerationType, boolean>>>({});
+  const [assistantState, setAssistantState] = useState<AssistantState>('idle');
   const [channelId, setChannelId] = useState('cloud-vision');
   const [modelId, setModelId] = useState('gpt-image-2');
-  const [assistantState, setAssistantState] = useState<'idle' | 'processing' | 'complete'>('idle');
-  const [productFacts, setProductFacts] = useState<ProductFacts>(EMPTY_PRODUCT_FACTS);
-  const [factsConfirmed, setFactsConfirmed] = useState(false);
-  const [conflictOpen, setConflictOpen] = useState(false);
-  const [pendingChoice, setPendingChoice] = useState<{ channelId: string; modelId: string } | null>(null);
-  const [mainAsset, setMainAsset] = useState<TaskReference | null>(null);
-  const [topAsset, setTopAsset] = useState<TaskReference | null>(null);
-  const [bottomAsset, setBottomAsset] = useState<TaskReference | null>(null);
-  const [compositeState, setCompositeState] = useState<'idle' | 'processing' | 'ready'>('idle');
-  const [references, setReferences] = useState<Partial<Record<ReferenceSlot, TaskReference>>>({});
-  const [referenceInsights, setReferenceInsights] = useState<Partial<Record<ReferenceSlot, string>>>({});
-  const [referenceOrder, setReferenceOrder] = useState<Partial<Record<ReferenceSlot, number>>>({});
-  const [promptOverrides, setPromptOverrides] = useState<Partial<Record<ImageGenerationType, string>>>({});
-  const [promptHasEdits, setPromptHasEdits] = useState(false);
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
-  const [pendingTemplate, setPendingTemplate] = useState<string | null>(null);
-  const [templateOverwriteOpen, setTemplateOverwriteOpen] = useState(false);
-  const [promptsConfirmed, setPromptsConfirmed] = useState(false);
+  const [ratio, setRatio] = useState('1:1');
+  const [resolution, setResolution] = useState('2048px');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [executionConfirmOpen, setExecutionConfirmOpen] = useState(false);
   const [readinessIssue, setReadinessIssue] = useState('');
+  const [factsCopyState, setFactsCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const channel = mockModelChannels.find((item) => item.id === channelId) ?? mockModelChannels[0];
   const model = channel.models.find((item) => item.id === modelId) ?? channel.models[0];
   const selectedMainProduct = mainAsset?.productAssetId
     ? products.find((product) => product.id === mainAsset.productAssetId) ?? null
     : null;
-  const isProductBound = Boolean(mainAsset && selectedMainProduct);
-  const taskProduct = selectedMainProduct ?? selectedProduct;
-  const usesOnModel = selectedTypes.includes('on_model');
+  const selectedStyle = mockImagePromptVisualTags.styles.find((item) => item.id === style) ?? mockImagePromptVisualTags.styles[0];
+  const availableScenes = mockImagePromptVisualTags.scenes.filter((item) => selectedStyle.sceneIds.includes(item.id));
+  const availablePoses = mockImagePromptVisualTags.poses.filter((item) => selectedStyle.poseIds.includes(item.id));
+  const selectedScene = availableScenes.find((item) => item.id === scene) ?? availableScenes[0];
+  const selectedPose = availablePoses.find((item) => item.id === pose) ?? availablePoses[0];
+  const subjectName = selectedMainProduct?.name ?? mainAsset?.name ?? '待选择主体素材';
+  const totalCount = selectedTypes.reduce((total, type) => total + typeCounts[type], 0);
   const availableModels = useMemo(() => mockModelChannels
     .filter((item) => item.health !== 'maintenance')
     .flatMap((item) => item.models
       .filter((itemModel) => itemModel.mediaTypes.includes('image'))
       .map((itemModel) => ({ channel: item, model: itemModel }))), []);
-  const hasPromptEdits = promptHasEdits;
-  const totalCount = selectedTypes.reduce((total, type) => total + typeCounts[type], 0);
-  const orderedReferenceInsights = useMemo(() => Object.entries(referenceInsights)
-    .sort(([left], [right]) => (referenceOrder[left as ReferenceSlot] ?? 99) - (referenceOrder[right as ReferenceSlot] ?? 99))
-    .map(([, insight]) => insight), [referenceInsights, referenceOrder]);
   const orderedReferences = useMemo(() => Object.entries(references)
     .filter((entry): entry is [ReferenceSlot, TaskReference] => Boolean(entry[1]))
     .sort(([left], [right]) => (referenceOrder[left] ?? 99) - (referenceOrder[right] ?? 99))
-    .map(([slot, reference], index) => ({ ...reference, position: index + 1, slot })), [referenceOrder, references]);
-
-  const prompts = useMemo(() => Object.fromEntries(TYPE_ORDER.map((type) => [
+    .map(([, reference], index) => ({ ...reference, position: index + 1 })), [referenceOrder, references]);
+  const generatedPrompts = useMemo(() => Object.fromEntries(TYPE_ORDER.map((type) => [
     type,
-    `${template}。${imageTypePromptHints[type]} 商品：${taskProduct.name}。风格：${style}；场景：${scene}${usesOnModel ? `；动作/姿势：${pose}` : ''}${orderedReferenceInsights.length ? `；参考图解析：${orderedReferenceInsights.join(' ')}` : ''}。${negativePrompt ? `负面约束：${negativePrompt}。` : ''}`,
-  ])) as Record<ImageGenerationType, string>, [negativePrompt, orderedReferenceInsights, pose, scene, style, taskProduct.name, template, usesOnModel]);
-  const buildPromptFromFacts = (type: ImageGenerationType, facts: ProductFacts, templateName = template) => (
-    `${templateName}。${imageTypePromptHints[type]} 商品：${facts.name}；品类：${facts.category}；核心卖点：${facts.sellingPoints}；颜色：${facts.color}；图案/材质：${facts.patternAndMaterial}；版型/结构：${facts.structure}。风格：${style}；场景：${scene}${usesOnModel ? `；动作/姿势：${pose}` : ''}${orderedReferenceInsights.length ? `；参考图解析：${orderedReferenceInsights.join(' ')}` : ''}。${negativePrompt ? `负面约束：${negativePrompt}。` : ''}`
-  );
-
+    buildPrompt(type, productFacts, selectedStyle.label, selectedScene.label, selectedPose.label, orderedReferences),
+  ])) as Record<ImageGenerationType, string>, [orderedReferences, productFacts, selectedPose.label, selectedScene.label, selectedStyle.label]);
+  const promptsComplete = selectedTypes.every((type) => (promptOverrides[type] ?? (assistantState === 'ready' ? generatedPrompts[type] : '')).trim().length > 0);
   const isSupported = model.capability.ratios.includes(ratio)
-    && selectedTypes.every((type) => typeCounts[type] <= model.capability.maxCount)
-    && model.capability.resolutions.includes(resolution);
-  const unsupported = [
-    !model.capability.ratios.includes(ratio) ? `比例 ${ratio}` : null,
-    selectedTypes.some((type) => typeCounts[type] > model.capability.maxCount) ? `单个图片类型张数（最大 ${model.capability.maxCount}）` : null,
-    !model.capability.resolutions.includes(resolution) ? `尺寸 ${resolution}` : null,
-  ].filter(Boolean);
-  const factsComplete = PRODUCT_FACT_FIELDS.every((field) => productFacts[field.key].trim().length > 0);
-  const promptsComplete = selectedTypes.every((type) => (promptOverrides[type] ?? prompts[type]).trim().length > 0);
-  const readinessChecks = [
-    { complete: isProductBound, message: '请先选择已关联商品资产的主体素材。', targetId: 'image-source-section' },
-    { complete: factsConfirmed && factsComplete, message: '请检查并确认商品事实。', targetId: 'image-content-section' },
-    { complete: promptsConfirmed && promptsComplete, message: '请确认本组任务 Prompt。', targetId: 'image-content-section' },
-    { complete: isSupported && channel.health !== 'maintenance', message: '当前模型通道或输出规格不可执行，请调整设置。', targetId: 'image-settings-section' },
-  ];
-  const readinessCount = readinessChecks.filter((item) => item.complete).length;
+    && model.capability.resolutions.includes(resolution)
+    && selectedTypes.every((type) => typeCounts[type] <= model.capability.maxCount);
 
-  const setModelWithValidation = (nextChannelId: string, nextModelId: string) => {
-    const nextChannel = mockModelChannels.find((item) => item.id === nextChannelId);
-    const nextModel = nextChannel?.models.find((item) => item.id === nextModelId);
-    if (!nextChannel || !nextModel) return;
-    const incompatible = !nextModel.capability.ratios.includes(ratio)
-      || selectedTypes.some((type) => typeCounts[type] > nextModel.capability.maxCount)
-      || !nextModel.capability.resolutions.includes(resolution);
-    if (incompatible) {
-      setPendingChoice({ channelId: nextChannelId, modelId: nextModelId });
-      setConflictOpen(true);
-      return;
-    }
-    setChannelId(nextChannelId);
-    setModelId(nextModelId);
-  };
-
-  const applyCompatibleModel = () => {
-    if (!pendingChoice) return;
-    const nextChannel = mockModelChannels.find((item) => item.id === pendingChoice.channelId)!;
-    const nextModel = nextChannel.models.find((item) => item.id === pendingChoice.modelId)!;
-    setChannelId(nextChannel.id);
-    setModelId(nextModel.id);
-    setRatio(nextModel.capability.ratios[0]);
-    setTypeCounts((current) => {
-      return selectedTypes.reduce((next, type) => {
-        next[type] = Math.min(current[type], nextModel.capability.maxCount, MAX_TYPE_COUNT);
-        return next;
-      }, { ...current });
-    });
-    setResolution(nextModel.capability.resolutions[0]);
-    setConflictOpen(false);
-    setPendingChoice(null);
-  };
-
-  const applyPreset = (preset: typeof PRESETS[number]) => {
-    const conflicts = !model.capability.ratios.includes(preset.ratio)
-      || !model.capability.resolutions.includes(preset.resolution);
-    if (conflicts) {
-      setPendingChoice({ channelId, modelId });
-      setConflictOpen(true);
-      return;
-    }
-    setRatio(preset.ratio);
-    setResolution(preset.resolution);
-  };
-
-  const toggleType = (type: ImageGenerationType) => {
-    setPromptsConfirmed(false);
-    if (selectedTypes.includes(type)) {
-      if (selectedTypes.length > 1) setSelectedTypes((previous) => previous.filter((item) => item !== type));
-      return;
-    }
-    setTypeCounts((current) => ({ ...current, [type]: MIN_TYPE_COUNT }));
-    setSelectedTypes((previous) => [...previous, type]);
-  };
-
-  const changeTypeCount = (type: ImageGenerationType, delta: number) => {
-    if (!selectedTypes.includes(type)) return;
-    const maximum = Math.min(MAX_TYPE_COUNT, model.capability.maxCount);
-    setTypeCounts((current) => ({
-      ...current,
-      [type]: Math.min(maximum, Math.max(MIN_TYPE_COUNT, current[type] + delta)),
-    }));
-  };
-
-  const resetFactsAndPrompts = () => {
-    setProductFacts(EMPTY_PRODUCT_FACTS);
-    setFactsConfirmed(false);
-    setAssistantState('idle');
+  const clearPromptState = () => {
     setPromptOverrides({});
-    setPromptHasEdits(false);
-    setPromptsConfirmed(false);
+    setManualPromptTypes({});
+    setAiSuggestions({});
+    setOpenSuggestions({});
+    setAssistantState('idle');
     setReadinessIssue('');
   };
 
-  const startComposite = () => {
-    if (!topAsset || !bottomAsset) return;
-    setCompositeState('processing');
-    window.setTimeout(() => setCompositeState('ready'), 700);
-  };
-
-  const toTaskReference = (asset: AssetResourceItem, role: string): TaskReference => {
-    return {
-      id: `asset-${asset.id}`,
-      role,
-      name: asset.name,
-      source: '资源中心',
-      active: true,
-      thumbnailUrl: asset.thumbnailUrl ?? asset.originalUrl,
-      productAssetId: asset.productAssetId,
-    };
-  };
+  const toTaskReference = (asset: AssetResourceItem, role: string): TaskReference => ({
+    id: `asset-${asset.id}`,
+    role,
+    name: asset.name,
+    thumbnailUrl: asset.thumbnailUrl ?? asset.originalUrl,
+    productAssetId: asset.productAssetId,
+  });
 
   const selectMainAsset = (assets: AssetResourceItem[]) => {
     const asset = assets[0];
     if (!asset) return;
     const reference = toTaskReference(asset, '主体素材');
-    setMainAsset(reference);
     const linkedProduct = reference.productAssetId
-      ? products.find((product) => product.id === reference.productAssetId)
-      : undefined;
+      ? products.find((item) => item.id === reference.productAssetId) ?? null
+      : null;
+    setMainAsset(reference);
     if (linkedProduct) setSelectedProduct(linkedProduct);
-    resetFactsAndPrompts();
-    setCompositeState('idle');
+    setProductFacts(createProductFacts(asset, linkedProduct));
+    clearPromptState();
   };
 
-  const selectGarmentAsset = (part: 'top' | 'bottom') => (assets: AssetResourceItem[]) => {
-    const asset = assets[0];
-    if (!asset) return;
-    const reference = toTaskReference(asset, part === 'top' ? '上衣图' : '下装图');
-    if (part === 'top') setTopAsset(reference);
-    else setBottomAsset(reference);
-    setCompositeState('idle');
+  const toOrderedReferences = (
+    nextReferences: Partial<Record<ReferenceSlot, TaskReference>>,
+    nextOrder: Partial<Record<ReferenceSlot, number>>,
+  ) => Object.entries(nextReferences)
+    .filter((entry): entry is [ReferenceSlot, TaskReference] => Boolean(entry[1]))
+    .sort(([left], [right]) => (nextOrder[left] ?? 99) - (nextOrder[right] ?? 99))
+    .map(([, reference], index) => ({ ...reference, position: index + 1 }));
+
+  const applyAiPromptUpdate = (candidates: Record<ImageGenerationType, string>, reason: string) => {
+    setPromptOverrides((current) => {
+      const next = { ...current };
+      selectedTypes.forEach((type) => {
+        if (!manualPromptTypes[type]) next[type] = candidates[type];
+      });
+      return next;
+    });
+    setAiSuggestions((current) => {
+      const next = { ...current };
+      selectedTypes.forEach((type) => {
+        if (manualPromptTypes[type]) next[type] = { prompt: candidates[type], reason };
+        else delete next[type];
+      });
+      return next;
+    });
+    setAssistantState('ready');
+  };
+
+  const normalizeTagSelection = (styleId: string, sceneId: string, poseId: string) => {
+    const nextStyle = mockImagePromptVisualTags.styles.find((item) => item.id === styleId) ?? mockImagePromptVisualTags.styles[0];
+    return {
+      styleId: nextStyle.id,
+      sceneId: nextStyle.sceneIds.includes(sceneId) ? sceneId : nextStyle.defaultSceneId,
+      poseId: nextStyle.poseIds.includes(poseId) ? poseId : nextStyle.defaultPoseId,
+    };
+  };
+
+  const getPromptCandidates = (
+    facts: ProductFacts,
+    nextStyle: string,
+    nextScene: string,
+    nextPose: string,
+    nextReferences: Array<TaskReference & { position: number }>,
+  ) => {
+    const tags = normalizeTagSelection(nextStyle, nextScene, nextPose);
+    const styleOption = mockImagePromptVisualTags.styles.find((item) => item.id === tags.styleId) ?? mockImagePromptVisualTags.styles[0];
+    const sceneOption = mockImagePromptVisualTags.scenes.find((item) => item.id === tags.sceneId) ?? mockImagePromptVisualTags.scenes[0];
+    const poseOption = mockImagePromptVisualTags.poses.find((item) => item.id === tags.poseId) ?? mockImagePromptVisualTags.poses[0];
+    return Object.fromEntries(TYPE_ORDER.map((type) => [
+      type,
+      buildPrompt(type, facts, styleOption.label, sceneOption.label, poseOption.label, nextReferences),
+    ])) as Record<ImageGenerationType, string>;
+  };
+
+  const refreshPrompts = () => {
+    if (!mainAsset) {
+      setReadinessIssue('请先选择主体素材，再生成提示词。');
+      return;
+    }
+    setAssistantState('processing');
+    window.setTimeout(() => {
+      applyAiPromptUpdate(getPromptCandidates(productFacts, style, scene, pose, orderedReferences), 'AI 助手重新生成');
+    }, 500);
   };
 
   const selectReferenceAsset = (slot: ReferenceSlot) => (assets: AssetResourceItem[]) => {
     const asset = assets[0];
     if (!asset) return;
-    const slotDefinition = REFERENCE_SLOTS.find((item) => item.id === slot);
-    const reference = toTaskReference(asset, slotDefinition?.role ?? '参考图');
+    const definition = REFERENCE_SLOTS.find((item) => item.id === slot);
+    const nextReference = toTaskReference(asset, definition?.role ?? '参考图');
     const analysis = asset.fileResourceId ? mockReferenceAnalysisByFileId[asset.fileResourceId] : undefined;
-    setReferences((current) => ({ ...current, [slot]: reference }));
-    setPromptsConfirmed(false);
-    setReferenceOrder((current) => ({ ...current, [slot]: current[slot] ?? Object.keys(current).length + 1 }));
-    if (analysis) {
-      setReferenceInsights((current) => ({ ...current, [slot]: analysis.promptHint }));
-      if (analysis.style) setStyle(analysis.style);
-      if (analysis.scene) setScene(analysis.scene);
-      if (analysis.pose) setPose(analysis.pose);
+    const nextReferences = { ...references, [slot]: nextReference };
+    const nextOrder = { ...referenceOrder, [slot]: referenceOrder[slot] ?? Object.keys(referenceOrder).length + 1 };
+    const nextTags = normalizeTagSelection(analysis?.style ?? style, analysis?.scene ?? scene, analysis?.pose ?? pose);
+    setReferences(nextReferences);
+    setReferenceOrder(nextOrder);
+    setStyle(nextTags.styleId);
+    setScene(nextTags.sceneId);
+    setPose(nextTags.poseId);
+    if (mainAsset) {
+      applyAiPromptUpdate(getPromptCandidates(productFacts, nextTags.styleId, nextTags.sceneId, nextTags.poseId, toOrderedReferences(nextReferences, nextOrder)), `${definition?.label ?? '参考'}参考图`);
     }
   };
 
+  const updateTag = (kind: 'style' | 'scene' | 'pose', value: string) => {
+    const nextTags = normalizeTagSelection(kind === 'style' ? value : style, kind === 'scene' ? value : scene, kind === 'pose' ? value : pose);
+    setStyle(nextTags.styleId);
+    setScene(nextTags.sceneId);
+    setPose(nextTags.poseId);
+    if (!mainAsset) return;
+    applyAiPromptUpdate(getPromptCandidates(productFacts, nextTags.styleId, nextTags.sceneId, nextTags.poseId, orderedReferences), `${kind === 'style' ? '风格' : kind === 'scene' ? '场景' : '姿势'}标签`);
+  };
+
+  const removeReference = (slot: ReferenceSlot) => {
+    const nextReferences = { ...references };
+    delete nextReferences[slot];
+    const nextOrder = Object.fromEntries(Object.entries(referenceOrder)
+      .filter(([key]) => key !== slot)
+      .map(([key], index) => [key, index + 1])) as Partial<Record<ReferenceSlot, number>>;
+    setReferences(nextReferences);
+    setReferenceOrder(nextOrder);
+    if (mainAsset) {
+      applyAiPromptUpdate(getPromptCandidates(productFacts, style, scene, pose, toOrderedReferences(nextReferences, nextOrder)), `${slot === 'model' ? '模特' : REFERENCE_SLOTS.find((item) => item.id === slot)?.label ?? '参考'}参考图`);
+    }
+  };
+
+  const toggleType = (type: ImageGenerationType) => {
+    if (selectedTypes.includes(type)) {
+      if (selectedTypes.length === 1) return;
+      const nextTypes = selectedTypes.filter((item) => item !== type);
+      setSelectedTypes(nextTypes);
+      setPromptOverrides((current) => {
+        const next = { ...current };
+        delete next[type];
+        return next;
+      });
+      setManualPromptTypes((current) => {
+        const next = { ...current };
+        delete next[type];
+        return next;
+      });
+      setAiSuggestions((current) => {
+        const next = { ...current };
+        delete next[type];
+        return next;
+      });
+      return;
+    }
+    const nextTypes = [...selectedTypes, type];
+    setSelectedTypes(nextTypes);
+    if (mainAsset && assistantState === 'ready') setPromptOverrides((current) => ({ ...current, [type]: generatedPrompts[type] }));
+  };
+
+  const updateProductFact = (key: keyof ProductFacts, value: string) => {
+    const nextFacts = { ...productFacts, [key]: value };
+    setProductFacts(nextFacts);
+    if (mainAsset) applyAiPromptUpdate(getPromptCandidates(nextFacts, style, scene, pose, orderedReferences), '商品事实');
+  };
+
+  const updatePrompt = (type: ImageGenerationType, value: string) => {
+    setPromptOverrides((current) => ({ ...current, [type]: value }));
+    setManualPromptTypes((current) => ({ ...current, [type]: true }));
+  };
+
+  const applySuggestion = (type: ImageGenerationType) => {
+    const suggestion = aiSuggestions[type];
+    if (!suggestion) return;
+    setPromptOverrides((current) => ({ ...current, [type]: suggestion.prompt }));
+    setManualPromptTypes((current) => ({ ...current, [type]: false }));
+    setAiSuggestions((current) => {
+      const next = { ...current };
+      delete next[type];
+      return next;
+    });
+  };
+
+  const dismissSuggestion = (type: ImageGenerationType) => {
+    setAiSuggestions((current) => {
+      const next = { ...current };
+      delete next[type];
+      return next;
+    });
+  };
+
+  const copyProductFacts = async () => {
+    const text = `商品名称：${productFacts.name}\n品类：${productFacts.category}\n颜色：${productFacts.color}\n图案/材质：${productFacts.materialAndPattern}\n版型/结构：${productFacts.structure}\n核心卖点：${productFacts.sellingPoints}`;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard API is unavailable');
+      await navigator.clipboard.writeText(text);
+      setFactsCopyState('copied');
+    } catch {
+      setFactsCopyState('failed');
+    }
+    window.setTimeout(() => setFactsCopyState('idle'), 1200);
+  };
+
+  const changeTypeCount = (type: ImageGenerationType, delta: number) => {
+    const max = Math.min(MAX_TYPE_COUNT, model.capability.maxCount);
+    setTypeCounts((current) => ({ ...current, [type]: Math.max(MIN_TYPE_COUNT, Math.min(max, current[type] + delta)) }));
+  };
+
+  const chooseModel = (value: string) => {
+    const choice = availableModels.find((item) => `${item.channel.id}:${item.model.id}` === value);
+    if (!choice) return;
+    setChannelId(choice.channel.id);
+    setModelId(choice.model.id);
+    setRatio(choice.model.capability.ratios.includes(ratio) ? ratio : choice.model.capability.ratios[0]);
+    setResolution(choice.model.capability.resolutions.includes(resolution) ? resolution : choice.model.capability.resolutions[0]);
+    setTypeCounts((current) => Object.fromEntries(TYPE_ORDER.map((type) => [
+      type,
+      Math.min(current[type], choice.model.capability.maxCount, MAX_TYPE_COUNT),
+    ])) as Record<ImageGenerationType, number>);
+  };
+
+  const checkAndGenerate = () => {
+    if (!mainAsset) {
+      setReadinessIssue('请选择主体素材后再生成。商品关联可稍后在资源中心完成。');
+      document.getElementById('image-source-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (!promptsComplete) {
+      setReadinessIssue('请先为全部已选图片类型生成或补充 Prompt。');
+      document.getElementById('image-prompt-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (!isSupported) {
+      setReadinessIssue('当前模型不支持所选输出规格或张数，请在高级设置中调整。');
+      document.getElementById('image-settings-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    setReadinessIssue('');
+    setExecutionConfirmOpen(true);
+  };
+
   const submitTasks = () => {
-    if (!isProductBound || !isSupported || !factsConfirmed || !promptsConfirmed) return;
+    if (!mainAsset) return;
     setExecutionConfirmOpen(false);
     const groupId = `G-${Date.now()}`;
     const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
-    const outputPreviewUrl = compositeState === 'ready'
-      ? topAsset?.thumbnailUrl ?? taskProduct.thumbnail
-      : mainAsset?.thumbnailUrl ?? taskProduct.thumbnail;
     selectedTypes.forEach((imageType, index) => {
-      const task: GenerationTask = {
+      const prompt = promptOverrides[imageType] ?? generatedPrompts[imageType];
+      onAddTask({
         id: `I-${Date.now()}-${index + 1}`,
         groupId,
-        name: `${IMAGE_GENERATION_TYPE_LABELS[imageType]} · ${taskProduct.name}`,
+        groupOrder: index + 1,
+        submittedAt: now,
+        name: `${IMAGE_GENERATION_TYPE_LABELS[imageType]} · ${subjectName}`,
         type: 'image',
         imageType,
         status: 'pending',
         progress: 0,
-        productName: taskProduct.name,
-        productImg: outputPreviewUrl,
-        templateName: template,
+        productName: subjectName,
+        productImg: mainAsset.thumbnailUrl ?? selectedMainProduct?.thumbnail ?? selectedProduct.thumbnail,
+        templateName: 'AI 商品图片工作流',
         timestamp: now,
         creator: '陆永奇',
         modelChannel: `${channel.name} / ${model.name}`,
-        taskPrompt: promptOverrides[imageType] ?? prompts[imageType],
-        negativePrompt,
-        reviewStrategy: { aesthetic: reviewEnabled, listing: false },
+        taskPrompt: prompt,
+        negativePrompt: '模糊、商品漂移、错误文字、材质失真',
         modelSnapshot: {
           accessType: channel.accessType,
           channelId: channel.id,
@@ -375,189 +548,123 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
           supportedResolutions: model.capability.resolutions,
           estimatedCost: model.cost * typeCounts[imageType],
         },
-        params: { ratio, count: typeCounts[imageType], prompt: promptOverrides[imageType] ?? prompts[imageType], negativePrompt },
-      };
-      onAddTask(task);
+        params: { ratio, resolution, count: typeCounts[imageType], prompt, negativePrompt: '模糊、商品漂移、错误文字、材质失真' },
+      });
     });
     setScreen(AppScreen.TASKS);
   };
 
-  const checkAndGenerate = () => {
-    const issue = readinessChecks.find((item) => !item.complete);
-    if (issue) {
-      setReadinessIssue(issue.message);
-      window.requestAnimationFrame(() => document.getElementById(issue.targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-      return;
-    }
-    setReadinessIssue('');
-    setExecutionConfirmOpen(true);
-  };
-
-  const runAssistantAnalysis = () => {
-    if (!isProductBound || assistantState === 'processing') return;
-    setAssistantState('processing');
-    window.setTimeout(() => {
-      const nextFacts = extractProductFacts(taskProduct);
-      setProductFacts(nextFacts);
-      setFactsConfirmed(false);
-      setPromptOverrides(Object.fromEntries(selectedTypes.map((type) => [
-        type,
-        buildPromptFromFacts(type, nextFacts),
-      ])));
-      setPromptHasEdits(true);
-      setPromptsConfirmed(false);
-      setAssistantState('complete');
-    }, 500);
-  };
-
-  const updateProductFact = (key: keyof ProductFacts, value: string) => {
-    setProductFacts((previous) => ({ ...previous, [key]: value }));
-    setFactsConfirmed(false);
-    setPromptsConfirmed(false);
-  };
-
-  const applyTemplate = (nextTemplate: string) => {
-    setTemplate(nextTemplate);
-    setPromptOverrides(productFacts.name
-      ? Object.fromEntries(selectedTypes.map((type) => [type, buildPromptFromFacts(type, productFacts, nextTemplate)]))
-      : {});
-    setPromptHasEdits(false);
-    setPromptsConfirmed(false);
-    setTemplatePickerOpen(false);
-    setTemplateOverwriteOpen(false);
-    setPendingTemplate(null);
-  };
-
-  const requestTemplateChange = (nextTemplate: string) => {
-    if (nextTemplate === template) {
-      setTemplatePickerOpen(false);
-      return;
-    }
-    if (hasPromptEdits) {
-      setPendingTemplate(nextTemplate);
-      setTemplatePickerOpen(false);
-      setTemplateOverwriteOpen(true);
-      return;
-    }
-    applyTemplate(nextTemplate);
-  };
-
-  const updateReferenceOrder = (slot: ReferenceSlot, nextOrder: number) => {
-    setPromptsConfirmed(false);
-    setReferenceOrder((current) => {
-      const currentOrder = current[slot];
-      const swapSlot = (Object.keys(current) as ReferenceSlot[]).find((item) => item !== slot && current[item] === nextOrder);
-      return {
-        ...current,
-        [slot]: nextOrder,
-        ...(swapSlot && currentOrder ? { [swapSlot]: currentOrder } : {}),
-      };
-    });
-  };
+  const assistantLabel = assistantState === 'processing'
+    ? '生成中'
+    : assistantState === 'ready'
+      ? '重新生成'
+      : assistantState === 'failed'
+        ? '重试'
+        : '生成提示词';
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f5f7fb] text-slate-800 flex flex-col" id="create-image-task-container">
-      <header className="h-16 shrink-0 px-6 bg-white border-b border-slate-200 flex items-center justify-between">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#f5f7fb] text-slate-800">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => setScreen(AppScreen.TASKS)} className="w-8 h-8 rounded-md hover:bg-slate-100 text-slate-500" title="返回任务列表"><span className="material-symbols-outlined">arrow_back</span></button>
-          <div><p className="text-[11px] font-bold text-primary">图片任务工作台</p><h1 className="text-base font-black">新建多类型图片任务</h1></div>
+          <button onClick={() => setScreen(AppScreen.TASKS)} className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100" title="返回任务列表"><span className="material-symbols-outlined">arrow_back</span></button>
+          <div><p className="text-[11px] font-bold text-primary">图片任务</p><h1 className="text-base font-black">新建图片任务</h1></div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right"><span className="block text-[10px] font-bold text-slate-400">生成准备度 {readinessCount}/4</span><span className="text-xs text-slate-500">{selectedTypes.length} 个图片类型 · {totalCount} 张</span></div>
-          <button onClick={checkAndGenerate} className="h-9 px-4 rounded-md bg-primary text-white text-xs font-bold shadow-sm">检查并生成</button>
+        <div className="flex items-center gap-4">
+          <span className="text-xs text-slate-500">{selectedTypes.length} 个类型 · 共 {totalCount} 张</span>
+          <button onClick={checkAndGenerate} className="h-9 rounded-md bg-primary px-4 text-xs font-bold text-white shadow-sm">生成</button>
         </div>
       </header>
 
       {readinessIssue && <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-6 py-2 text-[11px] font-bold text-amber-700"><span className="material-symbols-outlined mr-1 align-middle text-sm">error</span>{readinessIssue}</div>}
 
-      <main className="flex-1 overflow-y-auto p-5 grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)_380px] gap-5">
-        <section className="space-y-4">
-          <div id="image-source-section" className="bg-white border border-slate-200 rounded-lg p-4">
-            <div className="flex items-center justify-between"><h2 className="text-sm font-black">输入素材</h2><button onClick={() => openTransit(selectMainAsset, 'main')} className="text-xs text-primary font-bold">资源中心</button></div>
-            {compositeState === 'ready' && topAsset && bottomAsset ? (
-              <div className="mt-3 h-44 rounded-md border border-emerald-200 bg-emerald-50 overflow-hidden relative">
-                <div className="grid grid-cols-2 h-full"><img src={topAsset.thumbnailUrl} alt="上衣合成素材" className="w-full h-full object-cover" referrerPolicy="no-referrer" /><img src={bottomAsset.thumbnailUrl} alt="下装合成素材" className="w-full h-full object-cover" referrerPolicy="no-referrer" /></div>
-                <span className="absolute left-2 bottom-2 px-2 py-1 rounded bg-emerald-600 text-[10px] font-bold text-white">上下装合成预览</span>
-              </div>
-            ) : mainAsset?.thumbnailUrl ? (
-              <button onClick={() => openTransit(selectMainAsset, 'main')} className="mt-3 w-full text-left"><img src={mainAsset.thumbnailUrl} alt={mainAsset.name} className="w-full h-44 object-cover rounded-md border border-slate-100" referrerPolicy="no-referrer" /><p className="mt-2 text-xs font-bold leading-5">{mainAsset.name}</p></button>
+      <main className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[260px_minmax(480px,1fr)_300px]">
+        <section id="image-source-section" className="min-w-0 space-y-3">
+          <div className="border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between"><h2 className="text-xs font-black">主体素材</h2><button onClick={() => openTransit(selectMainAsset, 'main')} className="text-[11px] font-bold text-primary">资源中心</button></div>
+            {mainAsset?.thumbnailUrl ? (
+              <button onClick={() => openTransit(selectMainAsset, 'main')} className="mt-3 block w-full text-left"><img src={mainAsset.thumbnailUrl} alt={mainAsset.name} className="h-36 w-full object-cover" referrerPolicy="no-referrer" /><p className="mt-2 truncate text-xs font-bold text-slate-700">{mainAsset.name}</p></button>
             ) : (
-              <button onClick={() => openTransit(selectMainAsset, 'main')} className="mt-3 w-full h-44 rounded-md border-2 border-dashed border-slate-300 bg-slate-50 hover:border-primary hover:bg-blue-50 transition-colors flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-primary" title="从资源中心选择主体素材"><span className="material-symbols-outlined text-4xl">add</span><span className="text-xs font-bold">添加主体素材</span></button>
+              <button onClick={() => openTransit(selectMainAsset, 'main')} className="mt-3 flex h-36 w-full flex-col items-center justify-center gap-2 border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-primary hover:bg-blue-50 hover:text-primary"><span className="material-symbols-outlined text-3xl">add_photo_alternate</span><span className="text-xs font-bold">选择主体素材</span></button>
             )}
-            {mainAsset && selectedMainProduct && <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2"><span className="block text-[10px] text-slate-400">已关联商品资产</span><span className="mt-0.5 block text-xs font-bold text-slate-700">{selectedMainProduct.name}</span><span className="block text-[11px] text-slate-400">SKU：{selectedMainProduct.sku}</span></div>}
-            {mainAsset && !selectedMainProduct && <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-700"><b className="font-bold">该主体素材未关联商品资产。</b> 请先在素材库关联或创建商品资产，再继续解析和提交。</div>}
+            {mainAsset && <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500"><span className="material-symbols-outlined text-sm">inventory_2</span>{selectedMainProduct ? <span className="truncate">{selectedMainProduct.name} · {selectedMainProduct.sku}</span> : <span>未关联商品，可后续归档</span>}</div>}
           </div>
-          {taskProduct.category === '户外服饰' && <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between"><h2 className="text-sm font-black">上下装合成套图</h2><span className="text-[10px] text-slate-400">可选</span></div>
-            {([{ label: '上衣图', asset: topAsset, targetSlot: 'upper', select: selectGarmentAsset('top'), clear: () => { setTopAsset(null); setCompositeState('idle'); } }, { label: '下装图', asset: bottomAsset, targetSlot: 'lower', select: selectGarmentAsset('bottom'), clear: () => { setBottomAsset(null); setCompositeState('idle'); } }]).map((item) => {
-              return <div key={item.label} className="relative"><button onClick={() => openTransit(item.select, item.targetSlot)} className="w-full h-16 rounded-md border border-dashed border-slate-300 hover:border-primary flex items-center px-3 gap-3 text-left overflow-hidden">
-                {item.asset?.thumbnailUrl ? <img src={item.asset.thumbnailUrl} alt="" className="w-10 h-10 rounded object-cover" referrerPolicy="no-referrer" /> : <span className="material-symbols-outlined text-slate-400">add_photo_alternate</span>}<span className="text-xs min-w-0"><b className="block text-slate-700">{item.label}</b><span className="block truncate text-slate-400">{item.asset ? item.asset.name : '从资源中心选择'}</span></span>
-              </button>{item.asset && <button onClick={item.clear} className="absolute right-2 top-2 w-5 h-5 rounded-full bg-white/90 text-slate-400 hover:text-red-500" title={`移除${item.label}`}><span className="material-symbols-outlined text-sm">close</span></button>}</div>;
-            })}
-            <button onClick={startComposite} disabled={!topAsset || !bottomAsset || compositeState === 'processing'} className="w-full h-8 rounded bg-slate-900 disabled:bg-slate-200 text-white text-xs font-bold">{compositeState === 'processing' ? '合成中...' : compositeState === 'ready' ? '重新生成合成预览' : '生成合成预览'}</button>
-            {compositeState === 'ready' && <div className="rounded bg-emerald-50 border border-emerald-100 p-2 text-[11px] text-emerald-700">合成预览已显示在上方输入素材区，并会作为本次任务主体图。</div>}
+
+          <div className="border border-slate-200 bg-white p-3">
+            <div className="flex items-baseline justify-between"><h2 className="text-xs font-black">参考图</h2><span className="text-[10px] text-slate-400">自动识别标签</span></div>
+            <div className="mt-3 grid grid-cols-5 gap-1.5">
+              {REFERENCE_SLOTS.map((slot) => {
+                const reference = references[slot.id];
+                return <div key={slot.id} className="group relative min-w-0">
+                  <button onClick={() => openTransit(selectReferenceAsset(slot.id), slot.transitSlot)} className={`flex aspect-square w-full flex-col items-center justify-center overflow-hidden border text-slate-400 transition-colors ${reference ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-slate-50 hover:border-primary hover:text-primary'}`} title={`添加${slot.label}参考图`}>
+                    {reference?.thumbnailUrl ? <img src={reference.thumbnailUrl} alt={slot.label} className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <span className="material-symbols-outlined text-lg">{slot.icon}</span>}
+                  </button>
+                  {reference && <button onClick={() => removeReference(slot.id)} className="absolute -right-1 -top-1 hidden h-4 w-4 place-items-center rounded-full bg-slate-800 text-[10px] text-white group-hover:grid" title={`移除${slot.label}参考图`}>×</button>}
+                  <p className="mt-1 truncate text-center text-[10px] font-bold text-slate-500">{slot.label}</p>
+                </div>;
+              })}
+            </div>
+          </div>
+
+          {mainAsset && <div className="border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between gap-2"><div><h2 className="text-xs font-black">商品事实</h2><p className="mt-0.5 text-[10px] text-slate-400">AI 基于主体素材识别，可直接修改</p></div><button onClick={copyProductFacts} className={`grid h-6 w-6 place-items-center rounded border ${factsCopyState === 'failed' ? 'border-red-200 text-red-600' : 'border-slate-200 text-slate-500 hover:border-primary hover:text-primary'}`} title={factsCopyState === 'failed' ? '复制失败，请检查浏览器权限' : '复制商品信息'} aria-label={factsCopyState === 'failed' ? '复制失败' : '复制商品信息'}><span className="material-symbols-outlined text-sm">{factsCopyState === 'copied' ? 'check' : factsCopyState === 'failed' ? 'error' : 'content_copy'}</span></button></div>
+            <div className="mt-3 space-y-2"><label className="block"><span className="text-[10px] text-slate-400">商品名称</span><input value={productFacts.name} onChange={(event) => updateProductFact('name', event.target.value)} className="mt-0.5 h-7 w-full border-b border-slate-200 bg-transparent text-[11px] font-bold outline-none focus:border-primary" /></label><div className="grid grid-cols-2 gap-x-2 gap-y-2">{([['category', '品类'], ['color', '颜色'], ['materialAndPattern', '图案/材质'], ['structure', '版型/结构']] as Array<[keyof ProductFacts, string]>).map(([key, label]) => <label key={key} className="min-w-0"><span className="block text-[10px] text-slate-400">{label}</span><input value={productFacts[key]} onChange={(event) => updateProductFact(key, event.target.value)} className="mt-0.5 h-7 w-full truncate border-b border-slate-200 bg-transparent text-[11px] outline-none focus:border-primary" /></label>)}</div><label className="block"><span className="text-[10px] text-slate-400">核心卖点</span><textarea value={productFacts.sellingPoints} onChange={(event) => updateProductFact('sellingPoints', event.target.value)} className="mt-0.5 h-12 w-full resize-none border-b border-slate-200 bg-transparent text-[11px] leading-4 outline-none focus:border-primary" /></label></div>
           </div>}
-          <div className="bg-white border border-slate-200 rounded-lg p-4">
-            <h2 className="text-sm font-black">参考图 <span className="font-normal text-slate-400">(选传)</span></h2><p className="mt-1 text-[11px] leading-5 text-slate-400">用于补充细节、风格、场景、姿势或模特，不直接替代主体。</p>
-            <div className="grid grid-cols-2 gap-2 mt-3">{REFERENCE_SLOTS.map((slot, index) => {
-              const reference = references[slot.id];
-              return <div key={slot.id} className="min-w-0"><button onClick={() => openTransit(selectReferenceAsset(slot.id), slot.transitSlot)} className={`relative w-full h-16 rounded-md border-2 border-dashed overflow-hidden flex items-center gap-2 px-2 text-left transition-colors ${reference ? 'border-primary bg-blue-50' : 'border-slate-200 hover:border-primary bg-slate-50'}`} title={`选择${slot.label}参考图`}>
-                {reference?.thumbnailUrl ? <><img src={reference.thumbnailUrl} alt={slot.label} className="w-10 h-10 rounded object-cover" referrerPolicy="no-referrer" /><span className="min-w-0 text-[11px] font-bold text-primary truncate">{reference.name}</span></> : <><span className="material-symbols-outlined text-2xl text-slate-400">add</span><span className="text-[11px] text-slate-400">添加{slot.label}参考</span></>}
-              </button><div className="mt-1 flex items-center justify-between gap-1"><span className={`text-[11px] font-bold ${reference ? 'text-primary' : 'text-slate-400'}`}>{slot.label}参考</span>{reference && <><label className="text-[10px] text-slate-400">顺序<select value={referenceOrder[slot.id] ?? index + 1} onChange={(event) => updateReferenceOrder(slot.id, Number(event.target.value))} className="ml-1 h-5 border border-slate-200 bg-white text-[10px]">{REFERENCE_SLOTS.map((item, orderIndex) => <option key={item.id} value={orderIndex + 1}>{orderIndex + 1}</option>)}</select></label><button onClick={() => { setReferences((current) => ({ ...current, [slot.id]: undefined })); setReferenceInsights((current) => ({ ...current, [slot.id]: undefined })); setReferenceOrder((current) => ({ ...current, [slot.id]: undefined })); setPromptsConfirmed(false); }} className="text-[10px] text-slate-400 hover:text-red-500">移除</button></>}</div></div>;
-            })}</div>
-          </div>
         </section>
 
-        <section className="space-y-5">
-          <div className="bg-white border border-slate-200 rounded-lg p-5">
-            <div className="flex items-center justify-between mb-3"><div><p className="text-[11px] font-bold text-primary">任务配置</p><h2 className="text-base font-black">用户希望得到什么结果</h2></div><span className="text-[11px] text-slate-400">规格选项由所选模型提供</span></div>
-            <label className="text-xs font-bold text-slate-700">生成图片类型 <span className="text-slate-400 font-normal">可多选</span></label>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-1.5">{TYPE_ORDER.map((type) => {
-              const isSelected = selectedTypes.includes(type);
-              const canDecrease = isSelected && typeCounts[type] > MIN_TYPE_COUNT;
-              const canIncrease = isSelected && typeCounts[type] < Math.min(MAX_TYPE_COUNT, model.capability.maxCount);
-              return <div key={type} className={`relative min-h-[76px] border rounded-md transition-colors ${isSelected ? 'border-primary bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                <button onClick={() => toggleType(type)} className="absolute inset-0 flex items-center gap-2 rounded-md px-3 pr-24 text-left" title={`${isSelected ? '取消选择' : '选择'}${IMAGE_GENERATION_TYPE_LABELS[type]}`}><span className={`material-symbols-outlined shrink-0 text-xl ${isSelected ? 'text-primary' : 'text-slate-500'}`}>{typeIcon[type]}</span><span className="min-w-0 text-xs font-bold leading-4 text-slate-800">{typeCompactLabel[type]}</span><span className={`absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded border ${isSelected ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white'}`}>{isSelected && <span className="material-symbols-outlined text-[11px]">check</span>}</span></button>
-                {isSelected && <div className="absolute bottom-2 right-2 z-10 flex h-7 items-center rounded border border-blue-200 bg-white shadow-sm"><button onClick={() => changeTypeCount(type, -1)} disabled={!canDecrease} className="w-7 h-full text-slate-500 disabled:text-slate-300 hover:text-primary" title="减少一张"><span className="material-symbols-outlined text-base">remove</span></button><span className="w-7 border-x border-blue-100 text-center text-xs font-black leading-7 text-slate-700">{typeCounts[type]}</span><button onClick={() => changeTypeCount(type, 1)} disabled={!canIncrease} className="w-7 h-full text-slate-500 disabled:text-slate-300 hover:text-primary" title={typeCounts[type] >= MAX_TYPE_COUNT ? `每个图片类型最多 ${MAX_TYPE_COUNT} 张` : `当前模型最多生成 ${model.capability.maxCount} 张`}><span className="material-symbols-outlined text-base">add</span></button></div>}
+        <section id="image-prompt-section" className="min-w-0 border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div><p className="text-[11px] font-bold text-primary">内容</p><h2 className="mt-0.5 text-sm font-black">最终 Prompt</h2></div>
+            <button onClick={refreshPrompts} disabled={assistantState === 'processing'} className="flex h-8 items-center gap-1.5 rounded-md border border-primary bg-white px-3 text-[11px] font-bold text-primary disabled:border-slate-200 disabled:text-slate-400"><span className={`material-symbols-outlined text-base ${assistantState === 'processing' ? 'animate-spin' : ''}`}>{assistantState === 'ready' ? 'auto_awesome' : 'auto_fix_high'}</span>{assistantLabel}</button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {TYPE_ORDER.map((type) => {
+              const active = selectedTypes.includes(type);
+              return <div key={type} className={`flex h-16 min-w-0 items-center gap-2 border px-2 ${active ? 'border-primary bg-blue-50' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
+                <button onClick={() => toggleType(type)} aria-pressed={active} className="flex min-w-0 flex-1 items-center gap-1.5 text-left"><span className={`material-symbols-outlined text-base ${active ? 'text-primary' : 'text-slate-400'}`}>{active ? 'check_circle' : typeIcon[type]}</span><span className="truncate text-[11px] font-bold text-slate-700">{typeCompactLabel[type]}</span></button>
+                {active ? <div className="flex items-center border border-slate-200 bg-white text-[11px]"><button onClick={() => changeTypeCount(type, -1)} disabled={typeCounts[type] <= MIN_TYPE_COUNT} className="grid h-6 w-5 place-items-center text-slate-500 disabled:text-slate-300" title="减少张数">−</button><span className="w-4 text-center font-bold">{typeCounts[type]}</span><button onClick={() => changeTypeCount(type, 1)} disabled={typeCounts[type] >= Math.min(MAX_TYPE_COUNT, model.capability.maxCount)} className="grid h-6 w-5 place-items-center text-slate-500 disabled:text-slate-300" title="增加张数">+</button></div> : <button onClick={() => toggleType(type)} className="grid h-6 w-6 place-items-center text-slate-400 hover:text-primary" title={`添加${typeCompactLabel[type]}`}><span className="material-symbols-outlined text-base">add</span></button>}
               </div>;
-            })}</div>
-            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
-              <div className="relative text-xs font-bold text-slate-700"><span>当前模板</span><div className="mt-1.5 flex h-9 items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2"><span className="min-w-0 truncate text-xs font-medium">{template}</span><button onClick={() => setTemplatePickerOpen((open) => !open)} className="shrink-0 text-[11px] font-bold text-primary">更换模板</button></div>{templatePickerOpen && <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white p-1 shadow-lg">{TASK_TEMPLATES.map((item) => <button key={item.name} onClick={() => requestTemplateChange(item.name)} className={`w-full rounded px-2 py-2 text-left hover:bg-slate-50 ${item.name === template ? 'bg-blue-50 text-primary' : ''}`}><span className="block text-[11px] font-bold">{item.name}</span><span className="block mt-0.5 text-[10px] font-normal text-slate-400">{item.description}</span></button>)}</div>}</div>
-              {[['风格', style, setStyle, STYLE_OPTIONS], ['场景', scene, setScene, ['自然影棚', '城市街景', '居家陈列']], ['姿势', pose, setPose, POSE_OPTIONS]].map(([label, value, setter, options]) => <label key={String(label)} className="text-xs font-bold text-slate-700">{String(label)}<select value={value as string} onChange={(event) => { (setter as (value: string) => void)(event.target.value); setPromptsConfirmed(false); }} className="mt-1.5 w-full h-9 px-2 rounded border border-slate-200 bg-white text-xs font-medium">{(options as string[]).map((option) => <option key={option}>{option}</option>)}</select></label>)}
-            </div>
-            <details className="mt-4 border-t border-slate-100 pt-4"><summary className="cursor-pointer text-xs font-bold text-slate-600">高级设置</summary><label className="mt-3 block text-xs font-bold text-slate-700">负面约束<input value={negativePrompt} onChange={(event) => { setNegativePrompt(event.target.value); setPromptsConfirmed(false); }} className="mt-1.5 w-full h-9 px-2 rounded border border-slate-200 text-xs font-medium" /></label><p className="mt-1.5 text-[10px] text-slate-400">默认沿用当前模板的约束，可按本次任务覆盖。</p></details>
+            })}
           </div>
 
-          <div id="image-content-section" className="bg-white border border-slate-200 rounded-lg p-5">
-            <div className="flex items-center justify-between"><div><p className="text-[11px] font-bold text-primary">任务级 Prompt 副本</p><h2 className="text-base font-black">每种图片各自编辑</h2></div><button onClick={runAssistantAnalysis} disabled={!isProductBound || assistantState === 'processing'} className="h-8 px-3 border border-blue-200 bg-blue-50 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 text-primary text-xs font-bold rounded-md flex gap-1 items-center"><span className={`material-symbols-outlined text-base ${assistantState === 'processing' ? 'animate-pulse' : ''}`}>auto_awesome</span>{assistantState === 'processing' ? 'AI 解析中' : assistantState === 'complete' ? '重新生成' : 'AI 助手'}</button></div>
-            {!isProductBound && <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">先选择已关联商品资产的主体素材，才能确认商品事实、生成 Prompt 和提交任务。</div>}
-            {assistantState !== 'idle' && <div className={`mt-4 flex items-center gap-2 rounded-md border px-3 py-2 text-[11px] ${assistantState === 'complete' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-blue-100 bg-blue-50 text-primary'}`}><span className="material-symbols-outlined text-sm">{assistantState === 'complete' ? 'check_circle' : 'progress_activity'}</span>{assistantState === 'complete' ? '已基于商品事实写入当前任务的 Prompt 副本，可在下方继续编辑。' : '正在提取商品名称、卖点、品类、颜色、图案和结构，并初始化 Prompt…'}</div>}
-            <div className="mt-4 border-y border-slate-100 py-3">
-              <div className="flex items-start justify-between gap-3"><div><h3 className="text-xs font-black">商品事实确认</h3><p className="mt-1 text-[11px] text-slate-400">随任务常驻保存，是 AI 推荐和 Prompt 初始化的事实依据。</p></div><span className={`shrink-0 px-2 py-1 rounded text-[10px] font-bold ${factsConfirmed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{factsConfirmed ? '已确认' : '待确认'}</span></div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">{PRODUCT_FACT_FIELDS.map((field) => <label key={field.key} className="min-w-0 rounded border border-slate-200 bg-slate-50 px-2 py-1.5"><span className="block text-[10px] text-slate-400">{field.label}</span><input disabled={!isProductBound} value={productFacts[field.key]} onChange={(event) => updateProductFact(field.key, event.target.value)} placeholder="待 AI 解析" className="mt-0.5 w-full min-w-0 bg-transparent outline-none disabled:cursor-not-allowed text-[11px] font-bold text-slate-700 placeholder:text-slate-300" /></label>)}</div>
-              <div className="mt-3 flex items-center justify-between gap-3"><p className="text-[10px] leading-4 text-slate-400">修改事实不会自动覆盖下方 Prompt；需要重写时点击 AI 助手。</p><button onClick={() => { setFactsConfirmed(true); setReadinessIssue(''); }} disabled={!isProductBound || !factsComplete} className="shrink-0 h-7 px-2.5 rounded border border-slate-200 bg-white disabled:bg-slate-100 disabled:text-slate-400 text-[11px] font-bold text-slate-600 hover:border-primary hover:text-primary">确认商品事实</button></div>
+          <div className="mt-3 border-y border-slate-100 py-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <VisualTagPicker label="风格" value={style} options={mockImagePromptVisualTags.styles} onChange={(value) => updateTag('style', value)} />
+              <VisualTagPicker label="场景" value={scene} options={availableScenes} onChange={(value) => updateTag('scene', value)} />
+              <VisualTagPicker label="姿势" value={pose} options={availablePoses} onChange={(value) => updateTag('pose', value)} />
             </div>
-            <div className="mt-4 space-y-3">{selectedTypes.map((type) => <div key={type} className="border border-slate-200 rounded-md overflow-hidden"><div className="px-3 py-2 bg-slate-50 flex justify-between"><span className="text-xs font-black">{IMAGE_GENERATION_TYPE_LABELS[type]}</span><span className="text-[10px] text-slate-400">来源：{template}</span></div><textarea disabled={!isProductBound} value={promptOverrides[type] ?? prompts[type]} onChange={(event) => { setPromptOverrides((previous) => ({ ...previous, [type]: event.target.value })); setPromptHasEdits(true); setPromptsConfirmed(false); }} className="w-full h-24 resize-none p-3 outline-none disabled:bg-slate-50 disabled:text-slate-400 text-xs leading-5" /></div>)}</div>
-            <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4"><div><p className="text-xs font-black text-slate-700">本组 Prompt</p><p className="mt-1 text-[10px] text-slate-400">确认后如修改事实、Prompt、模板或参考图，将自动变为待确认。</p></div><button onClick={() => { setPromptsConfirmed(true); setReadinessIssue(''); }} disabled={!factsConfirmed || !promptsComplete} className={`h-8 shrink-0 rounded-md border px-3 text-xs font-bold ${promptsConfirmed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-primary bg-white text-primary disabled:border-slate-200 disabled:text-slate-300'}`}>{promptsConfirmed ? 'Prompt 已确认' : '确认本组 Prompt'}</button></div>
+            <p className="mt-2 text-[10px] text-slate-400">切换风格会自动保留兼容的场景与姿势；不兼容时回到该风格的推荐组合。</p>
           </div>
+
+          <div className="mt-4 space-y-3">
+            {selectedTypes.map((type) => {
+              const prompt = promptOverrides[type] ?? (assistantState === 'ready' ? generatedPrompts[type] : '');
+              const suggestion = aiSuggestions[type];
+              const suggestionOpen = openSuggestions[type];
+              return <div key={type} className="overflow-hidden border border-slate-200">
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-3 py-2"><div className="flex items-center gap-2"><span className="material-symbols-outlined text-base text-primary">{typeIcon[type]}</span><span className="text-xs font-black">{IMAGE_GENERATION_TYPE_LABELS[type]}</span><span className="text-[10px] text-slate-400">{taskProfileByType[type]} · {typeCounts[type]} 张</span></div><span className={`text-[10px] font-bold ${manualPromptTypes[type] ? 'text-amber-700' : 'text-emerald-700'}`}>{manualPromptTypes[type] ? '已手动编辑' : 'AI 生成'}</span></div>
+                {suggestion && <div className="border-y border-amber-200 bg-amber-50 px-3 py-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-[10px] font-bold text-amber-800">AI 有新的建议，来自：{suggestion.reason}</p><div className="flex gap-2"><button onClick={() => setOpenSuggestions((current) => ({ ...current, [type]: !suggestionOpen }))} className="text-[10px] font-bold text-primary">{suggestionOpen ? '收起建议' : '查看差异'}</button><button onClick={() => applySuggestion(type)} className="text-[10px] font-bold text-primary">覆盖为 AI 建议</button><button onClick={() => dismissSuggestion(type)} className="text-[10px] font-bold text-slate-500">保留当前</button></div></div>{suggestionOpen && <div className="mt-2 grid gap-2 border-t border-amber-200 pt-2 md:grid-cols-2"><div><p className="text-[10px] text-slate-500">当前人工版本</p><p className="mt-1 whitespace-pre-wrap text-[10px] leading-4 text-slate-700">{prompt}</p></div><div><p className="text-[10px] text-slate-500">AI 新建议</p><p className="mt-1 whitespace-pre-wrap text-[10px] leading-4 text-slate-700">{suggestion.prompt}</p></div></div>}</div>}
+                <textarea value={prompt} disabled={!mainAsset} onChange={(event) => updatePrompt(type, event.target.value)} placeholder="选择主体素材后，点击 AI 助手生成 Prompt" className="h-48 w-full resize-y p-3 text-xs leading-6 text-slate-700 outline-none placeholder:text-slate-300 disabled:bg-slate-50" />
+              </div>;
+            })}
+          </div>
+          <p className="mt-2 text-[10px] leading-4 text-slate-400">图片类型支持多选，所有已选类型的 Prompt 会依次显示。点击“生成”即接受当前 Prompt，并进入预检与费用确认。</p>
         </section>
 
-        <section className="space-y-4">
-          <div id="image-settings-section" className="bg-white border border-slate-200 rounded-lg p-5">
-            <p className="text-[11px] font-bold text-primary">执行参数</p><h2 className="text-base font-black mt-1">模型与输出规格</h2><p className="mt-1 text-[11px] text-slate-400">仅展示当前可用模型；成本、耗时和执行风险将在提交前确认。</p>
-            <label className="block mt-4 text-xs font-bold">模型<select value={`${channel.id}:${model.id}`} onChange={(event) => { const choice = availableModels.find((item) => `${item.channel.id}:${item.model.id}` === event.target.value); if (choice) setModelWithValidation(choice.channel.id, choice.model.id); }} className="mt-1.5 w-full h-9 rounded border border-slate-200 px-2 text-xs">{availableModels.map((item) => <option key={`${item.channel.id}:${item.model.id}`} value={`${item.channel.id}:${item.model.id}`}>{item.model.name} · {item.model.description}</option>)}</select></label>
-            <div className="mt-4"><span className="text-xs font-bold">平台规格推荐</span><div className="flex flex-wrap gap-2 mt-2">{PRESETS.map((preset) => <button key={preset.name} onClick={() => applyPreset(preset)} className="px-2 py-1.5 text-[11px] font-bold rounded border border-slate-200 hover:border-primary hover:text-primary">{preset.name}</button>)}</div></div>
-            <label className="block mt-4 text-xs font-bold">比例<select value={ratio} onChange={(event) => setRatio(event.target.value)} className="mt-1.5 w-full h-9 rounded border border-slate-200 px-2 text-xs">{model.capability.ratios.map((item) => <option key={item}>{item}</option>)}</select></label>
-            <div className="grid grid-cols-2 gap-3 mt-3"><div className="text-xs font-bold">本次总张数<div className="mt-1.5 flex h-9 items-center justify-between rounded border border-slate-200 bg-slate-50 px-2"><span className="text-sm font-black text-slate-800">{totalCount} 张</span><span className="text-[10px] font-normal text-slate-400">{selectedTypes.length} 个类型</span></div></div><label className="text-xs font-bold">图片尺寸<select value={resolution} onChange={(event) => setResolution(event.target.value)} className="mt-1.5 w-full h-9 rounded border border-slate-200 px-2 text-xs">{model.capability.resolutions.map((item) => <option key={item}>{item}</option>)}</select></label></div>
-            {!isSupported && <p className="mt-3 p-2 rounded bg-red-50 text-red-700 text-[11px]">当前规格不受所选模型支持：{unsupported.join('、')}</p>}
+        <section id="image-settings-section" className="min-w-0 space-y-3">
+          <div className="border border-slate-200 bg-white p-4">
+            <p className="text-[11px] font-bold text-primary">执行</p><h2 className="mt-0.5 text-sm font-black">模型与输出</h2>
+            <label className="mt-4 block text-[11px] font-bold text-slate-600">模型<select value={`${channel.id}:${model.id}`} onChange={(event) => chooseModel(event.target.value)} className="mt-1.5 h-9 w-full border border-slate-200 bg-white px-2 text-xs text-slate-700">{availableModels.map((item) => <option key={`${item.channel.id}:${item.model.id}`} value={`${item.channel.id}:${item.model.id}`}>{item.model.name}</option>)}</select></label><p className="mt-1 text-[10px] leading-4 text-slate-400">{model.description}</p>
+            <div className="mt-4 border-y border-slate-100 py-3"><p className="text-[10px] font-bold text-slate-400">本次任务总生成图片数</p><p className="mt-1 text-2xl font-black text-slate-800">{totalCount}<span className="ml-1 text-xs font-bold text-slate-400">张</span></p><p className="mt-1 text-[10px] text-slate-400">按图片类型分别生成</p></div>
+            <button onClick={() => setAdvancedOpen((current) => !current)} className="mt-3 flex w-full items-center justify-between text-left text-[11px] font-bold text-slate-600"><span>高级设置</span><span className="text-[10px] font-normal text-slate-400">{ratio} · {resolution}</span><span className="material-symbols-outlined text-base">{advancedOpen ? 'expand_less' : 'expand_more'}</span></button>
+            {advancedOpen && <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3"><label className="text-[11px] font-bold text-slate-600">比例<select value={ratio} onChange={(event) => setRatio(event.target.value)} className="mt-1 h-8 w-full border border-slate-200 bg-white px-2 text-xs">{model.capability.ratios.map((item) => <option key={item}>{item}</option>)}</select></label><label className="text-[11px] font-bold text-slate-600">分辨率<select value={resolution} onChange={(event) => setResolution(event.target.value)} className="mt-1 h-8 w-full border border-slate-200 bg-white px-2 text-xs">{model.capability.resolutions.map((item) => <option key={item}>{item}</option>)}</select></label></div>}
+            {!isSupported && <p className="mt-3 bg-red-50 px-2 py-2 text-[10px] leading-4 text-red-700">当前张数或输出规格不受所选模型支持，请调整设置。</p>}
           </div>
-          <div className="bg-white border border-slate-200 rounded-lg p-5"><h3 className="text-sm font-black">审核策略</h3><label className="mt-3 flex items-center justify-between text-xs font-bold">启用评分审核<input checked={reviewEnabled} onChange={(event) => setReviewEnabled(event.target.checked)} type="checkbox" className="accent-primary" /></label><p className="mt-2 text-[11px] text-slate-400">一次完成评分与通过/打回决策；通过后可创建视频。</p></div>
+          <p className="px-1 text-[10px] leading-4 text-slate-400">费用、耗时、通道健康度和失败兜底策略将在预检通过后的费用确认中展示。</p>
         </section>
       </main>
 
-      {executionConfirmOpen && <ExecutionConfirmDialog title={`确认生成 ${selectedTypes.length} 个图片子任务`} description="系统已按当前素材、商品事实、Prompt、模型能力和预算完成预检。确认后任务会先进入排队中。" estimatedCost={`¥ ${(model.cost * totalCount).toFixed(2)}`} estimatedDuration={`${Math.max(1, Math.ceil(totalCount / 2))}–${Math.max(2, Math.ceil(totalCount * 0.8))} 分钟`} healthLabel={channel.health === 'healthy' ? '服务健康' : '额度偏低'} healthDetail={channel.quotaText} fallbackPolicy="同配置最多自动重试 1 次；仍失败则停止并通知，不自动切换到其他付费通道，也不复用历史结果伪装生成成功。" summary={[{ label: '任务组', value: `${selectedTypes.map((type) => IMAGE_GENERATION_TYPE_LABELS[type]).join('、')} · 共 ${totalCount} 张` }, { label: '模型通道', value: `${channel.name} / ${model.name}` }, { label: '输出规格', value: `${ratio} · ${resolution}` }, { label: '审核策略', value: reviewEnabled ? '生成后进入评分审核' : '不启用评分审核' }]} requestLines={[`Prompt：已确认 ${selectedTypes.length} 个任务级副本`, `参考图：${orderedReferences.length ? orderedReferences.map((item) => `${item.position}.${item.role}`).join('、') : '未使用参考图'}`, `参数：ratio=${ratio}，resolution=${resolution}，count=${totalCount}`]} onCancel={() => setExecutionConfirmOpen(false)} onConfirm={submitTasks} />}
-      {conflictOpen && pendingChoice && <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><div className="absolute inset-0 bg-slate-900/40" /><div className="relative bg-white rounded-lg w-full max-w-md p-6 shadow-xl"><div className="flex gap-3"><span className="material-symbols-outlined text-amber-500">warning</span><div><h2 className="font-black">模型能力与当前规格冲突</h2><p className="mt-2 text-xs text-slate-500 leading-5">目标模型不支持当前的 {unsupported.length ? unsupported.join('、') : '输出规格'}。确认后将自动切换到该模型首个可用比例、尺寸，并将张数限制在上限内。</p></div></div><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setConflictOpen(false); setPendingChoice(null); }} className="h-8 px-3 text-xs font-bold border border-slate-200 rounded">保留当前选择</button><button onClick={applyCompatibleModel} className="h-8 px-3 text-xs font-bold text-white bg-primary rounded">确认调整</button></div></div></div>}
-      {templateOverwriteOpen && pendingTemplate && <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><div className="absolute inset-0 bg-slate-900/40" /><div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl"><div className="flex gap-3"><span className="material-symbols-outlined text-amber-500">warning</span><div><h2 className="font-black">覆盖当前任务级 Prompt？</h2><p className="mt-2 text-xs leading-5 text-slate-500">已由 AI 或人工改写的 Prompt 会被“{pendingTemplate}”重新初始化。本次任务之外的模板和任务不会受影响。</p></div></div><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setTemplateOverwriteOpen(false); setPendingTemplate(null); }} className="h-8 rounded border border-slate-200 px-3 text-xs font-bold">保留当前 Prompt</button><button onClick={() => applyTemplate(pendingTemplate)} className="h-8 rounded bg-primary px-3 text-xs font-bold text-white">覆盖并更换</button></div></div></div>}
+      {executionConfirmOpen && <ExecutionConfirmDialog title={`确认生成 ${selectedTypes.length} 个图片类型`} description="已按当前 Prompt、模型能力与结构化输出参数完成预检。确认费用后，任务将进入排队。" estimatedCost={`¥ ${(model.cost * totalCount).toFixed(2)}`} estimatedDuration={`${Math.max(1, Math.ceil(totalCount / 2))}–${Math.max(2, Math.ceil(totalCount * 0.8))} 分钟`} healthLabel={channel.health === 'healthy' ? '服务健康' : '额度偏低'} healthDetail={channel.quotaText} fallbackPolicy="同配置最多自动重试 1 次；仍失败则停止并通知，不自动切换其他付费通道。" summary={[{ label: '图片类型', value: selectedTypes.map((type) => IMAGE_GENERATION_TYPE_LABELS[type]).join('、') }, { label: '主体素材', value: subjectName }, { label: '模型', value: model.name }, { label: '输出规格', value: `${ratio} · ${resolution} · ${totalCount} 张` }]} requestLines={[`参考图：${orderedReferences.length ? orderedReferences.map((item) => `${item.position}.${item.role}`).join('、') : '未使用参考图'}`, `参数：ratio=${ratio}，resolution=${resolution}，count=${totalCount}`]} onCancel={() => setExecutionConfirmOpen(false)} onConfirm={submitTasks} />}
     </div>
   );
 };

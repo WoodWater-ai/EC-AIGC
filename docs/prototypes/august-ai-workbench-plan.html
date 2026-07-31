@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>八月 AI 素材工作台推进方案</title>
+  <style>
+    :root {
+      --ink: #132238;
+      --muted: #617086;
+      --line: #dbe2ea;
+      --paper: #f4f7fa;
+      --blue: #1266d6;
+      --green: #078260;
+      --orange: #d76616;
+      --navy: #0f2946;
+      --red: #b83d3d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 1120px;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .page {
+      width: 1440px;
+      min-height: 900px;
+      margin: 28px auto;
+      padding: 34px 40px 30px;
+      background: #fff;
+      box-shadow: 0 12px 42px rgb(20 39 61 / 12%);
+    }
+
+    .eyebrow, .section-kicker, .gantt-label, .owner-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--muted);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: 1.45fr .85fr;
+      gap: 28px;
+      padding-bottom: 22px;
+      border-bottom: 2px solid var(--navy);
+    }
+
+    h1 { margin: 6px 0 8px; font-size: 34px; line-height: 1.16; letter-spacing: 0; }
+    .subtitle { margin: 0; max-width: 800px; color: var(--muted); font-size: 15px; line-height: 1.65; }
+
+    .goal {
+      align-self: center;
+      padding: 16px 18px;
+      background: var(--navy);
+      color: #fff;
+    }
+    .goal small { display: block; color: #b7c9dc; font-size: 11px; font-weight: 700; letter-spacing: .06em; }
+    .goal strong { display: block; margin: 8px 0 5px; font-size: 18px; line-height: 1.35; }
+    .goal span { color: #d8e3ed; font-size: 12px; }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 20px 0;
+    }
+    .kpi { padding: 13px 15px; border: 1px solid var(--line); border-top: 3px solid var(--navy); }
+    .kpi:nth-child(2) { border-top-color: var(--green); }
+    .kpi:nth-child(3) { border-top-color: var(--orange); }
+    .kpi:nth-child(4) { border-top-color: var(--blue); }
+    .kpi b { display: block; margin-bottom: 4px; font-size: 21px; }
+    .kpi span { color: var(--muted); font-size: 12px; }
+
+    .tracks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 18px; }
+    .track { position: relative; min-height: 162px; padding: 18px; border: 1px solid var(--line); overflow: hidden; }
+    .track::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+    .track.product::before { background: var(--blue); }
+    .track.template::before { background: var(--green); }
+    .track.local::before { background: var(--orange); }
+    .track-header { display: flex; justify-content: space-between; align-items: baseline; }
+    .track-number { font-size: 13px; font-weight: 800; }
+    .product .track-number { color: var(--blue); }
+    .template .track-number { color: var(--green); }
+    .local .track-number { color: var(--orange); }
+    .track h2 { margin: 5px 0 11px; font-size: 18px; }
+    .track ul { margin: 0; padding: 0; list-style: none; }
+    .track li { position: relative; padding: 4px 0 4px 14px; color: #3f4e61; font-size: 13px; line-height: 1.45; }
+    .track li::before { content: ""; position: absolute; left: 0; top: 11px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .track .tag { display: inline-block; margin-top: 10px; padding: 4px 7px; font-size: 11px; font-weight: 700; background: #eef3f8; color: var(--muted); }
+
+    .workbench {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      min-height: 48px;
+      margin-bottom: 22px;
+      color: #fff;
+      background: var(--navy);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .workbench b { font-size: 15px; }
+    .workbench span { color: #c8d7e6; }
+
+    .roadmap { border: 1px solid var(--line); }
+    .roadmap-head { display: flex; justify-content: space-between; align-items: end; padding: 15px 17px 12px; border-bottom: 1px solid var(--line); }
+    .roadmap h2 { margin: 3px 0 0; font-size: 20px; }
+    .roadmap-note { max-width: 490px; color: var(--muted); font-size: 12px; line-height: 1.55; text-align: right; }
+    .gantt { display: grid; grid-template-columns: 226px repeat(4, 1fr); }
+    .gantt > div { border-right: 1px solid #e9eef3; border-bottom: 1px solid #e9eef3; }
+    .gantt > div:nth-child(5n) { border-right: 0; }
+    .week { min-height: 42px; padding: 8px 10px; background: #f7f9fb; color: var(--muted); font-size: 11px; font-weight: 800; }
+    .week b { display: block; color: var(--ink); font-size: 12px; }
+    .row-title { min-height: 52px; padding: 10px 14px; background: #fcfdfe; }
+    .row-title b { display: block; font-size: 13px; }
+    .row-title span { color: var(--muted); font-size: 11px; }
+    .cell { position: relative; min-height: 52px; padding: 8px; }
+    .bar { display: flex; align-items: center; min-height: 28px; padding: 4px 7px; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.25; }
+    .blue { background: var(--blue); }
+    .green { background: var(--green); }
+    .orange { background: var(--orange); }
+    .navy { background: var(--navy); }
+    .pale { color: #3d576e; background: #e8f1fb; }
+    .bar.milestone { background: #fff3e7; color: #9e4a0c; border-left: 3px solid var(--orange); }
+
+    .bottom { display: grid; grid-template-columns: 1.55fr .95fr; gap: 18px; margin-top: 20px; }
+    .ownership, .decision { min-height: 140px; padding: 17px; border: 1px solid var(--line); }
+    .ownership h2, .decision h2 { margin: 3px 0 12px; font-size: 18px; }
+    .owners { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .owner { padding-right: 10px; border-right: 1px solid var(--line); }
+    .owner:last-child { border-right: 0; }
+    .owner b { display: block; margin: 3px 0; font-size: 13px; }
+    .owner p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .decision { border-left: 4px solid var(--orange); }
+    .decision ul { margin: 0; padding-left: 18px; color: #42546a; font-size: 12px; line-height: 1.7; }
+    .decision strong { color: var(--red); }
+    .footnote { margin: 14px 0 0; color: #748195; font-size: 11px; }
+
+    @media print {
+      body { min-width: 0; background: #fff; }
+      .page { width: 100%; min-height: 0; margin: 0; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="top">
+      <div>
+        <div class="eyebrow">EC-AIGC / MANAGEMENT BRIEF</div>
+        <h1>八月 AI 素材工作台推进方案</h1>
+        <p class="subtitle">先补齐设计师的生产闭环，再把审核通过的优质成片沉淀为模板资产；本地视频通道通过公司硬件投入降低长期生成成本。</p>
+      </div>
+      <aside class="goal">
+        <small>八月总目标</small>
+        <strong>提效 · 降本 · 资产沉淀</strong>
+        <span>让优质素材从个人经验，变成团队可复刻的生产能力。</span>
+      </aside>
+    </header>
+
+    <section class="kpis" aria-label="八月交付目标">
+      <div class="kpi"><b>8/7</b><span>设计师可稳定出图并进入审核</span></div>
+      <div class="kpi"><b>8 个</b><span>首批发布模板：图 5 / 视频 3</span></div>
+      <div class="kpi"><b>≥ 50%</b><span>本地视频相对云端的可变成本降幅</span></div>
+      <div class="kpi"><b>20 人</b><span>5 人试点签收后内部开放</span></div>
+    </section>
+
+    <section class="tracks" aria-label="三项核心工作">
+      <article class="track product">
+        <div class="track-header"><span class="track-number">01</span><span class="section-kicker">PRODUCT</span></div>
+        <h2>产品闭环收尾</h2>
+        <ul>
+          <li>素材、生成任务、异步结果、审核可稳定使用</li>
+          <li>审核通过结果可直接“设为模板”</li>
+          <li>普通用户替换素材后受控复刻</li>
+        </ul>
+        <span class="tag">设计师先能高效出图</span>
+      </article>
+      <article class="track template">
+        <div class="track-header"><span class="track-number">02</span><span class="section-kicker">TEMPLATE</span></div>
+        <h2>模板广场与复刻</h2>
+        <ul>
+          <li>成片、Prompt、模型与参数继承为版本快照</li>
+          <li>设计师审核发布，模板广场统一展示</li>
+          <li>图 5 + 视频 3，沉淀可复用样式资产</li>
+        </ul>
+        <span class="tag">从个人经验到团队资产</span>
+      </article>
+      <article class="track local">
+        <div class="track-header"><span class="track-number">03</span><span class="section-kicker">LOCAL VIDEO</span></div>
+        <h2>本地视频生成降本</h2>
+        <ul>
+          <li>公司采购高显存工作站、存储与网络环境</li>
+          <li>大哥 / 新工程师部署 ComfyUI 并提供服务 API</li>
+          <li>后端封装 Provider，前端继续走统一任务接口</li>
+        </ul>
+        <span class="tag">本地与云端可比较、可切换</span>
+      </article>
+    </section>
+
+    <section class="workbench" aria-label="统一工作台能力">
+      <b>统一任务工作台</b><span>模板复刻</span><span>·</span><span>通道切换确认</span><span>·</span><span>审核</span><span>·</span><span>成本复盘</span>
+    </section>
+
+    <section class="roadmap" aria-label="八月甘特图">
+      <div class="roadmap-head">
+        <div><div class="section-kicker">AUGUST ROADMAP</div><h2>八月关键路径与甘特图</h2></div>
+        <div class="roadmap-note">产品主链路优先保障设计师出图；模板供给与本地视频并行推进，但本地环境延期不阻塞模板和全员开放。</div>
+      </div>
+      <div class="gantt">
+        <div class="week"><b>工作流 / 负责人</b></div><div class="week"><b>第 1 周</b>8/3 - 8/7</div><div class="week"><b>第 2 周</b>8/10 - 8/14</div><div class="week"><b>第 3 周</b>8/17 - 8/21</div><div class="week"><b>第 4 周</b>8/24 - 8/28</div>
+
+        <div class="row-title"><b>产品生产基础</b><span>前端 + 后端</span></div><div class="cell"><div class="bar blue">任务、结果、审核收尾</div></div><div class="cell"><div class="bar blue">图片模板闭环上线</div></div><div class="cell"><div class="bar pale">视频模板机制复用</div></div><div class="cell"><div class="bar navy">试点问题收口</div></div>
+        <div class="row-title"><b>模板供给与发布</b><span>设计师 + 审核负责人</span></div><div class="cell"><div class="bar green">设计师用真实任务出图</div></div><div class="cell"><div class="bar green">图模板 5 个审核发布</div></div><div class="cell"><div class="bar green">视频模板 3 个发布</div></div><div class="cell"><div class="bar navy">模板质量复盘</div></div>
+        <div class="row-title"><b>硬件与本地视频服务</b><span>公司 + 大哥 / 新工程师</span></div><div class="cell"><div class="bar orange">硬件规格确认、采购、API Mock</div></div><div class="cell"><div class="bar orange">GPU / 网络 / 存储环境部署</div></div><div class="cell"><div class="bar orange">ComfyUI、Provider、结果回收联调</div></div><div class="cell"><div class="bar milestone">云端 / 本地效果与成本对照</div></div>
+        <div class="row-title"><b>试点与开放</b><span>产品 + 运营 + 设计</span></div><div class="cell"></div><div class="cell"></div><div class="cell"><div class="bar pale">5 人试点准备</div></div><div class="cell"><div class="bar navy">5 人签收 → 20 人开放</div></div>
+      </div>
+    </section>
+
+    <section class="bottom">
+      <article class="ownership">
+        <div class="section-kicker">RESOURCE & OWNERSHIP</div><h2>资源与协作边界</h2>
+        <div class="owners">
+          <div class="owner"><div class="owner-label">公司</div><b>硬件与运行环境</b><p>采购高显存 GPU 工作站，保障存储、网络与运维支持。</p></div>
+          <div class="owner"><div class="owner-label">大哥 / 新工程师</div><b>本地视频服务</b><p>部署 ComfyUI、模型工作流和服务 API，配合后端联调。</p></div>
+          <div class="owner"><div class="owner-label">产品团队</div><b>闭环与模板资产</b><p>后端接 Provider / 队列；前端做工作台 / 模板广场；设计师生成、审核、发布。</p></div>
+        </div>
+      </article>
+      <aside class="decision">
+        <div class="section-kicker">MANAGEMENT DECISIONS</div><h2>本周需确认</h2>
+        <ul>
+          <li>批准采购高显存 GPU 工作站及配套环境。</li>
+          <li>确认大哥 / 新工程师在 <strong>8/7 前</strong>交付本地服务 API 文档与 Mock。</li>
+          <li>指定模板发布审核负责人，保证模板质量可控。</li>
+        </ul>
+      </aside>
+    </section>
+    <p class="footnote">说明：用户切换云端 / 本地通道时，系统将展示 Prompt 与参数差异、预估成本和时延，并要求确认后提交；不会静默降级或绕过统一任务链路。</p>
+  </main>
+</body>
+</html>

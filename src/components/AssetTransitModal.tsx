@@ -54,6 +54,9 @@ const SLOT_TAGS: Record<string, string | undefined> = {
 };
 
 const SLOT_ASSET_KINDS: Record<string, AssetResourceItem['assetKind'] | undefined> = {
+  'model-profile-reference': 'IMAGE',
+  'model-profile-face_source': 'IMAGE',
+  'model-profile-target_appearance': 'IMAGE',
   'video-first-frame': 'IMAGE',
   'video-reference': 'IMAGE',
   'trending-source-video': 'VIDEO',
@@ -61,6 +64,9 @@ const SLOT_ASSET_KINDS: Record<string, AssetResourceItem['assetKind'] | undefine
 };
 
 const SLOT_LABELS: Record<string, string> = {
+  'model-profile-reference': '模特参考图',
+  'model-profile-face_source': '脸部来源图',
+  'model-profile-target_appearance': '目标形象图',
   main: '主体素材',
   upper: '上衣图',
   lower: '下装图',
@@ -99,6 +105,10 @@ interface AssetTransitModalProps {
   productId?: number;
   /** 任务创建时的素材槽位提示,CreateImageTask / CreateVideoTask 用 */
   targetSlot?: string;
+  /** mock 阶段由父级持有运行时资源，保证发布的新模特可立即被选择。 */
+  mockAssets?: AssetResourceItem[];
+  /** 仅模特参考槽位提供，打开共享的新建 AI 模特流程。 */
+  onCreateModel?: () => void;
 }
 
 export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
@@ -112,6 +122,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   targetSlot = 'main',
   multiSelect = false,
   mode = 'picker',
+  mockAssets,
+  onCreateModel,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   /** 分类树折叠状态 —— 存被折叠的节点 id,默认空 = 全部展开 */
@@ -163,7 +175,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
       const keyword = searchQuery.trim().toLowerCase();
       const slotTag = SLOT_TAGS[targetSlot];
       const assetKind = SLOT_ASSET_KINDS[targetSlot];
-      setAssets(mockAssetResources.filter((asset) => {
+      const mockSource = mockAssets ?? mockAssetResources;
+      setAssets(mockSource.filter((asset) => {
         const matchesKeyword = !keyword || `${asset.name} ${asset.tags ?? ''}`.toLowerCase().includes(keyword);
         const matchesCategory = selectedCategoryId === null || asset.categoryIds.includes(selectedCategoryId);
         const matchesSlot = !slotTag || asset.tags?.includes(slotTag);
@@ -189,7 +202,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   useEffect(() => {
     refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, currentUserId, productId, selectedCategoryId, targetSlot]);
+  }, [searchQuery, currentUserId, productId, selectedCategoryId, targetSlot, mockAssets]);
 
   useEffect(() => {
     setSelectedAssetIds([]);
@@ -745,7 +758,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 md:p-10 select-none animate-fadeIn">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 md:p-10 select-none animate-fadeIn">
       
       {/* Hidden Upload Input */}
       <input
@@ -914,6 +927,15 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   <span className="material-symbols-outlined text-sm">scan</span>
                   <span>目录扫描</span>
                 </button>
+                {targetSlot === 'reference-model' && onCreateModel && (
+                  <button
+                    onClick={onCreateModel}
+                    className="flex items-center gap-2 border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100"
+                  >
+                    <span className="material-symbols-outlined text-sm">person_add</span>
+                    <span>新建 AI 模特</span>
+                  </button>
+                )}
               </div>
 
               {SLOT_LABELS[targetSlot] && (
