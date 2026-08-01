@@ -1,5 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { ProductAsset, AppScreen } from '../types';
+import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import {
+  productLibraryApi,
+  type ProductLibraryAsset,
+  type ProductLibraryDisplayStatus,
+  type ProductLibraryProduct,
+  type ProductLibraryReview,
+} from '../api/modules/productLibrary';
+import { toast } from 'sonner';
+import { withCosThumbnail } from '../utils/cosImage';
+import { ImagePreviewModal } from './ImagePreviewModal';
 import {
   Grid,
   List,
@@ -32,7 +43,6 @@ import {
 } from 'lucide-react';
 
 interface ProductAssetLibraryProps {
-  products: ProductAsset[];
   selectedProduct: ProductAsset;
   setSelectedProduct: (product: ProductAsset) => void;
   isDrawerOpen: boolean;
@@ -43,6 +53,7 @@ interface ProductAssetLibraryProps {
 // Highly realistic generated asset data structure
 interface GeneratedAsset {
   id: string;
+  mediaType: 'IMAGE' | 'VIDEO';
   productId: string;
   productName: string;
   sku: string;
@@ -53,17 +64,128 @@ interface GeneratedAsset {
   scene: string;
   ratioDuration: string;
   channel: string;
-  status: '已通过' | '待审核' | '废弃';
+  status: '生成中' | '生成失败' | '待审美评分' | '审核通过' | '已打回';
+  rawStatus?: string;
   score: number | null;
   promptVersion: string;
   cost: number;
   addedTime: string;
   thumbnail: string;
+  url: string;
   size?: string;
 }
 
+const STATUS_LABELS: Record<ProductLibraryDisplayStatus, GeneratedAsset['status']> = {
+  GENERATING: '生成中',
+  FAILED: '生成失败',
+  PENDING_REVIEW_SCORE: '待审美评分',
+  ARCHIVED: '审核通过',
+  REJECTED: '已打回',
+};
+
+const TASK_TYPE_LABELS: Record<string, string> = {
+  PRODUCT_MAIN: '商品主图',
+  SCENE_DETAIL: '场景图',
+  DETAIL_SCENE: '场景图',
+  DETAIL_CLOSEUP: '细节图',
+  DETAIL: '细节图',
+  MODEL_TRIPLE_VIEW: '三视图',
+  ON_MODEL: '三视图',
+  VIDEO: '视频任务',
+  IMAGE: '图片任务',
+};
+
+const taskTypeLabel = (asset: ProductLibraryAsset) => {
+  const code = asset.imageType || asset.taskType || '';
+  if (TASK_TYPE_LABELS[code]) return TASK_TYPE_LABELS[code];
+  if (/[\u4e00-\u9fff]/.test(code)) return code;
+  return asset.mediaType === 'VIDEO' ? '视频任务' : '图片任务';
+};
+
+const EMPTY_ASSET: GeneratedAsset = {
+  id: '',
+  mediaType: 'IMAGE',
+  productId: '',
+  productName: '暂无素材',
+  sku: '—',
+  category: '—',
+  type: '图片',
+  taskType: '—',
+  style: '—',
+  scene: '—',
+  ratioDuration: '—',
+  channel: '—',
+  status: '生成中',
+  score: null,
+  promptVersion: '—',
+  cost: 0,
+  addedTime: '—',
+  thumbnail: '',
+  url: '',
+};
+
+const statusClass = (status: GeneratedAsset['status']) => {
+  if (status === '审核通过') return 'bg-emerald-50 text-emerald-600';
+  if (status === '待审美评分') return 'bg-amber-50 text-amber-600';
+  if (status === '生成中') return 'bg-blue-50 text-blue-600';
+  return 'bg-rose-50 text-rose-600';
+};
+
+const toGeneratedAsset = (asset: ProductLibraryAsset): GeneratedAsset => ({
+  id: asset.id,
+  mediaType: asset.mediaType,
+  productId: asset.productId ?? '',
+  productName: asset.productName || '未命名商品',
+  sku: asset.taskCode || asset.productId || '—',
+  category: asset.productCategory || '未分类',
+  type: asset.mediaType === 'VIDEO' ? '视频' : '图片',
+  taskType: taskTypeLabel(asset),
+  style: asset.style || '—',
+  scene: asset.scene || '—',
+  ratioDuration: asset.mediaType === 'VIDEO'
+    ? [asset.durationSec ? `${asset.durationSec}s` : '', asset.aspectRatio, asset.width && asset.height ? `${asset.width}x${asset.height}` : ''].filter(Boolean).join(' · ')
+    : [asset.aspectRatio, asset.width && asset.height ? `${asset.width}x${asset.height}` : ''].filter(Boolean).join(' · '),
+  channel: asset.modelChannelName || asset.channelType || '—',
+  status: STATUS_LABELS[asset.status],
+  rawStatus: asset.rawStatus,
+  score: asset.score ?? null,
+  promptVersion: asset.promptVersion || '—',
+  cost: asset.cost ?? 0,
+  addedTime: asset.createTime?.replace('T', ' ').slice(0, 16) || '—',
+  thumbnail: withCosThumbnail(asset.thumbnailUrl || asset.url, 480) || asset.thumbnailUrl || asset.url,
+  url: asset.url,
+  size: asset.width && asset.height ? `${asset.width} × ${asset.height}` : undefined,
+});
+
+const toProductAsset = (product: ProductLibraryProduct): ProductAsset => ({
+  id: product.id,
+  name: product.name,
+  sku: product.id,
+  category: (product.category || '智能硬件') as ProductAsset['category'],
+  imageCount: product.imageCount,
+  videoCount: product.videoCount,
+  thumbnail: withCosThumbnail(product.imageUrl, 640) || product.imageUrl || '',
+  addedTime: product.createTime?.replace('T', ' ').slice(0, 16) || '—',
+  specs: {
+    brand: '',
+    color: product.color ? [product.color] : [],
+    material: product.material || '',
+    weight: '',
+    sellingPoints: product.sellingPoints
+      ? product.sellingPoints.split(/[,，、\n]/).map((item) => item.trim()).filter(Boolean)
+      : [],
+  },
+  files: [],
+  fabric: product.material,
+  costDetails: {
+    totalCost: String(product.totalCost ?? 0),
+    avgCostPerPass: product.passedCount
+      ? String((product.totalCost / product.passedCount).toFixed(2))
+      : '0',
+  },
+});
+
 export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
-  products,
   selectedProduct,
   setSelectedProduct,
   isDrawerOpen,
@@ -83,6 +205,9 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
   const [selectedChannel, setSelectedChannel] = useState('全部模型通道');
   const [selectedStatus, setSelectedStatus] = useState('全部状态');
   const [creationTimeRange, setCreationTimeRange] = useState('不限时间');
+  const [assetPageNum, setAssetPageNum] = useState(1);
+  const [assetPageSize, setAssetPageSize] = useState(20);
+  const [productPageNum, setProductPageNum] = useState(1);
 
   // Sorting
   const [sortBy, setSortBy] = useState<'latest' | 'score' | 'cost'>('latest');
@@ -95,6 +220,10 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
   const [activeAssetId, setActiveAssetId] = useState<string>('a1');
   const [productDrawerTab, setProductDrawerTab] = useState<'overview' | 'input' | 'images' | 'videos' | 'reviews' | 'costs'>('overview');
   const [assetDrawerTab, setAssetDrawerTab] = useState<'overview' | 'source' | 'audit' | 'costs'>('overview');
+  const [drawerProductAssets, setDrawerProductAssets] = useState<GeneratedAsset[]>([]);
+  const [drawerProductReviews, setDrawerProductReviews] = useState<ProductLibraryReview[]>([]);
+  const [loadedAssetDetail, setLoadedAssetDetail] = useState<ProductLibraryAsset | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   // Expanded costs detail panel toggle inside Asset Drawer
   const [costCollapse, setCostCollapse] = useState(true);
@@ -103,209 +232,200 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [onlyShowPending, setOnlyShowPending] = useState(false);
 
-  // Rich, realistic mock assets for the generated grid & table
-  const generatedAssets: GeneratedAsset[] = useMemo(() => [
-    {
-      id: 'a1',
-      productId: 'p2', // Nike Air Max (mapped to 跑鞋 Phantom X for design match)
-      productName: '跑鞋 Phantom X',
-      sku: 'PROD-883920',
-      category: '运动鞋',
-      type: '图片',
-      taskType: '主图',
-      style: '运动风',
-      scene: '白底图',
-      ratioDuration: '3:4 · 1024x1365',
-      channel: 'Stable Diffusion',
-      status: '已通过',
-      score: 92,
-      promptVersion: 'V2.4',
-      cost: 12.40,
-      addedTime: '2023-10-25 14:28',
-      thumbnail: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80',
-      size: '1.9 MB'
-    },
-    {
-      id: 'a2',
-      productId: 'p2',
-      productName: '跑鞋 Phantom X',
-      sku: 'PROD-883920',
-      category: '运动鞋',
-      type: '视频',
-      taskType: '运动展示',
-      style: '运动风',
-      scene: '室内影棚',
-      ratioDuration: '15s · 9:16 · 1080p',
-      channel: 'Vidu 极速版',
-      status: '已通过',
-      score: 88,
-      promptVersion: 'V2.4',
-      cost: 42.00,
-      addedTime: '2023-10-25 14:30',
-      thumbnail: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&w=400&q=80',
-      size: '42.5 MB'
-    },
-    {
-      id: 'a3',
-      productId: 'p4', // Light knitwear / cardigan
-      productName: '复古针织开衫',
-      sku: 'PROD-772311',
-      category: '女装',
-      type: '图片',
-      taskType: '主图',
-      style: '复古风',
-      scene: '白底图',
-      ratioDuration: '3:4 · 1024x1365',
-      channel: 'SDXL 1.0',
-      status: '已通过',
-      score: 90,
-      promptVersion: 'V2.3',
-      cost: 12.40,
-      addedTime: '2023-10-25 13:15',
-      thumbnail: 'https://images.unsplash.com/photo-1544923246-77307dd654cb?auto=format&fit=crop&w=400&q=80',
-      size: '2.1 MB'
-    },
-    {
-      id: 'a4',
-      productId: 'p3', // Makeup or dress floral
-      productName: '碎花连衣裙',
-      sku: 'PROD-661122',
-      category: '女装',
-      type: '图片',
-      taskType: '场景图',
-      style: '清新风',
-      scene: '花园',
-      ratioDuration: '3:4 · 1024x1365',
-      channel: 'Midjourney v6',
-      status: '待审核',
-      score: null,
-      promptVersion: 'V2.4',
-      cost: 12.40,
-      addedTime: '2023-10-25 12:50',
-      thumbnail: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=400&q=80',
-      size: '3.3 MB'
-    },
-    {
-      id: 'a5',
-      productId: 'p1', // Smart watch
-      productName: '智能运动手表 V3',
-      sku: 'PROD-554433',
-      category: '数码配件',
-      type: '图片',
-      taskType: '主图',
-      style: '科技风',
-      scene: '白底图',
-      ratioDuration: '3:4 · 1024x1365',
-      channel: 'SDXL 1.0',
-      status: '已通过',
-      score: 85,
-      promptVersion: 'V2.3',
-      cost: 12.40,
-      addedTime: '2023-10-25 11:30',
-      thumbnail: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80',
-      size: '1.8 MB'
-    },
-    {
-      id: 'a6',
-      productId: 'p1',
-      productName: '智能运动手表 V3',
-      sku: 'PROD-554433',
-      category: '数码配件',
-      type: '视频',
-      taskType: '功能展示',
-      style: '科技风',
-      scene: '办公室',
-      ratioDuration: '15s · 9:16 · 1080p',
-      channel: 'Runway Gen-V',
-      status: '已通过',
-      score: 86,
-      promptVersion: 'V2.4',
-      cost: 42.00,
-      addedTime: '2023-10-25 11:28',
-      thumbnail: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=400&q=80',
-      size: '38.0 MB'
-    },
-    {
-      id: 'a7',
-      productId: 'p4',
-      productName: '轻薄羽绒服',
-      sku: 'PROD-339912',
-      category: '女装',
-      type: '图片',
-      taskType: '主图',
-      style: '简约风',
-      scene: '白底图',
-      ratioDuration: '3:4 · 1024x1365',
-      channel: 'Stable Diffusion',
-      status: '废弃',
-      score: null,
-      promptVersion: 'V2.2',
-      cost: 0.00,
-      addedTime: '2023-10-25 10:20',
-      thumbnail: 'https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?auto=format&fit=crop&w=400&q=80',
-      size: '2.4 MB'
-    },
-    {
-      id: 'a8',
-      productId: 'p4',
-      productName: '简约托特包',
-      sku: 'PROD-229811',
-      category: '箱包',
-      type: '图片',
-      taskType: '主图',
-      style: '简约风',
-      scene: '白底图',
-      ratioDuration: '3:4 · 1024x1365',
-      channel: 'Midjourney v6',
-      status: '已通过',
-      score: 83,
-      promptVersion: 'V2.3',
-      cost: 12.40,
-      addedTime: '2023-10-24 16:45',
-      thumbnail: 'https://images.unsplash.com/photo-1544923246-77307dd654cb?auto=format&fit=crop&w=400&q=80',
-      size: '2.2 MB'
-    },
-    {
-      id: 'a9',
-      productId: 'p2',
-      productName: '跑鞋 Phantom X',
-      sku: 'PROD-883920',
-      category: '运动鞋',
-      type: '视频',
-      taskType: '街头穿搭',
-      style: '运动风',
-      scene: '街头',
-      ratioDuration: '15s · 9:16 · 1080p',
-      channel: 'Pika 1.0',
-      status: '待审核',
-      score: null,
-      promptVersion: 'V2.3',
-      cost: 42.00,
-      addedTime: '2023-10-24 15:50',
-      thumbnail: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80',
-      size: '41.1 MB'
-    },
-    {
-      id: 'a10',
-      productId: 'p2',
-      productName: '篮球专业版',
-      sku: 'PROD-118733',
-      category: '运动器材',
-      type: '图片',
-      taskType: '主图',
-      style: '运动风',
-      scene: '白底图',
-      ratioDuration: '1:1 · 1024x1024',
-      channel: 'SDXL 1.0',
-      status: '已通过',
-      score: 87,
-      promptVersion: 'V2.3',
-      cost: 12.40,
-      addedTime: '2023-10-24 15:20',
-      thumbnail: 'https://images.unsplash.com/photo-1483168527879-c66136b56105?auto=format&fit=crop&w=400&q=80',
-      size: '1.2 MB'
+  const apiStatus: ProductLibraryDisplayStatus | undefined = onlyShowPending
+    ? 'PENDING_REVIEW_SCORE'
+    : selectedStatus === '生成中' ? 'GENERATING'
+      : selectedStatus === '生成失败' ? 'FAILED'
+        : selectedStatus === '待审美评分' ? 'PENDING_REVIEW_SCORE'
+          : selectedStatus === '审核通过' ? 'ARCHIVED'
+            : selectedStatus === '已打回' ? 'REJECTED'
+              : undefined;
+  const creationStartTime = useMemo(() => {
+    const days = creationTimeRange === '近7天' ? 7
+      : creationTimeRange === '近30天' ? 30
+        : creationTimeRange === '近90天' ? 90
+          : 0;
+    if (!days) return undefined;
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toISOString().slice(0, 19);
+  }, [creationTimeRange]);
+
+  const statisticsQuery = useServiceQuery(() => productLibraryApi.statistics(), []);
+  const productPageQuery = useServiceQuery(
+    () => productLibraryApi.productPage({
+      pageNum: productPageNum,
+      pageSize: 20,
+      keyword: searchQuery || undefined,
+      category: selectedCategory === '全部品类' ? undefined : selectedCategory,
+      sortBy,
+    }),
+    [productPageNum, searchQuery, selectedCategory, sortBy],
+  );
+  const assetPageQuery = useServiceQuery(
+    () => productLibraryApi.assetPage({
+      pageNum: assetPageNum,
+      pageSize: assetPageSize,
+      keyword: searchQuery || undefined,
+      category: selectedCategory === '全部品类' ? undefined : selectedCategory,
+      mediaType: selectedAssetType === '图片' ? 'IMAGE' : selectedAssetType === '视频' ? 'VIDEO' : undefined,
+      archivedOnly: selectedAssetType === '废弃' || undefined,
+      taskType: selectedTaskType === '全部任务' ? undefined : selectedTaskType,
+      style: selectedStyle === '全部风格' ? undefined : selectedStyle,
+      scene: selectedScene === '全部场景' ? undefined : selectedScene,
+      channelType: selectedChannel === '全部模型通道' ? undefined : selectedChannel,
+      status: apiStatus,
+      startTime: creationStartTime,
+      sortBy,
+    }),
+    [
+      searchQuery,
+      assetPageNum,
+      assetPageSize,
+      selectedCategory,
+      selectedAssetType,
+      selectedTaskType,
+      selectedStyle,
+      selectedScene,
+      selectedChannel,
+      apiStatus,
+      creationStartTime,
+      sortBy,
+    ],
+  );
+
+  const products = useMemo(
+    () => productPageQuery.data?.list.map(toProductAsset) ?? [],
+    [productPageQuery.data],
+  );
+  const statistics = statisticsQuery.data;
+  const productSummaries = useMemo(
+    () => new Map((productPageQuery.data?.list ?? []).map((product) => [product.id, product])),
+    [productPageQuery.data],
+  );
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(products.map((product) => product.category).filter(Boolean))),
+    [products],
+  );
+
+  useEffect(() => {
+    setAssetPageNum(1);
+    setProductPageNum(1);
+  }, [
+    searchQuery,
+    selectedCategory,
+    selectedAssetType,
+    selectedTaskType,
+    selectedStyle,
+    selectedScene,
+    selectedChannel,
+    selectedStatus,
+    onlyShowPending,
+    sortBy,
+  ]);
+
+  useEffect(() => {
+    if (!productPageQuery.data || products.length === 0) return;
+    if (!products.some((product) => product.id === selectedProduct.id)) {
+      setSelectedProduct(products[0]);
     }
-  ], []);
+  }, [productPageQuery.data, products, selectedProduct.id, setSelectedProduct]);
+
+  useEffect(() => {
+    if (!isDrawerOpen || drawerType !== 'product' || !selectedProduct.id) return;
+    setDrawerProductAssets([]);
+    setDrawerProductReviews([]);
+    let active = true;
+    productLibraryApi.productDetail(selectedProduct.id)
+      .then((detail) => {
+        if (!active) return;
+        const base = toProductAsset(detail);
+        setDrawerProductAssets([...detail.generatedImages, ...detail.generatedVideos]
+          .map(toGeneratedAsset)
+          .sort((left, right) => right.addedTime.localeCompare(left.addedTime)));
+        setDrawerProductReviews(detail.reviews ?? []);
+        setSelectedProduct({
+          ...base,
+          files: detail.inputAssets.map((asset) => ({
+            id: asset.id,
+            name: asset.name,
+            url: withCosThumbnail(asset.thumbnailUrl || asset.url, 480) || asset.thumbnailUrl || asset.url,
+            size: asset.fileSize ? `${(asset.fileSize / 1024 / 1024).toFixed(2)} MB` : '—',
+            type: asset.mediaType === 'VIDEO' ? 'video' : 'image',
+          })),
+          originalImages: detail.inputAssets
+            .filter((asset) => asset.mediaType === 'IMAGE')
+            .map((asset) => ({
+              name: asset.name,
+              url: withCosThumbnail(asset.thumbnailUrl || asset.url, 480) || asset.thumbnailUrl || asset.url,
+            })),
+          passedImages: detail.generatedImages
+            .filter((asset) => asset.status === 'ARCHIVED')
+            .map((asset) => ({
+              id: asset.id,
+              url: withCosThumbnail(asset.thumbnailUrl || asset.url, 480) || asset.thumbnailUrl || asset.url,
+              date: asset.createTime || '',
+              score: asset.score || 0,
+            })),
+          passedVideos: detail.generatedVideos
+            .filter((asset) => asset.status === 'ARCHIVED')
+            .map((asset) => ({
+              id: asset.id,
+              url: asset.url,
+              date: asset.createTime || '',
+              coverUrl: withCosThumbnail(asset.thumbnailUrl || asset.url, 480) || asset.thumbnailUrl || asset.url,
+            })),
+          abandonedImages: detail.generatedImages
+            .filter((asset) => asset.status === 'REJECTED' || asset.rawStatus === 'ARCHIVED')
+            .map((asset) => ({
+              id: asset.id,
+              url: withCosThumbnail(asset.thumbnailUrl || asset.url, 480) || asset.thumbnailUrl || asset.url,
+              reason: asset.rejectReason || '已归档',
+            })),
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [isDrawerOpen, drawerType, selectedProduct.id, setSelectedProduct]);
+
+  const handleArchiveSelected = async () => {
+    const assets = generatedAssets
+      .filter((asset) => selectedAssetIds.includes(asset.id))
+      .map((asset) => ({ id: asset.id, mediaType: asset.mediaType }));
+    if (assets.length === 0) {
+      toast.warning('请先选择需要归档的素材');
+      return;
+    }
+    const affected = await productLibraryApi.archiveBatch(assets);
+    toast.success(`已归档 ${affected} 个素材`);
+    setSelectedAssetIds([]);
+    assetPageQuery.refetch();
+    statisticsQuery.refetch();
+    productPageQuery.refetch();
+  };
+
+  const generatedAssets = useMemo(
+    () => assetPageQuery.data?.list.map(toGeneratedAsset) ?? [],
+    [assetPageQuery.data],
+  );
+  const taskTypeOptions = useMemo(
+    () => Array.from(new Set(generatedAssets.map((asset) => asset.taskType).filter((value) => value !== '—'))),
+    [generatedAssets],
+  );
+  const styleOptions = useMemo(
+    () => Array.from(new Set(generatedAssets.map((asset) => asset.style).filter((value) => value !== '—'))),
+    [generatedAssets],
+  );
+  const sceneOptions = useMemo(
+    () => Array.from(new Set(generatedAssets.map((asset) => asset.scene).filter((value) => value !== '—'))),
+    [generatedAssets],
+  );
+  const channelOptions = useMemo(
+    () => Array.from(new Set(generatedAssets.map((asset) => asset.channel).filter((value) => value !== '—'))),
+    [generatedAssets],
+  );
 
   // Filtered Assets list based on selected controls
   const filteredAssets = useMemo(() => {
@@ -326,7 +446,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
       // 3. Asset Type Filter (from subtabs & segmented controls)
       if (selectedAssetType === '图片' && asset.type !== '图片') return false;
       if (selectedAssetType === '视频' && asset.type !== '视频') return false;
-      if (selectedAssetType === '废弃' && asset.status !== '废弃') return false;
+      if (selectedAssetType === '废弃' && asset.rawStatus !== 'ARCHIVED') return false;
 
       // 4. Task Type Filter
       if (selectedTaskType !== '全部任务' && asset.taskType !== selectedTaskType) return false;
@@ -342,13 +462,11 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
 
       // 8. Status Filter
       if (selectedStatus !== '全部状态') {
-        if (selectedStatus === '已通过' && asset.status !== '已通过') return false;
-        if (selectedStatus === '待审核' && asset.status !== '待审核') return false;
-        if (selectedStatus === '废弃' && asset.status !== '废弃') return false;
+        if (asset.status !== selectedStatus) return false;
       }
 
       // 9. Batch Filter Option
-      if (onlyShowPending && asset.status !== '待审核') return false;
+      if (onlyShowPending && asset.status !== '待审美评分') return false;
 
       return true;
     }).sort((a, b) => {
@@ -363,9 +481,40 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
   }, [generatedAssets, searchQuery, selectedCategory, selectedAssetType, selectedTaskType, selectedStyle, selectedScene, selectedChannel, selectedStatus, onlyShowPending, sortBy]);
 
   // Selected Active Asset model
+  const knownAssets = useMemo(
+    () => [...drawerProductAssets, ...generatedAssets],
+    [drawerProductAssets, generatedAssets],
+  );
   const activeAsset = useMemo(() => {
-    return generatedAssets.find(a => a.id === activeAssetId) || generatedAssets[0];
-  }, [generatedAssets, activeAssetId]);
+    return knownAssets.find(a => a.id === activeAssetId) || generatedAssets[0] || EMPTY_ASSET;
+  }, [knownAssets, generatedAssets, activeAssetId]);
+  const activeAssetData = useMemo(
+    () => assetPageQuery.data?.list.find((asset) => asset.id === activeAsset.id)
+      ?? (loadedAssetDetail?.id === activeAsset.id ? loadedAssetDetail : undefined),
+    [assetPageQuery.data, activeAsset.id, loadedAssetDetail],
+  );
+  const activeAssetProduct = products.find((product) => product.id === activeAsset.productId);
+  const selectedProductSummary = productSummaries.get(selectedProduct.id);
+  const selectedProductAssets = useMemo(
+    () => drawerProductAssets.length > 0
+      ? drawerProductAssets
+      : generatedAssets.filter((asset) => asset.productId === selectedProduct.id),
+    [drawerProductAssets, generatedAssets, selectedProduct.id],
+  );
+  const latestProductAsset = selectedProductAssets[0];
+
+  useEffect(() => {
+    if (!isDrawerOpen || drawerType !== 'asset' || !activeAsset.id) return;
+    let active = true;
+    productLibraryApi.assetDetail(activeAsset.mediaType, activeAsset.id)
+      .then((detail) => {
+        if (active) setLoadedAssetDetail(detail);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [isDrawerOpen, drawerType, activeAsset.id, activeAsset.mediaType]);
 
   // Handle asset click
   const handleSelectAsset = (assetId: string) => {
@@ -429,8 +578,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
           <div>
             <span className="text-[10px] font-bold text-slate-400 block tracking-wider uppercase">商品资产数</span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-lg font-extrabold text-slate-800 font-mono">1,248</span>
-              <span className="text-[10px] font-semibold text-emerald-500">+12% ↑</span>
+              <span className="text-lg font-extrabold text-slate-800 font-mono">{statistics?.productCount ?? 0}</span>
             </div>
           </div>
         </div>
@@ -442,8 +590,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
           <div>
             <span className="text-[10px] font-bold text-slate-400 block tracking-wider uppercase">图片归档数</span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-lg font-extrabold text-slate-800 font-mono">8,592</span>
-              <span className="text-[10px] font-semibold text-emerald-500">+5% ↑</span>
+              <span className="text-lg font-extrabold text-slate-800 font-mono">{statistics?.imageCount ?? 0}</span>
             </div>
           </div>
         </div>
@@ -455,8 +602,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
           <div>
             <span className="text-[10px] font-bold text-slate-400 block tracking-wider uppercase">视频归档数</span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-lg font-extrabold text-slate-800 font-mono">426</span>
-              <span className="text-[10px] font-semibold text-emerald-500">+18% ↑</span>
+              <span className="text-lg font-extrabold text-slate-800 font-mono">{statistics?.videoCount ?? 0}</span>
             </div>
           </div>
         </div>
@@ -466,10 +612,9 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
             <Clock className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            <span className="text-[10px] font-bold text-slate-400 block tracking-wider uppercase">待审核素材</span>
+            <span className="text-[10px] font-bold text-slate-400 block tracking-wider uppercase">待审美评分</span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-lg font-extrabold text-slate-800 font-mono">138</span>
-              <span className="text-[10px] font-semibold text-emerald-500">+3% ↑</span>
+              <span className="text-lg font-extrabold text-slate-800 font-mono">{statistics?.pendingReviewCount ?? 0}</span>
             </div>
           </div>
         </div>
@@ -481,8 +626,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
           <div>
             <span className="text-[10px] font-bold text-slate-400 block tracking-wider uppercase">高分素材数 (&gt;85)</span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-lg font-extrabold text-slate-800 font-mono">3,104</span>
-              <span className="text-[10px] font-semibold text-emerald-500">+2% ↑</span>
+              <span className="text-lg font-extrabold text-slate-800 font-mono">{statistics?.highScoreCount ?? 0}</span>
             </div>
           </div>
         </div>
@@ -492,10 +636,9 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
             <Trash2 className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] font-bold text-slate-400 block tracking-wider uppercase">废弃素材数</span>
+            <span className="text-[10px] font-bold text-slate-400 block tracking-wider uppercase">归档素材数</span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-lg font-extrabold text-slate-800 font-mono">1,824</span>
-              <span className="text-[10px] font-semibold text-rose-500">-4% ↓</span>
+              <span className="text-lg font-extrabold text-slate-800 font-mono">{statistics?.archivedCount ?? 0}</span>
             </div>
           </div>
         </div>
@@ -527,12 +670,9 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
               className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2 rounded-lg text-slate-700"
             >
               <option value="全部品类">全部品类</option>
-              <option value="运动鞋">运动鞋</option>
-              <option value="女装">女装</option>
-              <option value="数码配件">数码配件</option>
-              <option value="箱包">箱包</option>
-              <option value="运动器材">运动器材</option>
-              <option value="男装">男装</option>
+              {categoryOptions.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
             </select>
           </div>
 
@@ -563,12 +703,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
               className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2 rounded-lg text-slate-700"
             >
               <option value="全部任务">全部任务</option>
-              <option value="主图">主图</option>
-              <option value="场景图">场景图</option>
-              <option value="细节图">细节图</option>
-              <option value="运动展示">运动展示</option>
-              <option value="功能展示">功能展示</option>
-              <option value="街头穿搭">街头穿搭</option>
+              {taskTypeOptions.map((taskType) => <option key={taskType} value={taskType}>{taskType}</option>)}
             </select>
           </div>
         </div>
@@ -583,11 +718,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
               className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2 rounded-lg text-slate-700"
             >
               <option value="全部风格">全部风格</option>
-              <option value="运动风">运动风</option>
-              <option value="复古风">复古风</option>
-              <option value="清新风">清新风</option>
-              <option value="科技风">科技风</option>
-              <option value="简约风">简约风</option>
+              {styleOptions.map((style) => <option key={style} value={style}>{style}</option>)}
             </select>
           </div>
 
@@ -599,11 +730,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
               className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2 rounded-lg text-slate-700"
             >
               <option value="全部场景">全部场景</option>
-              <option value="白底图">白底图</option>
-              <option value="室内影棚">室内影棚</option>
-              <option value="花园">花园</option>
-              <option value="办公室">办公室</option>
-              <option value="街头">街头</option>
+              {sceneOptions.map((scene) => <option key={scene} value={scene}>{scene}</option>)}
             </select>
           </div>
 
@@ -615,35 +742,38 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
               className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2 rounded-lg text-slate-700"
             >
               <option value="全部模型通道">全部模型通道</option>
-              <option value="Stable Diffusion">Stable Diffusion</option>
-              <option value="Vidu 极速版">Vidu 极速版</option>
-              <option value="SDXL 1.0">SDXL 1.0</option>
-              <option value="Midjourney v6">Midjourney v6</option>
-              <option value="Runway Gen-V">Runway Gen-V</option>
-              <option value="Pika 1.0">Pika 1.0</option>
+              {channelOptions.map((channel) => <option key={channel} value={channel}>{channel}</option>)}
             </select>
           </div>
 
           <div>
-            <label className="text-[10px] font-bold text-slate-400 block mb-1">归档状态</label>
+            <label className="text-[10px] font-bold text-slate-400 block mb-1">任务状态</label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2 rounded-lg text-slate-700"
             >
               <option value="全部状态">全部状态</option>
-              <option value="已通过">已通过</option>
-              <option value="待审核">待审核</option>
-              <option value="废弃">废弃</option>
+              <option value="生成中">生成中</option>
+              <option value="生成失败">生成失败</option>
+              <option value="待审美评分">待审美评分</option>
+              <option value="审核通过">审核通过</option>
+              <option value="已打回">已打回</option>
             </select>
           </div>
 
           <div className="col-span-2 md:col-span-1">
             <label className="text-[10px] font-bold text-slate-400 block mb-1">创建时间</label>
-            <div className="flex bg-slate-50 border border-slate-200 text-xs px-3 py-2 rounded-lg text-slate-700 items-center justify-between cursor-pointer">
-              <span className="truncate">{creationTimeRange}</span>
-              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
-            </div>
+            <select
+              value={creationTimeRange}
+              onChange={(event) => setCreationTimeRange(event.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2 rounded-lg text-slate-700"
+            >
+              <option value="不限时间">不限时间</option>
+              <option value="近7天">近7天</option>
+              <option value="近30天">近30天</option>
+              <option value="近90天">近90天</option>
+            </select>
           </div>
         </div>
       </div>
@@ -658,7 +788,10 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                 批量导出
                 <ChevronDown className="w-3 h-3" />
               </button>
-              <button className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition-all">
+              <button
+                onClick={handleArchiveSelected}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition-all"
+              >
                 批量归档
               </button>
               <button
@@ -669,7 +802,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                仅看待审核
+                仅看待审美评分
               </button>
             </div>
           ) : viewMode === 'grid' ? (
@@ -698,7 +831,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
         {/* View Selection Segment (Matches Mock perfectly) */}
         <div className="flex items-center gap-4 ml-auto">
           {viewMode === 'grid' && (
-            <span className="text-[11px] text-slate-400 font-medium">共 12,846 个素材</span>
+            <span className="text-[11px] text-slate-400 font-medium">共 {assetPageQuery.data?.total ?? 0} 个素材</span>
           )}
 
           <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
@@ -765,6 +898,16 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
 
       {/* 5. Central Views Block */}
       <div className="grid grid-cols-1 gap-5">
+        {(assetPageQuery.loading || productPageQuery.loading) && (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
+            正在加载商品素材库真实数据…
+          </div>
+        )}
+        {(assetPageQuery.error || productPageQuery.error || statisticsQuery.error) && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
+            商品素材库接口加载失败，请确认后端已启动并执行本次数据库/代码更新。
+          </div>
+        )}
         
         {/* VIEW 1: 表格视图 (Table View - Matches Screenshot 1) */}
         {viewMode === 'table' && (
@@ -829,7 +972,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                               <img
                                 src={asset.thumbnail}
                                 alt={asset.productName}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                                 referrerPolicy="no-referrer"
                               />
                               {asset.type === '视频' && (
@@ -859,13 +1002,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                           <td className="py-3 px-3 font-mono text-[10px] text-slate-500">{asset.ratioDuration}</td>
                           <td className="py-3 px-3 font-medium text-slate-600">{asset.channel}</td>
                           <td className="py-3 px-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                              asset.status === '已通过'
-                                ? 'bg-emerald-50 text-emerald-600'
-                                : asset.status === '待审核'
-                                ? 'bg-amber-50 text-amber-600 animate-pulse'
-                                : 'bg-slate-100 text-slate-500'
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${statusClass(asset.status)}`}>
                               {asset.status}
                             </span>
                           </td>
@@ -884,9 +1021,15 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                             >
                               查看详情
                             </button>
-                            <button className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                            <a
+                              href={asset.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              download
+                              className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                            >
                               下载
-                            </button>
+                            </a>
                           </td>
                         </tr>
                       );
@@ -899,42 +1042,39 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
             {/* Pagination Footer */}
             <div className="bg-slate-50 px-4 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 select-none">
               <div>
-                共 1,248 条
+                共 {assetPageQuery.data?.total ?? 0} 条
               </div>
               <div className="flex items-center gap-1.5">
-                <button className="w-7 h-7 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded flex items-center justify-center cursor-pointer transition-all">
+                <button
+                  disabled={assetPageNum <= 1}
+                  onClick={() => setAssetPageNum((page) => Math.max(1, page - 1))}
+                  className="w-7 h-7 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded flex items-center justify-center cursor-pointer transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                >
                   &lt;
                 </button>
                 <button className="w-7 h-7 bg-blue-600 text-white font-bold rounded flex items-center justify-center">
-                  1
+                  {assetPageNum}
                 </button>
-                <button className="w-7 h-7 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded flex items-center justify-center cursor-pointer transition-all">
-                  2
-                </button>
-                <button className="w-7 h-7 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded flex items-center justify-center cursor-pointer transition-all">
-                  3
-                </button>
-                <button className="w-7 h-7 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded flex items-center justify-center cursor-pointer transition-all">
-                  4
-                </button>
-                <button className="w-7 h-7 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded flex items-center justify-center cursor-pointer transition-all">
-                  5
-                </button>
-                <span className="px-1 text-slate-400">...</span>
-                <button className="w-7 h-7 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded flex items-center justify-center cursor-pointer transition-all">
-                  63
-                </button>
-                <button className="w-7 h-7 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded flex items-center justify-center cursor-pointer transition-all">
+                <span className="px-1 text-slate-400">/ {Math.max(assetPageQuery.data?.pages ?? 1, 1)}</span>
+                <button
+                  disabled={assetPageNum >= Math.max(assetPageQuery.data?.pages ?? 1, 1)}
+                  onClick={() => setAssetPageNum((page) => page + 1)}
+                  className="w-7 h-7 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded flex items-center justify-center cursor-pointer transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                >
                   &gt;
                 </button>
 
-                <select className="bg-white border border-slate-200 text-slate-600 rounded py-0.5 px-1.5 font-semibold text-xs ml-2">
-                  <option>20 条/页</option>
-                  <option>50 条/页</option>
+                <select
+                  value={assetPageSize}
+                  onChange={(event) => {
+                    setAssetPageSize(Number(event.target.value));
+                    setAssetPageNum(1);
+                  }}
+                  className="bg-white border border-slate-200 text-slate-600 rounded py-0.5 px-1.5 font-semibold text-xs ml-2"
+                >
+                  <option value={20}>20 条/页</option>
+                  <option value={50}>50 条/页</option>
                 </select>
-                <span className="ml-1.5">跳转至</span>
-                <input type="text" defaultValue="1" className="w-8 text-center border border-slate-200 bg-white text-slate-700 py-0.5 rounded text-xs" />
-                <span>页</span>
               </div>
             </div>
           </div>
@@ -942,13 +1082,14 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
 
         {/* VIEW 2: 商品卡片视图 (Product Card View - Matches Screenshot 2) */}
         {viewMode === 'card' && (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {products.map((p) => {
-              // Map mock data properties cleanly or use defaults
               const isSelected = selectedProduct.id === p.id && isDrawerOpen && drawerType === 'product';
-              const latestStatus = p.id === 'p1' ? '生成中' : p.id === 'p3' ? '审核中' : '已通过';
-              const cumulativeCost = p.id === 'p1' ? '86.20' : p.id === 'p2' ? '112.40' : p.id === 'p3' ? '68.30' : '54.60';
-              const topScore = p.id === 'p1' ? '88分' : p.id === 'p2' ? '92分' : p.id === 'p3' ? '90分' : '85分';
+              const summary = productSummaries.get(p.id);
+              const latestStatus = summary ? STATUS_LABELS[summary.latestStatus] : '生成中';
+              const cumulativeCost = (summary?.totalCost ?? 0).toFixed(2);
+              const topScore = summary?.highestScore == null ? '—' : `${summary.highestScore}分`;
 
               return (
                 <div
@@ -977,7 +1118,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                     <img
                       src={p.thumbnail}
                       alt={p.name}
-                      className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+                      className="w-full h-full object-contain group-hover:scale-103 transition-transform duration-300"
                       referrerPolicy="no-referrer"
                     />
                     <span className="absolute bottom-2 left-2 bg-black/60 text-white backdrop-blur-xs text-[9px] font-bold px-2 py-0.5 rounded-sm">
@@ -994,37 +1135,59 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
 
                     <div className="grid grid-cols-3 gap-1 bg-slate-50/70 p-1.5 rounded-lg border border-slate-100 mt-3 text-center text-[10px] text-slate-500">
                       <div>
-                        <div className="font-bold text-slate-700 text-xs">{p.id === 'p1' ? 18 : p.id === 'p2' ? 32 : 24}</div>
-                        <div>通过图片</div>
+                        <div className="font-bold text-slate-700 text-xs">{summary?.passedCount ?? 0}</div>
+                        <div>审核通过素材</div>
                       </div>
                       <div className="border-x border-slate-150">
-                        <div className="font-bold text-slate-700 text-xs">{p.id === 'p1' ? 2 : p.id === 'p2' ? 5 : 3}</div>
-                        <div>通过视频</div>
+                        <div className="font-bold text-slate-700 text-xs">{summary?.videoCount ?? 0}</div>
+                        <div>生成视频</div>
                       </div>
                       <div>
-                        <div className="font-bold text-slate-700 text-xs">{p.id === 'p1' ? 6 : p.id === 'p2' ? 9 : 5}</div>
-                        <div>废弃素材</div>
+                        <div className="font-bold text-slate-700 text-xs">{summary?.rejectedCount ?? 0}</div>
+                        <div>已打回</div>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] pt-3 mt-3 border-t border-slate-100 text-slate-400 font-semibold">
                       <span>最高评分 <span className="text-amber-500 font-bold">{topScore}</span></span>
-                      <span>最新状态 <span className={`font-bold ${latestStatus === '生成中' ? 'text-blue-500' : latestStatus === '审核中' ? 'text-amber-500' : 'text-emerald-500'}`}>● {latestStatus}</span></span>
+                      <span>最新状态 <span className={`font-bold ${latestStatus === '生成中' ? 'text-blue-500' : latestStatus === '待审美评分' ? 'text-amber-500' : latestStatus === '审核通过' ? 'text-emerald-500' : 'text-rose-500'}`}>● {latestStatus}</span></span>
                       <span>累计成本 <span className="text-slate-800 font-bold font-mono">¥ {cumulativeCost}</span></span>
                     </div>
 
                     <div className="text-[9px] text-slate-300 font-mono mt-2 text-right">
-                      更新时间: 2023-10-25 14:30
+                      更新时间: {summary?.latestGeneratedTime?.replace('T', ' ').slice(0, 16) || p.addedTime}
                     </div>
                   </div>
                 </div>
               );
             })}
           </div>
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+            <span>共 {productPageQuery.data?.total ?? 0} 个商品</span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={productPageNum <= 1}
+                onClick={() => setProductPageNum((page) => Math.max(1, page - 1))}
+                className="rounded border border-slate-200 px-3 py-1.5 disabled:opacity-40"
+              >
+                上一页
+              </button>
+              <span>{productPageNum} / {Math.max(productPageQuery.data?.pages ?? 1, 1)}</span>
+              <button
+                disabled={productPageNum >= Math.max(productPageQuery.data?.pages ?? 1, 1)}
+                onClick={() => setProductPageNum((page) => page + 1)}
+                className="rounded border border-slate-200 px-3 py-1.5 disabled:opacity-40"
+              >
+                下一页
+              </button>
+            </div>
+          </div>
+          </>
         )}
 
         {/* VIEW 3: 素材网格视图 (Asset Grid View - Matches Screenshot 3) */}
         {viewMode === 'grid' && (
+          <>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filteredAssets.map((asset) => {
               const isSelected = activeAssetId === asset.id && isDrawerOpen && drawerType === 'asset';
@@ -1052,7 +1215,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                     <img
                       src={asset.thumbnail}
                       alt={asset.productName}
-                      className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+                      className="w-full h-full object-contain group-hover:scale-103 transition-transform duration-300"
                       referrerPolicy="no-referrer"
                     />
 
@@ -1066,9 +1229,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         </div>
                         {/* Video timing info bar */}
                         <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white py-1 px-2 flex items-center justify-between text-[9px] font-semibold font-mono">
-                          <span>15s</span>
-                          <span>9:16</span>
-                          <span>1080p</span>
+                          {asset.ratioDuration.split('·').map((value) => <span key={value}>{value.trim()}</span>)}
                         </div>
                       </>
                     )}
@@ -1087,11 +1248,13 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         <span className="font-bold text-slate-700 font-mono">{asset.score !== null ? `${asset.score}分` : '待审'}</span>
                       </div>
                       <span className={`font-bold ${
-                        asset.status === '已通过'
+                        asset.status === '审核通过'
                           ? 'text-emerald-500'
-                          : asset.status === '待审核'
+                          : asset.status === '待审美评分'
                           ? 'text-amber-500'
-                          : 'text-rose-500'
+                          : asset.status === '生成中'
+                            ? 'text-blue-500'
+                            : 'text-rose-500'
                       }`}>
                         ● {asset.status}
                       </span>
@@ -1106,6 +1269,15 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
               );
             })}
           </div>
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+            <span>共 {assetPageQuery.data?.total ?? 0} 个素材</span>
+            <div className="flex items-center gap-2">
+              <button disabled={assetPageNum <= 1} onClick={() => setAssetPageNum((page) => Math.max(1, page - 1))} className="rounded border border-slate-200 px-3 py-1.5 disabled:opacity-40">上一页</button>
+              <span>{assetPageNum} / {Math.max(assetPageQuery.data?.pages ?? 1, 1)}</span>
+              <button disabled={assetPageNum >= Math.max(assetPageQuery.data?.pages ?? 1, 1)} onClick={() => setAssetPageNum((page) => page + 1)} className="rounded border border-slate-200 px-3 py-1.5 disabled:opacity-40">下一页</button>
+            </div>
+          </div>
+          </>
         )}
       </div>
 
@@ -1126,7 +1298,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                 <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-lg overflow-hidden bg-slate-100 border border-slate-200/60">
-                      <img src={selectedProduct.thumbnail} alt={selectedProduct.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={selectedProduct.thumbnail} alt={selectedProduct.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                     </div>
                     <div>
                       <h3 className="text-sm font-extrabold text-[#0B1C30] flex items-center gap-1.5">
@@ -1181,24 +1353,24 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                       {/* Grid Stats Block */}
                       <div className="grid grid-cols-5 gap-2 text-center bg-slate-50/80 p-3 rounded-xl border border-slate-100">
                         <div>
-                          <p className="text-base font-bold text-slate-800 font-mono">1</p>
+                          <p className="text-base font-bold text-slate-800 font-mono">{selectedProduct.files.length}</p>
                           <p className="text-[9px] text-slate-400 mt-0.5">商品原图</p>
                         </div>
                         <div className="border-l border-slate-150">
-                          <p className="text-base font-bold text-slate-800 font-mono">0</p>
+                          <p className="text-base font-bold text-slate-800 font-mono">{selectedProduct.compositeImages?.length ?? 0}</p>
                           <p className="text-[9px] text-slate-400 mt-0.5">合成套图</p>
                         </div>
                         <div className="border-l border-slate-150">
-                          <p className="text-base font-bold text-slate-800 font-mono">18</p>
+                          <p className="text-base font-bold text-slate-800 font-mono">{selectedProduct.passedImages?.length ?? 0}</p>
                           <p className="text-[9px] text-slate-400 mt-0.5">通过图片</p>
                         </div>
                         <div className="border-l border-slate-150">
-                          <p className="text-base font-bold text-slate-800 font-mono">2</p>
+                          <p className="text-base font-bold text-slate-800 font-mono">{selectedProduct.passedVideos?.length ?? 0}</p>
                           <p className="text-[9px] text-slate-400 mt-0.5">通过视频</p>
                         </div>
                         <div className="border-l border-slate-150">
-                          <p className="text-base font-bold text-slate-800 font-mono">6</p>
-                          <p className="text-[9px] text-slate-400 mt-0.5">废弃素材</p>
+                          <p className="text-base font-bold text-slate-800 font-mono">{selectedProduct.abandonedImages?.length ?? 0}</p>
+                          <p className="text-[9px] text-slate-400 mt-0.5">已打回/归档</p>
                         </div>
                       </div>
 
@@ -1206,11 +1378,15 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-slate-50 border border-slate-150 rounded-lg p-3">
                           <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">最新 Prompt</span>
-                          <span className="font-bold text-slate-700 block mt-1">V2.4 · SDXL 1.0</span>
+                          <span className="font-bold text-slate-700 block mt-1">
+                            {latestProductAsset ? `${latestProductAsset.promptVersion} · ${latestProductAsset.channel}` : '暂无生成记录'}
+                          </span>
                         </div>
                         <div className="bg-slate-50 border border-slate-150 rounded-lg p-3">
                           <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">总成本</span>
-                          <span className="font-extrabold text-rose-500 block text-sm mt-1">¥ 86.20</span>
+                          <span className="font-extrabold text-rose-500 block text-sm mt-1">
+                            ¥ {(selectedProductSummary?.totalCost ?? 0).toFixed(2)}
+                          </span>
                         </div>
                       </div>
 
@@ -1220,42 +1396,27 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                           <span>输入素材</span>
                         </h4>
                         <div className="grid grid-cols-3 gap-2">
-                          <div className="border border-slate-100 rounded-lg overflow-hidden bg-white p-1 relative">
-                            <img src={selectedProduct.thumbnail} className="w-full h-16 object-cover rounded" referrerPolicy="no-referrer" />
-                            <div className="text-[9px] text-slate-400 mt-1 text-center font-semibold">商品原图</div>
-                          </div>
-                          <div className="border border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center h-[90px] bg-slate-50/50">
-                            <span className="material-symbols-outlined text-slate-300 text-lg">image</span>
-                            <span className="text-[9px] text-slate-300 font-semibold mt-1">暂无</span>
-                            <div className="text-[8px] text-slate-300">合成套图</div>
-                          </div>
-                          <div className="border border-slate-100 rounded-lg overflow-hidden bg-white p-1 relative">
-                            <img src="https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&w=400&q=80" className="w-full h-16 object-cover rounded" referrerPolicy="no-referrer" />
-                            <div className="text-[9px] text-slate-400 mt-1 text-center font-semibold">细节图</div>
-                          </div>
-                          <div className="border border-slate-100 rounded-lg overflow-hidden bg-white p-1 relative">
-                            <img src="https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=400&q=80" className="w-full h-16 object-cover rounded" referrerPolicy="no-referrer" />
-                            <div className="text-[9px] text-slate-400 mt-1 text-center font-semibold">风格参考</div>
-                          </div>
-                          <div className="border border-slate-100 rounded-lg overflow-hidden bg-white p-1 relative">
-                            <img src="https://images.unsplash.com/photo-1483168527879-c66136b56105?auto=format&fit=crop&w=400&q=80" className="w-full h-16 object-cover rounded" referrerPolicy="no-referrer" />
-                            <div className="text-[9px] text-slate-400 mt-1 text-center font-semibold">场景参考</div>
-                          </div>
-                          <div className="border border-slate-100 rounded-lg overflow-hidden bg-white p-1 relative">
-                            <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80" className="w-full h-16 object-cover rounded" referrerPolicy="no-referrer" />
-                            <div className="text-[9px] text-slate-400 mt-1 text-center font-semibold">姿势参考</div>
-                          </div>
+                          {selectedProduct.files.length > 0 ? selectedProduct.files.slice(0, 6).map((file) => (
+                            <div key={file.id} className="border border-slate-100 rounded-lg overflow-hidden bg-white p-1 relative">
+                              <img src={file.url} className="w-full h-16 object-contain rounded bg-slate-50" referrerPolicy="no-referrer" />
+                              <div className="text-[9px] text-slate-400 mt-1 text-center font-semibold truncate">{file.name}</div>
+                            </div>
+                          )) : (
+                            <div className="col-span-3 border border-dashed border-slate-200 rounded-lg flex items-center justify-center h-[90px] bg-slate-50/50 text-[10px] text-slate-400">
+                              暂无已关联输入素材
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       {/* 视频素材(通过) banner */}
-                      <div className="space-y-2">
+                      {selectedProduct.passedVideos?.[0] && <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <h4 className="font-bold text-slate-700">视频素材 (通过)</h4>
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded text-[8px]">已通过</span>
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded text-[8px]">审核通过</span>
                         </div>
                         <div className="border border-slate-200/80 rounded-xl overflow-hidden bg-slate-900 relative aspect-video flex items-center justify-center">
-                          <img src={selectedProduct.thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-50" referrerPolicy="no-referrer" />
+                          <img src={selectedProduct.passedVideos[0].coverUrl} className="absolute inset-0 w-full h-full object-contain opacity-60" referrerPolicy="no-referrer" />
                           <div className="w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white cursor-pointer z-10 transition-all border border-white/20">
                             <Play className="w-5 h-5 text-white fill-white ml-0.5" />
                           </div>
@@ -1266,23 +1427,23 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                           </div>
                           <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
                             <span className="text-[9px] text-white/90 bg-black/40 px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1">
-                              来源图片 <img src={selectedProduct.thumbnail} className="w-3 h-3 rounded-full object-cover inline" referrerPolicy="no-referrer" />
+                              商品 {selectedProduct.name}
                             </span>
                           </div>
                         </div>
-                      </div>
+                      </div>}
 
                       {/* 最新生产任务 & 审核评分 */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white border border-slate-200/60 p-3 rounded-xl shadow-2xs space-y-2">
                           <h4 className="font-bold text-slate-700">最新生产任务</h4>
                           <div>
-                            <p className="font-bold text-[#0B1C30]">Task-20231025-001</p>
-                            <p className="text-[10px] text-slate-400 mt-1">生成时间: 2023-10-25 14:28</p>
+                            <p className="font-bold text-[#0B1C30]">{latestProductAsset?.sku ?? '暂无任务'}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">生成时间: {latestProductAsset?.addedTime ?? '—'}</p>
                           </div>
                           <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 font-bold">
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                            生成中
+                            {latestProductAsset?.status ?? '暂无状态'}
                           </span>
                         </div>
 
@@ -1290,8 +1451,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                           <h4 className="font-bold text-slate-700">审核评分</h4>
                           <div>
                             <div className="text-lg font-black text-slate-800 flex items-baseline gap-1">
-                              88分
-                              <span className="text-[9px] text-emerald-500 bg-emerald-50 px-1 rounded">较上次 +3</span>
+                              {selectedProductSummary?.highestScore == null ? '—' : `${selectedProductSummary.highestScore}分`}
                             </div>
                             <div className="flex text-amber-500 mt-0.5">
                               <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -1308,7 +1468,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                       <div className="space-y-2">
                         <h4 className="font-bold text-slate-700">模型通道</h4>
                         <div className="bg-slate-50 border border-slate-150 rounded-lg p-2.5 font-semibold text-slate-700">
-                          Stable Diffusion
+                          {latestProductAsset?.channel ?? '暂无通道信息'}
                         </div>
                       </div>
 
@@ -1316,16 +1476,16 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         <h4 className="font-bold text-slate-700 pb-1.5 border-b border-slate-200/80">成本明细</h4>
                         <div className="space-y-2 pt-1 font-mono text-[11px] text-slate-500">
                           <div className="flex justify-between">
-                            <span>图片生成 (18张)</span>
-                            <span className="font-bold text-slate-700">¥ 12.40</span>
+                            <span>图片生成 ({selectedProduct.imageCount}张)</span>
+                            <span className="font-bold text-slate-700">按单个结果成本汇总</span>
                           </div>
                           <div className="flex justify-between">
-                            <span>视频生成 (2条)</span>
-                            <span className="font-bold text-slate-700">¥ 73.80</span>
+                            <span>视频生成 ({selectedProduct.videoCount}条)</span>
+                            <span className="font-bold text-slate-700">按单个结果成本汇总</span>
                           </div>
                           <div className="flex justify-between text-xs font-bold border-t border-slate-200 pt-2 text-rose-500">
                             <span>合计</span>
-                            <span>¥ 86.20</span>
+                            <span>¥ {(selectedProductSummary?.totalCost ?? 0).toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
@@ -1334,9 +1494,85 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                   )}
 
                   {productDrawerTab !== 'overview' && (
-                    <div className="py-12 text-center text-slate-400 animate-fadeIn">
-                      <FolderOpen className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                      当前商品标签页 [{(['概览', '输入素材', '生成图片', '生成视频', '审核记录', '成本记录'] as any).find((x: any) => x === productDrawerTab) || '其它'}] 深度关联数据已同步归档。
+                    <div className="animate-fadeIn">
+                      {productDrawerTab === 'input' && (
+                        <div className="grid grid-cols-2 gap-3">
+                          {selectedProduct.files.map((file) => (
+                            <div key={file.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                              <img src={file.url} className="h-32 w-full object-contain" referrerPolicy="no-referrer" />
+                              <div className="mt-2 truncate font-bold text-slate-700">{file.name}</div>
+                              <div className="text-[10px] text-slate-400">{file.size}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {productDrawerTab === 'images' && (
+                        <div className="grid grid-cols-2 gap-3">
+                          {selectedProductAssets.filter((asset) => asset.type === '图片').map((asset) => (
+                            <button key={asset.id} onClick={() => handleSelectAsset(asset.id)} className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-left">
+                              <img src={asset.thumbnail} className="h-36 w-full object-contain" referrerPolicy="no-referrer" />
+                              <div className="mt-2 flex items-center justify-between">
+                                <span className="truncate font-bold text-slate-700">{asset.taskType}</span>
+                                <span className={asset.status === '审核通过' ? 'text-emerald-600' : asset.status === '待审美评分' ? 'text-amber-600' : 'text-rose-600'}>{asset.status}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {productDrawerTab === 'videos' && (
+                        <div className="grid grid-cols-2 gap-3">
+                          {selectedProductAssets.filter((asset) => asset.type === '视频').map((asset) => (
+                            <button key={asset.id} onClick={() => handleSelectAsset(asset.id)} className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-left">
+                              <img src={asset.thumbnail} className="h-32 w-full object-contain" referrerPolicy="no-referrer" />
+                              <div className="mt-2 font-bold text-slate-700">{asset.taskType}</div>
+                              <div className="text-[10px] text-slate-400">{asset.ratioDuration}</div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {productDrawerTab === 'reviews' && (
+                        <div className="space-y-2">
+                          {drawerProductReviews.map((review) => (
+                            <div key={review.id} className="rounded-lg border border-slate-200 p-3">
+                              <div className="flex items-center justify-between">
+                              <div>
+                                  <div className="font-bold text-slate-700">{review.mediaType === 'VIDEO' ? '视频' : '图片'}评分</div>
+                                  <div className="text-[10px] text-slate-400">任务 {review.taskId} · 评分人 {review.scorerUserId}</div>
+                              </div>
+                              <div className="text-right">
+                                  <div className="font-bold">{review.overallScore}分</div>
+                                  <div className="text-[10px] text-slate-500">{review.scoreTime?.replace('T', ' ').slice(0, 16) || '—'}</div>
+                                </div>
+                              </div>
+                              {review.optimizationNote && <div className="mt-2 rounded bg-slate-50 p-2 text-[11px] text-slate-600">{review.optimizationNote}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {productDrawerTab === 'costs' && (
+                        <div className="space-y-2">
+                          {selectedProductAssets.map((asset) => (
+                            <div key={asset.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                              <span>{asset.type} · {asset.taskType}</span>
+                              <span className="font-mono font-bold text-slate-800">¥ {asset.cost.toFixed(2)}</span>
+                            </div>
+                          ))}
+                          <div className="flex justify-between border-t border-slate-200 pt-3 font-bold text-rose-500">
+                            <span>合计</span>
+                            <span>¥ {(selectedProductSummary?.totalCost ?? 0).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+                      {((productDrawerTab === 'input' && selectedProduct.files.length === 0)
+                        || (productDrawerTab === 'images' && !selectedProductAssets.some((asset) => asset.type === '图片'))
+                        || (productDrawerTab === 'videos' && !selectedProductAssets.some((asset) => asset.type === '视频'))
+                        || (productDrawerTab === 'reviews' && drawerProductReviews.length === 0)
+                        || (productDrawerTab === 'costs' && selectedProductAssets.length === 0)) && (
+                        <div className="py-12 text-center text-slate-400">
+                          <FolderOpen className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                          暂无真实数据
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1375,7 +1611,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                 <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-lg overflow-hidden bg-slate-100 border border-slate-200/60 shrink-0">
-                      <img src={activeAsset.thumbnail} alt={activeAsset.productName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={activeAsset.thumbnail} alt={activeAsset.productName} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                     </div>
                     <div>
                       <h3 className="text-sm font-extrabold text-[#0B1C30] flex items-center gap-1.5">
@@ -1386,12 +1622,14 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 font-bold rounded-sm text-[8px]">{activeAsset.type}</span>
                         {activeAsset.type === '视频' && (
                           <>
-                            <span className="px-1 bg-slate-100 rounded-sm text-slate-500">15s</span>
-                            <span className="px-1 bg-slate-100 rounded-sm text-slate-500">9:16</span>
-                            <span className="px-1 bg-slate-100 rounded-sm text-slate-500">1080p</span>
+                            {activeAsset.ratioDuration.split('·').map((value) => (
+                              <span key={value} className="px-1 bg-slate-100 rounded-sm text-slate-500">{value.trim()}</span>
+                            ))}
                           </>
                         )}
-                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded-sm text-[8px]">已通过</span>
+                        <span className={`px-1.5 py-0.5 font-bold rounded-sm text-[8px] ${statusClass(activeAsset.status)}`}>
+                          {activeAsset.status}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1431,26 +1669,45 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                     <div className="space-y-5 animate-fadeIn">
                       
                       {/* Media Player block */}
-                      <div className="border border-slate-200/80 rounded-xl overflow-hidden bg-slate-900 relative aspect-video flex items-center justify-center">
-                        <img src={activeAsset.thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60" referrerPolicy="no-referrer" />
-                        <div className="w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white cursor-pointer z-10 transition-all border border-white/20 shadow-lg">
-                          <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+                      {activeAsset.type === '图片' ? (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewImageUrl(activeAsset.url)}
+                          className="group relative flex aspect-video w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50"
+                          aria-label="放大查看图片"
+                        >
+                          <img
+                            src={activeAsset.url || activeAsset.thumbnail}
+                            className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+                            referrerPolicy="no-referrer"
+                            alt={activeAsset.productName}
+                          />
+                          <span className="absolute bottom-2 right-2 rounded bg-black/55 px-2 py-1 text-[10px] font-bold text-white">
+                            点击放大
+                          </span>
+                        </button>
+                      ) : (
+                        <div className="aspect-video w-full overflow-hidden rounded-xl border border-slate-200/80 bg-black">
+                          <video
+                            key={activeAsset.id}
+                            src={activeAsset.url}
+                            poster={activeAsset.thumbnail}
+                            controls
+                            playsInline
+                            preload="metadata"
+                            className="h-full w-full object-contain"
+                          >
+                            当前浏览器不支持视频播放。
+                          </video>
                         </div>
-                        {activeAsset.type === '视频' && (
-                          <div className="absolute bottom-2 left-2 flex gap-1.5 z-10">
-                            <span className="px-1.5 py-0.5 bg-black/70 text-white rounded font-bold font-mono text-[8px]">15s</span>
-                            <span className="px-1.5 py-0.5 bg-black/70 text-white rounded font-bold font-mono text-[8px]">9:16</span>
-                            <span className="px-1.5 py-0.5 bg-black/70 text-white rounded font-bold font-mono text-[8px]">1080p</span>
-                          </div>
-                        )}
-                      </div>
+                      )}
 
                       {/* Detail Key-Value Rows */}
                       <div className="bg-slate-50/50 border border-slate-150 rounded-xl p-4.5 space-y-3">
                         <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
                           <span className="text-slate-400 font-medium">来源图片</span>
                           <span className="font-bold text-blue-600 flex items-center gap-1">
-                            IMG-001
+                            {activeAssetProduct?.sku ?? '—'}
                             <ExternalLink className="w-3.5 h-3.5" />
                           </span>
                         </div>
@@ -1460,11 +1717,11 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         </div>
                         <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
                           <span className="text-slate-400 font-medium">任务 ID</span>
-                          <span className="font-mono font-bold text-slate-800">TASK-V-102</span>
+                          <span className="font-mono font-bold text-slate-800">{activeAssetData?.taskId ?? '—'}</span>
                         </div>
                         <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
                           <span className="text-slate-400 font-medium">Prompt 版本</span>
-                          <span className="font-mono font-bold text-slate-800">V2.4 · SDXL 1.0</span>
+                          <span className="font-mono font-bold text-slate-800">{activeAsset.promptVersion}</span>
                         </div>
                         <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
                           <span className="text-slate-400 font-medium">模型通道</span>
@@ -1473,7 +1730,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
                           <span className="text-slate-400 font-medium">审核评分</span>
                           <span className="font-bold text-slate-800 flex items-center gap-1 font-mono">
-                            {activeAsset.score || 88} 分
+                            {activeAsset.score == null ? '未评分' : `${activeAsset.score} 分`}
                             <span className="flex text-amber-500">
                               <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                               <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
@@ -1485,7 +1742,9 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         </div>
                         <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
                           <span className="text-slate-400 font-medium">审核结果</span>
-                          <span className="font-bold text-emerald-500">已通过</span>
+                          <span className={`font-bold ${activeAsset.status === '审核通过' ? 'text-emerald-500' : activeAsset.status === '待审美评分' ? 'text-amber-500' : 'text-rose-500'}`}>
+                            {activeAsset.status}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
                           <span className="text-slate-400 font-medium">成本</span>
@@ -1493,11 +1752,11 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         </div>
                         <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
                           <span className="text-slate-400 font-medium">创建时间</span>
-                          <span className="font-mono text-slate-500">2023-10-25 14:30:25</span>
+                          <span className="font-mono text-slate-500">{activeAsset.addedTime}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-slate-400 font-medium">更新时间</span>
-                          <span className="font-mono text-slate-500">2023-10-25 14:30:30</span>
+                          <span className="font-mono text-slate-500">{activeAsset.addedTime}</span>
                         </div>
                       </div>
 
@@ -1513,7 +1772,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         {!costCollapse && (
                           <div className="p-4 font-mono text-[11px] text-slate-500 space-y-2 bg-white animate-slideDown">
                             <div className="flex justify-between">
-                              <span>视频生成 (15s)</span>
+                              <span>{activeAsset.type}生成 ({activeAsset.ratioDuration || '—'})</span>
                               <span className="font-bold text-slate-700">¥ {activeAsset.cost.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between font-bold text-xs text-rose-500 pt-2 border-t border-slate-100 mt-2">
@@ -1528,9 +1787,55 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                   )}
 
                   {assetDrawerTab !== 'overview' && (
-                    <div className="py-12 text-center text-slate-400 animate-fadeIn">
-                      <FolderOpen className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                      当前素材标签页 [{(['概览', '来源', '审核', '成本'] as any).find((x: any) => x === assetDrawerTab) || '其它'}] 深度关联数据已同步归档。
+                    <div className="space-y-3 animate-fadeIn">
+                      {assetDrawerTab === 'source' && (
+                        <>
+                          {[
+                            ['商品', activeAsset.productName],
+                            ['商品 ID', activeAsset.productId],
+                            ['任务 ID', activeAssetData?.taskId],
+                            ['批次 ID', activeAssetData?.groupId],
+                            ['任务类型', activeAsset.taskType],
+                            ['风格', activeAsset.style],
+                            ['场景', activeAsset.scene],
+                            ['创建时间', activeAsset.addedTime],
+                          ].map(([label, value]) => (
+                            <div key={label} className="flex justify-between border-b border-slate-100 py-2">
+                              <span className="text-slate-400">{label}</span>
+                              <span className="max-w-[280px] break-all text-right font-bold text-slate-700">{value || '—'}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                      {assetDrawerTab === 'audit' && (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                          <div className="flex justify-between">
+                            <span>审核状态</span>
+                            <span className="font-bold">{activeAsset.status}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>审美评分</span>
+                            <span className="font-bold">{activeAsset.score == null ? '未评分' : `${activeAsset.score}分`}</span>
+                          </div>
+                          <div>
+                            <div className="mb-1 text-slate-400">打回原因</div>
+                            <div className="rounded-lg bg-white p-3 text-slate-700">{activeAssetData?.rejectReason || '—'}</div>
+                          </div>
+                        </div>
+                      )}
+                      {assetDrawerTab === 'costs' && (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                          <div className="flex justify-between">
+                            <span>模型通道</span>
+                            <span className="font-bold">{activeAsset.channel}</span>
+                          </div>
+                          <div className="flex justify-between border-t border-slate-200 pt-3 text-sm font-bold text-rose-500">
+                            <span>结果成本</span>
+                            <span>¥ {activeAsset.cost.toFixed(2)}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400">成本来自生成结果真实 cost 字段，不展示未落库的虚构拆分项。</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1538,15 +1843,24 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                 {/* Bottom Buttons inside asset drawer */}
                 <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
                   <div className="flex gap-2">
-                    <button className="px-3.5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-bold hover:bg-slate-100 cursor-pointer flex items-center gap-1 shadow-2xs">
+                    <a href={activeAsset.url} target="_blank" rel="noreferrer" className="px-3.5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-bold hover:bg-slate-100 cursor-pointer flex items-center gap-1 shadow-2xs">
                       <Eye className="w-3.5 h-3.5" />
                       预览
-                    </button>
-                    <button className="px-3.5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-bold hover:bg-slate-100 cursor-pointer flex items-center gap-1 shadow-2xs">
+                    </a>
+                    <a href={activeAsset.url} target="_blank" rel="noreferrer" download className="px-3.5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-bold hover:bg-slate-100 cursor-pointer flex items-center gap-1 shadow-2xs">
                       <Download className="w-3.5 h-3.5" />
                       下载
-                    </button>
-                    <button className="px-3.5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-bold hover:bg-slate-100 cursor-pointer flex items-center gap-1 shadow-2xs">
+                    </a>
+                    <button
+                      onClick={() => {
+                        if (activeAssetProduct) {
+                          setSelectedProduct(activeAssetProduct);
+                          setDrawerType('product');
+                          setProductDrawerTab('overview');
+                        }
+                      }}
+                      className="px-3.5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-bold hover:bg-slate-100 cursor-pointer flex items-center gap-1 shadow-2xs"
+                    >
                       查看商品
                       <ExternalLink className="w-3.5 h-3.5" />
                     </button>
@@ -1568,6 +1882,13 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
 
           </div>
         </>
+      )}
+
+      {previewImageUrl && (
+        <ImagePreviewModal
+          images={[{ url: previewImageUrl, label: activeAsset.productName }]}
+          onClose={() => setPreviewImageUrl(null)}
+        />
       )}
 
     </div>

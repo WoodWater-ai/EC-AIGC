@@ -463,8 +463,7 @@ export type TaskStatus =
   | 'FAILED'               // 失败
   | 'REJECTED'
   | 'ARCHIVED'
-  | 'CANCELED'             // 取消
-  | 'COMPLETED';           // 完成(二期引入,本期不一定用到)
+  | 'CANCELED';            // 取消
 
 export interface TaskMyPageQueryRequest {
   pageNum: number;

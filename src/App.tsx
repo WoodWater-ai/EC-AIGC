@@ -204,7 +204,6 @@ export default function App() {
       case AppScreen.ASSETS:
         return (
           <ProductAssetLibrary
-            products={products}
             selectedProduct={selectedProduct}
             setSelectedProduct={setSelectedProduct}
             isDrawerOpen={isProductDrawerOpen}

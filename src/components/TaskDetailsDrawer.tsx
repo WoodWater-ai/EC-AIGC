@@ -28,16 +28,15 @@ interface ReviewTarget {
 }
 
 const STATUS_META: Record<TaskStatus, { label: string; style: string }> = {
-  DRAFT: { label: '草稿', style: 'bg-slate-100 text-slate-600' },
-  PENDING: { label: '等待生成', style: 'bg-slate-100 text-slate-600' },
+  DRAFT: { label: '生成中', style: 'bg-blue-50 text-primary' },
+  PENDING: { label: '生成中', style: 'bg-blue-50 text-primary' },
   GENERATING: { label: '生成中', style: 'bg-blue-50 text-primary' },
   PENDING_REVIEW_SCORE: { label: '待审美评分', style: 'bg-amber-50 text-amber-700' },
   PENDING_REVIEW_PUBLISH: { label: '待审美评分', style: 'bg-amber-50 text-amber-700' },
-  ARCHIVED: { label: '审核完成', style: 'bg-emerald-50 text-emerald-700' },
+  ARCHIVED: { label: '审核通过', style: 'bg-emerald-50 text-emerald-700' },
   REJECTED: { label: '已打回', style: 'bg-rose-50 text-rose-700' },
-  CANCELED: { label: '已取消', style: 'bg-slate-100 text-slate-500' },
+  CANCELED: { label: '生成失败', style: 'bg-red-50 text-red-700' },
   FAILED: { label: '生成失败', style: 'bg-red-50 text-red-700' },
-  COMPLETED: { label: '审核完成', style: 'bg-emerald-50 text-emerald-700' },
 };
 
 const IMAGE_TYPE_LABELS: Record<string, string> = {
@@ -78,15 +77,15 @@ const resultPreviewUrl = (result: TaskResultPreviewResponse) =>
     : result.thumbnailUrl || result.url;
 
 const RESULT_STATUS_LABELS: Record<string, string> = {
-  PASSED: '审核完成',
+  PASSED: '审核通过',
   REJECTED: '已打回',
   UNAVAILABLE: '不可用',
   PENDING_SCORE: '待审美评分',
   PENDING_REVIEW: '待审美评分',
-  ARCHIVED: '审核完成',
+  ARCHIVED: '审核通过',
   待评分: '待审美评分',
   待审核: '待审美评分',
-  通过: '审核完成',
+  通过: '审核通过',
   打回: '已打回',
 };
 
@@ -622,7 +621,9 @@ const ReviewDialog: React.FC<{
     setSubmitting(true);
     try {
       await auditApi.submitScore({
-        generatedImageId: target.id,
+        mediaType: target.mediaType,
+        generatedImageId: target.mediaType === 'IMAGE' ? target.id : undefined,
+        generatedVideoId: target.mediaType === 'VIDEO' ? target.id : undefined,
         overallScore: rating,
         defectTags: defectTags.join(',') || undefined,
         advantageTags: advantageTags.join(',') || undefined,

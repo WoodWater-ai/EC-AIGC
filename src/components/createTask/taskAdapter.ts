@@ -23,7 +23,6 @@ function mapTaskStatus(s: TaskStatus): GenerationTask['status'] {
     case 'PENDING_REVIEW_SCORE':
     case 'PENDING_REVIEW_PUBLISH':
     case 'ARCHIVED':
-    case 'COMPLETED':
       return 'completed';
     case 'FAILED':
       return 'failed';

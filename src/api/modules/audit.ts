@@ -1,7 +1,9 @@
 import http from '../client';
 
 export interface ScoreSubmitRequest {
-  generatedImageId: string;
+  generatedImageId?: string;
+  generatedVideoId?: string;
+  mediaType: 'IMAGE' | 'VIDEO';
   overallScore: number;
   dimSubject?: number;
   dimStyle?: number;
