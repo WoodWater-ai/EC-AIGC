@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { ProductAsset, AppScreen } from '../types';
-import { AssetTransitModal } from './AssetTransitModal';
-import { assetApi } from '../api/modules/asset';
+import {
+  AssetTransitModal,
+  type ResourceCenterSource,
+} from './AssetTransitModal';
+import type { AssetResourceItem } from '../api/modules/asset';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { templateApi, type TemplateDTO } from '../api/modules/template';
 import { TaskParamsPanel } from './createTask/TaskParamsPanel';
@@ -53,6 +56,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   const templates: TemplateDTO[] = data?.list ?? [];
   // Modal states for Transit Station
   const [isTransitOpen, setIsTransitOpen] = useState(false);
+  const [transitInitialSource, setTransitInitialSource] =
+    useState<ResourceCenterSource>('UPLOAD');
 
   // Source images state pre-filled to match prototype strictly
   const [sourceImages, setSourceImages] = useState<SourceImage[]>([
@@ -130,30 +135,20 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     setNegativeTags(prev => prev.filter(t => t !== tagToDelete));
   };
 
-  // Handle selected items from transit modal —— 接 fileResourceIds,异步反查详情生成 SourceImage
-  const handleConfirmTransitSelection = async (fileResourceIds: string[]) => {
-    if (fileResourceIds.length === 0) return;
-
-    try {
-      const items = await Promise.all(
-        fileResourceIds.map((id) => assetApi.get(id)),
-      );
-      const newItems: SourceImage[] = items.map((asset, idx) => ({
-        id: `transit-${Date.now()}-${idx}`,
-        name: asset.name.length > 20 ? asset.name.substring(0, 15) + '...' : asset.name,
-        url: asset.thumbnailUrl ?? '',
-        tag: '资源中心导入 - 优质素材',
-        score: 85,  // 视频任务不强依赖评分,统一给一个默认
-        archived: false,
-        selected: true,
-      }));
-      setSourceImages((prev) => [...newItems, ...prev]);
-    } catch (err) {
-      console.error('[CreateVideoTask] 资源中心导入失败:', err);
-      alert(`导入失败: ${(err as Error).message}`);
-    } finally {
-      setIsTransitOpen(false);
-    }
+  // AssetTransitModal 已返回标准 asset_resource，无需再次按错误的 ID 反查。
+  const handleConfirmTransitSelection = (items: AssetResourceItem[]) => {
+    if (items.length === 0) return;
+    const newItems: SourceImage[] = items.map((asset, idx) => ({
+      id: `transit-${Date.now()}-${idx}`,
+      name: asset.name.length > 20 ? asset.name.substring(0, 15) + '...' : asset.name,
+      url: asset.originalUrl ?? asset.thumbnailUrl ?? '',
+      tag: '资源中心导入 - 优质素材',
+      score: 85,
+      archived: false,
+      selected: true,
+    }));
+    setSourceImages((prev) => [...newItems, ...prev]);
+    setIsTransitOpen(false);
   };
 
   // Selection counts
@@ -326,14 +321,20 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
             {/* Core Action Buttons - both open the AssetTransitModal as requested! */}
             <div className="flex gap-2">
               <button 
-                onClick={() => setIsTransitOpen(true)}
+                onClick={() => {
+                  setTransitInitialSource('PRODUCT');
+                  setIsTransitOpen(true);
+                }}
                 className="flex-1 bg-[#eff4ff] border border-[#b2c5ff] text-[#0054cd] rounded-lg py-2 flex items-center justify-center gap-1.5 hover:bg-blue-100 transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-base">photo_library</span>
                 <span className="text-xs font-extrabold">商品素材库</span>
               </button>
               <button 
-                onClick={() => setIsTransitOpen(true)}
+                onClick={() => {
+                  setTransitInitialSource('UPLOAD');
+                  setIsTransitOpen(true);
+                }}
                 className="flex-1 bg-white border border-[#c2c6d8] text-[#424655] rounded-lg py-2 flex items-center justify-center gap-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-base">upload</span>
@@ -563,7 +564,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       {isTransitOpen && (
         <AssetTransitModal
           purpose="PRODUCT"
-          productId={selectedProduct?.id ? Number(selectedProduct.id) : undefined}
+          productId={selectedProduct?.id}
+          assetKind="IMAGE"
+          initialSource={transitInitialSource}
           onClose={() => setIsTransitOpen(false)}
           onConfirmSelection={handleConfirmTransitSelection}
         />

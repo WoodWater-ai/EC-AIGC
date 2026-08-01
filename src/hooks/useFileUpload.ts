@@ -134,7 +134,7 @@ export type FileUploadPurpose = 'AVATAR' | 'PRODUCT' | 'DICT' | 'OTHER' | 'UP_DO
 
 export interface UseFileUploadOptions {
   purpose: FileUploadPurpose;
-  productId?: number;
+  productId?: string | number;
   onProgress?: (percent: number) => void;
 }
 

@@ -8,6 +8,8 @@ interface AssetImageProps {
   alt?: string;
   className?: string;
   aspectRatio?: 'square' | 'video' | 'auto';
+  /** 媒体在预览框中的缩放方式；资源中心使用 contain 保证长图/宽图完整显示。 */
+  objectFit?: 'cover' | 'contain';
   /** 自定义 fallback(覆盖默认缺损图),传 null/false 时不渲染任何东西 */
   fallback?: React.ReactNode;
   /** 资源类型:视频用 <video> 元素,图片用 <img> */
@@ -38,6 +40,7 @@ export const AssetImage: React.FC<AssetImageProps> = ({
   alt = '',
   className,
   aspectRatio = 'square',
+  objectFit = 'cover',
   fallback,
   assetKind,
   maxWidth = 400,
@@ -100,7 +103,7 @@ export const AssetImage: React.FC<AssetImageProps> = ({
           muted
           playsInline
           onError={handleError}
-          className="w-full h-full object-cover"
+          className={`w-full h-full ${objectFit === 'contain' ? 'object-contain' : 'object-cover'}`}
         />
         {/* 中心 play 图标(指示这是视频) */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -128,7 +131,9 @@ export const AssetImage: React.FC<AssetImageProps> = ({
         referrerPolicy="no-referrer"
         onError={handleError}
         loading="lazy"
-        className={`w-full h-full ${aspectRatio === 'auto' ? 'object-contain' : 'object-cover'}`}
+        className={`w-full h-full ${
+          aspectRatio === 'auto' || objectFit === 'contain' ? 'object-contain' : 'object-cover'
+        }`}
       />
     </div>
   );

@@ -33,7 +33,7 @@ export interface AssetResourceItem {
   id: string;
   resourceCode?: string;
   name: string;
-  assetKind: 'IMAGE' | 'VIDEO';
+  assetKind: 'IMAGE' | 'VIDEO' | 'AUDIO';
   assetType?: string;
   ossKey?: string;
   fileSize?: number;
@@ -52,6 +52,8 @@ export interface AssetResourceItem {
   recognitionId?: string;
   /** 关联 file_resource.id(Spec-B 主路径;长 string 防 JS 精度丢失) */
   fileResourceId?: string;
+  sourceType?: 'UPLOAD' | 'GENERATED_IMAGE' | 'GENERATED_VIDEO';
+  sourceId?: string;
   status: 'NORMAL' | 'ARCHIVED';
   categoryIds: string[];
   createTime?: string;
@@ -86,8 +88,13 @@ export const assetApi = {
 
   /** 批量删除;若 file_resource 引用归 0,后端会自动物理删除 COS 文件 */
   deleteBatch: (ids: string[]) =>
-    http.post<string>('/v1/admin/asset/delete-batch', { ids }),
+    http.post<number>('/v1/admin/asset/delete-batch', { ids }),
 
   updateCategories: (resourceId: string, categoryIds: string[]) =>
     http.post('/v1/admin/asset/update-categories', { resourceId, categoryIds }),
+
+  resolveGenerated: (
+    items: Array<{ mediaType: 'IMAGE' | 'VIDEO'; sourceId: string }>,
+  ) =>
+    http.post<AssetResourceItem[]>('/v1/admin/asset/resolve-generated', { items }),
 };

@@ -10,7 +10,7 @@ const asset = (id: string, fileResourceId: string | null): AssetResourceItem => 
   id,
   name: `asset-${id}`,
   assetKind: 'IMAGE',
-  uploadUserId: 1,
+  uploadUserId: '1',
   fileResourceId: fileResourceId ?? undefined,
   categoryIds: [],
   status: 'NORMAL',
@@ -43,8 +43,8 @@ test('空选中时不应调用 onConfirmSelection(items 应为空数组或干脆
   assert.equal(items.length, 0);
 });
 
-test('fileResourceId 缺失的资源不应通过确认(校验逻辑)', () => {
+test('业务资源以 asset_resource.id 为选择标识,fileResourceId 可为空', () => {
   const items: AssetResourceItem[] = [asset('1', null)];
-  const allHaveFileResId = items.every((it) => it.fileResourceId != null);
-  assert.equal(allHaveFileResId, false);
+  assert.equal(items[0].id, '1');
+  assert.equal(items[0].fileResourceId, undefined);
 });

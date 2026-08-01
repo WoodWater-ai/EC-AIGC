@@ -43,7 +43,8 @@ export interface TransitPickerButtonProps {
 /** 把 AssetResourceItem 拍扁成 SlotRef —— 父组件写值唯一入口 */
 export function toSlotRef(item: AssetResourceItem): SlotRef {
   return {
-    fileResourceId: item.fileResourceId!,
+    // 历史字段名保留，但任务链路实际需要 asset_resource.id。
+    fileResourceId: item.id,
     thumbnailUrl: item.thumbnailUrl ?? item.originalUrl,
     originalUrl: item.originalUrl,
     name: item.name,

@@ -17,7 +17,7 @@ export type UploadTokenPurpose = 'AVATAR' | 'PRODUCT' | 'DICT' | 'OTHER' | 'UP_D
 export interface UploadTokenRequest {
   purpose: UploadTokenPurpose;
   fileName: string;
-  productId?: number;
+  productId?: string | number;
 }
 
 export interface UploadTokenResponse {

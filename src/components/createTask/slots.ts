@@ -11,12 +11,11 @@ export const SLOT_KEYS = [
 
 export type SlotKey = (typeof SLOT_KEYS)[number];
 
-/** slot 已选资源引用 —— 只存必要字段,提交时携带 fileResourceId */
+/** slot 已选资源引用 —— 只存必要字段,提交时携带 asset_resource.id */
 export interface SlotRef {
   /**
-   * 后端真实业务标识(file_resource.id)
-   * —— 注:本字段在部分调用方实际存的是 asset_resource.id(后端业务主键),
-   *    命名沿用历史,见 OutfitComposePanel.tsx 注释。string 防 JS 精度丢失。
+   * 后端真实业务标识 asset_resource.id。
+   * 字段名为兼容既有调用方暂时保留，string 防 JS 精度丢失。
    */
   fileResourceId: string;
   /** 缩略图 URL —— UI 预览用 */

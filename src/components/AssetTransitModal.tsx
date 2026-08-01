@@ -3,6 +3,10 @@ import { Globe, Lock, ChevronRight, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProductAsset } from '../types';
 import { assetApi, type AssetResourceItem, type AssetResourceQueryRequest } from '../api/modules/asset';
+import {
+  productLibraryApi,
+  type ProductLibraryAsset,
+} from '../api/modules/productLibrary';
 import { assetCategoryApi, type AssetCategoryNode } from '../api/modules/assetCategory';
 import { useAuth } from '../auth/AuthContext';
 import { useFileUpload } from '../hooks/useFileUpload';
@@ -37,6 +41,30 @@ interface ScannedFile {
 
 /** TransitAsset 直接 alias 到后端 AssetResourceItem —— 单一数据源 */
 type TransitAsset = AssetResourceItem;
+export type ResourceCenterSource = 'UPLOAD' | 'PRODUCT';
+
+const toTransitAsset = (asset: ProductLibraryAsset): TransitAsset => ({
+  id: asset.id,
+  name: [asset.productName, asset.imageType ?? asset.taskType]
+    .filter(Boolean)
+    .join('-') || `商品素材-${asset.id}`,
+  assetKind: asset.mediaType,
+  assetType: 'AI_GENERATED',
+  width: asset.width,
+  height: asset.height,
+  durationSec: asset.durationSec,
+  thumbnailUrl: asset.thumbnailUrl ?? asset.url,
+  originalUrl: asset.url,
+  description: asset.taskCode ? `来源任务：${asset.taskCode}` : undefined,
+  tags: ['商品素材', asset.style, asset.scene, asset.action].filter(Boolean).join(','),
+  uploadUserId: '',
+  productId: asset.productId,
+  sourceType: asset.mediaType === 'IMAGE' ? 'GENERATED_IMAGE' : 'GENERATED_VIDEO',
+  sourceId: asset.id,
+  status: 'NORMAL',
+  categoryIds: [],
+  createTime: asset.createTime,
+});
 
 interface AssetTransitModalProps {
   /** 已废弃:父组件传 onConfirmSelection 后不再消费 products */
@@ -57,11 +85,13 @@ interface AssetTransitModalProps {
   /** 上传用途:AVATAR / PRODUCT / OTHER —— 默认 OTHER */
   purpose?: 'AVATAR' | 'PRODUCT' | 'OTHER';
   /** 关联商品 ID —— purpose=PRODUCT 时必填 */
-  productId?: number;
+  productId?: string | number;
   /** 任务创建时的素材槽位提示,CreateImageTask / CreateVideoTask 用 */
   targetSlot?: string;
   /** 资源类型过滤(默认 IMAGE) */
   assetKind?: 'IMAGE' | 'VIDEO' | 'AUDIO';
+  /** 初始数据来源；音频选择器始终降级为上传资源。 */
+  initialSource?: ResourceCenterSource;
 }
 
 export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
@@ -76,7 +106,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   assetKind = 'IMAGE',
   multiSelect = false,
   mode = 'picker',
+  initialSource = 'UPLOAD',
 }) => {
+  const productSourceAvailable = assetKind !== 'AUDIO';
+  const [activeSource, setActiveSource] = useState<ResourceCenterSource>(
+    initialSource === 'PRODUCT' && productSourceAvailable ? 'PRODUCT' : 'UPLOAD',
+  );
   const [searchQuery, setSearchQuery] = useState('');
   /** 分类树折叠状态 —— 存被折叠的节点 id,默认空 = 全部展开 */
   const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
@@ -95,7 +130,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const [categoryTreeError, setCategoryTreeError] = useState<string | null>(null);
 
   // Selected asset list(资源 ID,number)
-  const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
 
   // ============ 真后端数据 ============
   const { user } = useAuth();
@@ -112,7 +147,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     };
     // picker mode 才按 kind 过滤;manager mode 不传(查全部)
     if (mode !== 'manager' && assetKind) {
-      base.assetKind = assetKind;
+      base.assetKind = assetKind as 'IMAGE' | 'VIDEO' | 'AUDIO';
     }
     if (selectedCategoryId !== null) {
       return { ...base, categoryId: selectedCategoryId };
@@ -129,9 +164,24 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setLoading(true);
     setQueryError(null);
     try {
-      const query = { ...buildQuery(), keyword: searchQuery || undefined };
-      const page = await assetApi.page(query);
-      setAssets(page.list);
+      if (activeSource === 'PRODUCT') {
+        const page = await productLibraryApi.assetPage({
+          pageNum: 1,
+          pageSize: 100,
+          keyword: searchQuery || undefined,
+          mediaType: mode !== 'manager' && assetKind !== 'AUDIO'
+            ? (assetKind === 'VIDEO' ? 'VIDEO' : 'IMAGE')
+            : undefined,
+          sortBy: 'latest',
+        });
+        setAssets(page.list
+          .filter((item) => Boolean(item.url))
+          .map(toTransitAsset));
+      } else {
+        const query = { ...buildQuery(), keyword: searchQuery || undefined };
+        const page = await assetApi.page(query);
+        setAssets(page.list);
+      }
     } catch (err) {
       setQueryError(err as Error);
       setAssets([]);
@@ -144,7 +194,14 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   useEffect(() => {
     refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, currentUserId, productId, selectedCategoryId]);
+  }, [searchQuery, currentUserId, productId, selectedCategoryId, activeSource]);
+
+  const handleSourceChange = (source: ResourceCenterSource) => {
+    if (source === activeSource || (source === 'PRODUCT' && !productSourceAvailable)) return;
+    setActiveSource(source);
+    setSelectedAssetIds([]);
+    setSelectedCategoryId(null);
+  };
 
   /**
    * 加载真实分类树(用户打开 modal 时一次性加载)
@@ -190,7 +247,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   // mode='manager' 强制多选;picker 模式尊重调用方的 multiSelect
   const effectiveMultiSelect = mode === 'manager' ? true : multiSelect;
 
-  const handleCardClick = (id: number) => {
+  const handleCardClick = (id: string) => {
+    if (mode === 'manager' && activeSource === 'PRODUCT') return;
     if (effectiveMultiSelect) {
       // 多选:toggle 累加
       setSelectedAssetIds(prev =>
@@ -234,7 +292,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setIsMoving(true);
     try {
       for (const id of selectedAssetIds) {
-        await assetApi.updateCategories(id, [moveTargetCategoryId]);
+        await assetApi.updateCategories(id, [String(moveTargetCategoryId)]);
       }
       toast.success('移动完成,');
       setIsMoveModalOpen(false);
@@ -341,39 +399,49 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     }
   };
 
-  const handleConfirmSelection = () => {
+  const [confirmingSelection, setConfirmingSelection] = useState(false);
+
+  const handleConfirmSelection = async () => {
     if (selectedAssetIds.length === 0) {
       toast.warning('请至少选择一个资源');
       return;
     }
 
-    if (onConfirmSelection) {
-      // 真后端协议:把当前页 assets 中选中的 item 完整透传给父组件
-      // 父组件按需取 fileResourceId / thumbnailUrl / name
-      const items = selectedAssetIds
-        .map((id) => assets.find((a) => a.id === id))
-        .filter((x): x is AssetResourceItem => x !== undefined);
-
-      // 校验 fileResourceId:任一缺失则不允许确认(数据异常)
-      const missing = items.filter((it) => it.fileResourceId == null);
-      if (missing.length > 0) {
-        toast.error('所选资源缺少文件标识,请重新选择');
-        return;
-      }
-
-      onConfirmSelection(items);
-    } else if (onSelectProduct && products && products.length > 0) {
-      // 兼容老 onSelectProduct 行为(若父组件没用 onConfirmSelection)
-      const firstItem = assets.find((a) => a.id === selectedAssetIds[0]);
-      if (firstItem) {
-        onSelectProduct({
-          ...products[0],
-          name: firstItem.name,
-          thumbnail: firstItem.thumbnailUrl ?? products[0].thumbnail,
-        });
-      }
+    const selectedItems = selectedAssetIds
+      .map((id) => assets.find((asset) => asset.id === id))
+      .filter((item): item is AssetResourceItem => item !== undefined);
+    if (selectedItems.length === 0) {
+      toast.error('所选资源已不在当前列表，请重新选择');
+      return;
     }
-    onClose();
+
+    setConfirmingSelection(true);
+    try {
+      const resolvedItems = activeSource === 'PRODUCT'
+        ? await assetApi.resolveGenerated(selectedItems.map((item) => ({
+            mediaType: item.assetKind as 'IMAGE' | 'VIDEO',
+            sourceId: item.id,
+          })))
+        : selectedItems;
+
+      if (onConfirmSelection) {
+        onConfirmSelection(resolvedItems);
+      } else if (onSelectProduct && products && products.length > 0) {
+        const firstItem = resolvedItems[0];
+        if (firstItem) {
+          onSelectProduct({
+            ...products[0],
+            name: firstItem.name,
+            thumbnail: firstItem.thumbnailUrl ?? products[0].thumbnail,
+          });
+        }
+      }
+      onClose();
+    } catch (err) {
+      toast.error(`资源选择失败：${(err as Error).message}`);
+    } finally {
+      setConfirmingSelection(false);
+    }
   };
 
   // Local File Upload
@@ -709,6 +777,32 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
               <span className="material-symbols-outlined font-bold text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>dataset</span>
             </div>
             <h1 className="text-base font-extrabold text-slate-800">资源中心</h1>
+            <div className="ml-3 flex items-center rounded-lg bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => handleSourceChange('UPLOAD')}
+                className={`rounded-md px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  activeSource === 'UPLOAD'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                上传资源
+              </button>
+              {productSourceAvailable && (
+                <button
+                  type="button"
+                  onClick={() => handleSourceChange('PRODUCT')}
+                  className={`rounded-md px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                    activeSource === 'PRODUCT'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  商品素材
+                </button>
+              )}
+            </div>
           </div>
           <button
             onClick={handleMainClose}
@@ -725,7 +819,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
           <aside className="w-[240px] border-r border-slate-200 bg-white flex flex-col p-4 gap-4 shrink-0 overflow-y-auto">
 
             {/* 我的分类 —— 真实分类树(从 assetCategoryApi.tree 加载) */}
-            <div className="flex flex-col gap-2">
+            <div className={`flex flex-col gap-2 ${activeSource === 'PRODUCT' ? 'hidden' : ''}`}>
               <p className="text-[10px] font-extrabold text-slate-400 px-3 uppercase tracking-wider">我的分类</p>
               {categoryTreeError ? (
                 <div className="px-3 py-2 text-[10px] text-red-500 font-medium">
@@ -823,8 +917,28 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
               })()}
             </div>
 
+            {activeSource === 'PRODUCT' && (
+              <div className="flex flex-col gap-2">
+                <p className="text-[10px] font-extrabold text-slate-400 px-3 uppercase tracking-wider">
+                  商品素材
+                </p>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 w-full rounded-lg bg-blue-50 px-3 py-2 text-left text-xs font-bold text-blue-600"
+                >
+                  <span className="material-symbols-outlined text-base">photo_library</span>
+                  <span>全部商品素材</span>
+                </button>
+                <p className="px-3 pt-2 text-[10px] leading-5 text-slate-400">
+                  展示已生成的商品图片和视频。选择后会自动转换为任务可使用的标准资源。
+                </p>
+              </div>
+            )}
+
             {/* Storage Progress Meter in bottom of navigation */}
-            <div className="mt-auto p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+            <div className={`mt-auto p-4 bg-blue-50/50 rounded-xl border border-blue-100 ${
+              activeSource === 'PRODUCT' ? 'hidden' : ''
+            }`}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">存储空间</span>
                 <span className="text-[10px] font-bold text-slate-500">82%</span>
@@ -841,22 +955,29 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             
             {/* Action panel & search filters */}
             <div className="p-4 bg-white border-b border-slate-200 flex items-center justify-between gap-4">
-              <div className="flex gap-2">
-                <button 
-                  onClick={handleLocalUploadTrigger}
-                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-sm">cloud_upload</span>
-                  <span>本地上传</span>
-                </button>
-                <button 
-                  onClick={() => setIsScanOpen(true)}
-                  className="flex items-center gap-2 bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold border border-slate-200 hover:bg-slate-100 transition-colors shadow-xs cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-sm">scan</span>
-                  <span>目录扫描</span>
-                </button>
-              </div>
+              {activeSource === 'UPLOAD' ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleLocalUploadTrigger}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">cloud_upload</span>
+                    <span>本地上传</span>
+                  </button>
+                  <button
+                    onClick={() => setIsScanOpen(true)}
+                    className="flex items-center gap-2 bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold border border-slate-200 hover:bg-slate-100 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">scan</span>
+                    <span>目录扫描</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                  <span className="material-symbols-outlined text-base text-blue-500">auto_awesome</span>
+                  <span>商品任务生成素材</span>
+                </div>
+              )}
 
               {/* Filters search */}
               <div className="flex items-center gap-3 flex-1 max-w-lg">
@@ -864,7 +985,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
                   <input 
                     type="text" 
-                    placeholder="搜索资源文件名"
+                    placeholder={activeSource === 'PRODUCT' ? '搜索商品、任务或素材' : '搜索资源文件名'}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
@@ -872,7 +993,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                 </div>
                 <div className="flex gap-2">
                   <span className="text-[10px] font-bold text-slate-400 self-center">
-                    左侧选择分类
+                    {activeSource === 'PRODUCT' ? '商品素材' : '左侧选择分类'}
                   </span>
                 </div>
               </div>
@@ -881,17 +1002,37 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             {/* Scrollable grid area */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                {loading && (
+                  <div className="col-span-full flex items-center justify-center py-16 text-xs font-bold text-slate-400">
+                    <span className="material-symbols-outlined mr-2 animate-spin text-base">progress_activity</span>
+                    正在加载资源...
+                  </div>
+                )}
+                {!loading && queryError && (
+                  <div className="col-span-full flex flex-col items-center justify-center gap-3 py-16 text-xs font-bold text-red-500">
+                    <span>资源加载失败：{queryError.message}</span>
+                    <button
+                      type="button"
+                      onClick={() => void refetch()}
+                      className="rounded-lg border border-red-200 bg-white px-4 py-2 text-red-600 cursor-pointer"
+                    >
+                      重新加载
+                    </button>
+                  </div>
+                )}
 
                 {/* 固定首位:上传资源占位卡片(点击触发本地上传) */}
-                <div
-                  onClick={handleLocalUploadTrigger}
-                  className="group relative flex flex-col bg-white rounded-xl border border-slate-200 border-dashed overflow-hidden hover:bg-slate-50 transition-all cursor-pointer justify-center items-center p-6 aspect-square"
-                >
-                  <span className="material-symbols-outlined text-slate-400 text-3xl group-hover:text-blue-500 mb-2 transition-colors">add_photo_alternate</span>
-                  <p className="text-xs font-bold text-slate-400 group-hover:text-blue-600 transition-colors">上传资源...</p>
-                </div>
+                {!loading && !queryError && activeSource === 'UPLOAD' && (
+                  <div
+                    onClick={handleLocalUploadTrigger}
+                    className="group relative flex flex-col bg-white rounded-xl border border-slate-200 border-dashed overflow-hidden hover:bg-slate-50 transition-all cursor-pointer justify-center items-center p-6 aspect-square"
+                  >
+                    <span className="material-symbols-outlined text-slate-400 text-3xl group-hover:text-blue-500 mb-2 transition-colors">add_photo_alternate</span>
+                    <p className="text-xs font-bold text-slate-400 group-hover:text-blue-600 transition-colors">上传资源...</p>
+                  </div>
+                )}
 
-                {(() => {
+                {!loading && !queryError && (() => {
                   return filteredAssets.map((asset) => {
                     const isSelected = selectedAssetIds.includes(asset.id);
                     const selectIndex = selectedAssetIds.indexOf(asset.id) + 1;
@@ -908,7 +1049,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                             urls={[asset.originalUrl, asset.thumbnailUrl]}
                             alt={asset.name}
                             assetKind={asset.assetKind}
-                            className="transition-transform group-hover:scale-102"
+                            objectFit="contain"
+                            className="w-full h-full"
                           />
                           {/* Selected Index circular badge top-left */}
                           <div className={`absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shadow-sm transition-all ${
@@ -976,17 +1118,19 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                     >
                       清除选择
                     </button>
-                    <button
-                      onClick={handleMoveClick}
-                      className="text-xs text-blue-600 hover:underline font-bold bg-transparent border-none cursor-pointer"
-                    >
-                      移动
-                    </button>
+                    {activeSource === 'UPLOAD' && (
+                      <button
+                        onClick={handleMoveClick}
+                        className="text-xs text-blue-600 hover:underline font-bold bg-transparent border-none cursor-pointer"
+                      >
+                        移动
+                      </button>
+                    )}
                   </>
                 )}
               </div>
               <div className="flex items-center gap-3">
-                {selectedAssetIds.length > 0 && (
+                {activeSource === 'UPLOAD' && selectedAssetIds.length > 0 && (
                   <button
                     onClick={handleDeleteSelected}
                     className="text-xs font-bold text-red-600 hover:text-red-700 hover:underline bg-transparent border-none cursor-pointer"
@@ -1002,7 +1146,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                 </button>
                 <button
                   onClick={handleConfirmSelection}
-                  disabled={mode === 'manager' || selectedAssetIds.length === 0}
+                  disabled={mode === 'manager' || selectedAssetIds.length === 0 || confirmingSelection}
                   title={
                     mode === 'manager'
                       ? '管理型入口,不需要选择资源'
@@ -1012,7 +1156,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   }
                   className="px-8 py-2 bg-blue-600 text-white rounded-lg text-xs font-extrabold hover:bg-blue-700 hover:shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  确认选择
+                  {confirmingSelection ? '处理中...' : '确认选择'}
                 </button>
               </div>
             </footer>
