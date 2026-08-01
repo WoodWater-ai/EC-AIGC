@@ -659,6 +659,9 @@ export function useCreateImageTaskState(
         groupId: crypto.randomUUID(),
         productId: productIdValid ? productIdRaw : null,
         productFacts: formInput,
+        style,
+        scene,
+        action: pose,
         channelInstanceId: opts.channel.id,
         capability: 'REF_IMG_EDIT',
         channelType: 'VIDU',
@@ -686,7 +689,10 @@ export function useCreateImageTaskState(
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, opts, references, referenceOrder, selectedTypes, promptOverrides, prompts, negativePrompt, formInput, setExecutionConfirmOpen]);
+  }, [
+    isSubmitting, opts, references, referenceOrder, selectedTypes, promptOverrides,
+    prompts, negativePrompt, formInput, style, scene, pose, setExecutionConfirmOpen,
+  ]);
 
   const selectReference = useCallback((slot: ReferenceSlot, ref: any | undefined) => {
     setReferences((prev) => ({ ...prev, [slot]: ref }));

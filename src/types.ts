@@ -634,6 +634,12 @@ export interface ImageTaskSubmitPayload {
   groupId?: string;
   productId?: string | null;
   productFacts: ProductFactsInput;
+  /** 创建任务时选择的风格字典标签 */
+  style?: string;
+  /** 创建任务时选择的场景字典标签 */
+  scene?: string;
+  /** 创建任务时选择的姿势字典标签（后端 generation_task.action） */
+  action?: string;
   channelInstanceId: string;
   capability: 'REF_IMG_EDIT';
   channelType: 'VIDU';

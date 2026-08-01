@@ -62,6 +62,7 @@ interface GeneratedAsset {
   taskType: string;
   style: string;
   scene: string;
+  action: string;
   ratioDuration: string;
   channel: string;
   status: '生成中' | '生成失败' | '待审美评分' | '审核通过' | '已打回';
@@ -113,6 +114,7 @@ const EMPTY_ASSET: GeneratedAsset = {
   taskType: '—',
   style: '—',
   scene: '—',
+  action: '—',
   ratioDuration: '—',
   channel: '—',
   status: '生成中',
@@ -131,6 +133,9 @@ const statusClass = (status: GeneratedAsset['status']) => {
   return 'bg-rose-50 text-rose-600';
 };
 
+const isDiscardedAsset = (asset: GeneratedAsset) =>
+  asset.rawStatus === 'ARCHIVED' || asset.status === '已打回';
+
 const toGeneratedAsset = (asset: ProductLibraryAsset): GeneratedAsset => ({
   id: asset.id,
   mediaType: asset.mediaType,
@@ -142,6 +147,7 @@ const toGeneratedAsset = (asset: ProductLibraryAsset): GeneratedAsset => ({
   taskType: taskTypeLabel(asset),
   style: asset.style || '—',
   scene: asset.scene || '—',
+  action: asset.action || '—',
   ratioDuration: asset.mediaType === 'VIDEO'
     ? [asset.durationSec ? `${asset.durationSec}s` : '', asset.aspectRatio, asset.width && asset.height ? `${asset.width}x${asset.height}` : ''].filter(Boolean).join(' · ')
     : [asset.aspectRatio, asset.width && asset.height ? `${asset.width}x${asset.height}` : ''].filter(Boolean).join(' · '),
@@ -446,7 +452,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
       // 3. Asset Type Filter (from subtabs & segmented controls)
       if (selectedAssetType === '图片' && asset.type !== '图片') return false;
       if (selectedAssetType === '视频' && asset.type !== '视频') return false;
-      if (selectedAssetType === '废弃' && asset.rawStatus !== 'ARCHIVED') return false;
+      if (selectedAssetType === '废弃' && !isDiscardedAsset(asset)) return false;
 
       // 4. Task Type Filter
       if (selectedTaskType !== '全部任务' && asset.taskType !== selectedTaskType) return false;
@@ -931,6 +937,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                     <th className="py-3 px-3">任务类型</th>
                     <th className="py-3 px-3">风格</th>
                     <th className="py-3 px-3">场景</th>
+                    <th className="py-3 px-3">姿势</th>
                     <th className="py-3 px-3">比例/时长</th>
                     <th className="py-3 px-3">模型通道</th>
                     <th className="py-3 px-3">审核状态</th>
@@ -944,7 +951,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {filteredAssets.length === 0 ? (
                     <tr>
-                      <td colSpan={16} className="text-center py-10 text-slate-400 font-medium">
+                      <td colSpan={17} className="text-center py-10 text-slate-400 font-medium">
                         暂无符合筛选条件的素材资产
                       </td>
                     </tr>
@@ -999,6 +1006,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                           <td className="py-3 px-3 text-slate-600 font-medium">{asset.taskType}</td>
                           <td className="py-3 px-3 text-slate-500">{asset.style}</td>
                           <td className="py-3 px-3 text-slate-500">{asset.scene}</td>
+                          <td className="py-3 px-3 text-slate-500">{asset.action}</td>
                           <td className="py-3 px-3 font-mono text-[10px] text-slate-500">{asset.ratioDuration}</td>
                           <td className="py-3 px-3 font-medium text-slate-600">{asset.channel}</td>
                           <td className="py-3 px-3">
@@ -1798,6 +1806,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                             ['任务类型', activeAsset.taskType],
                             ['风格', activeAsset.style],
                             ['场景', activeAsset.scene],
+                            ['姿势', activeAsset.action],
                             ['创建时间', activeAsset.addedTime],
                           ].map(([label, value]) => (
                             <div key={label} className="flex justify-between border-b border-slate-100 py-2">
