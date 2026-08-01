@@ -270,7 +270,7 @@ export default function ProductManagePage() {
                         <img
                           src={withCosThumbnail(p.imageUrl, 64) ?? p.imageUrl}
                           alt={p.name}
-                          className="w-12 h-12 object-cover rounded-md border border-slate-200"
+                          className="h-12 w-12 rounded-md border border-slate-200 bg-slate-50 object-contain p-1"
                         />
                       ) : (
                         <div className="w-12 h-12 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center">
