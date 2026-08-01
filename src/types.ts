@@ -519,6 +519,7 @@ export interface TaskResultPreviewResponse {
   url: string;
   thumbnailUrl?: string | null;
   status?: string | null;
+  rejectReason?: string | null;
   score?: number | null;
   batchIdx?: number | null;
 }

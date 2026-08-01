@@ -8,6 +8,7 @@ import type {
 } from '../types';
 import { taskApi } from '../api/modules/task';
 import { asyncTaskApi } from '../api/modules/asyncTask';
+import { auditApi } from '../api/modules/audit';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { withCosThumbnail } from '../utils/cosImage';
 import { ImagePreviewModal } from './ImagePreviewModal';
@@ -22,17 +23,21 @@ interface TaskDetailsDrawerProps {
 
 type DetailTab = 'overview' | 'results' | 'inputs' | 'diagnostics';
 
+interface ReviewTarget {
+  result: TaskResultPreviewResponse;
+}
+
 const STATUS_META: Record<TaskStatus, { label: string; style: string }> = {
   DRAFT: { label: '草稿', style: 'bg-slate-100 text-slate-600' },
   PENDING: { label: '等待生成', style: 'bg-slate-100 text-slate-600' },
   GENERATING: { label: '生成中', style: 'bg-blue-50 text-primary' },
   PENDING_REVIEW_SCORE: { label: '待审美评分', style: 'bg-amber-50 text-amber-700' },
-  PENDING_REVIEW_PUBLISH: { label: '待上架审核', style: 'bg-violet-50 text-violet-700' },
-  ARCHIVED: { label: '已归档', style: 'bg-emerald-50 text-emerald-700' },
+  PENDING_REVIEW_PUBLISH: { label: '待审美评分', style: 'bg-amber-50 text-amber-700' },
+  ARCHIVED: { label: '审核完成', style: 'bg-emerald-50 text-emerald-700' },
   REJECTED: { label: '已打回', style: 'bg-rose-50 text-rose-700' },
   CANCELED: { label: '已取消', style: 'bg-slate-100 text-slate-500' },
   FAILED: { label: '生成失败', style: 'bg-red-50 text-red-700' },
-  COMPLETED: { label: '已完成', style: 'bg-emerald-50 text-emerald-700' },
+  COMPLETED: { label: '审核完成', style: 'bg-emerald-50 text-emerald-700' },
 };
 
 const IMAGE_TYPE_LABELS: Record<string, string> = {
@@ -72,6 +77,22 @@ const resultPreviewUrl = (result: TaskResultPreviewResponse) =>
     ? result.url
     : result.thumbnailUrl || result.url;
 
+const RESULT_STATUS_LABELS: Record<string, string> = {
+  PASSED: '审核完成',
+  REJECTED: '已打回',
+  UNAVAILABLE: '不可用',
+  PENDING_SCORE: '待审美评分',
+  PENDING_REVIEW: '待审美评分',
+  ARCHIVED: '审核完成',
+  待评分: '待审美评分',
+  待审核: '待审美评分',
+  通过: '审核完成',
+  打回: '已打回',
+};
+
+const resultStatusLabel = (status?: string | null) =>
+  status ? RESULT_STATUS_LABELS[status] ?? status : '已生成';
+
 export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   group: initialGroup,
   initialTaskId,
@@ -85,6 +106,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
   const [imagePreview, setImagePreview] = useState<{ results: TaskResultPreviewResponse[]; index: number } | null>(null);
   const [videoPreview, setVideoPreview] = useState<TaskResultPreviewResponse | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
   const [loading, setLoading] = useState(false);
 
   const selectedTask = group.tasks.find((task) => task.id === selectedTaskId)
@@ -203,6 +225,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                   task={selectedTask}
                   onPreviewImages={(results, index) => setImagePreview({ results, index })}
                   onPreviewVideo={setVideoPreview}
+                  onReview={(result) => setReviewTarget({ result })}
                 />
               )}
               {activeTab === 'inputs' && <InputsTab group={group} task={selectedTask} />}
@@ -237,6 +260,16 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
             <video src={videoPreview.url} controls autoPlay className="max-h-[82vh] w-full bg-black object-contain" />
           </div>
         </div>
+      )}
+      {reviewTarget && (
+        <ReviewDialog
+          target={reviewTarget.result}
+          onClose={() => setReviewTarget(null)}
+          onCompleted={async () => {
+            setReviewTarget(null);
+            await refreshGroup();
+          }}
+        />
       )}
     </div>
   );
@@ -309,7 +342,8 @@ const ResultsTab: React.FC<{
   task: TaskGroupItemResponse;
   onPreviewImages: (results: TaskResultPreviewResponse[], index: number) => void;
   onPreviewVideo: (result: TaskResultPreviewResponse) => void;
-}> = ({ task, onPreviewImages, onPreviewVideo }) => {
+  onReview: (result: TaskResultPreviewResponse) => void;
+}> = ({ task, onPreviewImages, onPreviewVideo, onReview }) => {
   const imageResults = task.resultPreviews.filter((result) => result.mediaType === 'IMAGE');
   if (task.resultPreviews.length === 0) {
     return (
@@ -343,12 +377,31 @@ const ResultsTab: React.FC<{
             <div className="flex items-center justify-between p-3">
               <div>
                 <b className="text-xs text-slate-800">产物 #{index + 1}</b>
-                <p className="mt-1 text-[10px] text-slate-400">{result.mediaType} · batch {result.batchIdx ?? index}</p>
+                <p className="mt-1 text-[10px] text-slate-400">
+                  {result.mediaType} · batch {result.batchIdx ?? index}
+                  {result.score != null ? ` · ${result.score} 分` : ''}
+                </p>
               </div>
-              <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">
-                {result.status || '已生成'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">
+                  {resultStatusLabel(result.status)}
+                </span>
+                {result.mediaType === 'IMAGE'
+                  && result.score == null && (
+                    <button
+                      onClick={() => onReview(result)}
+                      className="h-8 rounded bg-primary px-3 text-[11px] font-bold text-white"
+                    >
+                      评分与审核
+                    </button>
+                )}
+              </div>
             </div>
+            {result.rejectReason && (
+              <p className="border-t border-red-100 bg-red-50 px-3 py-2 text-[11px] leading-5 text-red-700">
+                打回原因：{result.rejectReason}
+              </p>
+            )}
           </article>
         );
       })}
@@ -537,6 +590,187 @@ const ExecutionCard: React.FC<{ execution: ChannelAsyncTask; onChanged: () => vo
     </details>
   );
 };
+
+const DEFECT_TAGS = ['主体漂移', '色彩失真', '构图问题', '细节缺失', '人物扭曲'];
+const ADVANTAGE_TAGS = ['主体准确', '风格一致', '构图自然', '细节清晰', '商业可用'];
+
+const ReviewDialog: React.FC<{
+  target: TaskResultPreviewResponse;
+  onClose: () => void;
+  onCompleted: () => Promise<void>;
+}> = ({ target, onClose, onCompleted }) => {
+  const [rating, setRating] = useState(Math.round(target.score ?? 4));
+  const [defectTags, setDefectTags] = useState<string[]>([]);
+  const [advantageTags, setAdvantageTags] = useState<string[]>([]);
+  const [note, setNote] = useState(target.rejectReason ?? '');
+  const [decision, setDecision] = useState<'PASSED' | 'REJECTED'>('PASSED');
+  const [submitting, setSubmitting] = useState(false);
+
+  const toggleTag = (
+    tag: string,
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+  ) => setter((current) =>
+    current.includes(tag)
+      ? current.filter((item) => item !== tag)
+      : [...current, tag]);
+
+  const submit = async () => {
+    if (decision === 'REJECTED' && !note.trim()) {
+      toast.error('打回时必须填写审核原因');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await auditApi.submitScore({
+        generatedImageId: target.id,
+        overallScore: rating,
+        defectTags: defectTags.join(',') || undefined,
+        advantageTags: advantageTags.join(',') || undefined,
+        optimizationNote: note.trim() || undefined,
+        reviewConclusion: decision,
+      });
+      toast.success(decision === 'PASSED' ? '评分审核已通过' : '产物已打回');
+      await onCompleted();
+    } catch {
+      // 统一请求层展示具体错误
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/60" onClick={onClose} />
+      <section className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+        <header className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <p className="text-[11px] font-bold text-primary">图片单件评分与审核</p>
+            <h2 className="mt-1 text-lg font-black text-slate-900">产物 #{target.batchIdx ?? target.id}</h2>
+          </div>
+          <button onClick={onClose} className="material-symbols-outlined text-slate-400" aria-label="关闭审核">
+            close
+          </button>
+        </header>
+
+        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="flex min-h-72 items-center justify-center overflow-hidden bg-slate-100 p-4">
+            <img
+              src={withCosThumbnail(target.url, 960)}
+              alt="待审核产物"
+              className="max-h-[65vh] max-w-full object-contain"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
+          <aside className="space-y-5 overflow-y-auto p-5">
+            <div>
+              <p className="text-xs font-black text-slate-800">审核决定</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setDecision('PASSED')}
+                  className={`h-10 rounded text-xs font-bold ${
+                    decision === 'PASSED' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  通过
+                </button>
+                <button
+                  onClick={() => setDecision('REJECTED')}
+                  className={`h-10 rounded text-xs font-bold ${
+                    decision === 'REJECTED' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  打回
+                </button>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-800">综合评分 {rating} / 5</p>
+              <div className="mt-2 flex gap-1">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => setRating(value)}
+                    className={`material-symbols-outlined text-3xl ${
+                      value <= rating ? 'text-amber-400' : 'text-slate-300'
+                    }`}
+                    aria-label={`评分 ${value}`}
+                  >
+                    star
+                  </button>
+                ))}
+              </div>
+            </div>
+            <TagSelector
+              label="问题标签"
+              tags={DEFECT_TAGS}
+              selected={defectTags}
+              onToggle={(tag) => toggleTag(tag, setDefectTags)}
+              activeClass="border-red-300 bg-red-50 text-red-700"
+            />
+            <TagSelector
+              label="优点标签"
+              tags={ADVANTAGE_TAGS}
+              selected={advantageTags}
+              onToggle={(tag) => toggleTag(tag, setAdvantageTags)}
+              activeClass="border-emerald-300 bg-emerald-50 text-emerald-700"
+            />
+
+            <label className="block text-xs font-black text-slate-800">
+              {decision === 'REJECTED' ? '打回原因' : '审核意见'}
+              <textarea
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                className="mt-2 h-28 w-full resize-none rounded-lg border border-slate-200 p-3 text-xs font-normal leading-5 outline-none focus:border-primary"
+                placeholder={decision === 'REJECTED'
+                  ? '请填写明确的打回原因'
+                  : '可填写评价或说明'}
+              />
+            </label>
+          </aside>
+        </div>
+
+        <footer className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <button onClick={onClose} disabled={submitting} className="h-9 rounded-lg border border-slate-200 px-4 text-xs font-bold">
+            取消
+          </button>
+          <button
+            onClick={() => void submit()}
+            disabled={submitting}
+            className="h-9 rounded-lg bg-primary px-5 text-xs font-bold text-white disabled:opacity-50"
+          >
+            {submitting ? '提交中…' : '提交决策评分'}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+};
+
+const TagSelector: React.FC<{
+  label: string;
+  tags: string[];
+  selected: string[];
+  onToggle: (tag: string) => void;
+  activeClass: string;
+}> = ({ label, tags, selected, onToggle, activeClass }) => (
+  <div>
+    <p className="text-xs font-black text-slate-800">{label}</p>
+    <div className="mt-2 flex flex-wrap gap-2">
+      {tags.map((tag) => (
+        <button
+          key={tag}
+          onClick={() => onToggle(tag)}
+          className={`rounded border px-2.5 py-1.5 text-[11px] font-bold ${
+            selected.includes(tag) ? activeClass : 'border-slate-200 text-slate-500'
+          }`}
+        >
+          {tag}
+        </button>
+      ))}
+    </div>
+  </div>
+);
 
 const InfoCard: React.FC<{ label: string; value?: string; children?: React.ReactNode }> = ({ label, value, children }) => (
   <div className="rounded-xl border border-slate-200 bg-white p-4">

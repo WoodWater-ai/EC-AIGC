@@ -30,7 +30,7 @@ const STATUS_FILTERS: Array<{
   { id: 'pending', label: '等待中', statuses: ['DRAFT', 'PENDING'] },
   { id: 'running', label: '生成中', statuses: ['GENERATING'] },
   { id: 'review', label: '待审核', statuses: ['PENDING_REVIEW_SCORE', 'PENDING_REVIEW_PUBLISH'] },
-  { id: 'completed', label: '已归档', statuses: ['ARCHIVED', 'COMPLETED'] },
+  { id: 'completed', label: '审核完成', statuses: ['ARCHIVED', 'COMPLETED'] },
   { id: 'failed', label: '失败', statuses: ['FAILED'] },
   { id: 'rejected', label: '已打回', statuses: ['REJECTED'] },
   { id: 'cancelled', label: '已取消', statuses: ['CANCELED'] },
@@ -41,12 +41,12 @@ const STATUS_META: Record<TaskStatus, { label: string; style: string }> = {
   PENDING: { label: '等待生成', style: 'bg-slate-100 text-slate-600' },
   GENERATING: { label: '生成中', style: 'bg-blue-50 text-primary' },
   PENDING_REVIEW_SCORE: { label: '待审美评分', style: 'bg-amber-50 text-amber-700' },
-  PENDING_REVIEW_PUBLISH: { label: '待上架审核', style: 'bg-violet-50 text-violet-700' },
-  ARCHIVED: { label: '已归档', style: 'bg-emerald-50 text-emerald-700' },
+  PENDING_REVIEW_PUBLISH: { label: '待审美评分', style: 'bg-amber-50 text-amber-700' },
+  ARCHIVED: { label: '审核完成', style: 'bg-emerald-50 text-emerald-700' },
   REJECTED: { label: '已打回', style: 'bg-rose-50 text-rose-700' },
   CANCELED: { label: '已取消', style: 'bg-slate-100 text-slate-500' },
   FAILED: { label: '生成失败', style: 'bg-red-50 text-red-700' },
-  COMPLETED: { label: '已完成', style: 'bg-emerald-50 text-emerald-700' },
+  COMPLETED: { label: '审核完成', style: 'bg-emerald-50 text-emerald-700' },
 };
 
 const IMAGE_TYPE_LABELS: Record<string, string> = {
