@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { useTaskParams } from '../../createTask/useTaskParams';
 import { ParamSchemaForm } from '../../common/ParamSchemaForm';
+import { localValidate } from '../../common/ParamSchemaForm/utils/validate';
 import { UnsupportedNotice } from './UnsupportedNotice';
 import { messages } from '../../../labels/createImageTask';
 
@@ -18,6 +19,7 @@ export interface TaskParamsSnapshot {
    * 不传则 hook 用 Vidu 能力 schema 的默认/推荐值兜底。
    */
   schemaParams?: Record<string, any>;
+  executionParamsReady: boolean;
 }
 
 /** ratio 由 useCreateImageTaskState 内部维护;本节不再展示。
@@ -40,6 +42,9 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
 
   // 选中状态变化时通知父组件
   useEffect(() => {
+    const schemaValid = !!tp.schema
+      && localValidate(tp.schemaParams, tp.schema.fields ?? []).length === 0;
+    const modelSelected = !!tp.modelId || tp.modelsInGroup.length > 0;
     onParamsChange?.({
       channelId: tp.channelId,
       channelType: tp.channelType,
@@ -49,8 +54,12 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
       // aspect_ratio / resolution 等参数不会进提交 payload;
       // 之前 useCreateImageTaskState 写死 ratio='16:9' 正是因为收不到这个值。
       schemaParams: tp.schemaParams,
+      executionParamsReady: !!tp.channelId
+        && !!tp.capability
+        && modelSelected
+        && schemaValid,
     });
-  }, [tp.channelId, tp.channelType, tp.capability, tp.modelId, tp.schemaParams, onParamsChange]);
+  }, [tp.channelId, tp.channelType, tp.capability, tp.modelId, tp.modelsInGroup, tp.schema, tp.schemaParams, onParamsChange]);
 
   return (
     <div

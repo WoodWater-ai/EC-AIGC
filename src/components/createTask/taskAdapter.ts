@@ -10,20 +10,24 @@
  *
  * 不放 buildSubmitPayload 那种"组装请求"的文件,这里专做"展示适配"。
  */
-import type { GenerationTaskResponse, TaskStatus } from '../../../types';
-import type { GenerationTask, ProductAsset } from '../../../types';
+import type { GenerationTaskResponse, TaskStatus } from '../../types';
+import type { GenerationTask, ProductAsset } from '../../types';
 
 /** 后端 6 态 → 前端 5 态(按 spec 决策) */
 function mapTaskStatus(s: TaskStatus): GenerationTask['status'] {
   switch (s) {
+    case 'DRAFT':
     case 'PENDING':
     case 'GENERATING':
       return 'running';
     case 'PENDING_REVIEW_SCORE':
+    case 'PENDING_REVIEW_PUBLISH':
+    case 'ARCHIVED':
     case 'COMPLETED':
       return 'completed';
     case 'FAILED':
       return 'failed';
+    case 'REJECTED':
     case 'CANCELED':
       return 'rejected';
     default:

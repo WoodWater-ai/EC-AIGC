@@ -27,7 +27,6 @@ import { taskApi } from './api/modules/task';
 import { toUIGenerationTask } from './components/createTask/taskAdapter';
 
 import {
-  mockTasks,
   mockProducts,
   mockNotifications
 } from './mockData';
@@ -81,6 +80,7 @@ export default function App() {
   // 旧版本初始值是 LOGIN（依赖 user 未持久化），现在 AuthProvider 会用 /me 恢复 user。
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
   const [highlightGroupId, setHighlightGroupId] = useState<string | null>(null);
+  const [highlightTaskKind, setHighlightTaskKind] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
 
   const setScreen = (screen: AppScreen, payload?: { highlightGroupId?: string }) => {
     setCurrentScreen(screen);
@@ -93,17 +93,16 @@ export default function App() {
   const [products, setProducts] = useState<ProductAsset[]>(mockProducts);
   const [notifications, setNotifications] = useState<SystemNotification[]>(mockNotifications);
 
-  // [2026-07-16 P0] 任务列表 —— 拉真接口 /v1/task/my-page,failure fallback mockTasks
-  // 数据用 useServiceQuery 自动重试;失败 toast 警告;fallback 保留以保持首屏可用
+  // 工作台摘要仍使用 /v1/task/my-page；任务列表页内部使用批次分页接口。
   const tasksQuery = useServiceQuery(() => taskApi.myPage({ pageNum: 1, pageSize: 50 }), []);
   const realTasks: GenerationTask[] = useMemo(() => {
     const list = tasksQuery.data?.list ?? [];
     return list.map((r) => toUIGenerationTask(r, products));
   }, [tasksQuery.data, products]);
-  const tasks = realTasks.length > 0 ? realTasks : mockTasks;
+  const tasks = realTasks;
   useEffect(() => {
     if (tasksQuery.error) {
-      console.warn('[App] /v1/task/my-page 失败,使用 mock 数据:', tasksQuery.error);
+      console.warn('[App] /v1/task/my-page 加载失败:', tasksQuery.error);
     }
   }, [tasksQuery.error]);
 
@@ -154,15 +153,10 @@ export default function App() {
   }, []);
 
   // State Mutators
-  const handleAddTask = (info: { groupId: string; taskIds: string[] }) => {
+  const handleAddTask = (info: { groupId: string; taskIds: string[]; taskKind?: 'IMAGE' | 'VIDEO' }) => {
     setHighlightGroupId(info.groupId);
+    if (info.taskKind) setHighlightTaskKind(info.taskKind);
     setCurrentScreen(AppScreen.TASKS);
-  };
-
-  const handleUpdateTask = (_updatedTask: GenerationTask) => {
-    // [2026-07-16 P0] tasks 已改为 useServiceQuery 真接口,不再有 setTasks
-    // 父列表数据刷新由 onRefresh / refetch 触发;Drawer 内部 setState 暂不联动后端
-    // 实际编辑类操作(评分/批注)二期接后端
   };
 
   const handleUpdateUserRole = (userId: string, newRole: any, newDeptId?: string) => {
@@ -190,13 +184,9 @@ export default function App() {
       case AppScreen.TASKS:
         return (
           <TaskList
-            tasks={tasks}
-            products={products}
-            onAddTask={handleAddTask}
-            onUpdateTask={handleUpdateTask}
             highlightGroupId={highlightGroupId}
+            highlightTaskKind={highlightTaskKind}
             setScreen={setScreen}
-            onRefresh={() => tasksQuery.refetch()}
           />
         );
       case AppScreen.CREATE_IMAGE_TASK:

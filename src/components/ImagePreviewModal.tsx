@@ -123,7 +123,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
               <button
                 key={i}
                 onClick={() => { setErrored(false); setIndex(i); }}
-                className={`w-12 h-12 rounded overflow-hidden border-2 shrink-0 cursor-pointer ${
+                className={`grid w-12 h-12 place-items-center rounded overflow-hidden border-2 bg-white p-1 shrink-0 cursor-pointer ${
                   i === index ? 'border-primary' : 'border-transparent opacity-60 hover:opacity-100'
                 }`}
                 aria-label={`查看第 ${i + 1} 张`}
@@ -131,7 +131,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                 <img
                   src={img.url}
                   alt={img.label ?? `thumb-${i}`}
-                  className="w-full h-full object-cover"
+                  className="block h-auto max-h-full w-auto max-w-full object-contain object-center"
                   referrerPolicy="no-referrer"
                   loading="lazy"
                 />

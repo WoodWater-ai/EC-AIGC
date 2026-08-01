@@ -1,752 +1,570 @@
-import React, { useState, useEffect } from 'react';
-import { GenerationTask, ProductAsset, AppScreen } from '../types';
-import type { GeneratedImageVO } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import type {
+  ChannelAsyncTask,
+  TaskGroupItemResponse,
+  TaskGroupResponse,
+  TaskResultPreviewResponse,
+  TaskStatus,
+} from '../types';
 import { taskApi } from '../api/modules/task';
+import { asyncTaskApi } from '../api/modules/asyncTask';
+import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import { withCosThumbnail } from '../utils/cosImage';
+import { ImagePreviewModal } from './ImagePreviewModal';
+import { toast } from 'sonner';
 
 interface TaskDetailsDrawerProps {
-  task: GenerationTask;
-  taskIds: string[];
-  products: ProductAsset[];
+  group: TaskGroupResponse;
+  initialTaskId?: string;
   onClose: () => void;
-  onUpdateTask: (task: GenerationTask) => void;
-  initialTab?: 'overview' | 'inputs' | 'results' | 'reviews' | 'costs';
+  onChanged?: () => void;
 }
 
-function TaskResultsTab({ taskIds }: { taskIds: string[] }) {
-  const [results, setResults] = useState<GeneratedImageVO[]>([]);
-  const taskIdsKey = taskIds.join(',');
+type DetailTab = 'overview' | 'results' | 'inputs' | 'diagnostics';
 
-  useEffect(() => {
-    if (!taskIds.length) return;
-    let tick = 0;
-    let cancelled = false;
+const STATUS_META: Record<TaskStatus, { label: string; style: string }> = {
+  DRAFT: { label: '草稿', style: 'bg-slate-100 text-slate-600' },
+  PENDING: { label: '等待生成', style: 'bg-slate-100 text-slate-600' },
+  GENERATING: { label: '生成中', style: 'bg-blue-50 text-primary' },
+  PENDING_REVIEW_SCORE: { label: '待审美评分', style: 'bg-amber-50 text-amber-700' },
+  PENDING_REVIEW_PUBLISH: { label: '待上架审核', style: 'bg-violet-50 text-violet-700' },
+  ARCHIVED: { label: '已归档', style: 'bg-emerald-50 text-emerald-700' },
+  REJECTED: { label: '已打回', style: 'bg-rose-50 text-rose-700' },
+  CANCELED: { label: '已取消', style: 'bg-slate-100 text-slate-500' },
+  FAILED: { label: '生成失败', style: 'bg-red-50 text-red-700' },
+  COMPLETED: { label: '已完成', style: 'bg-emerald-50 text-emerald-700' },
+};
 
-    const fetchOnce = async () => {
-      const data = await taskApi.fetchGeneratedImagesBatch(taskIds);
-      if (cancelled) return;
-      setResults(data);
-      const allTerminal = data.length > 0 && data.every((result) =>
-        ['PASSED', 'REJECTED', 'UNAVAILABLE', 'FAILED'].includes(result.status)
-      );
-      return allTerminal;
-    };
+const IMAGE_TYPE_LABELS: Record<string, string> = {
+  PRODUCT_MAIN: '商品主图',
+  SCENE_DETAIL: '详情/场景图',
+  DETAIL_SCENE: '详情/场景图',
+  DETAIL_CLOSEUP: '细节图',
+  DETAIL: '细节图',
+  MODEL_TRIPLE_VIEW: '模特三视图',
+  ON_MODEL: '模特三视图',
+  VIDEO: '视频任务',
+};
 
-    fetchOnce().then((terminal) => {
-      if (terminal || cancelled) return;
-      const interval = window.setInterval(async () => {
-        tick++;
-        const isTerminal = await fetchOnce();
-        if (isTerminal || tick >= 60 || cancelled) window.clearInterval(interval);
-      }, 3000);
-    });
+const isActive = (status: TaskStatus) =>
+  ['DRAFT', 'PENDING', 'GENERATING'].includes(status);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [taskIdsKey]);
+const taskLabel = (task: TaskGroupItemResponse) =>
+  IMAGE_TYPE_LABELS[task.imageType ?? task.taskType] ?? task.title;
 
-  if (results.length === 0) {
-    return (
-      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
-        <span className="material-symbols-outlined text-4xl block mb-2 animate-spin text-slate-300">sync</span>
-        <span>任务正在努力生成中，生成结果会自动刷新...</span>
-      </div>
-    );
+const formatDateTime = (value?: string | null) =>
+  value ? value.replace('T', ' ').slice(0, 19) : '—';
+
+const parseParams = (value?: string | null): Record<string, unknown> => {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
   }
+};
 
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      {results.map((img) => (
-        <div key={img.id} className="border border-slate-200 rounded-xl p-2 bg-white">
-          <img
-            src={img.thumbnailUrl ?? img.imageUrl}
-            alt={img.taskId}
-            className="w-full aspect-square object-cover rounded-lg"
-            referrerPolicy="no-referrer"
-          />
-          <div className="text-xs mt-2 flex items-center gap-2">
-            <span className={
-              img.status === 'PASSED' ? 'text-success' :
-              img.status === 'REJECTED' ? 'text-danger' :
-              img.status === 'FAILED' ? 'text-red-900' :
-              'text-text-muted'
-            }>
-              {img.status}
-            </span>
-            {img.score != null && <span>★ {img.score.toFixed(1)}</span>}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+const resultPreviewUrl = (result: TaskResultPreviewResponse) =>
+  result.mediaType === 'IMAGE'
+    ? result.url
+    : result.thumbnailUrl || result.url;
 
 export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
-  task,
-  taskIds,
-  products,
+  group: initialGroup,
+  initialTaskId,
   onClose,
-  onUpdateTask,
-  initialTab
+  onChanged,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'inputs' | 'results' | 'reviews' | 'costs'>('overview');
+  const [group, setGroup] = useState(initialGroup);
+  const [selectedTaskId, setSelectedTaskId] = useState(
+    initialTaskId ?? initialGroup.tasks[0]?.id,
+  );
+  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+  const [imagePreview, setImagePreview] = useState<{ results: TaskResultPreviewResponse[]; index: number } | null>(null);
+  const [videoPreview, setVideoPreview] = useState<TaskResultPreviewResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const selectedTask = group.tasks.find((task) => task.id === selectedTaskId)
+    ?? group.tasks[0];
+
+  const refreshGroup = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const detail = await taskApi.groupDetail(group.groupId);
+      setGroup(detail);
+      setSelectedTaskId((current) =>
+        detail.tasks.some((task) => task.id === current) ? current : detail.tasks[0]?.id);
+      onChanged?.();
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [initialTab, task]);
-  
-  // Find associated product
-  const associatedProduct = products.find(p => p.name === task.productName) || products[0];
+    void refreshGroup();
+    if (!isActive(initialGroup.status)) return;
+    const timer = window.setInterval(() => void refreshGroup(true), 4000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialGroup.groupId]);
 
-  // Local state for generated images with ratings
-  const [generatedImages, setGeneratedImages] = useState<any[]>([]);
-  // Local state for review history
-  const [reviews, setReviews] = useState<any[]>([]);
-  // Copy feedback state
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
-
-  // Active image being rated/reviewed
-  const [activeReviewImgId, setActiveReviewImgId] = useState<string | null>(null);
-  const [reviewStatus, setReviewStatus] = useState<'approved' | 'rejected'>('approved');
-  const [reviewRating, setReviewRating] = useState<number>(5);
-  const [reviewComment, setReviewComment] = useState<string>('');
-
-  // Refined scoring sub-dimensions
-  const [reviewAccuracy, setReviewAccuracy] = useState<number>(4.0);
-  const [reviewConsistency, setReviewConsistency] = useState<number>(4.0);
-  const [reviewComposition, setReviewComposition] = useState<number>(4.0);
-  const [reviewTexture, setReviewTexture] = useState<number>(4.0);
-  const [selectedReviewTags, setSelectedReviewTags] = useState<string[]>([]);
-  const [availableReviewTags, setAvailableReviewTags] = useState<string[]>([
-    '主体漂移', '色彩失真', '布料闪烁', '人物扭曲', '视频水印'
-  ]);
-  const [showCustomTagInput, setShowCustomTagInput] = useState<boolean>(false);
-  const [newCustomTag, setNewCustomTag] = useState<string>('');
-
-  // Automatically calculate the overall rating based on sub-dimensions
-  useEffect(() => {
-    if (activeReviewImgId) {
-      const avg = (reviewAccuracy + reviewConsistency + reviewComposition + reviewTexture) / 4;
-      setReviewRating(parseFloat(avg.toFixed(1)));
-    }
-  }, [reviewAccuracy, reviewConsistency, reviewComposition, reviewTexture, activeReviewImgId]);
-
-  // Timeline / Quick review states
-  const [quickComment, setQuickComment] = useState('');
-  const [quickRating, setQuickRating] = useState(5);
-  const [quickStatus, setQuickStatus] = useState<'approved' | 'rejected'>('approved');
-
-  // Initialize data once drawer opens
-  useEffect(() => {
-    // 1. Generate mockup images for completed tasks
-    if (task.status === 'completed' || task.status === 'rejected') {
-      const imagesList = task.generatedImages && task.generatedImages.length > 0 
-        ? task.generatedImages 
-        : [
-            { id: 'img-1', url: task.resultUrl || task.productImg, rating: task.rating || 5, status: task.status === 'rejected' ? 'rejected' : 'approved', comment: '商品主体保真度高，边缘合成良好。' },
-            { id: 'img-2', url: associatedProduct?.files[1]?.url || task.productImg, rating: 4, status: 'approved', comment: '材质纹理细腻，符合极简冷淡风。' },
-            { id: 'img-3', url: associatedProduct?.files[2]?.url || task.productImg, rating: 5, status: 'approved', comment: '整体高奢，背景光影效果拉满。' },
-            { id: 'img-4', url: associatedProduct?.thumbnail || task.productImg, rating: 3, status: 'pending', comment: '脚部透视有轻微偏差，需微调。' }
-          ];
-      setGeneratedImages(imagesList);
-    } else {
-      setGeneratedImages([]);
-    }
-
-    // 2. Generate default reviews
-    const defaultReviews = task.reviews && task.reviews.length > 0 
-      ? task.reviews 
-      : [
-          {
-            id: 'rev-1',
-            reviewer: '陈美晴',
-            rating: 4,
-            status: 'approved',
-            comment: '一审通过。光效融合度良好，商品无漂移，白鸭绒外壳质感表达完美。',
-            timestamp: '2026-07-03 15:42'
-          },
-          ...(task.status === 'rejected' ? [{
-            id: 'rev-2',
-            reviewer: '林若云 (客户)',
-            rating: 2,
-            status: 'rejected',
-            comment: task.feedback || '高光部分有些许过曝，拉低了整体的高级感，建议降低参数重新运行。',
-            timestamp: '2026-07-03 16:15'
-          }] : [])
-        ];
-    setReviews(defaultReviews);
-  }, [task, associatedProduct]);
-
-  // Copy prompt helper
-  const handleCopyPrompt = () => {
-    const promptText = task.params?.prompt || `A premium studio product photography of ${task.productName}, clean marble stone display, morning shadow play, minimal aesthetics, highly detailed textures, 8k render.`;
-    navigator.clipboard.writeText(promptText);
-    setCopiedPrompt(true);
-    setTimeout(() => setCopiedPrompt(false), 2000);
-  };
-
-  // Submit rating for an individual image
-  const handleSubmitImageReview = (imgId: string) => {
-    const updated = generatedImages.map(img => {
-      if (img.id === imgId) {
-        return {
-          ...img,
-          status: reviewStatus,
-          rating: reviewRating,
-          accuracyRating: reviewAccuracy,
-          consistencyRating: reviewConsistency,
-          compositionRating: reviewComposition,
-          textureRating: reviewTexture,
-          problemTags: selectedReviewTags,
-          comment: reviewComment || (reviewStatus === 'approved' ? '审核通过，效果极佳。' : '审核不通过，建议重绘。')
-        };
-      }
-      return img;
-    });
-
-    setGeneratedImages(updated);
-
-    // Append to timeline reviews
-    const newReview = {
-      id: `rev-gen-${Date.now()}`,
-      reviewer: '陆永奇 (当前用户)',
-      rating: reviewRating,
-      status: reviewStatus,
-      comment: `针对生成图 #${imgId.split('-')[1]} 的单评: ${reviewComment || (reviewStatus === 'approved' ? '审核通过' : '审核退回')}`,
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16)
-    };
-
-    const newReviewsList = [...reviews, newReview];
-    setReviews(newReviewsList);
-
-    // Sync back to main parent task state
-    onUpdateTask({
-      ...task,
-      rating: Math.round(newReviewsList.reduce((acc, r) => acc + r.rating, 0) / newReviewsList.length),
-      generatedImages: updated,
-      reviews: newReviewsList
-    });
-
-    // Reset review form
-    setActiveReviewImgId(null);
-    setReviewComment('');
-  };
-
-  // Submit quick review timeline record
-  const handleAddQuickReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickComment.trim()) return;
-
-    const newReview = {
-      id: `rev-quick-${Date.now()}`,
-      reviewer: '陆永奇 (当前用户)',
-      rating: quickRating,
-      status: quickStatus,
-      comment: quickComment,
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16)
-    };
-
-    const newReviewsList = [...reviews, newReview];
-    setReviews(newReviewsList);
-
-    // Update parent task
-    onUpdateTask({
-      ...task,
-      status: quickStatus === 'approved' ? 'completed' : 'rejected',
-      feedback: quickStatus === 'rejected' ? quickComment : undefined,
-      reviews: newReviewsList,
-      rating: Math.round(newReviewsList.reduce((acc, r) => acc + r.rating, 0) / newReviewsList.length)
-    });
-
-    setQuickComment('');
-  };
-
-  // Cost data calculation matching the task type
-  const cost = task.type === 'video' ? 120 : (task.params?.steps || 30) * 3;
-  const breakdown = task.costBreakdown || {
-    compute: Math.round(cost * 0.55),
-    steps: Math.round(cost * 0.20),
-    upscaler: Math.round(cost * 0.15),
-    bandwidth: Math.round(cost * 0.10)
-  };
+  if (!selectedTask) return null;
+  const meta = STATUS_META[selectedTask.status];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Background overlay */}
-      <div 
-        onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity duration-300"
-      />
-
-      {/* Slide-out drawer panel */}
-      <div className="relative bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col z-10 animate-slideLeft border-l border-slate-200">
-        
-        {/* Header Section */}
-        <header className="px-6 py-5 border-b border-slate-150 flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-3">
-            <h2 className="text-base lg:text-lg font-black text-slate-800 tracking-tight">#{task.id} 任务详情</h2>
-            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 ${
-              task.status === 'running' ? 'bg-blue-50 text-blue-600 border border-blue-200' :
-              task.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
-              task.status === 'failed' ? 'bg-red-50 text-red-600 border border-red-200' :
-              'bg-amber-50 text-amber-600 border border-amber-200'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                task.status === 'running' ? 'bg-blue-500 animate-pulse' :
-                task.status === 'completed' ? 'bg-emerald-500' :
-                task.status === 'failed' ? 'bg-red-500' : 'bg-amber-500'
-              }`} />
-              {task.status === 'running' ? '生成中' :
-               task.status === 'completed' ? '已完成' :
-               task.status === 'failed' ? '生成失败' : '被退回'}
-            </span>
+    <div className="fixed inset-0 z-[80] flex justify-end">
+      <div className="absolute inset-0 bg-slate-950/35" onClick={onClose} />
+      <section className="relative flex h-full w-full max-w-6xl flex-col bg-slate-50 shadow-2xl">
+        <header className="flex items-start justify-between border-b border-slate-200 bg-white px-6 py-4">
+          <div>
+            <p className="font-mono text-[11px] font-bold text-primary">批次详情 · {group.groupId}</p>
+            <h2 className="mt-1 text-lg font-black text-slate-900">{group.productName}</h2>
+            <p className="mt-1 text-[11px] text-slate-400">
+              提交时间：{formatDateTime(group.submittedAt)} · {group.taskCount} 个业务子任务 · {group.resultCount} 个产物
+            </p>
           </div>
-          <button 
-            onClick={onClose} 
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined font-bold text-xl">close</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void refreshGroup()}
+              className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500"
+              title="刷新批次"
+            >
+              <span className={`material-symbols-outlined text-lg ${loading ? 'animate-spin' : ''}`}>refresh</span>
+            </button>
+            <button onClick={onClose} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="关闭">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
         </header>
 
-        {/* Multi-Tab Navigation Row */}
-        <div className="px-6 border-b border-slate-100 bg-white shrink-0 flex space-x-6 text-sm font-semibold select-none">
-          {[
-            { id: 'overview', label: '概览' },
-            { id: 'inputs', label: '输入素材' },
-            { id: 'results', label: '生成结果' },
-            { id: 'reviews', label: '审核记录' },
-            { id: 'costs', label: '成本明细' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`py-3.5 border-b-2 transition-all cursor-pointer ${
-                activeTab === tab.id 
-                  ? 'border-[#0054cd] text-[#0054cd] font-extrabold' 
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Scrollable Container */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
-          
-          {/* TAB 1: 概览 (Overview) */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              
-              {/* 输入素材 Section */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-3.5 bg-blue-600 rounded-full" />
-                  <h3 className="text-xs lg:text-sm font-extrabold text-slate-800">输入素材</h3>
-                </div>
-                
-                <div className="grid grid-cols-4 gap-3">
-                  {/* Item 1: 原图 */}
-                  <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col justify-between items-center h-[130px] shadow-2xs hover:shadow-xs transition-shadow">
-                    <div className="w-14 h-14 bg-slate-50 rounded-lg overflow-hidden border border-slate-100 flex items-center justify-center">
-                      <img src={task.productImg} alt="原图" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1.5 truncate w-full">原图</span>
-                  </div>
-
-                  {/* Item 2: 风格 */}
-                  <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col justify-between items-center h-[130px] shadow-2xs">
-                    <div className="w-14 h-14 bg-[#eff4ff] rounded-lg border border-blue-100 flex items-center justify-center text-blue-500">
-                      <span className="material-symbols-outlined text-2xl">style</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1.5 truncate w-full">风格参考</span>
-                  </div>
-
-                  {/* Item 3: 场景 */}
-                  <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col justify-between items-center h-[130px] shadow-2xs">
-                    <div className="w-14 h-14 bg-[#f1fcf8] rounded-lg border border-emerald-100 flex items-center justify-center text-emerald-500">
-                      <span className="material-symbols-outlined text-2xl">landscape</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1.5 truncate w-full">场景参考</span>
-                  </div>
-
-                  {/* Item 4: 姿态 */}
-                  <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col justify-between items-center h-[130px] shadow-2xs">
-                    <div className="w-14 h-14 bg-[#fff9eb] rounded-lg border border-amber-100 flex items-center justify-center text-amber-500">
-                      <span className="material-symbols-outlined text-2xl">accessibility</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 mt-1.5 truncate w-full">姿态参考</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 商品信息 Section */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-3.5 bg-blue-600 rounded-full" />
-                  <h3 className="text-xs lg:text-sm font-extrabold text-slate-800">商品信息</h3>
-                </div>
-                
-                <div className="bg-blue-50/40 rounded-xl p-5 border border-blue-100/50 space-y-4">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">商品名称</label>
-                    <span className="text-xs lg:text-sm font-extrabold text-slate-800 leading-tight">
-                      {associatedProduct?.name || task.productName}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 pt-1">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">类目</label>
-                      <span className="text-xs font-bold text-slate-700">
-                        {associatedProduct?.category || '户外服饰'}
-                      </span>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">颜色/花色</label>
-                      <span className="text-xs font-bold text-slate-700">
-                        {associatedProduct?.specs?.color?.join('、') || '极美火山灰'}
-                      </span>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">面料</label>
-                      <span className="text-xs font-bold text-slate-700">
-                        {associatedProduct?.specs?.material || '抗撕裂科技纤维面料'}
-                      </span>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">核心卖点</label>
-                      <span className="text-xs font-bold text-slate-700">
-                        {associatedProduct?.specs?.sellingPoints?.slice(0, 2).join('、') || '防风透湿、极轻量设计'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 任务参数 Section */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-3.5 bg-blue-600 rounded-full" />
-                  <h3 className="text-xs lg:text-sm font-extrabold text-slate-800">任务参数</h3>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: '任务类型', value: task.type === 'image' ? '商品主图' : '视频脚本' },
-                    { label: '风格', value: task.type === 'image' ? '甜美网红风' : '爆破粒子风' },
-                    { label: '场景', value: task.type === 'image' ? '北欧极简石室' : '三维炫彩粒子' },
-                    { label: '比例', value: task.params?.ratio || '1:1' },
-                    { label: '生成数量', value: task.type === 'image' ? '24张' : '1个' },
-                    { label: '模型通道', value: task.modelChannel || 'DaVinci Vision v3.5' }
-                  ].map((param, i) => (
-                    <div key={i} className="bg-white p-3.5 rounded-xl border border-slate-200">
-                      <span className="text-[10px] font-bold text-slate-400 block mb-1">{param.label}</span>
-                      <span className="text-xs font-extrabold text-slate-800">{param.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 提示词预览 Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-3.5 bg-blue-600 rounded-full" />
-                    <h3 className="text-xs lg:text-sm font-extrabold text-slate-800">提示词预览</h3>
-                  </div>
-                  <button 
-                    onClick={handleCopyPrompt}
-                    className="text-xs text-blue-600 font-extrabold flex items-center gap-1 hover:text-blue-700 cursor-pointer"
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[250px_minmax(0,1fr)]">
+          <aside className="overflow-y-auto border-r border-slate-200 bg-white p-4">
+            <p className="mb-3 text-[10px] font-black uppercase tracking-wider text-slate-400">批次内任务</p>
+            <div className="space-y-2">
+              {group.tasks.map((task) => {
+                const taskMeta = STATUS_META[task.status];
+                return (
+                  <button
+                    key={task.id}
+                    onClick={() => setSelectedTaskId(task.id)}
+                    className={`w-full rounded-xl border p-3 text-left ${
+                      selectedTask.id === task.id
+                        ? 'border-primary bg-blue-50'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                    }`}
                   >
-                    <span className="material-symbols-outlined text-sm">{copiedPrompt ? 'check' : 'content_copy'}</span>
-                    {copiedPrompt ? '已复制成功' : '复制提示词'}
-                  </button>
-                </div>
-                
-                <div className="bg-slate-100 rounded-xl p-4 border border-slate-200">
-                  <p className="text-xs font-mono text-slate-600 leading-relaxed font-medium">
-                    {task.params?.prompt || `A premium product photography of ${task.productName}, placed on a minimalist sand plaster block with sharp hard morning sunlight. High dynamic range, soft shadows, 8k commercial quality.`}
-                  </p>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB 2: 输入素材 (Input Assets Details) */}
-          {activeTab === 'inputs' && (
-            <div className="space-y-4">
-              {[
-                { title: '商品主体原图 (Source Main Image)', size: '2.4 MB', resolution: '2048 x 2048', type: 'PNG', status: '解析正常 (提取率 99.8%)', img: task.productImg },
-                { title: '风格特征参考图 (Style Ref)', size: '1.8 MB', resolution: '1024 x 1024', type: 'JPG', status: '已转换为Latent特征向量', icon: 'style', bg: 'bg-[#eff4ff] text-blue-500' },
-                { title: '场景布局参考图 (Scene Ref)', size: '3.1 MB', resolution: '1920 x 1080', type: 'JPG', status: '空间景深及网格已映射', icon: 'landscape', bg: 'bg-[#f1fcf8] text-emerald-500' },
-                { title: '人模姿态参考图 (Pose Ref)', size: '1.2 MB', resolution: '1024 x 1024', type: 'PNG', status: '骨骼关节点检测完成', icon: 'accessibility', bg: 'bg-[#fff9eb] text-amber-500' }
-              ].map((input, idx) => (
-                <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 flex items-center gap-4 hover:shadow-sm transition-shadow">
-                  <div className="w-14 h-14 rounded-lg overflow-hidden border border-slate-100 flex items-center justify-center shrink-0">
-                    {input.img ? (
-                      <img src={input.img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <div className={`w-full h-full flex items-center justify-center ${input.bg}`}>
-                        <span className="material-symbols-outlined text-2xl">{input.icon}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-bold text-slate-800 truncate">{input.title}</h4>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400 mt-1 font-mono">
-                      <span>格式: {input.type}</span>
-                      <span>大小: {input.size}</span>
-                      <span>分辨率: {input.resolution}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <b className="truncate text-xs text-slate-800">{taskLabel(task)}</b>
+                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold ${taskMeta.style}`}>
+                        {taskMeta.label}
+                      </span>
                     </div>
-                  </div>
+                    <p className="mt-2 truncate font-mono text-[9px] text-slate-400">{task.taskCode || task.id}</p>
+                    <div className="mt-2 h-1 overflow-hidden rounded bg-slate-100">
+                      <div className="h-full bg-primary" style={{ width: `${task.progressPercent}%` }} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
 
-                  <div className="text-right shrink-0">
-                    <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[9px] font-bold px-2 py-0.5 rounded-full inline-block">
-                      {input.status}
-                    </span>
-                  </div>
-                </div>
+          <main className="flex min-h-0 flex-col">
+            <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-5 pt-3">
+              {([
+                ['overview', '概览'],
+                ['results', `生成结果 (${selectedTask.resultPreviews.length})`],
+                ['inputs', '输入与 Prompt'],
+                ['diagnostics', '执行诊断'],
+              ] as Array<[DetailTab, string]>).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={`border-b-2 px-4 py-3 text-xs font-bold ${
+                    activeTab === id
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-slate-500'
+                  }`}
+                >
+                  {label}
+                </button>
               ))}
             </div>
-          )}
 
-          {/* TAB 3: 生成结果 (poll-driven real data) */}
-          {activeTab === 'results' && (
-            <TaskResultsTab taskIds={taskIds} />
-          )}
-
-          {/* TAB 4: 审核记录 (Review Records History Timeline) */}
-          {activeTab === 'reviews' && (
-            <div className="space-y-6">
-              
-              {/* Audit Timeline List */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5 shadow-2xs">
-                <h4 className="text-xs font-extrabold text-slate-800">审批流程时间轴</h4>
-                
-                <div className="relative border-l border-slate-150 pl-5 ml-2.5 space-y-5">
-                  {reviews.map((rev, idx) => (
-                    <div key={rev.id} className="relative">
-                      {/* Anchor Dot */}
-                      <span className={`absolute -left-[27px] top-1 w-3 h-3 rounded-full border-2 border-white ring-4 ${
-                        rev.status === 'approved' ? 'bg-emerald-500 ring-emerald-50' : 'bg-red-500 ring-red-50'
-                      }`} />
-                      
-                      {/* Review Block Card */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-slate-800">{rev.reviewer}</span>
-                            <span className={`px-1.5 py-0.2 rounded text-[8px] font-black border ${
-                              rev.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
-                            }`}>
-                              {rev.status === 'approved' ? '审核通过' : '审核拒绝'}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-slate-400 font-mono">{rev.timestamp}</span>
-                        </div>
-
-                        {/* Stars row */}
-                        <div className="flex items-center gap-0.5">
-                          {Array.from({ length: 5 }).map((_, s) => (
-                            <span 
-                              key={s} 
-                              className={`material-symbols-outlined text-xs ${s < rev.rating ? 'text-amber-500' : 'text-slate-200'}`}
-                              style={{ fontVariationSettings: "'FILL' 1" }}
-                            >
-                              star
-                            </span>
-                          ))}
-                        </div>
-
-                        <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50 p-2.5 rounded-lg border border-slate-100/50">
-                          {rev.comment}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Form to submit an instant rating/review in the timeline */}
-              <form onSubmit={handleAddQuickReview} className="bg-white rounded-xl border border-[#b2c5ff]/40 p-5 space-y-4 shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-blue-600 text-lg font-bold">rate_review</span>
-                  <h4 className="text-xs font-extrabold text-slate-800">快捷新增批注 / 评分</h4>
-                </div>
-
-                {/* Score slider */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500">综合评分星级</span>
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setQuickRating(star)}
-                        className={`material-symbols-outlined text-xl cursor-pointer ${
-                          star <= quickRating ? 'text-amber-500' : 'text-slate-250'
-                        }`}
-                        style={{ fontVariationSettings: star <= quickRating ? "'FILL' 1" : "'FILL' 0" }}
-                      >
-                        star
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Decision */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500">综合审核决策</span>
-                  <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => setQuickStatus('approved')}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                        quickStatus === 'approved' ? 'bg-white text-emerald-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      通过 (Pass)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuickStatus('rejected')}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                        quickStatus === 'rejected' ? 'bg-white text-red-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      拒绝退回 (Reject)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Comment box */}
-                <div>
-                  <textarea
-                    value={quickComment}
-                    onChange={(e) => setQuickComment(e.target.value)}
-                    placeholder="输入协作评语或拒绝的反馈内容..."
-                    className="w-full text-xs font-medium border border-slate-200 focus:border-blue-500 rounded-xl p-3 h-16 outline-none resize-none transition-all bg-slate-50 focus:bg-white"
-                  />
-                </div>
-
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="submit"
-                    className="bg-[#0054cd] hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-xs font-extrabold cursor-pointer flex items-center gap-1 shadow-sm"
-                  >
-                    <span className="material-symbols-outlined text-sm">gavel</span>
-                    提交当前评分批注
-                  </button>
-                </div>
-              </form>
-
+            <div className="min-h-0 flex-1 overflow-y-auto p-5 lg:p-6">
+              {activeTab === 'overview' && (
+                <OverviewTab group={group} task={selectedTask} meta={meta} />
+              )}
+              {activeTab === 'results' && (
+                <ResultsTab
+                  task={selectedTask}
+                  onPreviewImages={(results, index) => setImagePreview({ results, index })}
+                  onPreviewVideo={setVideoPreview}
+                />
+              )}
+              {activeTab === 'inputs' && <InputsTab group={group} task={selectedTask} />}
+              {activeTab === 'diagnostics' && (
+                <DiagnosticsTab task={selectedTask} onTaskChanged={() => void refreshGroup()} />
+              )}
             </div>
-          )}
-
-          {/* TAB 5: 成本明细 (Cost Breakdown Visualization) */}
-          {activeTab === 'costs' && (
-            <div className="space-y-6">
-              
-              {/* Point Expenditure Summary box */}
-              <div className="bg-gradient-to-r from-slate-800 to-[#1D6FFF] text-white p-5 rounded-xl flex items-center justify-between shadow-md">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-300 tracking-wider uppercase block">预估等额算力成本</span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-black">{cost} Pts</span>
-                    <span className="text-xs font-bold text-slate-200">(等值大约 ¥ {task.type === 'video' ? '1.50' : '0.45'})</span>
-                  </div>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center border border-white/20">
-                  <span className="material-symbols-outlined text-2xl">toll</span>
-                </div>
-              </div>
-
-              {/* Breakdown Bars list */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5 shadow-2xs">
-                <h4 className="text-xs font-extrabold text-slate-800">算力损耗配比结构</h4>
-                
-                <div className="space-y-4">
-                  {/* Compute Core */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-600 flex items-center gap-1">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                        GPU 渲染核心算力
-                      </span>
-                      <span className="text-slate-800 font-mono">{breakdown.compute} Pts</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-blue-500 h-full rounded-full" style={{ width: `${(breakdown.compute / cost) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  {/* Steps fee */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-600 flex items-center gap-1">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                        渲染步数与高去噪增溢费
-                      </span>
-                      <span className="text-slate-800 font-mono">{breakdown.steps} Pts</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${(breakdown.steps / cost) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  {/* HD Upscaler */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-600 flex items-center gap-1">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                        超分像素放大与重构损耗
-                      </span>
-                      <span className="text-slate-800 font-mono">{breakdown.upscaler} Pts</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-amber-500 h-full rounded-full" style={{ width: `${(breakdown.upscaler / cost) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  {/* Storage / CDN */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-600 flex items-center gap-1">
-                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                        高保真存储及云端分发服务
-                      </span>
-                      <span className="text-slate-800 font-mono">{breakdown.bandwidth} Pts</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${(breakdown.bandwidth / cost) * 100}%` }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Resource saving tip */}
-              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200/50 flex gap-3">
-                <span className="material-symbols-outlined text-emerald-600 text-lg font-bold shrink-0">check_circle</span>
-                <div className="space-y-0.5">
-                  <h5 className="text-xs font-extrabold text-emerald-800">算力推荐优化建议</h5>
-                  <p className="text-[10px] text-emerald-600 leading-relaxed font-medium">
-                    您当前已勾选「DaVinci Vision v3.5 (自研推荐)」通道，在保障极佳画质的同时相比传统 Midjourney 通道已节省 35% 算力开销。
-                  </p>
-                </div>
-              </div>
-
-            </div>
-          )}
-
+          </main>
         </div>
+      </section>
 
-      </div>
+      {imagePreview && (
+        <ImagePreviewModal
+          images={imagePreview.results.map((result, index) => ({
+            url: result.url,
+            label: `${taskLabel(selectedTask)} · 产物 ${index + 1}`,
+          }))}
+          initialIndex={imagePreview.index}
+          onClose={() => setImagePreview(null)}
+        />
+      )}
+      {videoPreview && (
+        <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/75 p-6" onClick={() => setVideoPreview(null)}>
+          <div className="relative w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
+            <button
+              onClick={() => setVideoPreview(null)}
+              className="absolute -right-2 -top-10 text-white"
+              aria-label="关闭视频预览"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            <video src={videoPreview.url} controls autoPlay className="max-h-[82vh] w-full bg-black object-contain" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+const OverviewTab: React.FC<{
+  group: TaskGroupResponse;
+  task: TaskGroupItemResponse;
+  meta: { label: string; style: string };
+}> = ({ group, task, meta }) => {
+  const params = useMemo(() => parseParams(task.taskParamsJson), [task.taskParamsJson]);
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <InfoCard label="任务状态">
+          <span className={`inline-block rounded-md px-2 py-1 text-xs font-bold ${meta.style}`}>{meta.label}</span>
+        </InfoCard>
+        <InfoCard label="生成进度" value={`${task.progressPercent}%`} />
+        <InfoCard label="模型通道" value={task.modelChannelName || task.modelChannelId || '未记录'} />
+        <InfoCard label="产物数量" value={`${task.resultPreviews.length} / ${task.count ?? 0}`} />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <h3 className="text-sm font-black text-slate-800">任务配置</h3>
+          <dl className="mt-4 grid gap-4 text-xs sm:grid-cols-2">
+            <InfoRow label="业务类型" value={taskLabel(task)} />
+            <InfoRow label="生成比例" value={task.aspectRatio || String(params.aspect_ratio ?? '—')} />
+            <InfoRow label="模板" value={task.templateName || group.templateName || '未使用模板'} />
+            <InfoRow label="提交时间" value={formatDateTime(task.createTime)} />
+            <InfoRow label="预估成本" value={task.estimatedCost == null ? '—' : `${task.estimatedCost} Pts`} />
+            <InfoRow label="实际成本" value={task.actualCost == null ? '—' : `${task.actualCost} Pts`} />
+          </dl>
+        </section>
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <h3 className="text-sm font-black text-slate-800">关联商品</h3>
+          <div className="mt-4 flex items-center gap-3">
+            {group.productImage ? (
+              <img
+                src={withCosThumbnail(group.productImage, 200)}
+                alt={group.productName}
+                className="block h-24 w-24 rounded-lg border border-slate-200 bg-white p-2 object-contain object-center"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="grid h-24 w-24 place-items-center rounded-lg bg-slate-100 text-slate-300">
+                <span className="material-symbols-outlined text-3xl">inventory_2</span>
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-slate-800">{group.productName}</p>
+              <p className="mt-2 font-mono text-[10px] text-slate-400">商品 ID：{group.productId || '未绑定'}</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {task.status === 'FAILED' && (
+        <section className="rounded-xl border border-red-200 bg-red-50 p-5">
+          <h3 className="text-sm font-black text-red-800">失败原因</h3>
+          <p className="mt-2 text-xs leading-6 text-red-700">{task.failReason || '后端未记录失败原因'}</p>
+          {task.failCode && <p className="mt-1 font-mono text-[10px] text-red-500">{task.failCode}</p>}
+        </section>
+      )}
+    </div>
+  );
+};
+
+const ResultsTab: React.FC<{
+  task: TaskGroupItemResponse;
+  onPreviewImages: (results: TaskResultPreviewResponse[], index: number) => void;
+  onPreviewVideo: (result: TaskResultPreviewResponse) => void;
+}> = ({ task, onPreviewImages, onPreviewVideo }) => {
+  const imageResults = task.resultPreviews.filter((result) => result.mediaType === 'IMAGE');
+  if (task.resultPreviews.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-400">
+        {isActive(task.status) ? `正在生成，当前进度 ${task.progressPercent}%` : '当前任务暂无产物'}
+      </div>
+    );
+  }
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {task.resultPreviews.map((result, index) => {
+        const imageIndex = imageResults.findIndex((item) => item.id === result.id);
+        return (
+          <article key={result.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <button
+              onClick={() => result.mediaType === 'VIDEO'
+                ? onPreviewVideo(result)
+                : onPreviewImages(imageResults, imageIndex)}
+              className="relative flex h-64 w-full items-center justify-center overflow-hidden bg-slate-100 p-3"
+            >
+              <img
+                src={withCosThumbnail(resultPreviewUrl(result), 720)}
+                alt={`产物 ${index + 1}`}
+                className="max-h-full max-w-full object-contain"
+                referrerPolicy="no-referrer"
+              />
+              {result.mediaType === 'VIDEO' && (
+                <span className="material-symbols-outlined absolute text-5xl text-white drop-shadow-lg">play_circle</span>
+              )}
+            </button>
+            <div className="flex items-center justify-between p-3">
+              <div>
+                <b className="text-xs text-slate-800">产物 #{index + 1}</b>
+                <p className="mt-1 text-[10px] text-slate-400">{result.mediaType} · batch {result.batchIdx ?? index}</p>
+              </div>
+              <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">
+                {result.status || '已生成'}
+              </span>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+};
+
+const InputsTab: React.FC<{ group: TaskGroupResponse; task: TaskGroupItemResponse }> = ({ group, task }) => {
+  const inputUrls = useMemo(() => {
+    const urls = [...(task.inputImages ?? [])];
+    task.inputImageUrls?.split(',').map((url) => url.trim()).filter(Boolean).forEach((url) => {
+      if (!urls.includes(url)) urls.push(url);
+    });
+    if (group.productImage && !urls.includes(group.productImage)) urls.unshift(group.productImage);
+    return urls;
+  }, [group.productImage, task.inputImages, task.inputImageUrls]);
+  const params = useMemo(() => parseParams(task.taskParamsJson), [task.taskParamsJson]);
+  const copyText = async (value: string, label: string) => {
+    await navigator.clipboard.writeText(value);
+    toast.success(`${label}已复制`);
+  };
+  return (
+    <div className="space-y-5">
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <h3 className="text-sm font-black text-slate-800">输入素材</h3>
+        {inputUrls.length > 0 ? (
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {inputUrls.map((url, index) => (
+              <div
+                key={`${url}-${index}`}
+                className="flex aspect-square w-full min-w-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 p-2"
+              >
+                <img
+                  src={withCosThumbnail(url, 360)}
+                  alt={`输入素材 ${index + 1}`}
+                  className="min-h-0 min-w-0 max-h-full max-w-full object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 text-xs text-slate-400">该历史任务未记录输入素材地址。</p>
+        )}
+      </section>
+
+      <PromptBlock
+        label="最终 Prompt"
+        value={task.taskPrompt || ''}
+        onCopy={() => void copyText(task.taskPrompt || '', 'Prompt')}
+      />
+      <PromptBlock
+        label="负面 Prompt"
+        value={task.negativePrompt || ''}
+        onCopy={() => void copyText(task.negativePrompt || '', '负面 Prompt')}
+      />
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <h3 className="text-sm font-black text-slate-800">执行参数快照</h3>
+        {Object.keys(params).length ? (
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+            {Object.entries(params).map(([key, value]) => (
+              <InfoRow key={key} label={key} value={String(value)} />
+            ))}
+          </dl>
+        ) : (
+          <p className="mt-4 text-xs text-slate-400">未记录执行参数。</p>
+        )}
+      </section>
+    </div>
+  );
+};
+
+const DiagnosticsTab: React.FC<{
+  task: TaskGroupItemResponse;
+  onTaskChanged: () => void;
+}> = ({ task, onTaskChanged }) => {
+  const executionsQuery = useServiceQuery(
+    () => asyncTaskApi.page({ bizId: task.id, page: 1, size: 50 }),
+    [task.id],
+  );
+  const executions = executionsQuery.data?.list ?? [];
+
+  const retryBusinessTask = async () => {
+    try {
+      await taskApi.retry(task.id);
+      toast.success('任务已重新提交');
+      onTaskChanged();
+    } catch {
+      // 统一请求层已经提示具体错误
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-black text-slate-800">业务任务诊断</h3>
+            <p className="mt-1 font-mono text-[10px] text-slate-400">{task.taskCode || task.id}</p>
+          </div>
+          {task.status === 'FAILED' && (
+            <button onClick={() => void retryBusinessTask()} className="h-8 rounded-lg bg-primary px-3 text-xs font-bold text-white">
+              重试业务任务
+            </button>
+          )}
+        </div>
+        <dl className="mt-4 grid gap-4 text-xs sm:grid-cols-2">
+          <InfoRow label="失败代码" value={task.failCode || '—'} />
+          <InfoRow label="失败原因" value={task.failReason || '—'} />
+        </dl>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-black text-slate-800">渠道执行记录</h3>
+            <p className="mt-1 text-[10px] text-slate-400">仅用于执行排查，不作为任务列表主层级。</p>
+          </div>
+          <button
+            onClick={() => executionsQuery.refetch()}
+            className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500"
+          >
+            <span className="material-symbols-outlined text-base">refresh</span>
+          </button>
+        </div>
+        {executionsQuery.error && (
+          <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
+            当前账号无权查看渠道执行记录，业务任务和产物不受影响。
+          </p>
+        )}
+        {!executionsQuery.loading && !executionsQuery.error && executions.length === 0 && (
+          <p className="mt-4 text-xs text-slate-400">暂无渠道执行记录。</p>
+        )}
+        <div className="mt-4 space-y-3">
+          {executions.map((execution) => (
+            <ExecutionCard key={execution.id} execution={execution} onChanged={executionsQuery.refetch} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+};
+
+const ExecutionCard: React.FC<{ execution: ChannelAsyncTask; onChanged: () => void }> = ({ execution, onChanged }) => {
+  const retry = async () => {
+    try {
+      await asyncTaskApi.retry(execution.id);
+      toast.success('渠道执行已重试');
+      onChanged();
+    } catch {
+      // 请求层提示
+    }
+  };
+  return (
+    <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold text-slate-800">
+              {execution.channelType} · {execution.capability}
+            </p>
+            <p className="mt-1 font-mono text-[10px] text-slate-400">
+              #{execution.id} · remote {execution.remoteTaskId || '未提交'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded bg-white px-2 py-1 text-[10px] font-bold text-slate-600">{execution.status}</span>
+            {['FAILED', 'DEAD_LETTER'].includes(execution.status) && (
+              <button onClick={(event) => { event.preventDefault(); void retry(); }} className="h-7 rounded bg-primary px-2 text-[10px] font-bold text-white">
+                重试
+              </button>
+            )}
+          </div>
+        </div>
+      </summary>
+      <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 text-[11px] text-slate-600 sm:grid-cols-2">
+        <InfoRow label="开始时间" value={formatDateTime(execution.startedAt)} />
+        <InfoRow label="结束时间" value={formatDateTime(execution.finishedAt)} />
+        <InfoRow label="重试次数" value={String(execution.retryCount)} />
+        <InfoRow label="产物数量" value={String(execution.resultCount)} />
+        <div className="sm:col-span-2">
+          <InfoRow label="失败原因" value={execution.failReason || '—'} />
+        </div>
+      </div>
+    </details>
+  );
+};
+
+const InfoCard: React.FC<{ label: string; value?: string; children?: React.ReactNode }> = ({ label, value, children }) => (
+  <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+    <div className="mt-2 text-sm font-black text-slate-800">{children ?? value ?? '—'}</div>
+  </div>
+);
+
+const InfoRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div>
+    <dt className="text-[10px] font-bold text-slate-400">{label}</dt>
+    <dd className="mt-1 break-words text-xs font-semibold text-slate-700">{value}</dd>
+  </div>
+);
+
+const PromptBlock: React.FC<{ label: string; value: string; onCopy: () => void }> = ({ label, value, onCopy }) => (
+  <section className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="flex items-center justify-between">
+      <h3 className="text-sm font-black text-slate-800">{label}</h3>
+      <button
+        disabled={!value}
+        onClick={onCopy}
+        className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-600 disabled:opacity-40"
+      >
+        <span className="material-symbols-outlined text-sm">content_copy</span>
+        复制
+      </button>
+    </div>
+    <p className="mt-4 whitespace-pre-wrap text-xs leading-6 text-slate-600">{value || '未记录'}</p>
+  </section>
+);

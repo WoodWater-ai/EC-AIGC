@@ -5,10 +5,10 @@ export const messages = {
   readiness: {
     selectMain:
       '请先选择已关联商品资产的主体素材。',
-    confirmFacts:
-      '请检查并确认商品事实。',
-    confirmPrompts:
-      '请确认本组任务 Prompt。',
+    completePrompts:
+      '请先为全部已选图片类型生成或补充 Prompt。',
+    selectExecutionParams:
+      '请选择完整的执行参数。',
     unsupportedSpec:
       '当前模型通道或输出规格不可执行，请调整设置。',
   },
@@ -26,7 +26,6 @@ export const messages = {
     color: '颜色',
     patternAndMaterial: '图案 / 材质',
     structure: '版型 / 结构',
-    confirm: '确认商品事实',
     factPlaceholder: '待 AI 解析',
   },
   type: {
@@ -75,8 +74,6 @@ export const messages = {
   prompt: {
     regen: '按表单重算',
     aiOptimize: 'AI 建议',
-    confirmPrompts: '确认本组 Prompt',
-    confirmed: 'Prompt 已确认',
     placeholder: '支持手写 Prompt；点击「按表单重算」或「AI 建议」',
   },
   conflict: {

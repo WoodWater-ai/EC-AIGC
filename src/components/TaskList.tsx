@@ -1,964 +1,493 @@
-import React, { useState } from 'react';
-import { toast } from 'sonner';
+import React, { useEffect, useState } from 'react';
 import {
-  GenerationTask,
   AppScreen,
-  ProductAsset,
-  ChannelAsyncTask,
-  ChannelAsyncTaskImage,
-  ChannelAsyncTaskVideo,
-  AsyncTaskStatus,
-  ASYNC_TASK_STATUS_STYLES,
+  type TaskGroupItemResponse,
+  type TaskGroupResponse,
+  type TaskResultPreviewResponse,
+  type TaskStatus,
 } from '../types';
-import { TaskDetailsDrawer } from './TaskDetailsDrawer';
-import { ImagePreviewModal, PreviewImage } from './ImagePreviewModal';
-import { VideoPreviewModal, PreviewVideo } from './VideoPreviewModal';
-import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { taskApi } from '../api/modules/task';
-import { asyncTaskApi } from '../api/modules/asyncTask';
+import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import { withCosThumbnail } from '../utils/cosImage';
+import { ImagePreviewModal } from './ImagePreviewModal';
+import { TaskDetailsDrawer } from './TaskDetailsDrawer';
 
 interface TaskListProps {
-  tasks: GenerationTask[];
-  products: ProductAsset[];
-  onAddTask: (task: GenerationTask) => void;
-  onUpdateTask: (task: GenerationTask) => void;
   highlightGroupId: string | null;
-  setScreen: (screen: AppScreen) => void;
-  /** [2026-07-16 P0] 由 App 层传入的 refetch 回调(在重试/筛选后触发) */
-  onRefresh?: () => void;
+  highlightTaskKind: MediaKind;
+  setScreen: (screen: AppScreen, payload?: { highlightGroupId?: string }) => void;
 }
 
-// ==================== [2026-07-16 P0] 子任务 chip(带缩略图) ====================
+type MediaKind = 'IMAGE' | 'VIDEO';
+type StatusFilter = 'all' | 'pending' | 'running' | 'review' | 'completed' | 'failed' | 'rejected' | 'cancelled';
 
-interface ChildTaskChipProps {
-  child: ChannelAsyncTask;
-  onRetry: (id: string) => void;
-  /** [2026-07-21] 点击图片子任务缩略图:把全部产出图冒泡到 TaskList 顶层 */
-  onPreviewImage: (images: PreviewImage[], index: number) => void;
-  /** [2026-07-25] 点击视频子任务缩略图:把全部产出视频冒泡到 TaskList 顶层 */
-  onPreviewVideo: (videos: PreviewVideo[], index: number) => void;
-}
+const STATUS_FILTERS: Array<{
+  id: StatusFilter;
+  label: string;
+  statuses?: TaskStatus[];
+}> = [
+  { id: 'all', label: '全部' },
+  { id: 'pending', label: '等待中', statuses: ['DRAFT', 'PENDING'] },
+  { id: 'running', label: '生成中', statuses: ['GENERATING'] },
+  { id: 'review', label: '待审核', statuses: ['PENDING_REVIEW_SCORE', 'PENDING_REVIEW_PUBLISH'] },
+  { id: 'completed', label: '已归档', statuses: ['ARCHIVED', 'COMPLETED'] },
+  { id: 'failed', label: '失败', statuses: ['FAILED'] },
+  { id: 'rejected', label: '已打回', statuses: ['REJECTED'] },
+  { id: 'cancelled', label: '已取消', statuses: ['CANCELED'] },
+];
 
-/**
- * 子任务 chip 缩略图 URL(图片):
- *  - imageUrl 已是完整 URL(COS 域名前缀 + fileKey)
- *  - 用 CI 数据万象 ?imageMogr2/thumbnail/64x64 实时缩放
- *  - 子任务用 64x64 缩略图(单子任务很小)
- *  <p>[2026-07-16 P0 修订] 后端 image_url 存完整 URL,前端只拼 CI 缩放参数
- */
-function buildThumbUrl(imageUrl: string | null | undefined, size = 64): string | null {
-  if (!imageUrl) return null;
-  // 完整 URL 已有 ?query 时用 & 拼接,否则用 ?
-  const sep = imageUrl.includes('?') ? '&' : '?';
-  return `${imageUrl}${sep}imageMogr2/thumbnail/${size}x${size}`;
-}
+const STATUS_META: Record<TaskStatus, { label: string; style: string }> = {
+  DRAFT: { label: '草稿', style: 'bg-slate-100 text-slate-600' },
+  PENDING: { label: '等待生成', style: 'bg-slate-100 text-slate-600' },
+  GENERATING: { label: '生成中', style: 'bg-blue-50 text-primary' },
+  PENDING_REVIEW_SCORE: { label: '待审美评分', style: 'bg-amber-50 text-amber-700' },
+  PENDING_REVIEW_PUBLISH: { label: '待上架审核', style: 'bg-violet-50 text-violet-700' },
+  ARCHIVED: { label: '已归档', style: 'bg-emerald-50 text-emerald-700' },
+  REJECTED: { label: '已打回', style: 'bg-rose-50 text-rose-700' },
+  CANCELED: { label: '已取消', style: 'bg-slate-100 text-slate-500' },
+  FAILED: { label: '生成失败', style: 'bg-red-50 text-red-700' },
+  COMPLETED: { label: '已完成', style: 'bg-emerald-50 text-emerald-700' },
+};
 
-const ChildTaskChip: React.FC<ChildTaskChipProps> = ({
-  child,
-  onRetry,
-  onPreviewImage,
-  onPreviewVideo,
-}) => {
-  const style = ASYNC_TASK_STATUS_STYLES[child.status as AsyncTaskStatus];
-  const isVideo = child.resultType === 'VIDEO';
+const IMAGE_TYPE_LABELS: Record<string, string> = {
+  PRODUCT_MAIN: '商品主图',
+  SCENE_DETAIL: '详情/场景图',
+  DETAIL_SCENE: '详情/场景图',
+  DETAIL_CLOSEUP: '细节图',
+  DETAIL: '细节图',
+  MODEL_TRIPLE_VIEW: '模特三视图',
+  ON_MODEL: '模特三视图',
+  VIDEO: '视频任务',
+};
 
-  // [2026-07-16 P0 / 2026-07-25] SUCCESS 状态子任务拉产物列表
-  // 图片走 /images,视频走 /videos —— 走哪个由后端 ChannelAsyncTask.resultType 决定
-  const { data: images, loading: imgsLoading } = useServiceQuery<ChannelAsyncTaskImage[]>(
-    () => (child.status === 'SUCCESS' && !isVideo
-      ? asyncTaskApi.images(child.id)
-      : Promise.resolve([] as ChannelAsyncTaskImage[])),
-    [child.id, child.status, isVideo],
+const isActiveStatus = (status: TaskStatus) =>
+  ['DRAFT', 'PENDING', 'GENERATING'].includes(status);
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '—';
+  return value.replace('T', ' ').slice(0, 16);
+};
+
+const taskLabel = (task: TaskGroupItemResponse) =>
+  IMAGE_TYPE_LABELS[task.imageType ?? task.taskType] ?? task.title ?? task.taskCode;
+
+const resultImageUrl = (result: TaskResultPreviewResponse) =>
+  result.mediaType === 'IMAGE'
+    ? result.url
+    : result.thumbnailUrl || result.url;
+
+export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightTaskKind, setScreen }) => {
+  const [kind, setKind] = useState<MediaKind>(highlightTaskKind);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [searchInput, setSearchInput] = useState('');
+  const [keyword, setKeyword] = useState('');
+  const [pageNum, setPageNum] = useState(1);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedGroup, setSelectedGroup] = useState<TaskGroupResponse | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string>();
+  const [imagePreview, setImagePreview] = useState<{ results: TaskResultPreviewResponse[]; index: number } | null>(null);
+  const [videoPreview, setVideoPreview] = useState<TaskResultPreviewResponse | null>(null);
+
+  const activeFilter = STATUS_FILTERS.find((item) => item.id === statusFilter);
+  const groupsQuery = useServiceQuery(
+    () => taskApi.groupPage({
+      pageNum,
+      pageSize: 10,
+      taskKind: kind,
+      statuses: activeFilter?.statuses,
+      keyword: keyword || undefined,
+    }),
+    [pageNum, kind, statusFilter, keyword],
   );
-  const { data: videos, loading: vidsLoading } = useServiceQuery<ChannelAsyncTaskVideo[]>(
-    () => (child.status === 'SUCCESS' && isVideo
-      ? asyncTaskApi.videos(child.id)
-      : Promise.resolve([] as ChannelAsyncTaskVideo[])),
-    [child.id, child.status, isVideo],
+  const imageCountQuery = useServiceQuery(
+    () => taskApi.groupPage({ pageNum: 1, pageSize: 1, taskKind: 'IMAGE' }),
+    [],
   );
-  const imgs = images ?? [];
-  const vids = videos ?? [];
-  const loading = isVideo ? vidsLoading : imgsLoading;
+  const videoCountQuery = useServiceQuery(
+    () => taskApi.groupPage({ pageNum: 1, pageSize: 1, taskKind: 'VIDEO' }),
+    [],
+  );
 
-  // ============== 缩略图 + 预览数据准备 ==============
-  // 图片路径
-  const firstImg = imgs[0];
-  const thumbUrl = buildThumbUrl(firstImg?.imageUrl, 64);
-  const previewImages: PreviewImage[] = imgs
-    .filter((im) => !!im.imageUrl)
-    .map((im) => ({
-      url: im.imageUrl,
-      label: im.version ? `batchIdx=${im.batchIdx} · ${im.version}` : `batchIdx=${im.batchIdx}`,
-    }));
-  const canPreviewImage = previewImages.length > 0;
+  const groups = groupsQuery.data?.list ?? [];
+  const total = groupsQuery.data?.total ?? 0;
+  const pages = Math.max(groupsQuery.data?.pages ?? 0, 1);
 
-  // 视频路径
-  const firstVid = vids[0];
-  // 缩略图优先 coverUrl(海报表),没有再 fallback thumbnailUrl
-  const videoThumbUrl = firstVid?.coverUrl ?? firstVid?.thumbnailUrl ?? null;
-  const previewVideos: PreviewVideo[] = vids
-    .filter((v) => !!v.videoUrl)
-    .map((v) => ({
-      url: v.videoUrl,
-      poster: v.coverUrl ?? v.thumbnailUrl ?? null,
-      label: v.durationSec != null
-        ? `batchIdx=${v.batchIdx} · ${v.durationSec}s`
-        : `batchIdx=${v.batchIdx}`,
-    }));
-  const canPreviewVideo = previewVideos.length > 0;
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setKeyword(searchInput.trim());
+      setPageNum(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (!groups.some((group) => isActiveStatus(group.status))) return;
+    const timer = window.setInterval(() => groupsQuery.refetch(), 5000);
+    return () => window.clearInterval(timer);
+  }, [groups, groupsQuery.refetch]);
+
+  useEffect(() => {
+    if (!highlightGroupId) return;
+    setKind(highlightTaskKind);
+    setStatusFilter('all');
+    setSearchInput('');
+    setKeyword('');
+    setPageNum(1);
+    setExpandedGroups((current) => new Set(current).add(highlightGroupId));
+  }, [highlightGroupId, highlightTaskKind]);
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  };
+
+  const openDrawer = (group: TaskGroupResponse, taskId?: string) => {
+    setSelectedTaskId(taskId);
+    setSelectedGroup(group);
+  };
 
   return (
-    <div
-      className={`inline-flex flex-col gap-1.5 p-2 rounded-lg text-[10px] font-bold ${style.bg} ${style.text} min-w-[140px]`}
-    >
-      {/* 第一行:缩略图 + batchIdx + 状态 + 重试 */}
-      <div className="flex items-center gap-1.5">
-        {/* ============ 缩略图(按 resultType 分支) ============ */}
-        {!isVideo ? (
-          // ===== 图片缩略图 =====
-          thumbUrl ? (
-            <button
-              type="button"
-              onClick={() => canPreviewImage && onPreviewImage(previewImages, 0)}
-              className="w-10 h-10 rounded overflow-hidden border border-black/10 cursor-zoom-in p-0 block"
-              aria-label={`放大预览 batchIdx=${child.batchIdx}`}
-            >
-              <img
-                src={thumbUrl}
-                alt={`batchIdx=${child.batchIdx}`}
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-                loading="lazy"
-              />
-            </button>
-          ) : (
-            <div className="w-10 h-10 rounded bg-black/5 flex items-center justify-center">
-              <span className="material-symbols-outlined text-sm opacity-50">
-                {child.status === 'SUCCESS' ? 'image' : 'pending'}
-              </span>
-            </div>
-          )
-        ) : (
-          // ===== 视频缩略图(cover + 播放按钮 + 时长 badge) =====
-          videoThumbUrl ? (
-            <button
-              type="button"
-              onClick={() => canPreviewVideo && onPreviewVideo(previewVideos, 0)}
-              className="w-10 h-10 rounded overflow-hidden border border-black/10 cursor-zoom-in p-0 block relative group"
-              aria-label={`播放视频 batchIdx=${child.batchIdx}`}
-            >
-              <img
-                src={videoThumbUrl}
-                alt={`batchIdx=${child.batchIdx}`}
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-                loading="lazy"
-              />
-              {/* 居中播放按钮(半透明) */}
-              <span className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
-                <span className="material-symbols-outlined text-white text-base drop-shadow">play_circle</span>
-              </span>
-              {/* 右下角时长 badge */}
-              {firstVid?.durationSec != null && (
-                <span className="absolute bottom-0.5 right-0.5 px-1 py-px rounded bg-black/70 text-white text-[8px] font-mono font-black leading-tight">
-                  {firstVid.durationSec}s
-                </span>
-              )}
-            </button>
-          ) : (
-            <div
-              className="w-10 h-10 rounded bg-black/5 flex items-center justify-center"
-              aria-label={`无封面视频 batchIdx=${child.batchIdx}`}
-            >
-              <span className="material-symbols-outlined text-sm opacity-50">
-                {child.status === 'SUCCESS' ? 'movie' : 'pending'}
-              </span>
-            </div>
-          )
-        )}
-
-        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <span className="font-mono font-black">batchIdx={child.batchIdx}</span>
-            {isVideo && (
-              <span className="material-symbols-outlined text-[10px] opacity-70" title="视频子任务">movie</span>
-            )}
-            <span>{style.label}</span>
-            {loading && child.status === 'SUCCESS' && (
-              <span className="material-symbols-outlined text-[10px] animate-spin">progress_activity</span>
-            )}
-          </div>
-          {child.durationMs != null && child.status === 'SUCCESS' && (
-            <span className="text-[9px] opacity-60 font-mono">
-              {(child.durationMs / 1000).toFixed(1)}s
-            </span>
-          )}
-          {child.failReason && (
-            <span
-              className="text-[9px] opacity-80 truncate max-w-[120px]"
-              title={child.failReason}
-            >
-              {child.failReason}
-            </span>
-          )}
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-bold text-primary">生成任务中心</p>
+          <h2 className="mt-1 text-2xl font-black text-slate-900">任务列表</h2>
+          <p className="mt-2 text-sm text-slate-500">
+            每次提交为一个批次；展开后按图片类型或视频任务查看产物与执行状态。
+          </p>
         </div>
-        {child.status === 'DEAD_LETTER' && (
+        <div className="flex gap-2">
           <button
-            onClick={() => onRetry(child.id)}
-            className="px-1.5 py-0.5 bg-white/60 rounded text-[9px] hover:bg-white shrink-0"
+            onClick={() => setScreen(AppScreen.CREATE_IMAGE_TASK)}
+            className="h-10 rounded-lg bg-primary px-4 text-xs font-bold text-white"
           >
-            重试
+            新建图片任务
           </button>
-        )}
+          <button
+            onClick={() => setScreen(AppScreen.CREATE_VIDEO_TASK)}
+            className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700"
+          >
+            新建视频任务
+          </button>
+        </div>
       </div>
-      {/* 第二行:多产物提示 */}
-      {!isVideo && imgs.length > 1 && (
-        <div className="text-[9px] opacity-60 font-mono">+{imgs.length - 1} 张图</div>
+
+      <div className="flex gap-2 rounded-xl border border-slate-200 bg-white p-2">
+        {([
+          ['IMAGE', `图片批次 (${imageCountQuery.data?.total ?? 0})`],
+          ['VIDEO', `视频批次 (${videoCountQuery.data?.total ?? 0})`],
+        ] as const).map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => {
+              setKind(value);
+              setStatusFilter('all');
+              setPageNum(1);
+              setExpandedGroups(new Set());
+            }}
+            className={`h-9 rounded-lg px-4 text-xs font-bold ${
+              kind === value ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setStatusFilter(item.id);
+                setPageNum(1);
+              }}
+              className={`h-8 rounded-lg px-3 text-xs font-bold ${
+                statusFilter === item.id
+                  ? 'bg-primary text-white'
+                  : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              {item.label}
+              {statusFilter === item.id ? ` ${total}` : ''}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <label className="relative block">
+            <span className="material-symbols-outlined absolute left-3 top-2.5 text-base text-slate-400">search</span>
+            <input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="搜索批次、任务、商品或编号"
+              className="h-9 w-64 rounded-lg border border-slate-200 pl-9 pr-3 text-xs outline-none focus:border-primary"
+            />
+          </label>
+          <button
+            onClick={() => groupsQuery.refetch()}
+            className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500"
+            title="刷新"
+          >
+            <span className={`material-symbols-outlined text-lg ${groupsQuery.loading ? 'animate-spin' : ''}`}>
+              refresh
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1040px] text-left">
+            <thead className="bg-slate-50 text-[11px] text-slate-500">
+              <tr>
+                <th className="p-4 font-bold">批次 / 商品</th>
+                <th className="p-4 font-bold">模板</th>
+                <th className="p-4 font-bold">提交时间</th>
+                <th className="p-4 font-bold">批次状态</th>
+                <th className="p-4 font-bold">任务与产物</th>
+                <th className="p-4 text-right font-bold">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {groups.map((group) => {
+                const expanded = expandedGroups.has(group.groupId);
+                const meta = STATUS_META[group.status];
+                const highlighted = highlightGroupId === group.groupId;
+                return (
+                  <React.Fragment key={group.groupId}>
+                    <tr className={`${highlighted ? 'bg-blue-50/80' : 'hover:bg-slate-50/70'}`}>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2.5">
+                          <button
+                            onClick={() => toggleGroup(group.groupId)}
+                            className="grid h-7 w-7 shrink-0 place-items-center rounded text-slate-500 hover:bg-slate-100"
+                            title={expanded ? '收起批次' : '展开批次'}
+                          >
+                            <span className={`material-symbols-outlined text-base transition-transform ${expanded ? 'rotate-90' : ''}`}>
+                              chevron_right
+                            </span>
+                          </button>
+                          {group.productImage ? (
+                            <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1">
+                              <img
+                                src={withCosThumbnail(group.productImage, 96)}
+                                alt=""
+                                className="block h-auto max-h-full w-auto max-w-full object-contain object-center"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          ) : (
+                            <div className="grid h-11 w-11 place-items-center rounded-lg bg-slate-100 text-slate-300">
+                              <span className="material-symbols-outlined">inventory_2</span>
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="max-w-[230px] truncate font-mono text-[10px] text-slate-400">
+                              {group.groupId}
+                            </p>
+                            <p className="mt-1 max-w-[230px] truncate text-xs font-black text-slate-800">
+                              {group.productName || '未命名商品'}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <p className="max-w-[190px] truncate text-xs font-bold text-slate-700">
+                          {group.templateName || '未使用模板'}
+                        </p>
+                        <p className="mt-1 text-[10px] text-slate-400">提交人 {group.submitterUserId}</p>
+                      </td>
+                      <td className="p-4 text-xs text-slate-600">{formatDateTime(group.submittedAt)}</td>
+                      <td className="p-4">
+                        <span className={`rounded-md px-2 py-1 text-[10px] font-bold ${meta.style}`}>
+                          {meta.label}
+                        </span>
+                        {isActiveStatus(group.status) && (
+                          <div className="mt-2 h-1.5 w-28 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${group.progressPercent}%` }} />
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <p className="text-xs font-bold text-slate-700">
+                          {group.taskCount} 个子任务 · {group.resultCount} 个产物
+                        </p>
+                        <p className="mt-1 max-w-[260px] truncate text-[10px] text-slate-400">
+                          {group.tasks.map(taskLabel).join('、')}
+                        </p>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => openDrawer(group)}
+                            className="h-8 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                          >
+                            详情
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expanded && group.tasks.map((task) => (
+                      <TaskChildRow
+                        key={task.id}
+                        task={task}
+                        onOpen={() => openDrawer(group, task.id)}
+                        onPreviewImage={(results, index) => setImagePreview({ results, index })}
+                        onPreviewVideo={setVideoPreview}
+                      />
+                    ))}
+                  </React.Fragment>
+                );
+              })}
+              {!groupsQuery.loading && groups.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-16 text-center text-sm text-slate-400">
+                    没有符合条件的任务批次
+                  </td>
+                </tr>
+              )}
+              {groupsQuery.loading && (
+                <tr>
+                  <td colSpan={6} className="p-16 text-center text-sm text-slate-400">
+                    正在加载任务批次…
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-3">
+          <p className="text-xs text-slate-500">共 {total} 个批次</p>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={pageNum <= 1}
+              onClick={() => setPageNum((value) => Math.max(1, value - 1))}
+              className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold disabled:opacity-40"
+            >
+              上一页
+            </button>
+            <span className="text-xs font-mono text-slate-500">{pageNum} / {pages}</span>
+            <button
+              disabled={pageNum >= pages}
+              onClick={() => setPageNum((value) => Math.min(pages, value + 1))}
+              className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold disabled:opacity-40"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {selectedGroup && (
+        <TaskDetailsDrawer
+          group={selectedGroup}
+          initialTaskId={selectedTaskId}
+          onClose={() => setSelectedGroup(null)}
+          onChanged={() => groupsQuery.refetch()}
+        />
       )}
-      {isVideo && vids.length > 1 && (
-        <div className="text-[9px] opacity-60 font-mono">+{vids.length - 1} 个视频</div>
+      {imagePreview && (
+        <ImagePreviewModal
+          images={imagePreview.results.map((result, index) => ({
+            url: result.url,
+            label: `产物 ${index + 1}`,
+          }))}
+          initialIndex={imagePreview.index}
+          onClose={() => setImagePreview(null)}
+        />
+      )}
+      {videoPreview && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/70 p-6" onClick={() => setVideoPreview(null)}>
+          <div className="relative w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
+            <button
+              onClick={() => setVideoPreview(null)}
+              className="absolute -right-3 -top-10 text-white"
+              aria-label="关闭视频预览"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            <video src={videoPreview.url} controls autoPlay className="max-h-[82vh] w-full bg-black object-contain" />
+          </div>
+        </div>
       )}
     </div>
   );
 };
 
-export const TaskList: React.FC<TaskListProps> = ({
-  tasks,
-  products,
-  onAddTask,
-  onUpdateTask,
-  highlightGroupId,
-  setScreen,
-  onRefresh,
+interface TaskChildRowProps {
+  task: TaskGroupItemResponse;
+  onOpen: () => void;
+  onPreviewImage: (results: TaskResultPreviewResponse[], index: number) => void;
+  onPreviewVideo: (result: TaskResultPreviewResponse) => void;
+}
+
+const TaskChildRow: React.FC<TaskChildRowProps> = ({
+  task,
+  onOpen,
+  onPreviewImage,
+  onPreviewVideo,
 }) => {
-  const [primaryTab, setPrimaryTab] = useState<'image' | 'video'>('image');
-  const [activeTab, setActiveTab] = useState<'all' | 'running' | 'completed' | 'failed' | 'rejected'>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [channelFilter, setChannelFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 5;
-
-  // Selected Task for Preview Modal
-  const [previewTask, setPreviewTask] = useState<GenerationTask | null>(null);
-  const [feedbackTask, setFeedbackTask] = useState<GenerationTask | null>(null);
-  // [2026-07-21] 子任务缩略图放大预览(图)
-  const [previewImages, setPreviewImages] = useState<PreviewImage[] | null>(null);
-  const [previewIndex, setPreviewIndex] = useState(0);
-  // [2026-07-25] 子任务缩略图放大预览(视频)
-  const [previewVideos, setPreviewVideos] = useState<PreviewVideo[] | null>(null);
-  const [previewVideoIndex, setPreviewVideoIndex] = useState(0);
-  // [2026-07-25] 手动刷新按钮 loading 态(onRefresh 不返回 Promise,这里用最小动画时长兜底)
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedDetailTask, setSelectedDetailTask] = useState<GenerationTask | null>(null);
-  const [detailDrawerTab, setDetailDrawerTab] = useState<'overview' | 'inputs' | 'results' | 'reviews' | 'costs'>('overview');
-
-  // [2026-07-16 P0] 子任务展开
-  const [expandedBizId, setExpandedBizId] = useState<string | null>(null);
-  const { data: childrenData } = useServiceQuery(
-    () => (expandedBizId
-      ? asyncTaskApi.page({ bizId: expandedBizId, page: 1, size: 50 })
-      : Promise.resolve({ list: [] as ChannelAsyncTask[], total: 0, pageNum: 1, pageSize: 50 } as any)),
-    [expandedBizId],
-  );
-  const children: ChannelAsyncTask[] = childrenData?.list ?? [];
-
-  const handleSetPrimaryTab = (tab: 'image' | 'video') => {
-    setPrimaryTab(tab);
-    setActiveTab('all');
-    setCurrentPage(1);
-  };
-
-  const handleSetActiveTab = (tab: any) => {
-    setActiveTab(tab);
-    setCurrentPage(1);
-  };
-
-  // Filter tasks
-  const filteredTasks = tasks.filter((task) => {
-    const matchesPrimaryType = task.type === primaryTab;
-    const matchesTab = activeTab === 'all' || task.status === activeTab;
-    const matchesSearch = task.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          task.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          task.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesChannel = channelFilter === 'all' || (task.modelChannel && task.modelChannel.includes(channelFilter));
-
-    return matchesPrimaryType && matchesTab && matchesSearch && matchesChannel;
-  });
-
-  // Pagination calculations
-  const totalItems = filteredTasks.length;
-  const totalPages = Math.ceil(totalItems / pageSize) || 1;
-  const paginatedTasks = filteredTasks.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  // Status counts specific to selected primaryTab (Image / Video)
-  const currentTypeTasks = tasks.filter(t => t.type === primaryTab);
-
-  // Unique model channels for filter dropdown
-  const channels = ['DaVinci', 'Midjourney', 'Stable Diffusion', 'Runway', 'Kling', 'VIDU'];
-
-  // [2026-07-16 P0] 真实重试(调 admin 端点 /v1/admin/task/retry)
-  const handleRetryTask = async (task: GenerationTask) => {
-    try {
-      await taskApi.retry(task.id);
-      toast.success(`任务 ${task.id} 已提交重试,几秒后状态会更新`);
-      // 5s 后 refetch(Poller 已经把子任务 SUCCESS 写回父任务,这段时间够)
-      setTimeout(() => onRefresh?.(), 5000);
-    } catch (e: any) {
-      const msg = e?.message ?? '';
-      if (msg.includes('权限') || msg.includes('401') || msg.includes('403')) {
-        toast.error('重试需要管理员权限,或当前任务不支持重试');
-      } else {
-        toast.error(`重试失败: ${msg || '未知错误'}`);
-      }
-    }
-  };
-
-  // [2026-07-16 P0] 重试子任务(DEAD_LETTER 状态)
-  const handleRetryChild = async (childId: string) => {
-    try {
-      await asyncTaskApi.retry(childId);
-      toast.success(`子任务 ${childId} 已提交重试`);
-      // 触发 useServiceQuery refetch(通过 toggle expandedBizId 强制)
-      const cur = expandedBizId;
-      setExpandedBizId(null);
-      setTimeout(() => setExpandedBizId(cur), 100);
-    } catch (e: any) {
-      toast.error(`子任务重试失败: ${e?.message ?? '未知错误'}`);
-    }
-  };
-
-  // [2026-07-16 P0] 错误诊断按钮改 toast(本期不接 detail 接口的真实 fail_reason 弹窗)
-  const handleShowError = (task: GenerationTask) => {
-    if (task.errorMsg) {
-      toast.error(task.errorMsg, { duration: 8000 });
-    } else {
-      toast.info('该任务暂无失败详情');
-    }
-  };
-
-  // [2026-07-16 P0] 意见按钮改 toast
-  const handleShowFeedback = (task: GenerationTask) => {
-    if (task.feedback) {
-      toast.warning(task.feedback, { duration: 8000 });
-    } else {
-      toast.info('该任务暂无退回批注');
-    }
-  };
-
-  const handleBatchRetryFailed = async () => {
-    const failedOnes = tasks.filter(t => t.status === 'failed' && t.type === primaryTab);
-    if (failedOnes.length === 0) {
-      toast.info('当前没有失败任务');
-      return;
-    }
-    toast.info(`正在批量重试 ${failedOnes.length} 个失败任务...`);
-    for (const t of failedOnes) {
-      try {
-        await taskApi.retry(t.id);
-      } catch (e) {
-        console.warn('[TaskList] batch retry failed for', t.id, e);
-      }
-    }
-    setTimeout(() => onRefresh?.(), 5000);
-  };
-
-  const handleSetChannelFilter = (v: string) => {
-    setChannelFilter(v);
-    setCurrentPage(1);
-  };
-
-  // [2026-07-25] 手动刷新任务列表
-  // onRefresh 由 App 层传 tasksQuery.refetch() —— refetch 不返回 Promise,
-  // 用 setTimeout 给个最小动画时长(600ms),保证用户能看到旋转反馈,
-  // 避免请求极快时旋转一闪而过体感差
-  const handleRefresh = () => {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-    onRefresh?.();
-    setTimeout(() => setIsRefreshing(false), 600);
-  };
-
-  // 动态成本估算(本期不接后端 costRate,简单规则:张数 × 1 Pts)
-  const getEstimatedCost = (task: GenerationTask) => {
-    const n = (task.params?.steps as unknown as number) || task.id ? 30 : 30;
-    return `${n} Pts`;
-  };
-
+  const meta = STATUS_META[task.status];
+  const imageResults = task.resultPreviews.filter((result) => result.mediaType === 'IMAGE');
   return (
-    <div className="space-y-6">
-
-      {/* 1st Level Primary Tabs (图片生成任务 / 视频生成任务) */}
-      <div className="flex border-b border-slate-200/80 bg-white p-2 rounded-2xl border shadow-xs gap-2">
-        <button
-          onClick={() => handleSetPrimaryTab('image')}
-          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all cursor-pointer ${
-            primaryTab === 'image'
-              ? 'bg-primary text-white shadow-md shadow-blue-500/10'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-          }`}
-        >
-          <span className="material-symbols-outlined text-lg">image</span>
-          <span>图片生成任务 ({tasks.filter(t => t.type === 'image').length})</span>
-        </button>
-        <button
-          onClick={() => handleSetPrimaryTab('video')}
-          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all cursor-pointer ${
-            primaryTab === 'video'
-              ? 'bg-primary text-white shadow-md shadow-blue-500/10'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-          }`}
-        >
-          <span className="material-symbols-outlined text-lg">video_library</span>
-          <span>视频生成任务 ({tasks.filter(t => t.type === 'video').length})</span>
-        </button>
-      </div>
-
-      {/* Top Banner / Tab Stats */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-2 shadow-sm flex flex-wrap gap-1">
-        {[
-          { id: 'all', label: '全部任务', count: currentTypeTasks.length, icon: 'list_alt', color: 'text-slate-500 bg-slate-100' },
-          { id: 'running', label: '生成中', count: currentTypeTasks.filter(t => t.status === 'running').length, icon: 'autorenew', color: 'text-primary bg-primary-light' },
-          { id: 'completed', label: '已完成素材', count: currentTypeTasks.filter(t => t.status === 'completed').length, icon: 'check_circle', color: 'text-success bg-emerald-50' },
-          { id: 'failed', label: '生成失败', count: currentTypeTasks.filter(t => t.status === 'failed').length, icon: 'cancel', color: 'text-danger bg-red-50' },
-          { id: 'rejected', label: '被退回修正', count: currentTypeTasks.filter(t => t.status === 'rejected').length, icon: 'gavel', color: 'text-warning bg-amber-50' }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => handleSetActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === tab.id
-                ? 'bg-[#0B1C30] text-white shadow-sm'
-                : 'text-slate-500 hover:bg-slate-50'
-            }`}
-          >
-            <span className={`material-symbols-outlined text-base ${activeTab === tab.id ? 'text-primary' : ''}`}>{tab.icon}</span>
-            <span>{tab.label}</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${activeTab === tab.id ? 'bg-slate-800 text-white' : tab.color}`}>
-              {tab.count}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* Advanced Filter and Control Panel */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full md:w-auto flex-1">
-            {/* Search */}
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">search</span>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="搜索任务名称、产品、ID..."
-                className="w-full h-10 pl-9 pr-4 text-xs bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-xl outline-none transition-all"
+    <tr className="bg-slate-50/70">
+      <td className="py-3 pl-14 pr-4">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-sm text-slate-400">subdirectory_arrow_right</span>
+          <p className="text-xs font-bold text-slate-700">{taskLabel(task)}</p>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <p className="font-mono text-[10px] text-slate-500">{task.taskCode || task.id}</p>
+        <p className="mt-1 text-[10px] text-slate-400">
+          {task.modelChannelName || task.modelChannelId || '未记录模型通道'}
+        </p>
+      </td>
+      <td className="px-4 py-3 text-[10px] text-slate-500">{task.aspectRatio || '—'}</td>
+      <td className="px-4 py-3">
+        <span className={`rounded-md px-2 py-1 text-[10px] font-bold ${meta.style}`}>{meta.label}</span>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1.5">
+          {task.resultPreviews.slice(0, 4).map((result, index) => (
+            <button
+              key={result.id}
+              onClick={() => result.mediaType === 'VIDEO'
+                ? onPreviewVideo(result)
+                : onPreviewImage(imageResults, imageResults.findIndex((item) => item.id === result.id))}
+              className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white p-1"
+              title="预览产物"
+            >
+              <img
+                src={withCosThumbnail(resultImageUrl(result), 96)}
+                alt=""
+                className="max-h-full max-w-full object-contain"
+                referrerPolicy="no-referrer"
               />
-            </div>
-
-            {/* Channel Selector */}
-            <select
-              value={channelFilter}
-              onChange={(e) => handleSetChannelFilter(e.target.value)}
-              className="h-10 text-xs bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-xl outline-none px-3 transition-all font-semibold text-slate-700"
-            >
-              <option value="all">全部生成引擎通道</option>
-              {channels.map(ch => (
-                <option key={ch} value={ch}>{ch} 通道</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Action buttons on the right */}
-          <div className="flex gap-2 w-full md:w-auto shrink-0 justify-end">
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="h-10 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs text-slate-500 font-bold cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="手动刷新任务列表"
-            >
-              <span className={`material-symbols-outlined text-sm font-bold ${isRefreshing ? 'animate-spin' : ''}`}>refresh</span>
-              刷新
-            </button>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                handleSetChannelFilter('all');
-                setCurrentPage(1);
-              }}
-              className="h-10 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs text-slate-500 font-bold cursor-pointer transition-all"
-            >
-              重置筛选
-            </button>
-            <button
-              onClick={handleBatchRetryFailed}
-              className="h-10 px-4 rounded-xl bg-primary-light text-primary hover:bg-primary/20 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
-            >
-              <span className="material-symbols-outlined text-sm font-bold">cached</span>
-              重新运行失败任务
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Table View */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 tracking-wider">
-                <th className="py-4 px-5">任务编号 & 名称</th>
-                <th className="py-4 px-5">关联商品底图</th>
-                <th className="py-4 px-5">{primaryTab === 'image' ? '所选智能排版模板' : '所选动态视频脚本'}</th>
-                <th className="py-4 px-5">创建信息</th>
-                <th className="py-4 px-5">生成状态 & 进度</th>
-                <th className="py-4 px-5">消耗估算</th>
-                <th className="py-4 px-5">配置参数与通道</th>
-                <th className="py-4 px-5 text-right">管理操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {paginatedTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    <span className="material-symbols-outlined text-4xl block mb-2 text-slate-300">hourglass_disabled</span>
-                    未找到符合筛选条件的生成任务
-                  </td>
-                </tr>
-              ) : (
-                paginatedTasks.map((task) => (
-                  <React.Fragment key={task.id}>
-                  <tr className={`hover:bg-slate-50/50 transition-colors ${
-                    highlightGroupId && task.groupId === highlightGroupId
-                      ? 'bg-primary-light ring-2 ring-primary'
-                      : ''
-                  }`}>
-                    {/* Name & ID */}
-                    <td className="py-4 px-5">
-                      <div>
-                        <span className="text-[10px] font-mono text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">
-                          {task.id}
-                        </span>
-                        <h4 className="font-bold text-slate-800 mt-1.5 leading-tight">{task.name}</h4>
-                      </div>
-                    </td>
-
-                    {/* Product */}
-                    <td className="py-4 px-5">
-                      <div className="flex items-center gap-2.5">
-                        {task.productImg ? (
-                          <img
-                            src={task.productImg}
-                            alt={task.productName}
-                            className="w-10 h-10 rounded-lg object-cover border border-slate-200"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-300">
-                            <span className="material-symbols-outlined text-base">image</span>
-                          </div>
-                        )}
-                        <span className="font-semibold text-slate-700 max-w-[130px] truncate block">{task.productName}</span>
-                      </div>
-                    </td>
-
-                    {/* Template */}
-                    <td className="py-4 px-5">
-                      <span className="font-semibold text-slate-600 block">{task.templateName}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">比例: {task.params?.ratio || '1:1'}</span>
-                    </td>
-
-                    {/* Operator & Time Column */}
-                    <td className="py-4 px-5">
-                      <div className="space-y-1">
-                        <span className="inline-flex items-center gap-1 font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-100/70">
-                          <span className="material-symbols-outlined text-[12px] text-slate-400">person</span>
-                          {task.creator}
-                        </span>
-                        <span className="text-[10px] text-slate-400 block font-mono">{task.timestamp}</span>
-                      </div>
-                    </td>
-
-                    {/* Status & Progress */}
-                    <td className="py-4 px-5">
-                      <div className="space-y-1.5 max-w-[140px]">
-                        <div className="flex items-center justify-between">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 ${
-                            task.status === 'running' ? 'bg-blue-50 text-primary border border-blue-200' :
-                            task.status === 'completed' ? 'bg-emerald-50 text-success border border-emerald-200' :
-                            task.status === 'failed' ? 'bg-red-50 text-danger border border-red-200' :
-                            'bg-amber-50 text-warning border border-amber-200'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              task.status === 'running' ? 'bg-primary animate-pulse' :
-                              task.status === 'completed' ? 'bg-success' :
-                              task.status === 'failed' ? 'bg-danger' : 'bg-warning'
-                            }`} />
-                            {task.status === 'running' ? '进行中' :
-                             task.status === 'completed' ? '已完成' :
-                             task.status === 'failed' ? '生成失败' : '被退回'}
-                          </span>
-                          <span className="text-[11px] font-bold font-mono text-slate-500">{task.progress}%</span>
-                        </div>
-                        {/* Progress slider bar */}
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-300 ${
-                              task.status === 'running' ? 'bg-primary animate-pulse' :
-                              task.status === 'completed' ? 'bg-success' :
-                              task.status === 'failed' ? 'bg-danger' : 'bg-warning'
-                            }`}
-                            style={{ width: `${task.progress}%` }}
-                          />
-                        </div>
-                        {/* Interactive score / rating indicators */}
-                        {task.status === 'completed' && (
-                          <div className="flex items-center gap-1.5 mt-1 bg-amber-50/70 border border-amber-200 px-2 py-0.5 rounded-md w-max">
-                            <span className="material-symbols-outlined text-[12px] text-amber-500 font-black">star</span>
-                            <span className="text-[10px] font-black text-amber-700 font-mono">
-                              {task.rating ? `${task.rating * 20}分` : (task.id === 'T-1002' ? '96分' : '90分')}
-                            </span>
-                          </div>
-                        )}
-                        {task.status === 'rejected' && (
-                          <div className="flex items-center gap-1 mt-1 bg-red-50/70 border border-red-200 px-1.5 py-0.5 rounded-md w-max">
-                            <span className="material-symbols-outlined text-[12px] text-red-500 font-bold">gavel</span>
-                            <span className="text-[10px] font-bold text-red-700">被驳回</span>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Estimated Cost Column */}
-                    <td className="py-4 px-5">
-                      <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-blue-50/50 text-primary border border-blue-100/60 inline-block font-mono">
-                        {getEstimatedCost(task)}
-                      </span>
-                    </td>
-
-                    {/* Config params */}
-                    <td className="py-4 px-5">
-                      <span className="text-slate-600 font-medium block truncate max-w-[130px]">{task.modelChannel}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        比例: {task.params?.ratio || '1:1'} · 步数: {task.params?.steps || 30} · 引导: {task.params?.guidance || 7.5}
-                      </span>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="py-4 px-5 text-right">
-                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                        {/* Universal details button */}
-                        <button
-                          onClick={() => {
-                            setDetailDrawerTab('overview');
-                            setSelectedDetailTask(task);
-                          }}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer transition-all"
-                          title="查看任务多维详情面板"
-                        >
-                          详情
-                        </button>
-
-                        {/* [2026-07-16 P0] 展开子任务 */}
-                        <button
-                          onClick={() => setExpandedBizId(expandedBizId === task.id ? null : task.id)}
-                          className={`px-2.5 py-1.5 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-0.5 ${
-                            expandedBizId === task.id
-                              ? 'bg-indigo-100 text-indigo-700'
-                              : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                          }`}
-                          title="展开/收起通道子任务"
-                        >
-                          <span className="material-symbols-outlined text-xs font-black">
-                            {expandedBizId === task.id ? 'expand_less' : 'expand_more'}
-                          </span>
-                          子任务
-                        </button>
-
-                        {task.status === 'completed' && (
-                          <>
-                            <button
-                              onClick={() => {
-                                setDetailDrawerTab('results');
-                                setSelectedDetailTask(task);
-                              }}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold cursor-pointer transition-all flex items-center gap-0.5"
-                              title="对生成结果进行打分审核(本期暂未接真实评分)"
-                            >
-                              <span className="material-symbols-outlined text-xs font-black">star</span>
-                              去评分
-                            </button>
-                            <button
-                              onClick={() => setPreviewTask(task)}
-                              className="px-2.5 py-1.5 rounded-lg bg-primary-light text-primary hover:bg-primary/20 font-bold transition-all"
-                            >
-                              预览
-                            </button>
-                          </>
-                        )}
-                        {task.status === 'failed' && (
-                          <>
-                            <button
-                              onClick={() => handleShowError(task)}
-                              className="px-2.5 py-1.5 rounded-lg bg-red-50 text-danger hover:bg-red-100 font-bold cursor-pointer transition-all"
-                            >
-                              诊断
-                            </button>
-                            <button
-                              onClick={() => handleRetryTask(task)}
-                              className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer transition-all"
-                            >
-                              重试
-                            </button>
-                          </>
-                        )}
-                        {task.status === 'rejected' && (
-                          <>
-                            <button
-                              onClick={() => handleShowFeedback(task)}
-                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-warning hover:bg-amber-100 font-bold cursor-pointer transition-all"
-                            >
-                              意见
-                            </button>
-                            <button
-                              onClick={() => handleRetryTask(task)}
-                              className="px-2.5 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-hover font-bold cursor-pointer transition-all"
-                            >
-                              重构
-                            </button>
-                          </>
-                        )}
-                        {task.status === 'running' && (
-                          <span className="text-slate-400 animate-pulse font-mono text-[10px]">运算中...</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-
-                  {/* [2026-07-16 P0] 展开子任务行 */}
-                  {expandedBizId === task.id && (
-                    <tr>
-                      <td colSpan={8} className="bg-slate-50/80 px-5 py-3 border-t border-slate-100">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">layers</span>
-                            通道子任务 ({children.length})
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            后端:Vidu / batchIdx 0..{children.length - 1}
-                          </span>
-                        </div>
-                        {children.length === 0 ? (
-                          <div className="text-[10px] text-slate-400 font-mono py-2">
-                            无子任务(可能是同步通道或老数据)
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap gap-2">
-                            {children.map((c) => (
-                              <ChildTaskChip
-                                key={c.id}
-                                child={c}
-                                onRetry={handleRetryChild}
-                                onPreviewImage={(imgs, idx) => {
-                                  setPreviewImages(imgs);
-                                  setPreviewIndex(idx);
-                                }}
-                                onPreviewVideo={(vids, idx) => {
-                                  setPreviewVideos(vids);
-                                  setPreviewVideoIndex(idx);
-                                }}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                  </React.Fragment>
-                ))
+              {result.mediaType === 'VIDEO' && (
+                <span className="material-symbols-outlined absolute text-lg text-white drop-shadow">play_circle</span>
               )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Dynamic Pagination */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-500 font-semibold select-none">
-          <span className="text-xs">
-            显示第 <span className="text-slate-800 font-mono font-bold">{totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> 至{' '}
-            <span className="text-slate-800 font-mono font-bold">{Math.min(currentPage * pageSize, totalItems)}</span> 项结果，共{' '}
-            <span className="text-slate-800 font-mono font-bold">{totalItems}</span> 项
-          </span>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="w-8 h-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-400 disabled:opacity-40 disabled:hover:bg-white cursor-pointer transition-all"
-            >
-              <span className="material-symbols-outlined text-sm font-bold">chevron_left</span>
             </button>
-
-            {Array.from({ length: totalPages }).map((_, i) => {
-              const pageNum = i + 1;
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shadow-xs transition-all cursor-pointer ${
-                    currentPage === pageNum
-                      ? 'bg-primary text-white font-black'
-                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="w-8 h-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-400 disabled:opacity-40 disabled:hover:bg-white cursor-pointer transition-all"
-            >
-              <span className="material-symbols-outlined text-sm font-bold">chevron_right</span>
-            </button>
-          </div>
+          ))}
+          {task.resultPreviews.length === 0 && (
+            <span className="text-[10px] text-slate-400">
+              {isActiveStatus(task.status) ? `生成中 ${task.progressPercent}%` : '暂无产物'}
+            </span>
+          )}
         </div>
-      </div>
-
-      {/* 1. Preview Result Image Modal */}
-      {previewTask && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200">
-            <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">高解析素材预览 ({previewTask.id})</span>
-              <button onClick={() => setPreviewTask(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-            <div className="p-6 flex flex-col items-center">
-              <div className="w-full aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
-                {previewTask.resultUrl ? (
-                  <img
-                    src={previewTask.resultUrl}
-                    alt={previewTask.name}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-400">
-                    <span className="material-symbols-outlined text-5xl">image</span>
-                  </div>
-                )}
-              </div>
-              <div className="w-full mt-4 bg-slate-50 rounded-xl p-3 border border-slate-100">
-                <h4 className="text-xs font-bold text-slate-800">{previewTask.name}</h4>
-                <p className="text-[10px] text-slate-400 mt-1 font-mono">生成管道: {previewTask.modelChannel}</p>
-              </div>
-            </div>
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
-              <button
-                onClick={() => setPreviewTask(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-500 font-bold hover:bg-slate-100 cursor-pointer"
-              >
-                关闭
-              </button>
-              {previewTask.resultUrl && (
-                <a
-                  href={previewTask.resultUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-sm"
-                >
-                  浏览原图
-                </a>
-              )}
-            </div>
-          </div>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex justify-end">
+          <button onClick={onOpen} className="h-7 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-bold">
+            详情
+          </button>
         </div>
-      )}
-
-      {/* 3. Feedback Details Modal —— 改 toast 后保留结构占位(本期不接真实批注) */}
-      {feedbackTask && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-amber-100">
-            <div className="p-4 border-b border-amber-100 bg-amber-50 flex items-center justify-between text-warning">
-              <span className="text-xs font-bold flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-base">gavel</span>
-                协作审核退回批注
-              </span>
-              <button onClick={() => setFeedbackTask(null)} className="text-amber-500 hover:text-amber-700 cursor-pointer">
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5 text-xs text-slate-700 leading-relaxed">
-                <p className="font-bold text-amber-800 mb-1">二审批注人:协同客户 林若云</p>
-                <p className="font-mono">{feedbackTask.feedback || '(暂无批注)'}</p>
-              </div>
-              <div className="space-y-2 text-xs text-slate-600 leading-relaxed">
-                <p className="font-bold text-slate-800">建议重绘参数:</p>
-                <p>• 将引导系数 (CFG Guidance) 调降至 <span className="font-bold text-amber-600">6.0</span>。</p>
-                <p>• 在负向提示词中加入 <span className="font-bold text-slate-700">"overexposed, glossy plastic"</span> 以消除塑料质感。</p>
-              </div>
-            </div>
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
-              <button
-                onClick={() => setFeedbackTask(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-500 font-bold hover:bg-slate-100 cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  handleRetryTask(feedbackTask);
-                  setFeedbackTask(null);
-                }}
-                className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-sm cursor-pointer"
-              >
-                采纳建议并一键重新绘制
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. Sliding Multi-Tab Details Drawer */}
-      {selectedDetailTask && (
-        <TaskDetailsDrawer
-          task={selectedDetailTask}
-          taskIds={[selectedDetailTask.id]}
-          products={products}
-          initialTab={detailDrawerTab}
-          onClose={() => setSelectedDetailTask(null)}
-          onUpdateTask={(updated) => {
-            onUpdateTask(updated);
-            setSelectedDetailTask(updated);
-          }}
-        />
-      )}
-
-      {/* 5. [2026-07-21] 子任务缩略图放大预览(图片) */}
-      {previewImages && (
-        <ImagePreviewModal
-          images={previewImages}
-          initialIndex={previewIndex}
-          onClose={() => setPreviewImages(null)}
-        />
-      )}
-
-      {/* 6. [2026-07-25] 子任务缩略图放大预览(视频) */}
-      {previewVideos && (
-        <VideoPreviewModal
-          videos={previewVideos}
-          initialIndex={previewVideoIndex}
-          onClose={() => setPreviewVideos(null)}
-        />
-      )}
-
-    </div>
+      </td>
+    </tr>
   );
 };

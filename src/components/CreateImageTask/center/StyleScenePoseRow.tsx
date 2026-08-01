@@ -135,12 +135,11 @@ function VisualTagPicker({
 
   return (
     <div ref={rootRef} className="relative min-w-0">
-      <div className="mb-1.5 text-xs font-bold text-slate-700">{label}</div>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
-        className={`flex h-13 w-full items-center gap-2.5 rounded-xl border bg-white px-2.5 text-left transition ${
+        className={`flex h-9 max-w-[220px] items-center gap-2 rounded-full border bg-white py-1 pl-1 pr-2 text-left transition ${
           open
             ? 'border-primary ring-2 ring-primary/10'
             : 'border-slate-200 hover:border-primary/50 hover:bg-primary/5'
@@ -152,16 +151,16 @@ function VisualTagPicker({
             alt=""
             loading="lazy"
             referrerPolicy="no-referrer"
-            className="h-9 w-9 shrink-0 rounded-lg border border-slate-100 bg-slate-50 object-contain p-0.5 shadow-sm"
+            className="h-7 w-7 shrink-0 rounded border border-slate-100 bg-slate-50 object-contain p-0.5"
           />
         ) : (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-slate-100">
             <ImageIcon className="h-4 w-4 text-slate-400" />
           </span>
         )}
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[10px] text-slate-400">{label}</span>
-          <span className="block truncate text-xs font-semibold text-slate-700">
+          <span className="mr-1 text-[10px] font-bold text-slate-400">{label}</span>
+          <span className="text-[11px] font-bold text-slate-700">
             {loading ? '加载中…' : isEmpty ? '暂无可用字典项' : selected?.label ?? value ?? '请选择'}
           </span>
         </span>
@@ -169,7 +168,7 @@ function VisualTagPicker({
       </button>
 
       {open && !disabled && (
-        <div className="absolute left-0 right-0 z-40 mt-2 max-h-80 min-w-[260px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
+        <div className="absolute left-0 z-40 mt-2 max-h-80 w-[280px] overflow-y-auto rounded-md border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
           {decoratedOptions.map((option) => {
             const active = option.label === value;
             return (
@@ -180,7 +179,7 @@ function VisualTagPicker({
                   onChange(option.label);
                   setOpen(false);
                 }}
-                className={`flex w-full items-center gap-3 rounded-xl p-2 text-left transition ${
+                  className={`flex w-full items-center gap-2.5 rounded p-1.5 text-left transition ${
                   active ? 'bg-primary/10' : 'hover:bg-slate-50'
                 }`}
               >
@@ -189,7 +188,7 @@ function VisualTagPicker({
                   alt=""
                   loading="lazy"
                   referrerPolicy="no-referrer"
-                  className="h-14 w-14 shrink-0 rounded-xl border border-slate-100 bg-slate-50 object-contain p-1"
+                  className="h-10 w-10 shrink-0 rounded border border-slate-100 bg-slate-50 object-contain p-0.5"
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-semibold text-slate-800">
@@ -223,7 +222,7 @@ export const StyleScenePoseRow: React.FC<StyleScenePoseRowProps> = ({
   onSceneChange,
   onPoseChange,
 }) => (
-  <div className="grid gap-3 md:grid-cols-3">
+  <div className="flex flex-wrap items-center gap-2">
     <VisualTagPicker
       kind="style"
       label="风格"

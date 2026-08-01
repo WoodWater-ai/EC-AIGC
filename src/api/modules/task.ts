@@ -11,6 +11,8 @@ import type {
   GenerationTaskResponse,
   ImageTaskSubmitPayload,
   ImageTaskSubmitResponse,
+  TaskGroupQueryRequest,
+  TaskGroupResponse,
   TaskMyPageQueryRequest,
   VideoTaskSubmitPayload,
   VideoTaskSubmitResponse,
@@ -58,6 +60,18 @@ export const taskApi = {
   /** 我的任务分页(/v1/task/my-page) */
   myPage(req: TaskMyPageQueryRequest): Promise<PageInfo<GenerationTaskResponse>> {
     return http.post<PageInfo<GenerationTaskResponse>>('/v1/task/my-page', req);
+  },
+
+  /** 按一次提交形成的批次分页 */
+  groupPage(req: TaskGroupQueryRequest): Promise<PageInfo<TaskGroupResponse>> {
+    return http.post<PageInfo<TaskGroupResponse>>('/v1/task/group-page', req);
+  },
+
+  /** 获取当前用户的一个完整任务批次 */
+  groupDetail(groupId: string): Promise<TaskGroupResponse> {
+    return http.post<TaskGroupResponse>('/v1/task/group-detail', null, {
+      params: { groupId },
+    });
   },
 
   /** 任务详情(/v1/task/detail?id=) */

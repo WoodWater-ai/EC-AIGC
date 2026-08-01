@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ProductAsset, GenerationTask, AppScreen } from '../types';
+import { ProductAsset, AppScreen } from '../types';
 import { AssetTransitModal } from './AssetTransitModal';
 import { assetApi } from '../api/modules/asset';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
@@ -24,8 +24,8 @@ function readPrefill(): import('./createTask/useTaskParams').PrefillState | null
 
 interface CreateVideoTaskProps {
   products: ProductAsset[];
-  onAddTask: (task: GenerationTask) => void;
-  setScreen: (screen: AppScreen) => void;
+  onAddTask: (info: { groupId: string; taskIds: string[]; taskKind?: 'IMAGE' | 'VIDEO' }) => void;
+  setScreen: (screen: AppScreen, payload?: { highlightGroupId?: string }) => void;
   selectedProduct: ProductAsset;
   setSelectedProduct: (product: ProductAsset) => void;
 }
@@ -210,9 +210,10 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       count,
     };
     try {
-      await taskApi.submitVideoTask(payload);
+      const response = await taskApi.submitVideoTask(payload);
       sessionStorage.removeItem('beta.template.prefill');
-      setScreen(AppScreen.TASKS);
+      onAddTask({ ...response, taskKind: 'VIDEO' });
+      setScreen(AppScreen.TASKS, { highlightGroupId: response.groupId });
     } catch {
       // http 拦截器已 toast 错误
     }

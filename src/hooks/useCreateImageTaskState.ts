@@ -86,7 +86,7 @@ export interface UseCreateImageTaskStateOpts {
   model: { id: string; name: string; capability: { maxCount: number } };
   templateName: string;
   toSubmit: () => Promise<string>;
-  onAddTask: (info: { groupId: string; taskIds: string[] }) => void;
+  onAddTask: (info: { groupId: string; taskIds: string[]; taskKind?: 'IMAGE' | 'VIDEO' }) => void;
   /**
    * 切换 AppScreen 的 setter。
    * [2026-07-24 Task 13] 第二个 payload 参数供 Task 14 实现"高亮 groupId"用;
@@ -100,6 +100,8 @@ export interface UseCreateImageTaskStateOpts {
    * 现在让后端 ChannelParamBinder 按 schema 自动映射(单源真相)。
    */
   schemaParams?: Record<string, any>;
+  /** 通道、能力、模型以及能力 Schema 必填参数是否已完成选择。 */
+  executionParamsReady: boolean;
 }
 
 export interface UseCreateImageTaskStateReturn {
@@ -118,8 +120,6 @@ export interface UseCreateImageTaskStateReturn {
    * UI 可据此显示"已使用本地建议"提示。
    */
   assistantFallback: boolean;
-  factsConfirmed: boolean;
-  promptsConfirmed: boolean;
   assistantState: 'idle' | 'processing' | 'complete';
   reviewEnabled: boolean;
   references: Record<ReferenceSlot, any | undefined>;
@@ -139,7 +139,6 @@ export interface UseCreateImageTaskStateReturn {
   readinessCount: number;
   prompts: Record<ImageGenerationType, string>;
   promptsComplete: boolean;
-  factsComplete: boolean;
   isSupported: boolean;
   totalCount: number;
   // actions
@@ -153,13 +152,9 @@ export interface UseCreateImageTaskStateReturn {
   setPose(v: string): void;
   setNegativePrompt(v: string): void;
   updateProductFact<K extends keyof ProductFactsInput>(key: K, value: ProductFactsInput[K]): void;
-  confirmFacts(): void;
-  setFactsConfirmed(v: boolean): void;
   // 顶层灌入"产品事实"路径(被选产品等):同步 hook 内部 formInput 让 prompts 重算
   setFormFactsExternal(facts: ProductFactsInput): void;
   setPromptOverride(t: ImageGenerationType, v: string): void;
-  confirmPrompts(): void;
-  markPromptsDirty(): void;
   runAssistantAnalysis(): Promise<void>;
   regeneratePrompts(): void;
   applyAiOptimizeToSelected(selected: ImageGenerationType[]): void;
@@ -214,8 +209,6 @@ export function useCreateImageTaskState(
   const [negativePrompt, setNegativePrompt] = useState<string>('blurry, bad quality, distorted');
   const [promptOverrides, setPromptOverrides] = useState<Partial<Record<ImageGenerationType, string>>>({});
   const [promptHasEdits, setPromptHasEdits] = useState<boolean>(false);
-  const [factsConfirmed, setFactsConfirmed] = useState<boolean>(false);
-  const [promptsConfirmed, setPromptsConfirmed] = useState<boolean>(false);
   const [assistantState, setAssistantState] = useState<'idle' | 'processing' | 'complete'>('idle');
   /**
    * [2026-07-26] AI 助手是否降级(后端 imagePlanApi.analyze 失败时为 true)。
@@ -352,11 +345,6 @@ export function useCreateImageTaskState(
     return result;
   }, [productFacts, formInput, style, scene, pose, orderedReferenceInsights]);
 
-  // prompts 变化 → 视为编辑,reset 确认态
-  useEffect(() => {
-    setPromptsConfirmed(false);
-  }, [prompts]);
-
   const promptsComplete = useMemo(() => {
     if (selectedTypes.length === 0) return false;
     return selectedTypes.every((t) => {
@@ -366,11 +354,6 @@ export function useCreateImageTaskState(
       return typeof prompt === 'string' && prompt.trim().length > 0;
     });
   }, [selectedTypes, promptOverrides, prompts]);
-
-  const factsComplete = useMemo(
-    () => formInput.name.trim().length > 0,
-    [formInput],
-  );
 
   const isSupported = useMemo(() => {
     // [2026-07-25 P0 修复] 删 model.capability.ratios/resolutions 写死字段(Phase 2 清理);
@@ -389,13 +372,11 @@ export function useCreateImageTaskState(
 
   const readinessDeps = useMemo(() => ({
     isProductBound: opts.isProductBound,
-    factsConfirmed,
-    factsComplete,
-    promptsConfirmed,
     promptsComplete,
+    executionParamsReady: opts.executionParamsReady,
     isSupported,
     channelMaintenance: opts.channel.health === 'maintenance',
-  }), [opts.isProductBound, factsConfirmed, factsComplete, promptsConfirmed, promptsComplete, isSupported, opts.channel.health]);
+  }), [opts.isProductBound, promptsComplete, opts.executionParamsReady, isSupported, opts.channel.health]);
 
   const readinessChecks = useMemo(() => computeReadinessChecks(readinessDeps), [readinessDeps]);
   const readinessCount = readinessChecks.filter((c) => c.complete).length;
@@ -408,7 +389,6 @@ export function useCreateImageTaskState(
       }
       return [...prev, t];
     });
-    setPromptsConfirmed(false);
   }, []);
 
   const changeTypeCount = useCallback((t: ImageGenerationType, delta: number) => {
@@ -417,7 +397,6 @@ export function useCreateImageTaskState(
       const next = Math.min(Math.max(prev[t] + delta, MIN_TYPE_COUNT), Math.min(cap, MAX_TYPE_COUNT));
       return { ...prev, [t]: next };
     });
-    setPromptsConfirmed(false);
   }, [opts.model.capability.maxCount]);
 
   const requestTemplateChange = useCallback((name: string) => {
@@ -438,12 +417,10 @@ export function useCreateImageTaskState(
     setTemplatePickerOpen(false);
     setTemplateOverwriteOpen(false);
     setPendingTemplate(null);
-    setPromptsConfirmed(false);
   }, []);
 
   const updateProductFact: UseCreateImageTaskStateReturn['updateProductFact'] = useCallback((key, value) => {
     setFormInput((prev) => ({ ...prev, [key]: value }));
-    setFactsConfirmed(false);
     setProductFacts(null);
   }, []);
 
@@ -451,34 +428,11 @@ export function useCreateImageTaskState(
   const setFormFactsExternal = useCallback((facts: ProductFactsInput) => {
     setFormInput(facts);
     setProductFacts(extractProductFacts(facts));
-    setFactsConfirmed(false);
   }, []);
-
-  const setFactsConfirmedExposed = useCallback((v: boolean) => {
-    setFactsConfirmed(v);
-  }, []);
-
-  const confirmFacts = useCallback(() => {
-    if (!opts.isProductBound) return;
-    setFactsConfirmed(true);
-    if (!productFacts) setProductFacts(extractProductFacts(formInput));
-    setReadinessIssue('');
-  }, [opts.isProductBound, productFacts, formInput]);
 
   const setPromptOverride = useCallback((t: ImageGenerationType, v: string) => {
     setPromptOverrides((prev) => ({ ...prev, [t]: v }));
     setPromptHasEdits(true);
-    setPromptsConfirmed(false);
-  }, []);
-
-  const confirmPrompts = useCallback(() => {
-    if (!factsConfirmed || !promptsComplete) return;
-    setPromptsConfirmed(true);
-    setReadinessIssue('');
-  }, [factsConfirmed, promptsComplete]);
-
-  const markPromptsDirty = useCallback(() => {
-    setPromptsConfirmed(false);
   }, []);
 
   /**
@@ -506,9 +460,7 @@ export function useCreateImageTaskState(
       nextOverrides[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
     });
     setPromptOverrides(nextOverrides);
-    setFactsConfirmed(true);
     setPromptHasEdits(true);
-    setPromptsConfirmed(false);
     setAssistantState('complete');
   };
 
@@ -578,9 +530,7 @@ export function useCreateImageTaskState(
       }
       setPromptOverrides(nextOverrides);
       setNegativePrompt(resp.negativePrompt);
-      setFactsConfirmed(true);
       setPromptHasEdits(true);
-      setPromptsConfirmed(false);
       setAssistantState('complete');
       opts.onAiComplete?.(resp.productFacts);
       toast.success(messages.assistant.complete);
@@ -605,7 +555,6 @@ export function useCreateImageTaskState(
   const regeneratePrompts = useCallback(() => {
     setPromptOverrides({});
     setPromptHasEdits(false);
-    setPromptsConfirmed(false);
     if (opts.isProductBound && formInput.name.trim()) {
       setProductFacts(extractProductFacts(formInput));
     }
@@ -624,13 +573,13 @@ export function useCreateImageTaskState(
       return next;
     });
     setPromptHasEdits(true);
-    setPromptsConfirmed(false);
   }, [productFacts, formInput, style, scene, pose, orderedReferenceInsights]);
 
   const checkAndGenerate = useCallback(() => {
     const issue = readinessChecks.find((c) => !c.complete);
     if (issue) {
       setReadinessIssue(issue.message);
+      toast.error(issue.message);
       window.requestAnimationFrame(() => {
         document.getElementById(issue.targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
@@ -727,7 +676,7 @@ export function useCreateImageTaskState(
       const resp = await taskApi.submitImageTask(payload);
 
       // 跳转:通知 App 高亮本次提交的 group,并切到任务列表。
-      opts.onAddTask?.({ groupId: resp.groupId, taskIds: resp.taskIds });
+      opts.onAddTask?.({ groupId: resp.groupId, taskIds: resp.taskIds, taskKind: 'IMAGE' });
       opts.setScreen(AppScreen.TASKS, { highlightGroupId: resp.groupId });
 
       try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* quota */ }
@@ -751,12 +700,10 @@ export function useCreateImageTaskState(
       // 已有 order 的 slot 保留;新选 slot 用 assignNextOrder 补齐
       return assignNextOrder(prev, nextSelected);
     });
-    setPromptsConfirmed(false);
   }, []);
 
   const updateReferenceOrder = useCallback((slot: ReferenceSlot, order: number) => {
     setReferenceOrder((prev) => ({ ...prev, [slot]: order }));
-    setPromptsConfirmed(false);
   }, []);
 
   /**
@@ -770,7 +717,6 @@ export function useCreateImageTaskState(
       );
       return moveReferenceInOrder(prev, selected, fromSlot, toIndex);
     });
-    setPromptsConfirmed(false);
   }, []);
 
   /**
@@ -795,8 +741,6 @@ export function useCreateImageTaskState(
     negativePrompt,
     promptOverrides,
     promptHasEdits,
-    factsConfirmed,
-    promptsConfirmed,
     assistantState,
     reviewEnabled,
     references,
@@ -816,7 +760,6 @@ export function useCreateImageTaskState(
     readinessCount,
     prompts,
     promptsComplete,
-    factsComplete,
     isSupported,
     totalCount,
     toggleType,
@@ -830,11 +773,7 @@ export function useCreateImageTaskState(
     setNegativePrompt,
     updateProductFact,
     setFormFactsExternal,
-    setFactsConfirmed: setFactsConfirmedExposed,
-    confirmFacts,
     setPromptOverride,
-    confirmPrompts,
-    markPromptsDirty,
     runAssistantAnalysis,
     regeneratePrompts,
     applyAiOptimizeToSelected,

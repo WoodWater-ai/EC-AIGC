@@ -4,13 +4,12 @@ import { toast } from 'sonner';
 import { AppScreen } from '../../types';
 import type { ProductAsset } from '../../types';
 import type { ProductDTO } from '../../api/modules/productInfo';
-import type { ImageGenerationType, ReadinessCheck } from '../../lib/createImageTask/readinessChecks';
+import type { ImageGenerationType } from '../../lib/createImageTask/readinessChecks';
 import type { ReferenceSlot } from '../../lib/createImageTask/extractReferenceInsights';
 import type { ProductFactsInput } from '../../lib/createImageTask/extractProductFacts';
 import { toSlotRef } from '../common/TransitPickerButton';
 
 import { TopHeader } from './header/TopHeader';
-import { ReadinessBanner } from './header/ReadinessBanner';
 import { ThreeColumnLayout } from './layout/ThreeColumnLayout';
 import { ProductPickerCard } from './left/ProductPickerCard';
 import { ProductPickerModal } from './ProductPickerModal';
@@ -22,6 +21,7 @@ import { TemplatePicker } from './center/TemplatePicker';
 import { StyleScenePoseRow } from './center/StyleScenePoseRow';
 import { AdvancedSettings } from './center/AdvancedSettings';
 import { ImageContentSection } from './center/ImageContentSection';
+import { ProductFactsEditor } from './center/ProductFactsEditor';
 import { ImageSettingsSection, type TaskParamsSnapshot } from './right/ImageSettingsSection';
 import { ReviewStrategyPanel } from './right/ReviewStrategyPanel';
 import { ConflictDialog } from './dialogs/ConflictDialog';
@@ -35,7 +35,7 @@ import { withCosThumbnail } from '../../utils/cosImage';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
-  onAddTask: (info: { groupId: string; taskIds: string[] }) => void;
+  onAddTask: (info: { groupId: string; taskIds: string[]; taskKind?: 'IMAGE' | 'VIDEO' }) => void;
   setScreen: (screen: AppScreen, payload?: { highlightGroupId?: string }) => void;
   openTransit: () => void;
   selectedProduct: ProductAsset;
@@ -98,6 +98,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     channelType: null,
     capability: null,
     modelId: null,
+    executionParamsReady: false,
     // [2026-07-25 P0 修复] 加 schemaParams 字段,接收 ImageSettingsSection.onParamsChange
     // 冒泡上来的能力参数(包含 aspect_ratio / resolution 等),透传给 useCreateImageTaskState。
     schemaParams: {},
@@ -131,6 +132,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     // ParamSchemaForm 收集的能力参数整体透传给 hook,直接作为 taskParamsJson 提交;
     // 后端 ChannelParamBinder 按 ViduCapabilities schema 字段名映射到 Vidu body。
     schemaParams: paramsSnapshot.schemaParams,
+    executionParamsReady: paramsSnapshot.executionParamsReady,
     templateName: '默认模板',
     toSubmit: async () => '',
     onAddTask,
@@ -140,18 +142,18 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const {
     selectedTypes, typeCounts, template,
     style, scene, pose, negativePrompt,
-    promptOverrides, factsConfirmed, promptsConfirmed,
-    assistantState, reviewEnabled, references, readinessIssue,
+    promptOverrides,
+    assistantState, reviewEnabled, references,
     conflictOpen, templatePickerOpen, pendingTemplate,
     templateOverwriteOpen, executionConfirmOpen,
     isSubmitting,
     setConflictOpen, setTemplateOverwriteOpen, setExecutionConfirmOpen,
-    readinessCount, prompts, promptsComplete, factsComplete,
+    prompts, promptsComplete,
     isSupported, totalCount,
     toggleType, changeTypeCount, requestTemplateChange, applyTemplate,
     setStyle, setScene, setPose, setNegativePrompt,
-    updateProductFact, setFormFactsExternal, setFactsConfirmed, confirmFacts,
-    setPromptOverride, confirmPrompts, runAssistantAnalysis,
+    updateProductFact, setFormFactsExternal,
+    setPromptOverride, runAssistantAnalysis,
     regeneratePrompts, applyAiOptimizeToSelected,
     setReviewEnabled,
     selectReference, updateReferenceOrder, checkAndGenerate, submitTasks,
@@ -179,24 +181,11 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     }
   }, [poseOptions, loadingPose, pose, setPose]);
 
-  // ---- 移除参考图:走 selectReference(slot, undefined) 复用现有重排 + promptsConfirmed 重置逻辑 ----
+  // ---- 移除参考图:走 selectReference(slot, undefined) 复用现有重排逻辑 ----
   const handleRemoveReference = useCallback(
     (slot: ReferenceSlot) => selectReference(slot, undefined),
     [selectReference],
   );
-
-  // ---- derived readiness state for banner ----
-  const readiness = useMemo(() => {
-    const checks = state.readinessChecks;
-    const map = new Map<number, boolean>();
-    checks.forEach((c) => map.set(c.id, c.complete));
-    return {
-      selectMain: !!mainValue,
-      confirmFacts: map.get(2) ?? false,
-      confirmPrompts: map.get(3) ?? false,
-      unsupportedSpec: map.get(4) ?? false,
-    };
-  }, [state.readinessChecks, mainValue]);
 
   // ---- AI assistant ----
   const handleAssistantClick = useCallback(() => {
@@ -244,7 +233,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       setProductFacts(nextFacts);
       // 关键:也回写到 hook 的 formInput,触发 `prompts` useMemo 重算 → 4 类型 Prompt 自动重写
       setFormFactsExternal(nextFacts);
-      setFactsConfirmed(false);
       // 主图:imageUrl(ossKey) → withCosThumbnail(256) 拼 COS thumbnail,
       // 与 handleTransitConfirm 的主图分支保持一致缩放规则。
       const compressedThumb = withCosThumbnail(product.imageUrl, 256) ?? product.imageUrl;
@@ -258,7 +246,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       });
       toast.success(`已选择产品:${product.name}`);
     },
-    [setFormFactsExternal, setFactsConfirmed],
+    [setFormFactsExternal],
   );
 
   const handleClearProduct = useCallback(() => {
@@ -322,18 +310,14 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const isProductBound = !!mainValue;
 
   return (
-    <div className="h-screen flex flex-col bg-white overflow-hidden text-slate-800">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#f5f7fb] text-slate-800">
       {/* Header */}
       <TopHeader
         selectedTypesCount={selectedTypes.length}
         totalCount={totalCount}
-        readinessCount={readinessCount}
         onBack={() => setScreen(AppScreen.TASKS)}
         onCheckAndGenerate={checkAndGenerate}
       />
-
-      {/* Readiness banner */}
-      <ReadinessBanner readiness={readiness} />
 
       {/* 3-column layout */}
       <ThreeColumnLayout
@@ -365,51 +349,21 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
               openSlotPicker={openSlotPicker}
               onRemove={handleRemoveReference}
             />
+            <ProductFactsEditor
+              value={productFacts}
+              isProductBound={isProductBound}
+              onChange={updateProductFact}
+            />
           </>
         }
         center={
           <>
-            <ImageTypeSelector
-              selectedTypes={selectedTypes}
-              typeCounts={typeCounts}
-              maxCountPerType={5}
-              onToggle={toggleType}
-              onChangeCount={changeTypeCount}
-            />
-            <TemplatePicker
-              value={template}
-              options={[{ id: 'default', name: '默认模板' }]}
-              onPickRequest={requestTemplateChange}
-            />
-            <StyleScenePoseRow
-              styleOptions={styleOptions}
-              sceneOptions={sceneOptions}
-              poseOptions={poseOptions}
-              loadingStyle={loadingStyle}
-              loadingScene={loadingScene}
-              loadingPose={loadingPose}
-              style={style}
-              scene={scene}
-              pose={pose}
-              onStyleChange={setStyle}
-              onSceneChange={setScene}
-              onPoseChange={setPose}
-            />
-            <AdvancedSettings
-              negativePrompt={negativePrompt}
-              onChange={setNegativePrompt}
-            />
             <ImageContentSection
               isProductBound={isProductBound}
               assistantState={assistantState}
               onAssistantClick={handleAssistantClick}
-              productFacts={productFacts}
-              factsComplete={factsComplete}
-              factsConfirmed={factsConfirmed}
-              onChangeFact={updateProductFact}
-              onConfirmFacts={confirmFacts}
-              promptsConfirmed={promptsConfirmed}
               selectedTypes={selectedTypes}
+              typeCounts={typeCounts}
               defaultPrompts={prompts}
               promptOverrides={promptOverrides}
               templateName={template}
@@ -417,7 +371,44 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
               onChangePromptOverride={setPromptOverride}
               onRegenerateAll={handleRegenerateAll}
               onAiOptimizeSelected={handleAiOptimizeSelected}
-              onConfirmPrompts={confirmPrompts}
+              typeSelector={
+                <ImageTypeSelector
+                  selectedTypes={selectedTypes}
+                  typeCounts={typeCounts}
+                  maxCountPerType={5}
+                  onToggle={toggleType}
+                  onChangeCount={changeTypeCount}
+                />
+              }
+              tagSelector={
+                <StyleScenePoseRow
+                  styleOptions={styleOptions}
+                  sceneOptions={sceneOptions}
+                  poseOptions={poseOptions}
+                  loadingStyle={loadingStyle}
+                  loadingScene={loadingScene}
+                  loadingPose={loadingPose}
+                  style={style}
+                  scene={scene}
+                  pose={pose}
+                  onStyleChange={setStyle}
+                  onSceneChange={setScene}
+                  onPoseChange={setPose}
+                />
+              }
+              templateSelector={
+                <TemplatePicker
+                  value={template}
+                  options={[{ id: 'default', name: '默认模板' }]}
+                  onPickRequest={requestTemplateChange}
+                />
+              }
+              advancedSettings={
+                <AdvancedSettings
+                  negativePrompt={negativePrompt}
+                  onChange={setNegativePrompt}
+                />
+              }
             />
           </>
         }

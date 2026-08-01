@@ -455,12 +455,25 @@ export const ASYNC_TASK_STATUS_STYLES: Record<AsyncTaskStatus, { bg: string; tex
 
 /** 父任务状态机(对齐后端 EnumTaskStatus) */
 export type TaskStatus =
+  | 'DRAFT'
   | 'PENDING'              // 已提交,待执行
   | 'GENERATING'           // 生成中
   | 'PENDING_REVIEW_SCORE' // 已完成,待评分
+  | 'PENDING_REVIEW_PUBLISH'
   | 'FAILED'               // 失败
+  | 'REJECTED'
+  | 'ARCHIVED'
   | 'CANCELED'             // 取消
   | 'COMPLETED';           // 完成(二期引入,本期不一定用到)
+
+export interface TaskMyPageQueryRequest {
+  pageNum: number;
+  pageSize: number;
+  status?: TaskStatus;
+  taskType?: string;
+  productId?: string;
+  keyword?: string;
+}
 
 /** 父任务响应 DTO(对齐后端 TaskResponse) */
 export interface GenerationTaskResponse {
@@ -489,6 +502,70 @@ export interface GenerationTaskResponse {
   finishedAt: string | null;
   submitterUserId: string;
   createTime: string;
+}
+
+export interface TaskGroupQueryRequest {
+  pageNum: number;
+  pageSize: number;
+  taskKind?: 'IMAGE' | 'VIDEO';
+  statuses?: TaskStatus[];
+  keyword?: string;
+}
+
+export interface TaskResultPreviewResponse {
+  id: string;
+  taskId: string;
+  mediaType: 'IMAGE' | 'VIDEO';
+  url: string;
+  thumbnailUrl?: string | null;
+  status?: string | null;
+  score?: number | null;
+  batchIdx?: number | null;
+}
+
+export interface TaskGroupItemResponse {
+  id: string;
+  taskCode: string;
+  title: string;
+  taskKind: 'IMAGE' | 'VIDEO';
+  taskType: string;
+  imageType?: string | null;
+  status: TaskStatus;
+  progressPercent: number;
+  count: number;
+  aspectRatio?: string | null;
+  modelChannelId?: string | null;
+  modelChannelName?: string | null;
+  templateId?: string | null;
+  templateName?: string | null;
+  taskPrompt?: string | null;
+  negativePrompt?: string | null;
+  taskParamsJson?: string | null;
+  inputImageUrls?: string | null;
+  inputImages: string[];
+  failCode?: string | null;
+  failReason?: string | null;
+  estimatedCost?: number | null;
+  actualCost?: number | null;
+  createTime: string;
+  resultPreviews: TaskResultPreviewResponse[];
+}
+
+export interface TaskGroupResponse {
+  groupId: string;
+  taskKind: 'IMAGE' | 'VIDEO';
+  status: TaskStatus;
+  progressPercent: number;
+  submittedAt: string;
+  productId?: string | null;
+  productName: string;
+  productImage?: string | null;
+  templateId?: string | null;
+  templateName?: string | null;
+  submitterUserId: string;
+  taskCount: number;
+  resultCount: number;
+  tasks: TaskGroupItemResponse[];
 }
 
 // ============================================================================

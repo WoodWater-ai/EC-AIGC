@@ -36,10 +36,19 @@ export function useServiceQuery<T>(
   // trigger counter 累加,每次 refetch 触发 useEffect 重跑 fetcher
   const [trigger, setTrigger] = useState(0);
   const aliveRef = useRef(true);
+  const previousDepsRef = useRef<DependencyList>(deps);
 
   useEffect(() => {
     aliveRef.current = true;
-    setState({ data: null, loading: true, error: null });
+    const previousDeps = previousDepsRef.current;
+    const depsChanged = previousDeps.length !== deps.length
+      || deps.some((value, index) => !Object.is(value, previousDeps[index]));
+    previousDepsRef.current = deps;
+    setState((current) => ({
+      data: depsChanged ? null : current.data,
+      loading: true,
+      error: null,
+    }));
 
     fetcher()
       .then((data) => {

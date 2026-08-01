@@ -26,7 +26,7 @@ export interface ReferenceGridProps {
   openSlotPicker: (slot: ReferenceSlot) => void;
   /**
    * 移除已选参考图:卡片底部"移除"按钮触发。
-   * 父容器一般走 selectReference(slot, undefined) 复用现有重排 + promptsConfirmed 重置逻辑。
+   * 父容器一般走 selectReference(slot, undefined) 复用现有重排逻辑。
    * 不传则不渲染移除按钮。
    */
   onRemove?: (slot: ReferenceSlot) => void;
@@ -106,25 +106,18 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
   };
 
   return (
-    <div id="reference-grid" className="bg-white border border-slate-200 rounded-lg p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-black">
-          参考图 <span className="font-normal text-slate-400">(选传)</span>
-        </h2>
-        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-          {orderedRefs.length} / {REFERENCE_SLOTS_INTERNAL.length}
-        </span>
+    <div id="reference-grid" className="border border-slate-200 bg-white p-3">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-xs font-black">参考图</h2>
+        <span className="text-[10px] text-slate-400">自动识别标签 · {orderedRefs.length}/{REFERENCE_SLOTS_INTERNAL.length}</span>
       </div>
-      <p className="mt-1 text-[11px] leading-5 text-slate-400">
-        5 张图可拖动排序;空槽排在已选图后面,新选图自动靠前冒泡
-      </p>
 
-      <div className="grid grid-cols-2 gap-2 mt-3">
+      <div className="mt-3 grid grid-cols-5 gap-1.5">
         {renderList.map((item, index) => {
           const slotLabel = REFERENCE_SLOT_META[item.slot].label;
           const showOrder = item.kind === 'filled';
           return (
-            <div key={item.slot} className="relative">
+            <div key={item.slot} className="group relative">
               {dragSlot !== null && dragOverIndex === index && (
                 <div
                   aria-hidden="true"
@@ -149,28 +142,22 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
                     type="button"
                     onClick={() => openSlotPicker(item.slot)}
                     aria-label={`更换${slotLabel}参考`}
-                    className="relative w-full h-16 rounded-md border-2 overflow-hidden flex items-center gap-2 px-2 text-left transition-colors border-primary bg-blue-50"
+                    className="relative flex aspect-square w-full items-center justify-center overflow-hidden border border-slate-200 bg-white text-left"
                   >
                     {(item as any).ref?.thumbnailUrl || (item as any).ref?.originalUrl ? (
                       <img
                         src={(item as any).ref.thumbnailUrl ?? (item as any).ref.originalUrl ?? ''}
                         alt={(item as any).ref.name ?? slotLabel}
-                        className="w-10 h-10 rounded object-cover"
+                        className="h-full w-full object-contain"
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <span className="material-symbols-outlined text-2xl text-slate-400">image</span>
+                      <span className="material-symbols-outlined text-lg text-slate-400">image</span>
                     )}
-                    <span
-                      className="min-w-0 text-[11px] font-bold text-primary truncate"
-                      title={(item as any).ref.name ?? ''}
-                    >
-                      {(item as any).ref.name ?? slotLabel}
-                    </span>
                     {showOrder && (
                       <span
                         aria-hidden="true"
-                        className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center shadow-sm"
+                        className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white"
                       >
                         {(item as any).order}
                       </span>
@@ -182,28 +169,25 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
                   type="button"
                   onClick={() => openSlotPicker(item.slot)}
                   aria-label={`添加${slotLabel}参考`}
-                  className="w-full h-16 rounded-md border-2 border-dashed border-slate-200 hover:border-primary bg-slate-50 hover:bg-blue-50 transition-colors flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-primary"
+                  className="flex aspect-square w-full flex-col items-center justify-center border border-dashed border-slate-300 bg-slate-50 text-slate-400 transition-colors hover:border-primary hover:text-primary"
                 >
-                  <span className="material-symbols-outlined text-2xl">add</span>
-                  <span className="text-[10px] font-bold">添加参考</span>
+                  <span className="material-symbols-outlined text-lg">{REFERENCE_SLOT_META[item.slot].icon ?? 'add'}</span>
                 </button>
               )}
 
               {/* 卡片下方:slot 中文标签(已选/空槽都显示,固定 detail/style/...)。
                   已选时右侧追加红色「移除」文字按钮,点击走 onRemove 移除该 slot。
                   stopPropagation 防止冒泡触发卡片本身的换图 picker。 */}
-              <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
-                <span className={item.kind === 'filled' ? 'text-primary' : 'text-slate-400'}>
-                  {slotLabel}参考
-                </span>
+              <div className="mt-1 flex items-center justify-center text-[10px] font-bold">
+                <span className={`truncate ${item.kind === 'filled' ? 'text-primary' : 'text-slate-500'}`}>{slotLabel}</span>
                 {item.kind === 'filled' && onRemove && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onRemove(item.slot); }}
-                    className="text-red-500 hover:text-red-700 hover:underline transition-colors"
+                    className="absolute -right-1 -top-1 hidden h-4 w-4 place-items-center rounded-full bg-slate-800 text-[10px] text-white group-hover:grid"
                     aria-label={`移除${slotLabel}参考`}
                   >
-                    移除
+                    ×
                   </button>
                 )}
               </div>

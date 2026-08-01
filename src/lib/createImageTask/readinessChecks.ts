@@ -14,10 +14,8 @@ export interface ReadinessCheck {
 
 export interface ReadinessDeps {
   isProductBound: boolean;
-  factsConfirmed: boolean;
-  factsComplete: boolean;
-  promptsConfirmed: boolean;
   promptsComplete: boolean;
+  executionParamsReady: boolean;
   isSupported: boolean;
   channelMaintenance: boolean;
 }
@@ -32,15 +30,15 @@ export function computeReadinessChecks(deps: ReadinessDeps): ReadinessCheck[] {
     },
     {
       id: 2,
-      complete: deps.factsConfirmed && deps.factsComplete,
-      message: messages.readiness.confirmFacts,
+      complete: deps.promptsComplete,
+      message: messages.readiness.completePrompts,
       targetId: 'image-content-section',
     },
     {
       id: 3,
-      complete: deps.promptsConfirmed && deps.promptsComplete,
-      message: messages.readiness.confirmPrompts,
-      targetId: 'image-content-section',
+      complete: deps.executionParamsReady,
+      message: messages.readiness.selectExecutionParams,
+      targetId: 'image-settings-section',
     },
     {
       id: 4,
