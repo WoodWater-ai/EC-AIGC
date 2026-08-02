@@ -49,6 +49,19 @@ export interface SubmitTaskRequest {
   productSellingPoints?: string;
 }
 
+export interface ImageRevisionSubmitRequest {
+  sourceResultId: string;
+  maskFileResourceId: string;
+  instruction: string;
+}
+
+export interface ImageRevisionSubmitResponse {
+  revisionTaskId: string;
+  rootTaskId: string;
+  rootResultId: string;
+  revisionNo: number;
+}
+
 /** 提交任务,返回任务 id(后端 Long → string) */
 export async function submitTask(req: SubmitTaskRequest): Promise<string> {
   return http.post<string>('/v1/task/submit', req);
@@ -100,6 +113,23 @@ export const taskApi = {
     payload: ImageTaskSubmitPayload
   ): Promise<ImageTaskSubmitResponse> {
     return http.post<ImageTaskSubmitResponse>('/v1/task/submit', payload);
+  },
+
+  /** 基于已有图片成果创建隐藏的二次编辑执行任务。 */
+  submitImageRevision(
+    payload: ImageRevisionSubmitRequest,
+  ): Promise<ImageRevisionSubmitResponse> {
+    return http.post<ImageRevisionSubmitResponse>(
+      '/v1/task/image-revision/submit',
+      payload,
+    );
+  },
+
+  /** 重试本人失败的图片二次编辑任务。 */
+  retryImageRevision(id: string): Promise<void> {
+    return http.post<void>('/v1/task/image-revision/retry', null, {
+      params: { id },
+    });
   },
 
   /** 单任务拉取生成图片列表(/v1/task/generated-images) */

@@ -554,6 +554,23 @@ export interface TaskResultPreviewResponse {
   batchIdx?: number | null;
   creationTemplateId?: string | null;
   templateStatus?: 'DRAFT' | 'PUBLISHED' | 'OFFLINE' | null;
+  rootResultId?: string | null;
+  parentResultId?: string | null;
+  revisionNo?: number | null;
+  editInstruction?: string | null;
+  maskUrl?: string | null;
+}
+
+export interface ImageRevisionJobResponse {
+  taskId: string;
+  sourceResultId: string;
+  rootResultId: string;
+  revisionNo: number;
+  status: TaskStatus;
+  failReason?: string | null;
+  editInstruction?: string | null;
+  maskUrl?: string | null;
+  createTime?: string | null;
 }
 
 export interface TaskGroupItemResponse {
@@ -583,6 +600,7 @@ export interface TaskGroupItemResponse {
   actualCost?: number | null;
   createTime: string;
   resultPreviews: TaskResultPreviewResponse[];
+  revisionJobs?: ImageRevisionJobResponse[];
 }
 
 export interface TaskGroupResponse {
@@ -600,6 +618,7 @@ export interface TaskGroupResponse {
   taskCount: number;
   resultCount: number;
   tasks: TaskGroupItemResponse[];
+  hasActiveRevision?: boolean;
 }
 
 // ============================================================================

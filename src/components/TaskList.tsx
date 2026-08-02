@@ -118,7 +118,7 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
   }, [searchInput]);
 
   useEffect(() => {
-    if (!groups.some((group) => isActiveStatus(group.status))) return;
+    if (!groups.some((group) => isActiveStatus(group.status) || group.hasActiveRevision)) return;
     const timer = window.setInterval(() => groupsQuery.refetch(), 5000);
     return () => window.clearInterval(timer);
   }, [groups, groupsQuery.refetch]);
@@ -450,8 +450,8 @@ const TaskChildRow: React.FC<TaskChildRowProps> = ({
         <span className={`rounded-md px-2 py-1 text-[10px] font-bold ${meta.style}`}>{meta.label}</span>
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center gap-1.5">
-          {task.resultPreviews.slice(0, 4).map((result, index) => (
+        <div className="flex max-w-[300px] items-center gap-1.5 overflow-x-auto pb-1">
+          {task.resultPreviews.map((result, index) => (
             <button
               key={result.id}
               onClick={() => result.mediaType === 'VIDEO'
@@ -469,7 +469,30 @@ const TaskChildRow: React.FC<TaskChildRowProps> = ({
               {result.mediaType === 'VIDEO' && (
                 <span className="material-symbols-outlined absolute text-lg text-white drop-shadow">play_circle</span>
               )}
+              {result.mediaType === 'IMAGE' && (
+                <span className="absolute bottom-0.5 right-0.5 rounded bg-slate-950/75 px-1 text-[8px] font-bold text-white">
+                  V{result.revisionNo ?? 1}
+                </span>
+              )}
             </button>
+          ))}
+          {(task.revisionJobs ?? []).map((job) => (
+            <div
+              key={job.taskId}
+              className={`grid h-12 w-12 shrink-0 place-items-center rounded-md border ${
+                job.status === 'FAILED'
+                  ? 'border-red-200 bg-red-50 text-red-500'
+                  : 'border-blue-200 bg-blue-50 text-primary'
+              }`}
+              title={job.status === 'FAILED' ? job.failReason || '二次编辑生成失败' : '二次编辑生成中'}
+            >
+              <span className={`material-symbols-outlined text-lg ${
+                job.status === 'FAILED' ? '' : 'animate-spin'
+              }`}>
+                {job.status === 'FAILED' ? 'error' : 'progress_activity'}
+              </span>
+              <span className="text-[8px] font-bold">V{job.revisionNo}</span>
+            </div>
           ))}
           {task.resultPreviews.length === 0 && (
             <span className="text-[10px] text-slate-400">

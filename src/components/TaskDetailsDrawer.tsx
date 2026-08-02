@@ -15,6 +15,7 @@ import { ImagePreviewModal } from './ImagePreviewModal';
 import { toast } from 'sonner';
 import { creationTemplateApi } from '../api/modules/creationTemplate';
 import { PublishTemplateDialog } from './common/PublishTemplateDialog';
+import { ImageRevisionDialog } from './task/ImageRevisionDialog';
 
 interface TaskDetailsDrawerProps {
   group: TaskGroupResponse;
@@ -115,6 +116,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   const [videoPreview, setVideoPreview] = useState<TaskResultPreviewResponse | null>(null);
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
   const [templatePublishTarget, setTemplatePublishTarget] = useState<TemplatePublishTarget | null>(null);
+  const [revisionTarget, setRevisionTarget] = useState<TaskResultPreviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
   const selectedTask = group.tasks.find((task) => task.id === selectedTaskId)
@@ -135,11 +137,15 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
 
   useEffect(() => {
     void refreshGroup();
-    if (!isActive(initialGroup.status)) return;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialGroup.groupId]);
+
+  useEffect(() => {
+    if (!isActive(group.status) && !group.hasActiveRevision) return;
     const timer = window.setInterval(() => void refreshGroup(true), 4000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialGroup.groupId]);
+  }, [group.groupId, group.status, group.hasActiveRevision]);
 
   if (!selectedTask) return null;
   const meta = STATUS_META[selectedTask.status];
@@ -234,9 +240,15 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                   onPreviewImages={(results, index) => setImagePreview({ results, index })}
                   onPreviewVideo={setVideoPreview}
                   onReview={(result) => setReviewTarget({ result })}
+                  onRevise={setRevisionTarget}
+                  onRevisionRetry={async (taskId) => {
+                    await taskApi.retryImageRevision(taskId);
+                    toast.success('已重新提交二次编辑任务');
+                    await refreshGroup();
+                  }}
                   onPublishTemplate={(result) => setTemplatePublishTarget({
                     result,
-                    taskId: selectedTask.id,
+                    taskId: result.taskId,
                     defaultName: `${taskLabel(selectedTask)}模板`,
                   })}
                   onOfflineTemplate={async (result) => {
@@ -290,6 +302,17 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
           onClose={() => setReviewTarget(null)}
           onCompleted={async () => {
             setReviewTarget(null);
+            await refreshGroup();
+          }}
+        />
+      )}
+      {revisionTarget && (
+        <ImageRevisionDialog
+          source={revisionTarget}
+          task={selectedTask}
+          onClose={() => setRevisionTarget(null)}
+          onSubmitted={async () => {
+            setRevisionTarget(null);
             await refreshGroup();
           }}
         />
@@ -383,6 +406,8 @@ const ResultsTab: React.FC<{
   onPreviewImages: (results: TaskResultPreviewResponse[], index: number) => void;
   onPreviewVideo: (result: TaskResultPreviewResponse) => void;
   onReview: (result: TaskResultPreviewResponse) => void;
+  onRevise: (result: TaskResultPreviewResponse) => void;
+  onRevisionRetry: (taskId: string) => Promise<void>;
   onPublishTemplate: (result: TaskResultPreviewResponse) => void;
   onOfflineTemplate: (result: TaskResultPreviewResponse) => Promise<void>;
 }> = ({
@@ -390,11 +415,14 @@ const ResultsTab: React.FC<{
   onPreviewImages,
   onPreviewVideo,
   onReview,
+  onRevise,
+  onRevisionRetry,
   onPublishTemplate,
   onOfflineTemplate,
 }) => {
   const imageResults = task.resultPreviews.filter((result) => result.mediaType === 'IMAGE');
-  if (task.resultPreviews.length === 0) {
+  const revisionJobs = task.revisionJobs ?? [];
+  if (task.resultPreviews.length === 0 && revisionJobs.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-400">
         {isActive(task.status) ? `正在生成，当前进度 ${task.progressPercent}%` : '当前任务暂无产物'}
@@ -422,6 +450,11 @@ const ResultsTab: React.FC<{
               {result.mediaType === 'VIDEO' && (
                 <span className="material-symbols-outlined absolute text-5xl text-white drop-shadow-lg">play_circle</span>
               )}
+              {result.mediaType === 'IMAGE' && (
+                <span className="absolute left-3 top-3 rounded-md bg-slate-950/70 px-2 py-1 text-[10px] font-black text-white">
+                  V{result.revisionNo ?? 1}
+                </span>
+              )}
             </button>
             <div className="p-3">
               <div className="flex min-w-0 items-start justify-between gap-3">
@@ -436,12 +469,29 @@ const ResultsTab: React.FC<{
                       <span className="whitespace-nowrap">{result.score} 分</span>
                     )}
                   </div>
+                  {result.editInstruction && (
+                    <p
+                      className="mt-2 line-clamp-2 break-words text-[10px] leading-4 text-slate-500"
+                      title={result.editInstruction}
+                    >
+                      编辑要求：{result.editInstruction}
+                    </p>
+                  )}
                 </div>
                 <span className="shrink-0 whitespace-nowrap rounded bg-slate-100 px-2 py-1 text-[10px] font-bold leading-4 text-slate-600">
                   {resultStatusLabel(result.status)}
                 </span>
               </div>
               <div className="mt-3 flex min-h-8 flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                {result.mediaType === 'IMAGE' && (
+                  <button
+                    onClick={() => onRevise(result)}
+                    className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-primary/25 bg-blue-50 px-3 text-[11px] font-bold text-primary hover:border-primary"
+                  >
+                    <span className="material-symbols-outlined text-sm">brush</span>
+                    二次编辑
+                  </button>
+                )}
                 {result.score == null && (
                     <button
                       onClick={() => onReview(result)}
@@ -476,6 +526,49 @@ const ResultsTab: React.FC<{
           </article>
         );
       })}
+      {revisionJobs.map((job) => (
+        <article
+          key={job.taskId}
+          className={`overflow-hidden rounded-xl border bg-white ${
+            job.status === 'FAILED' ? 'border-red-200' : 'border-blue-200'
+          }`}
+        >
+          <div className="grid h-64 place-items-center bg-slate-100 p-6 text-center">
+            <div>
+              <span className={`material-symbols-outlined text-5xl ${
+                job.status === 'FAILED' ? 'text-red-400' : 'animate-spin text-primary'
+              }`}>
+                {job.status === 'FAILED' ? 'error' : 'progress_activity'}
+              </span>
+              <p className="mt-3 text-xs font-black text-slate-700">
+                V{job.revisionNo} {job.status === 'FAILED' ? '生成失败' : '正在生成'}
+              </p>
+              {job.failReason && (
+                <p className="mt-2 line-clamp-3 break-words text-[10px] leading-5 text-red-600">
+                  {job.failReason}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="p-3">
+            <p className="break-words text-[10px] leading-5 text-slate-500">
+              编辑要求：{job.editInstruction || '未记录'}
+            </p>
+            {job.status === 'FAILED' && (
+              <div className="mt-3 flex justify-end border-t border-slate-100 pt-3">
+                <button
+                  onClick={async () => {
+                    await onRevisionRetry(job.taskId);
+                  }}
+                  className="h-8 rounded bg-primary px-3 text-[11px] font-bold text-white"
+                >
+                  重试
+                </button>
+              </div>
+            )}
+          </div>
+        </article>
+      ))}
     </div>
   );
 };

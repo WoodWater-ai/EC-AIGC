@@ -130,7 +130,13 @@ async function compressImageUnder(file: File, maxBytes = IMAGE_MAX_BYTES): Promi
  *   - COS 上传失败    → throw Error(COS 返回的错误码 + message)
  *   - upload-complete 失败 → throw Error(message)
  */
-export type FileUploadPurpose = 'AVATAR' | 'PRODUCT' | 'DICT' | 'OTHER' | 'UP_DOWN_MERGE';
+export type FileUploadPurpose =
+  | 'AVATAR'
+  | 'PRODUCT'
+  | 'DICT'
+  | 'IMAGE_EDIT_MASK'
+  | 'OTHER'
+  | 'UP_DOWN_MERGE';
 
 export interface UseFileUploadOptions {
   purpose: FileUploadPurpose;
