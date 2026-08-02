@@ -4,13 +4,17 @@ import { toast } from 'sonner';
 
 import { AppScreen } from '../types';
 import type {
-  ProductAsset,
+  ProductAsset, ProductFactsInput as ApiProductFactsInput,
   ImageTypeEntry, TaskAssetRef, ImageTaskSubmitPayload, ImageTaskType, TaskAssetSlot,
 } from '../types';
 import type { ImageGenerationType, ReadinessCheck } from '../lib/createImageTask/readinessChecks';
 import type { ReferenceSlot } from '../lib/createImageTask/extractReferenceInsights';
 import { computeReadinessChecks } from '../lib/createImageTask/readinessChecks';
-import { extractProductFacts, type ProductFactsInput } from '../lib/createImageTask/extractProductFacts';
+import {
+  extractProductFacts,
+  type ProductFacts,
+  type ProductFactsInput,
+} from '../lib/createImageTask/extractProductFacts';
 import { buildPromptFromFacts } from '../lib/createImageTask/buildPromptFromFacts';
 import { extractReferenceInsights } from '../lib/createImageTask/extractReferenceInsights';
 import { applyAiOptimizePerType, type AllTypePrompts } from '../lib/createImageTask/applyAiOptimizePerType';
@@ -23,6 +27,19 @@ import { messages } from '../labels/createImageTask';
 // 重新声明一份以避免 export-re-export 在 Vite HMR 下偶发的 TDZ
 // (ReferenceError: ... is not defined) — 直接定义比 re-export 稳定。
 const REFERENCE_SLOTS_INTERNAL: readonly ReferenceSlot[] = REFERENCE_SLOTS;
+
+function normalizeAnalyzedProductFacts(
+  input: Partial<ApiProductFactsInput> | null | undefined,
+): ProductFactsInput {
+  return {
+    name: input?.name ?? '',
+    sellingPoints: input?.sellingPoints ?? '',
+    productCategory: input?.productCategory ?? '',
+    colorPattern: input?.color ?? '',
+    fabricTexture: input?.fabricTexture ?? '',
+    fitStructure: input?.fitStructure ?? '',
+  };
+}
 
 // ==================== [2026-07-24 Task 13] 图片任务提交辅助 ====================
 
@@ -100,6 +117,8 @@ export interface UseCreateImageTaskStateOpts {
    * 现在让后端 ChannelParamBinder 按 schema 自动映射(单源真相)。
    */
   schemaParams?: Record<string, any>;
+  sourceCreationTemplateId?: string | null;
+  sourceCreationTemplateVersionId?: string | null;
   /** 通道、能力、模型以及能力 Schema 必填参数是否已完成选择。 */
   executionParamsReady: boolean;
 }
@@ -454,7 +473,7 @@ export function useCreateImageTaskState(
    * [2026-07-26] 后端 AI 助手失败时的本地降级:
    * 用 buildPromptFromFacts 拼 4 类 prompt,语义跟 imagePlanServiceImpl.buildFallbackPrompt 一致。
    */
-  const fallbackToLocalPrompts = (facts: ProductFactsInput) => {
+  const fallbackToLocalPrompts = (facts: ProductFacts) => {
     const nextOverrides: Partial<Record<ImageGenerationType, string>> = {};
     selectedTypes.forEach((t) => {
       nextOverrides[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
@@ -517,8 +536,9 @@ export function useCreateImageTaskState(
       window.clearTimeout(guardTimeout);
 
       // 回填
-      setFormInput(resp.productFacts);
-      setProductFacts(resp.productFacts);
+      const analyzedFacts = normalizeAnalyzedProductFacts(resp.productFacts);
+      setFormInput(analyzedFacts);
+      setProductFacts(extractProductFacts(analyzedFacts));
       // [2026-07-26] 后端 Map<EnumImageTaskType, String> 序列化为大写 enum name(),
       // 写入 promptOverrides(小写 ImageGenerationType)时做 toLowerCase 转换,
       // 否则 UI 用 promptOverrides['product_main'] 取值会拿到 undefined,fallback 到本地拼,
@@ -532,7 +552,7 @@ export function useCreateImageTaskState(
       setNegativePrompt(resp.negativePrompt);
       setPromptHasEdits(true);
       setAssistantState('complete');
-      opts.onAiComplete?.(resp.productFacts);
+      opts.onAiComplete?.(analyzedFacts);
       toast.success(messages.assistant.complete);
       remoteSuccess = true;
     } catch (err) {
@@ -671,6 +691,8 @@ export function useCreateImageTaskState(
         // 用 schema 字段名解析、ChannelParamBinder 按 targetField 映射到 Vidu body。
         // 之前前端做 mapResolutionToVidu 单位转换 + ratio: '16:9' 写死是把供应商映射提前做,链路断裂。
         taskParamsJson: JSON.stringify(opts.schemaParams ?? {}),
+        sourceCreationTemplateId: opts.sourceCreationTemplateId ?? undefined,
+        sourceCreationTemplateVersionId: opts.sourceCreationTemplateVersionId ?? undefined,
         imageTypes,
         assets,
       };

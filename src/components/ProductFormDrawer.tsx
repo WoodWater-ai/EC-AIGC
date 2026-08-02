@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProductDTO, ProductAddReq, ProductUpdateReq, ProductStatus } from '../api/modules/productInfo';
 import { productInfoApi, type ProductAiAnalyzeResponse } from '../api/modules/productInfo';

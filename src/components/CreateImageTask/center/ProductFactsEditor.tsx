@@ -15,7 +15,7 @@ export const ProductFactsEditor: React.FC<ProductFactsEditorProps> = ({
   value, isProductBound, onChange,
 }) => {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  const hasFacts = Object.values(value).some((item) => item.trim().length > 0);
+  const hasFacts = Object.values(value).some((item) => String(item ?? '').trim().length > 0);
 
   const copyFacts = async () => {
     const text = [

@@ -495,8 +495,8 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
     return knownAssets.find(a => a.id === activeAssetId) || generatedAssets[0] || EMPTY_ASSET;
   }, [knownAssets, generatedAssets, activeAssetId]);
   const activeAssetData = useMemo(
-    () => assetPageQuery.data?.list.find((asset) => asset.id === activeAsset.id)
-      ?? (loadedAssetDetail?.id === activeAsset.id ? loadedAssetDetail : undefined),
+    () => (loadedAssetDetail?.id === activeAsset.id ? loadedAssetDetail : undefined)
+      ?? assetPageQuery.data?.list.find((asset) => asset.id === activeAsset.id),
     [assetPageQuery.data, activeAsset.id, loadedAssetDetail],
   );
   const activeAssetProduct = products.find((product) => product.id === activeAsset.productId);
@@ -1827,8 +1827,16 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                             <span className="font-bold">{activeAsset.score == null ? '未评分' : `${activeAsset.score}分`}</span>
                           </div>
                           <div>
-                            <div className="mb-1 text-slate-400">打回原因</div>
-                            <div className="rounded-lg bg-white p-3 text-slate-700">{activeAssetData?.rejectReason || '—'}</div>
+                            <div className="mb-1 text-slate-400">
+                              {activeAsset.status === '审核通过'
+                                ? '通过原因'
+                                : activeAsset.status === '已打回' ? '打回原因' : '审核意见'}
+                            </div>
+                            <div className="rounded-lg bg-white p-3 text-slate-700">
+                              {(activeAsset.status === '审核通过'
+                                ? activeAssetData?.optimizationNote
+                                : activeAssetData?.rejectReason || activeAssetData?.optimizationNote) || '—'}
+                            </div>
                           </div>
                         </div>
                       )}

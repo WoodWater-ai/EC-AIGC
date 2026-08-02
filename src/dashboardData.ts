@@ -8,6 +8,7 @@ export interface DashboardTemplate {
   version: number;
   coverUrl: string;
   hoverPreviewUrl?: string;
+  productImageUrl?: string;
   description: string;
   category: string;
   usage: string;
@@ -15,6 +16,7 @@ export interface DashboardTemplate {
   usageCount: number;
   viewCount: number;
   favoriteCount: number;
+  favorited: boolean;
   sourceTaskId: string;
   sourceProductName: string;
   createdAt: string;
@@ -23,7 +25,7 @@ export interface DashboardTemplate {
   poseOrShot: string;
 }
 
-const templates: Omit<DashboardTemplate, 'viewCount' | 'favoriteCount'>[] = [
+const templates: Omit<DashboardTemplate, 'viewCount' | 'favoriteCount' | 'favorited'>[] = [
   {
     id: 'I01', name: '静奢缎面晨光', mediaType: 'image', status: 'active', version: 1,
     coverUrl: '/mock-assets/template-gallery/quiet-satin-morning.jpg',
@@ -112,4 +114,5 @@ export const mockDashboardTemplates: DashboardTemplate[] = templates.map((templa
   ...template,
   viewCount: 328 - index * 23,
   favoriteCount: 32 - Math.min(index * 2, 18),
+  favorited: false,
 }));

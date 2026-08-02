@@ -146,6 +146,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="material-symbols-outlined text-lg text-stone-500">grid_view</span>
             资源中心
           </button>
+          <button
+            onClick={() => setScreen(AppScreen.MODEL_LIBRARY)}
+            className={`group flex h-8 w-full cursor-pointer items-center justify-between rounded-md px-2.5 text-xs font-medium transition-all duration-150 ${
+              currentScreen === AppScreen.MODEL_LIBRARY
+                ? 'bg-[#37322e] text-white'
+                : 'text-stone-400 hover:bg-[#2a2724] hover:text-stone-100'
+            }`}
+            id={`menu-item-${AppScreen.MODEL_LIBRARY.toLowerCase()}`}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className={`material-symbols-outlined text-lg ${
+                currentScreen === AppScreen.MODEL_LIBRARY
+                  ? 'text-primary'
+                  : 'text-stone-500 group-hover:text-stone-300'
+              }`}>
+                face_3
+              </span>
+              模特资源库
+            </div>
+            {currentScreen === AppScreen.MODEL_LIBRARY && (
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+            )}
+          </button>
         </div>
       </div>
 

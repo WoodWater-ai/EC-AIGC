@@ -7,6 +7,7 @@ import { SystemBuiltinChannelCard } from './SystemBuiltinChannelCard';
 const BUILTIN_KEYS: { key: BuiltinKey; label: string }[] = [
   { key: 'BUILTIN_CHAT', label: '文本对话' },
   { key: 'BUILTIN_IMAGE_UNDERSTAND', label: '图片理解' },
+  { key: 'BUILTIN_MODEL_GENERATION', label: 'AI 模特生成（Vidu Image 2）' },
 ];
 
 /** 「系统内置通道配置」主 tab */
@@ -15,19 +16,25 @@ export function SystemBuiltinChannelTab() {
   const [optionsMap, setOptionsMap] = useState<Record<BuiltinKey, ModelChannelDTO[]>>({
     BUILTIN_CHAT: [],
     BUILTIN_IMAGE_UNDERSTAND: [],
+    BUILTIN_MODEL_GENERATION: [],
   });
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [allRes, chatOpts, imgOpts] = await Promise.all([
+      const [allRes, chatOpts, imgOpts, modelOpts] = await Promise.all([
         builtinChannelApi.getAll(),
         builtinChannelApi.listAvailableChannels('BUILTIN_CHAT'),
         builtinChannelApi.listAvailableChannels('BUILTIN_IMAGE_UNDERSTAND'),
+        builtinChannelApi.listAvailableChannels('BUILTIN_MODEL_GENERATION'),
       ]);
       setAll(allRes);
-      setOptionsMap({ BUILTIN_CHAT: chatOpts, BUILTIN_IMAGE_UNDERSTAND: imgOpts });
+      setOptionsMap({
+        BUILTIN_CHAT: chatOpts,
+        BUILTIN_IMAGE_UNDERSTAND: imgOpts,
+        BUILTIN_MODEL_GENERATION: modelOpts,
+      });
     } catch (e: any) {
       toast.error(e?.message ?? '加载失败');
     } finally {
@@ -69,13 +76,14 @@ export function SystemBuiltinChannelTab() {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {BUILTIN_KEYS.map(({ key, label }) => (
-        <SystemBuiltinChannelCard
-          key={key}
-          label={label}
-          current={all[key]}
-          options={optionsMap[key]}
-          onSave={(channelId) => handleSave(key, channelId)}
-        />
+        <div key={key}>
+          <SystemBuiltinChannelCard
+            label={label}
+            current={all[key]}
+            options={optionsMap[key]}
+            onSave={(channelId) => handleSave(key, channelId)}
+          />
+        </div>
       ))}
     </div>
   );

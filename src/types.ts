@@ -6,6 +6,7 @@ export enum AppScreen {
   CREATE_VIDEO_TASK = 'CREATE_VIDEO_TASK',
   TEMPLATES = 'TEMPLATES',
   ASSETS = 'ASSETS',
+  MODEL_LIBRARY = 'MODEL_LIBRARY',
   ANALYTICS = 'ANALYTICS',
   SYSTEM_CONFIG = 'SYSTEM_CONFIG',
   ASSET_CATEGORY = 'ASSET_CATEGORY',
@@ -243,8 +244,8 @@ export const DEFAULT_MODEL_PLACEHOLDERS: Record<ChannelType, Partial<Record<Capa
   QWEN:     { TEXT: 'qwen3-max / qwen-plus',          IMAGE: 'qwen-image / qwen-image-2.0',     VIDEO: 'wan2.6-t2v / wan2.6-i2v' },
   DOUBAO:   { TEXT: 'doubao-seed-2.0-pro / doubao-1.5-pro', IMAGE: 'seedream-4.0 / doubao-image-3.0', VIDEO: 'seedance-1.5-pro / seedance-1.0-pro' },
   DEEPSEEK: { TEXT: 'deepseek-chat / deepseek-reasoner' },
-  // [v1.4 2026-07-12] Vidu IMAGE = viduq1/viduq2(reference2image);VIDEO = 6 个模型;SOLUTION 不需要 model
-  VIDU:     { IMAGE: 'viduq2 / viduq1',               VIDEO: 'viduq3-turbo / viduq2-pro / vidu2.0' },
+  // [v1.7 2026-08-02] Vidu IMAGE 优先 viduimage-2：同一端点支持文生图、图片编辑、多图参考。
+  VIDU:     { IMAGE: 'viduimage-2 / viduq2 / viduq1', VIDEO: 'viduq3-turbo / viduq2-pro / vidu2.0' },
   // [v1.5 2026-07-12] Agnes AI:3 个官方模型(文本/图像/视频各 1 个,OpenAI 兼容 + 异步视频)
   AGNES_AI: { TEXT: 'agnes-2.0-flash',                IMAGE: 'agnes-image-2.0-flash',           VIDEO: 'agnes-video-v2.0' },
 };
@@ -474,6 +475,36 @@ export interface TaskMyPageQueryRequest {
   keyword?: string;
 }
 
+export interface ModelProfile {
+  id: string;
+  name: string;
+  image: string;
+  source: '虚拟模特' | '授权参考' | '内部素材' | '用户授权上传';
+  tags: string[];
+  suitableFor: ImageGenerationType[];
+  reason: string;
+  status: 'draft' | 'active' | 'disabled';
+  sourceMode: 'text' | 'reference' | 'face_swap';
+  faceAnchor: ModelProfileAnchor;
+  appearanceAnchor?: ModelProfileAnchor;
+  declaration?: ModelRightsDeclaration;
+}
+
+export interface ModelProfileAnchor {
+  assetId: string;
+  url: string;
+  position: number;
+  role: 'face_anchor' | 'appearance_anchor' | 'style_reference';
+}
+
+export interface ModelRightsDeclaration {
+  accepted: true;
+  version: string;
+  operator: string;
+  declaredAt: string;
+  sourceDescription: string;
+}
+
 /** 父任务响应 DTO(对齐后端 TaskResponse) */
 export interface GenerationTaskResponse {
   id: string;                          // 后端 Long + @JsonSerialize → string
@@ -521,6 +552,8 @@ export interface TaskResultPreviewResponse {
   rejectReason?: string | null;
   score?: number | null;
   batchIdx?: number | null;
+  creationTemplateId?: string | null;
+  templateStatus?: 'DRAFT' | 'PUBLISHED' | 'OFFLINE' | null;
 }
 
 export interface TaskGroupItemResponse {
@@ -543,6 +576,7 @@ export interface TaskGroupItemResponse {
   taskParamsJson?: string | null;
   inputImageUrls?: string | null;
   inputImages: string[];
+  inputVideos: string[];
   failCode?: string | null;
   failReason?: string | null;
   estimatedCost?: number | null;
@@ -573,7 +607,10 @@ export interface TaskGroupResponse {
 // ============================================================================
 
 /** 系统内置通道键,与后端 EnumBuiltinKey.name() 对齐 */
-export type BuiltinKey = 'BUILTIN_CHAT' | 'BUILTIN_IMAGE_UNDERSTAND';
+export type BuiltinKey =
+  | 'BUILTIN_CHAT'
+  | 'BUILTIN_IMAGE_UNDERSTAND'
+  | 'BUILTIN_MODEL_GENERATION';
 
 /** 单条更新项(channelId=null 表示清空) */
 export interface SystemBuiltinChannelItem {
@@ -645,6 +682,8 @@ export interface ImageTaskSubmitPayload {
   channelType: 'VIDU';
   modelId?: string | null;
   taskParamsJson: string;
+  sourceCreationTemplateId?: string;
+  sourceCreationTemplateVersionId?: string;
   imageTypes: ImageTypeEntry[];
   assets: TaskAssetRef[];
 }
@@ -696,13 +735,28 @@ export interface VideoTaskSubmitPayload {
   channelInstanceId: string;
   capability: string;
   channelType: string;
-  modelId?: string | null;
+  videoMode: 'FIRST_FRAME' | 'TRENDING_REPLICATE';
+  modelCode?: string | null;
   taskParamsJson: string;
   taskPrompt: string;
   negativePrompt?: string;
   inputImageUrls?: string;
+  assets: Array<{
+    assetId: string;
+    slotRole:
+      | 'FIRST_FRAME'
+      | 'SOURCE_VIDEO'
+      | 'PRODUCT_REFERENCE'
+      | 'REPLACEMENT_REFERENCE';
+    sortOrder: number;
+    originalUrl?: string;
+    thumbnailUrl?: string;
+    name?: string;
+  }>;
   templateId?: string;
   templateVersionId?: string;
+  sourceCreationTemplateId?: string;
+  sourceCreationTemplateVersionId?: string;
   title?: string;
   count?: number;
 }

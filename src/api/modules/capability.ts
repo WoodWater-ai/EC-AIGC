@@ -28,6 +28,8 @@ export interface FieldDef {
   targetField?: string;
   placeholder?: string;
   helpText?: string;
+  uiGroup?: 'BASIC' | 'ADVANCED' | string;
+  uiOrder?: number;
   /** [F1 新] DICT 字段必填,指向字典 category code(如 "scene_style" / "camera_motion") */
   dictCode?: string;
   /** [F1 新] IMAGES_URL 字段:最大张数(Vidu SOLUTION 限制 7) */
@@ -81,10 +83,21 @@ export async function fetchCapabilityMatrix(): Promise<MatrixResponse> {
 
 export async function fetchCapabilitySchema(
   channelType: string,
-  capability: string
+  capability: string,
+  context?: {
+    modelCode?: string | null;
+    taskParams?: Record<string, unknown>;
+  },
 ): Promise<CapabilityDefinition> {
   return http.post<CapabilityDefinition>(
-    '/v1/task/capability-schema/detail', { channelType, capability });
+    '/v1/task/capability-schema/detail', {
+      channelType,
+      capability,
+      modelCode: context?.modelCode || undefined,
+      taskParamsJson: context?.taskParams
+        ? JSON.stringify(context.taskParams)
+        : undefined,
+    });
 }
 
 export async function validateTaskParams(req: {
@@ -107,9 +120,10 @@ export function useCapabilitySchema(
   channelType: string | undefined,
   capability: string | undefined
 ) {
-  return useServiceQuery<CapabilityDefinition>({
-    queryKey: ['capability-schema', channelType, capability],
-    queryFn: () => fetchCapabilitySchema(channelType!, capability!),
-    enabled: !!channelType && !!capability,
-  });
+  return useServiceQuery<CapabilityDefinition | null>(
+    () => channelType && capability
+      ? fetchCapabilitySchema(channelType, capability)
+      : Promise.resolve(null),
+    [channelType, capability],
+  );
 }

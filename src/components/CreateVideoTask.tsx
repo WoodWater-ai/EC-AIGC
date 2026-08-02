@@ -1,577 +1,1075 @@
-import React, { useState } from 'react';
-import { ProductAsset, AppScreen } from '../types';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { AppScreen, type ProductAsset, type VideoTaskSubmitPayload } from '../types';
+import type { ProductDTO } from '../api/modules/productInfo';
 import {
   AssetTransitModal,
   type ResourceCenterSource,
 } from './AssetTransitModal';
 import type { AssetResourceItem } from '../api/modules/asset';
-import { useServiceQuery } from '../api/hooks/useServiceQuery';
-import { templateApi, type TemplateDTO } from '../api/modules/template';
-import { TaskParamsPanel } from './createTask/TaskParamsPanel';
 import { taskApi } from '../api/modules/task';
-import type { VideoTaskSubmitPayload } from '../types';
-import { toast } from 'sonner';
+import { TaskParamsPanel } from './createTask/TaskParamsPanel';
+import { ProductPickerCard } from './CreateImageTask/left/ProductPickerCard';
+import { ProductPickerModal } from './CreateImageTask/ProductPickerModal';
+import { creationTemplateApi } from '../api/modules/creationTemplate';
+import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import type { PrefillState } from './createTask/useTaskParams';
 
-/** 从 sessionStorage 读模版 prefill(容错,失败返 null) */
-function readPrefill(): import('./createTask/useTaskParams').PrefillState | null {
-  try {
-    const raw = sessionStorage.getItem('beta.template.prefill');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as import('./createTask/useTaskParams').PrefillState | null;
-    if (!parsed || !parsed.templateId) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+type VideoMode = 'FIRST_FRAME' | 'TRENDING_REPLICATE';
+type InputRole = 'FIRST_FRAME' | 'SOURCE_VIDEO' | 'REPLACEMENT_REFERENCE';
+
+interface SelectedAsset {
+  assetId: string;
+  name: string;
+  assetKind: 'IMAGE' | 'VIDEO' | 'AUDIO';
+  originalUrl: string;
+  thumbnailUrl?: string;
+  durationSec?: number;
+}
+
+interface ParamsSnapshot {
+  channelId: string | null;
+  channelType: string | null;
+  capability: string | null;
+  modelId: string | null;
+  schemaParams: Record<string, unknown>;
 }
 
 interface CreateVideoTaskProps {
   products: ProductAsset[];
-  onAddTask: (info: { groupId: string; taskIds: string[]; taskKind?: 'IMAGE' | 'VIDEO' }) => void;
-  setScreen: (screen: AppScreen, payload?: { highlightGroupId?: string }) => void;
+  onAddTask: (info: {
+    groupId: string;
+    taskIds: string[];
+    taskKind?: 'IMAGE' | 'VIDEO';
+  }) => void;
+  setScreen: (
+    screen: AppScreen,
+    payload?: { highlightGroupId?: string; creationTemplateId?: string },
+  ) => void;
   selectedProduct: ProductAsset;
   setSelectedProduct: (product: ProductAsset) => void;
+  creationTemplateId?: string | null;
 }
 
-interface SourceImage {
-  id: string;
-  name: string;
-  url: string;
-  tag: string;
-  score: number;
-  archived: boolean;
-  selected: boolean;
-}
+const EMPTY_PARAMS: ParamsSnapshot = {
+  channelId: null,
+  channelType: null,
+  capability: null,
+  modelId: null,
+  schemaParams: {},
+};
+
+const MODE_CONFIG: Record<
+  VideoMode,
+  {
+    label: string;
+    description: string;
+    capability: 'IMG2VIDEO' | 'SOLUTION_TRENDING_REPL';
+    group: 'VIDEO' | 'SOLUTION';
+  }
+> = {
+  FIRST_FRAME: {
+    label: '首帧图生视频',
+    description: '以一张图片作为视频严格首帧生成视频',
+    capability: 'IMG2VIDEO',
+    group: 'VIDEO',
+  },
+  TRENDING_REPLICATE: {
+    label: '爆款复刻',
+    description: '参考原视频结构，替换为所选商品或模特素材',
+    capability: 'SOLUTION_TRENDING_REPL',
+    group: 'SOLUTION',
+  },
+};
+
+const toSelectedAsset = (asset: AssetResourceItem): SelectedAsset => ({
+  assetId: asset.id,
+  name: asset.name,
+  assetKind: asset.assetKind,
+  originalUrl: asset.originalUrl ?? asset.thumbnailUrl ?? '',
+  thumbnailUrl: asset.thumbnailUrl,
+  durationSec: asset.durationSec,
+});
+
+const cleanReusableVideoPrompt = (value: string): string => {
+  let cleaned = value.replace(/\r\n/g, '\n').trim();
+  while (true) {
+    const factStart = cleaned.indexOf('【商品事实】');
+    if (factStart < 0) break;
+    const requirementStart = cleaned.indexOf('【生成要求】', factStart);
+    if (requirementStart < 0) break;
+    const blockEnd = cleaned.indexOf('\n\n', requirementStart);
+    if (blockEnd < 0) {
+      cleaned = cleaned.slice(0, factStart).trim();
+      break;
+    }
+    cleaned = `${cleaned.slice(0, factStart)}${cleaned.slice(blockEnd + 2)}`.trim();
+  }
+  return cleaned
+    .split('\n')
+    .filter((line) => {
+      const text = line.trim();
+      return !text.startsWith('负面约束：') && !text.startsWith('负面 Prompt：');
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
 
 export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
-  products,
   onAddTask,
   setScreen,
-  selectedProduct,
-  setSelectedProduct
+  creationTemplateId,
 }) => {
-  const { data } = useServiceQuery(() =>
-    templateApi.page({ pageSize: 200, status: 'NORMAL' }),
+  const creationPrefillQuery = useServiceQuery(
+    () => creationTemplateId
+      ? creationTemplateApi.reuseContext(creationTemplateId)
+      : Promise.resolve(null),
+    [creationTemplateId],
   );
-  const templates: TemplateDTO[] = data?.list ?? [];
-  // Modal states for Transit Station
-  const [isTransitOpen, setIsTransitOpen] = useState(false);
-  const [transitInitialSource, setTransitInitialSource] =
-    useState<ResourceCenterSource>('UPLOAD');
-
-  // Source images state pre-filled to match prototype strictly
-  const [sourceImages, setSourceImages] = useState<SourceImage[]>([
-    {
-      id: 'src-1',
-      name: 'SmartWatch Pro Max',
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBXLKRx6cjMgfXncaHMmKOTF7Q0MuvqCUDcrGBYPJ8t0xaKMCNt-oynAekl-4LUA85q7NEgINvKN62zkstOMZcachuBrsEH0faf-GWccm90PUVv2zaMmPhF-t3GQ60_gP1R8Pk3vz6-FYuI_nvCQFVLTf-dVxom4I9IpUdKZqjj5oBH2JEnlj7bZzJ5TPSR8CH9EWoBXxefRQf0M50H8T177AAFCc7fdYXDIxrcOlAcmnVxLzTSfeTm',
-      tag: '主图生成 - 场景融合',
-      score: 92,
-      archived: true,
-      selected: true
-    },
-    {
-      id: 'src-2',
-      name: 'Executive Briefcase',
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCFSOML8HXFXlpBdlHKBE8COFusXwu0-hCvaaD4DOFXKsNRw6OY5mfhPTVz6s-TvOVKJxs7xpXxayrBK0EVofK0em5JeRSPbiSdv3h1_NceYuEKuFWOBZ3D8T7AOWVzVlZFGgn2sM2oUfFKK8KdWjvKy3K4BokFSPwqlgD-O5U8a1R2fyqwwPjKKRi5NGJTRAovRtmbpyP8wWBHqgc9s7XF835_vGAKoz492WYos2-bggHnJeBREmnM',
-      tag: '模特穿搭 - 咖啡厅',
-      score: 88,
-      archived: false,
-      selected: false
-    }
-  ]);
-
-  // Mode Switch tab
-  const [activeTab, setActiveTab] = useState<'ref' | 'first'>('ref');
-
-  // Prompts config state (middle column JSX 仍引用)
-  const [promptTemplate, setPromptTemplate] = useState('上身展示视频模板');
-  const [shot03, setShot03] = useState('');
-  const [shot39, setShot39] = useState('');
-  const [shot915, setShot915] = useState('');
-
-  // Negative constraints (middle column JSX 仍引用)
-  const [negativeTags, setNegativeTags] = useState<string[]>(['商品漂移', '面料闪烁', '多余手指']);
-  const [newNegativeInput, setNewNegativeInput] = useState('');
-  const [customNegativeText, setCustomNegativeText] = useState('');
-
-  // Task parameters in Right Column
-  const [aspectRatio, setAspectRatio] = useState('9:16');
+  const creationPrefill = creationPrefillQuery.data;
+  const videoParamsPrefill = useMemo<PrefillState | null>(() => {
+    if (!creationPrefill || creationPrefill.mediaType !== 'VIDEO') return null;
+    const snapshot = creationPrefill.snapshot;
+    return {
+      channelType: snapshot.channelType ?? null,
+      capability: snapshot.capability ?? null,
+      model: snapshot.modelCode ?? null,
+      schemaParams: snapshot.schemaParams,
+      lockExecution: false,
+    };
+  }, [creationPrefill]);
+  const [selectedProductInfo, setSelectedProductInfo] = useState<ProductDTO | null>(null);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [mode, setMode] = useState<VideoMode>('FIRST_FRAME');
+  const [firstFrame, setFirstFrame] = useState<SelectedAsset | null>(null);
+  const [sourceVideo, setSourceVideo] = useState<SelectedAsset | null>(null);
+  const [replacementReferences, setReplacementReferences] = useState<
+    SelectedAsset[]
+  >([]);
+  const [prompt, setPrompt] = useState('');
+  const [negativePrompt, setNegativePrompt] = useState(
+    '商品漂移、材质闪烁、人物畸形、镜头突变、文字变化',
+  );
+  const [shots, setShots] = useState(['', '', '']);
+  const [storyboardGenerated, setStoryboardGenerated] = useState(false);
+  const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
   const [count, setCount] = useState(1);
-  const [negativePrompt, setNegativePrompt] = useState('');
-  const [promptText, setPromptText] = useState('');
-  const [taskParams, setTaskParams] = useState<{ channelId: string | null; channelType: string | null; capability: string | null; modelId: string | null; schemaParams: Record<string, any> }>({ channelId: null, channelType: null, capability: null, modelId: null, schemaParams: {} });
-  const [videoPrefill] = useState<import('./createTask/useTaskParams').PrefillState | null>(() => {
-    try { const raw = sessionStorage.getItem('beta.template.prefill'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  const [params, setParams] = useState<ParamsSnapshot>(EMPTY_PARAMS);
+  const [submitting, setSubmitting] = useState(false);
+  const [productFacts, setProductFacts] = useState<
+    VideoTaskSubmitPayload['productFacts']
+  >({
+    name: '',
+    sellingPoints: '',
+    productCategory: '',
+    color: '',
+    fabricTexture: '',
+    fitStructure: '',
   });
-  // [2026-07-13] VIDEO / SOLUTION 双模式;prefill.group='SOLUTION' 时默认 SOLUTION
-  const [videoMode, setVideoMode] = useState<'VIDEO' | 'SOLUTION'>(() => {
-    const p = readPrefill();
-    return p?.group === 'SOLUTION' ? 'SOLUTION' : 'VIDEO';
-  });
+  const [picker, setPicker] = useState<{
+    role: InputRole;
+    assetKind: 'IMAGE' | 'VIDEO';
+    source: ResourceCenterSource;
+  } | null>(null);
+  const appliedCreationTemplateRef = useRef<string | null>(null);
 
-  const switchVideoMode = (mode: 'VIDEO' | 'SOLUTION') => {
-    setVideoMode(mode);
-    // 切 group 时清空 ①②③ 选择(实例/能力/模型都跟 group 强相关)
-    setTaskParams({ channelId: null, channelType: null, capability: null, modelId: null, schemaParams: {} });
-  };
-
-  // Toggle selection on source images
-  const handleToggleImage = (id: string) => {
-    setSourceImages(prev => prev.map(img => img.id === id ? { ...img, selected: !img.selected } : img));
-  };
-
-  // Add tag constraint (middle column JSX 仍引用)
-  const handleAddTag = () => {
-    const val = newNegativeInput.trim();
-    if (val && !negativeTags.includes(val)) {
-      setNegativeTags(prev => [...prev, val]);
-      setNewNegativeInput('');
-    }
-  };
-
-  // Delete tag constraint (middle column JSX 仍引用)
-  const handleDeleteTag = (tagToDelete: string) => {
-    setNegativeTags(prev => prev.filter(t => t !== tagToDelete));
-  };
-
-  // AssetTransitModal 已返回标准 asset_resource，无需再次按错误的 ID 反查。
-  const handleConfirmTransitSelection = (items: AssetResourceItem[]) => {
-    if (items.length === 0) return;
-    const newItems: SourceImage[] = items.map((asset, idx) => ({
-      id: `transit-${Date.now()}-${idx}`,
-      name: asset.name.length > 20 ? asset.name.substring(0, 15) + '...' : asset.name,
-      url: asset.originalUrl ?? asset.thumbnailUrl ?? '',
-      tag: '资源中心导入 - 优质素材',
-      score: 85,
-      archived: false,
-      selected: true,
-    }));
-    setSourceImages((prev) => [...newItems, ...prev]);
-    setIsTransitOpen(false);
-  };
-
-  // Selection counts
-  const selectedCount = sourceImages.filter(img => img.selected).length;
-
-  const handleSubmitTask = async () => {
-    if (!taskParams.channelType || !taskParams.capability) {
-      toast.warning('请先在右侧选择通道和能力');
-      return;
-    }
-    if (!taskParams.channelId) {
-      toast.warning('请先在右侧选择通道实例');
-      return;
-    }
-    // [2026-07-25] inputImageUrls:选中 sourceImages 的 URL 列表(逗号分隔),
-    // 后端 Worker 解析为 List<String> 喂给 Vidu images:[] / taskParamsJson.images。
-    const inputImageUrls = sourceImages
-      .filter((s) => s.selected)
-      .map((s) => s.url)
-      .join(',');
-    // [2026-07-25] productFacts 6 字段,从 selectedProduct 派生。
-    // 本期保留 mock 兼容;后续引入 ProductPickerModal 后,改用 selectedFromLibrary。
-    const productNameFallback = selectedProduct?.name || '默认产品';
-    const specs = selectedProduct?.specs;
-    const productFacts: VideoTaskSubmitPayload['productFacts'] = {
-      name: productNameFallback,
-      sellingPoints: specs?.sellingPoints?.length
-        ? specs.sellingPoints.join('、')
-        : '',
-      productCategory: (selectedProduct as any)?.category ?? '',
-      color: (specs?.color?.length ? specs.color.join('、') : (selectedProduct as any)?.mainColor ?? ''),
-      fabricTexture: (selectedProduct as any)?.fabricTexture ?? specs?.material ?? '',
-      fitStructure: (selectedProduct as any)?.fitStructure ?? '',
-    };
-    const payload: VideoTaskSubmitPayload = {
-      title: `视频生成任务_${productNameFallback}`,
-      // [2026-07-25] selectedProduct.id 是 mock 占位(如 "p1")时 → 视为未选产品,
-      // 走后端 productFacts 6 字段新建产品路径;仅当 id 是纯数字字符串才作为真雪花 ID 透传。
-      // 对齐 image 路径 buildSubmitPayload.ts:69-72 的 numeric-id 判定逻辑。
-      productId: (typeof selectedProduct?.id === 'string' && /^\d+$/.test(selectedProduct.id))
-        ? selectedProduct.id
+  useEffect(() => {
+    if (!creationPrefill || creationPrefill.mediaType !== 'VIDEO') return;
+    if (appliedCreationTemplateRef.current === creationPrefill.templateId) return;
+    appliedCreationTemplateRef.current = creationPrefill.templateId;
+    const snapshot = creationPrefill.snapshot;
+    const nextMode = snapshot.videoMode === 'TRENDING_REPLICATE'
+      ? 'TRENDING_REPLICATE'
+      : 'FIRST_FRAME';
+    setMode(nextMode);
+    setSelectedProductInfo(null);
+    setProductFacts({
+      name: '',
+      sellingPoints: '',
+      productCategory: '',
+      color: '',
+      fabricTexture: '',
+      fitStructure: '',
+    });
+    const references = snapshot.references ?? [];
+    const toTemplateAsset = (
+      reference: (typeof references)[number],
+      assetKind: 'IMAGE' | 'VIDEO',
+    ): SelectedAsset => ({
+      assetId: reference.assetId,
+      name: reference.name || (assetKind === 'VIDEO' ? '模板源视频' : '模板参考图'),
+      assetKind,
+      originalUrl: reference.url,
+      thumbnailUrl: reference.thumbnailUrl ?? undefined,
+      durationSec: reference.durationSec ?? undefined,
+    });
+    const firstFrameReference = references.find(
+      (reference) => reference.role === 'FIRST_FRAME',
+    );
+    const sourceVideoReference = references.find(
+      (reference) => reference.role === 'SOURCE_VIDEO',
+    );
+    const replacementReferenceAssets = references
+      .filter((reference) => reference.role === 'REPLACEMENT_REFERENCE')
+      .sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0))
+      .map((reference) => toTemplateAsset(reference, 'IMAGE'))
+      .filter((asset) => Boolean(asset.originalUrl))
+      .slice(0, 7);
+    setFirstFrame(
+      firstFrameReference?.url
+        ? toTemplateAsset(firstFrameReference, 'IMAGE')
         : null,
-      productFacts,
-      channelInstanceId: String(taskParams.channelId),
-      channelType: taskParams.channelType,
-      capability: taskParams.capability,
-      modelId: taskParams.modelId ?? undefined,
-      taskParamsJson: JSON.stringify(taskParams.schemaParams ?? {}),
-      taskPrompt: promptText,
-      negativePrompt: negativePrompt || undefined,
-      inputImageUrls: inputImageUrls || undefined,
-      templateId: videoPrefill?.templateId,
-      templateVersionId: videoPrefill?.templateVersionId,
-      count,
+    );
+    setSourceVideo(
+      sourceVideoReference?.url
+        ? toTemplateAsset(sourceVideoReference, 'VIDEO')
+        : null,
+    );
+    setReplacementReferences(replacementReferenceAssets);
+    setPrompt(cleanReusableVideoPrompt(snapshot.prompt ?? ''));
+    setNegativePrompt(snapshot.negativePrompt ?? '');
+    setCount(Math.max(1, Math.min(8, snapshot.count ?? 1)));
+    setShots(['', '', '']);
+    setStoryboardGenerated(false);
+    toast.success(`已应用模板：${creationPrefill.templateName}，已带入视频素材与 Prompt，请选择本次商品`);
+  }, [creationPrefill]);
+
+  const config = MODE_CONFIG[mode];
+  const hasProductReference = Boolean(selectedProductInfo?.imageId);
+  const isInputReady =
+    mode === 'FIRST_FRAME'
+      ? firstFrame !== null
+      : sourceVideo !== null &&
+        (hasProductReference || replacementReferences.length > 0);
+  const readiness = [
+    selectedProductInfo !== null,
+    isInputReady,
+    prompt.trim().length > 0,
+    params.channelType === 'VIDU' &&
+      params.capability === config.capability &&
+      params.channelId !== null,
+  ].filter(Boolean).length;
+  const duration = mode === 'TRENDING_REPLICATE'
+    ? '跟随原视频'
+    : String(params.schemaParams.duration ?? '5');
+  const outputRatio = String(
+    params.schemaParams.aspect_ratio ??
+      (mode === 'FIRST_FRAME' ? '跟随首帧' : '原视频比例'),
+  );
+
+  const handleProductPicked = (product: ProductDTO) => {
+    const nextFacts = {
+      name: (product.name ?? '').trim(),
+      sellingPoints: (product.sellingPoints ?? '').trim(),
+      productCategory: (product.category ?? '').trim(),
+      color: (product.color ?? '').trim(),
+      fabricTexture: (product.patternMaterial ?? '').trim(),
+      fitStructure: (product.silhouetteStructure ?? '').trim(),
     };
+    setSelectedProductInfo(product);
+    setProductFacts(nextFacts);
+    if (product.imageId) {
+      setReplacementReferences((previous) => {
+        const withoutProductImage = previous.filter(
+          (asset) => asset.assetId !== product.imageId,
+        );
+        if (withoutProductImage.length > 6) {
+          toast.info('商品主图将自动用于爆款复刻，其他替换参考图最多保留 6 张');
+        }
+        return withoutProductImage.slice(0, 6);
+      });
+    }
+    const reusablePrompt = cleanReusableVideoPrompt(
+      creationPrefill?.snapshot.prompt ?? '',
+    );
+    if (reusablePrompt) {
+      const values: Record<string, string> = {
+        name: nextFacts.name,
+        productName: nextFacts.name,
+        sellingPoints: nextFacts.sellingPoints,
+        productCategory: nextFacts.productCategory,
+        category: nextFacts.productCategory,
+        color: nextFacts.color,
+        fabricTexture: nextFacts.fabricTexture,
+        fitStructure: nextFacts.fitStructure,
+      };
+      setPrompt(reusablePrompt.replace(/\{\{([^}]+)}}/g, (match, key: string) =>
+        values[key] || match));
+    }
+    toast.success(`已选择产品：${product.name}`);
+  };
+
+  const handleClearProduct = () => {
+    setSelectedProductInfo(null);
+    setProductFacts({
+      name: '',
+      sellingPoints: '',
+      productCategory: '',
+      color: '',
+      fabricTexture: '',
+      fitStructure: '',
+    });
+    toast.info('已清除产品选择');
+  };
+
+  const switchMode = (nextMode: VideoMode) => {
+    if (nextMode === mode) return;
+    setMode(nextMode);
+    setParams(EMPTY_PARAMS);
+    setShots(['', '', '']);
+    setStoryboardGenerated(false);
+    setTemplateMenuOpen(false);
+  };
+
+  const generateStoryboard = () => {
+    setShots([
+      '建立主体与环境，镜头保持稳定。',
+      '展示核心动作和商品细节，控制主体一致性。',
+      '镜头自然收束并完成品牌或商品定格。',
+    ]);
+    setStoryboardGenerated(true);
+  };
+
+  const applyPromptTemplate = (template: 'PRODUCT' | 'TRENDING') => {
+    setPrompt(
+      template === 'TRENDING'
+        ? '保留原视频的创意结构、镜头节奏和爆点，替换为新的商品、模特和场景素材。'
+        : '镜头稳定呈现商品主体，突出材质、动作和核心卖点。',
+    );
+    setNegativePrompt('商品漂移、材质闪烁、人物畸形、镜头突变、文字变化');
+    setStoryboardGenerated(false);
+    setTemplateMenuOpen(false);
+    toast.success('已应用视频 Prompt 模板');
+  };
+
+  const applyAiSuggestion = () => {
+    const suggestion =
+      mode === 'FIRST_FRAME'
+        ? '保持首帧中的商品主体和构图，使用克制流畅的镜头运动，结尾以特写强化材质与核心卖点。'
+        : '保留原视频的镜头节奏与转场逻辑，替换商品和场景后保持主体一致、动作自然、卖点清晰。';
+    setPrompt((current) =>
+      current.trim() ? `${current.trim()}\n${suggestion}` : suggestion,
+    );
+    setStoryboardGenerated(false);
+    toast.success('已添加 AI 助手建议');
+  };
+
+  const openPicker = (
+    role: InputRole,
+    assetKind: 'IMAGE' | 'VIDEO',
+    source: ResourceCenterSource = 'UPLOAD',
+  ) => setPicker({ role, assetKind, source });
+
+  const confirmAssets = (items: AssetResourceItem[]) => {
+    if (!picker || items.length === 0) return;
+    const selected = items
+      .filter((item) => item.assetKind === picker.assetKind)
+      .map(toSelectedAsset)
+      .filter((item) => item.originalUrl);
+    if (selected.length === 0) {
+      toast.warning(
+        picker.assetKind === 'VIDEO'
+          ? '请选择有效的视频资源'
+          : '请选择有效的图片资源',
+      );
+      return;
+    }
+    if (picker.role === 'FIRST_FRAME') {
+      setFirstFrame(selected[0]);
+    } else if (picker.role === 'SOURCE_VIDEO') {
+      setSourceVideo(selected[0]);
+    } else {
+      setReplacementReferences((previous) => {
+        const merged = [...previous];
+        for (const item of selected) {
+          if (item.assetId === selectedProductInfo?.imageId) continue;
+          if (!merged.some((current) => current.assetId === item.assetId)) {
+            merged.push(item);
+          }
+        }
+        const maxReferences = selectedProductInfo?.imageId ? 6 : 7;
+        if (merged.length > maxReferences) {
+          toast.warning(
+            selectedProductInfo?.imageId
+              ? '商品主图已自动占用 1 个复刻图片槽位，其他参考图最多选择 6 张'
+              : '替换参考图最多选择 7 张',
+          );
+        }
+        return merged.slice(0, maxReferences);
+      });
+    }
+    setPicker(null);
+  };
+
+  const buildAssets = (): VideoTaskSubmitPayload['assets'] => {
+    if (mode === 'FIRST_FRAME' && firstFrame) {
+      return [
+        {
+          assetId: firstFrame.assetId,
+          slotRole: 'FIRST_FRAME',
+          sortOrder: 0,
+          originalUrl: firstFrame.originalUrl,
+          thumbnailUrl: firstFrame.thumbnailUrl,
+          name: firstFrame.name,
+        },
+      ];
+    }
+    if (mode === 'TRENDING_REPLICATE' && sourceVideo) {
+      const productReference = selectedProductInfo?.imageId
+        ? {
+            assetId: selectedProductInfo.imageId,
+            slotRole: 'PRODUCT_REFERENCE' as const,
+            sortOrder: 0,
+            originalUrl: selectedProductInfo.imageUrl,
+            thumbnailUrl: selectedProductInfo.imageUrl,
+            name: `${selectedProductInfo.name}（商品主图）`,
+          }
+        : null;
+      const references = replacementReferences
+        .filter((asset) => asset.assetId !== productReference?.assetId)
+        .slice(0, productReference ? 6 : 7);
+      return [
+        {
+          assetId: sourceVideo.assetId,
+          slotRole: 'SOURCE_VIDEO',
+          sortOrder: 0,
+          originalUrl: sourceVideo.originalUrl,
+          thumbnailUrl: sourceVideo.thumbnailUrl,
+          name: sourceVideo.name,
+        },
+        ...(productReference ? [productReference] : []),
+        ...references.map((asset, index) => ({
+          assetId: asset.assetId,
+          slotRole: 'REPLACEMENT_REFERENCE' as const,
+          sortOrder: index + (productReference ? 1 : 0),
+          originalUrl: asset.originalUrl,
+          thumbnailUrl: asset.thumbnailUrl,
+          name: asset.name,
+        })),
+      ];
+    }
+    return [];
+  };
+
+  const submit = async () => {
+    if (!selectedProductInfo) {
+      toast.warning('请先选择产品');
+      return;
+    }
+    if (!isInputReady) {
+      toast.warning(
+        mode === 'FIRST_FRAME'
+          ? '请先选择视频首帧'
+          : '请先选择爆款原视频，并确保商品有主图或至少选择 1 张替换参考图',
+      );
+      return;
+    }
+    if (!prompt.trim()) {
+      toast.warning('请输入本次视频 Prompt');
+      return;
+    }
+    if (
+      !params.channelId ||
+      params.channelType !== 'VIDU' ||
+      params.capability !== config.capability
+    ) {
+      toast.warning('Vidu 通道能力尚未准备完成');
+      return;
+    }
+
+    const storyboard = (storyboardGenerated ? shots : [])
+      .map((text, index) =>
+        text.trim() ? `分镜${index + 1}：${text.trim()}` : '',
+      )
+      .filter(Boolean)
+      .join('\n');
+    const positivePrompt = storyboard
+      ? `${prompt.trim()}\n\n分镜规划：\n${storyboard}`
+      : prompt.trim();
+    // 负面约束使用独立字段提交，由后端统一且幂等地组装进供应商 Prompt。
+    const taskPrompt = positivePrompt;
+    const numericProductId = /^\d+$/.test(selectedProductInfo.id)
+      ? selectedProductInfo.id
+      : null;
+
+    const payload: VideoTaskSubmitPayload = {
+      title: `${config.label}_${productFacts.name}`,
+      productId: numericProductId,
+      productFacts,
+      channelInstanceId: params.channelId,
+      channelType: 'VIDU',
+      capability: config.capability,
+      videoMode: mode,
+      modelCode: params.modelId,
+      taskParamsJson: JSON.stringify(params.schemaParams ?? {}),
+      taskPrompt,
+      negativePrompt: negativePrompt.trim() || undefined,
+      assets: buildAssets(),
+      count,
+      sourceCreationTemplateId: creationPrefill?.templateId,
+      sourceCreationTemplateVersionId: creationPrefill?.versionId,
+    };
+
+    setSubmitting(true);
     try {
       const response = await taskApi.submitVideoTask(payload);
       sessionStorage.removeItem('beta.template.prefill');
       onAddTask({ ...response, taskKind: 'VIDEO' });
       setScreen(AppScreen.TASKS, { highlightGroupId: response.groupId });
-    } catch {
-      // http 拦截器已 toast 错误
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#F5F7FB] overflow-hidden text-[#0b1c30] select-none">
-      
-      {/* Top Header Navigation */}
-      <header className="h-16 bg-white border-b border-[#c2c6d8] flex items-center justify-between px-6 shrink-0 z-10 shadow-[0px_2px_8px_rgba(0,0,0,0.05)]">
-        <div className="flex items-center gap-4">
-          <button 
+    <div className="flex h-screen flex-col overflow-hidden bg-[#f5f7fb] text-slate-800">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
             onClick={() => setScreen(AppScreen.TASKS)}
-            className="text-[#424655] hover:text-[#0054cd] transition-colors flex items-center justify-center cursor-pointer w-8 h-8 rounded-full hover:bg-slate-100"
+            className="h-8 w-8 rounded-md text-slate-500 hover:bg-slate-100"
+            title="返回任务列表"
           >
-            <span className="material-symbols-outlined font-bold text-xl">arrow_back</span>
+            <span className="material-symbols-outlined">arrow_back</span>
           </button>
-          <h1 className="font-bold text-lg text-[#0b1c30]">新建视频任务</h1>
-          <span className="bg-[#eff4ff] text-[#0054cd] px-2 py-0.5 rounded text-xs font-bold">基于图片资产</span>
-        </div>
-
-        {/* Step Indicator strictly matches design */}
-        <div className="hidden md:flex items-center space-x-3">
-          <div className="flex items-center text-[#0054cd] font-bold text-xs lg:text-sm">
-            <div className="w-5 h-5 rounded-full bg-[#136bfb] text-white flex items-center justify-center text-[10px] font-bold mr-2">1</div>
-            <span>选择图片</span>
-          </div>
-          <div className="w-8 h-px bg-[#0054cd]" />
-          
-          <div className="flex items-center text-[#0054cd] font-bold text-xs lg:text-sm">
-            <div className="w-5 h-5 rounded-full bg-[#136bfb] text-white flex items-center justify-center text-[10px] font-bold mr-2">2</div>
-            <span>视频参数</span>
-          </div>
-          <div className="w-8 h-px bg-[#c2c6d8]" />
-          
-          <div className="flex items-center text-[#424655] font-semibold text-xs lg:text-sm">
-            <div className="w-5 h-5 rounded-full border border-[#c2c6d8] text-[#424655] flex items-center justify-center text-[10px] font-bold mr-2">3</div>
-            <span>确认生成</span>
+          <div>
+            <p className="text-[11px] font-bold text-emerald-600">
+              视频任务工作台
+            </p>
+            <h1 className="text-base font-black">新建视频任务</h1>
           </div>
         </div>
-
-        <div className="flex items-center gap-4">
-          <button className="bg-[#0054cd] text-white px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 hover:opacity-90 transition-opacity shadow-sm cursor-pointer">
-            <span className="material-symbols-outlined text-sm font-bold" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
-            AI 助手
-          </button>
-          <span className="text-[#424655] text-xs font-medium">草稿已自动保存于 10:42</span>
-        </div>
-      </header>
-
-      {/* 任务模式 tab — VIDEO(视频能力) / SOLUTION(Vidu 解决方案) */}
-      <div className="flex items-center gap-2 px-6 py-3 border-b border-slate-100 bg-white">
-        <span className="text-xs text-slate-500">任务模式</span>
-        <button
-          type="button"
-          onClick={() => switchVideoMode('VIDEO')}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium border ${
-            videoMode === 'VIDEO'
-              ? 'bg-emerald-600 text-white border-emerald-600'
-              : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400'
-          }`}
-        >
-          视频能力
-        </button>
-        <button
-          type="button"
-          onClick={() => switchVideoMode('SOLUTION')}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium border ${
-            videoMode === 'SOLUTION'
-              ? 'bg-emerald-600 text-white border-emerald-600'
-              : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400'
-          }`}
-        >
-          解决方案
-        </button>
-      </div>
-
-      {/* Main Column Layout */}
-      <main className="flex-1 flex overflow-hidden">
-        
-        {/* Column 1: Source Image Selection (Left Sidebar / Width 25%) */}
-        <section className="w-1/4 min-w-[280px] max-w-[340px] bg-white border-r border-[#c2c6d8] flex flex-col h-full shadow-[0px_2px_8px_rgba(0,0,0,0.05)] shrink-0">
-          <div className="p-5 border-b border-[#c2c6d8] shrink-0">
-            <h2 className="text-base font-extrabold text-[#0b1c30] mb-4">来源图片</h2>
-            
-            {/* Mode Switch tabs */}
-            <div className="flex bg-[#e5eeff] p-1 rounded-lg mb-4">
-              <button 
-                onClick={() => setActiveTab('ref')}
-                className={`flex-1 py-1.5 text-xs font-extrabold rounded text-center cursor-pointer transition-all ${
-                  activeTab === 'ref' 
-                    ? 'bg-white text-[#0054cd] shadow-xs' 
-                    : 'text-[#424655] hover:text-[#0b1c30]'
-                }`}
-              >
-                参考图生视频 ({selectedCount}/7)
-              </button>
-              <button 
-                onClick={() => setActiveTab('first')}
-                className={`flex-1 py-1.5 text-xs font-extrabold rounded text-center cursor-pointer transition-all ${
-                  activeTab === 'first' 
-                    ? 'bg-white text-[#0054cd] shadow-xs' 
-                    : 'text-[#424655] hover:text-[#0b1c30]'
-                }`}
-              >
-                首帧图生视频 ({selectedCount > 0 ? 1 : 0}/1)
-              </button>
-            </div>
-
-            {/* Core Action Buttons - both open the AssetTransitModal as requested! */}
-            <div className="flex gap-2">
-              <button 
-                onClick={() => {
-                  setTransitInitialSource('PRODUCT');
-                  setIsTransitOpen(true);
-                }}
-                className="flex-1 bg-[#eff4ff] border border-[#b2c5ff] text-[#0054cd] rounded-lg py-2 flex items-center justify-center gap-1.5 hover:bg-blue-100 transition-colors cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-base">photo_library</span>
-                <span className="text-xs font-extrabold">商品素材库</span>
-              </button>
-              <button 
-                onClick={() => {
-                  setTransitInitialSource('UPLOAD');
-                  setIsTransitOpen(true);
-                }}
-                className="flex-1 bg-white border border-[#c2c6d8] text-[#424655] rounded-lg py-2 flex items-center justify-center gap-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-base">upload</span>
-                <span className="text-xs font-extrabold">本地上传</span>
-              </button>
-            </div>
+        <div className="flex items-center gap-2">
+          <div className="mr-1 text-right">
+            <span className="block text-[10px] font-bold text-slate-400">
+              生成准备度 {readiness}/4
+            </span>
+            <span className="text-[10px] text-slate-500">
+              {mode === 'TRENDING_REPLICATE' ? duration : `${duration} 秒`} · {outputRatio}
+            </span>
           </div>
-
-          {/* Source Image Grid List */}
-          <div className="flex-1 overflow-y-auto p-4 bg-[#F5F7FB] space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              {sourceImages.map((img) => (
-                <div 
-                  key={img.id}
-                  onClick={() => handleToggleImage(img.id)}
-                  className={`group relative rounded-xl overflow-hidden border-2 bg-white cursor-pointer transition-all hover:shadow-md ${
-                    img.selected ? 'border-[#0054cd] shadow-xs' : 'border-[#c2c6d8]'
-                  }`}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setTemplateMenuOpen((open) => !open)}
+              className="h-9 rounded-md border border-primary px-3 text-xs font-bold text-primary"
+            >
+              模板
+            </button>
+            {templateMenuOpen && (
+              <div className="absolute right-0 top-11 z-40 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => applyPromptTemplate('PRODUCT')}
+                  className="w-full rounded-md px-3 py-2 text-left hover:bg-primary-light"
                 >
-                  {/* Status badges top-left */}
-                  <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
-                    {img.archived && (
-                      <span className="bg-black/60 backdrop-blur-xs text-white text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1 font-bold">
-                        <span className="material-symbols-outlined text-[10px] font-bold">check_circle</span>
-                        已归档
-                      </span>
-                    )}
-                    <span className="bg-black/60 backdrop-blur-xs text-white text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1 font-bold">
-                      <span className="material-symbols-outlined text-[10px] font-bold">star</span>
-                      {img.score}分
-                    </span>
-                  </div>
-
-                  {/* Circular checkmark select indicator top-right */}
-                  <div className={`absolute top-2 right-2 z-10 w-5 h-5 rounded-full flex items-center justify-center text-white transition-all ${
-                    img.selected ? 'bg-[#0054cd]' : 'border border-white/80 bg-black/10'
-                  }`}>
-                    {img.selected && <span className="material-symbols-outlined text-xs font-bold">check</span>}
-                  </div>
-
-                  {/* Aspect square image display */}
-                  <div className="aspect-square bg-slate-50 overflow-hidden relative">
-                    <img 
-                      src={img.url} 
-                      alt={img.name} 
-                      className="w-full h-full object-cover group-hover:scale-102 transition-transform" 
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-
-                  {/* Text details */}
-                  <div className="p-2.5 bg-white border-t border-slate-100">
-                    <p className="font-extrabold text-xs text-[#0b1c30] truncate">{img.name}</p>
-                    <p className="text-[10px] text-[#424655] font-medium truncate mt-0.5">{img.tag}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {sourceImages.length === 0 && (
-              <div className="text-center py-12 text-[#424655] text-xs font-bold">
-                暂未添加参考图片。请点击上方按钮通过资源中心选择并添加。
+                  <span className="block text-xs font-bold text-slate-800">
+                    商品动态展示
+                  </span>
+                  <span className="mt-1 block text-[10px] text-slate-400">
+                    稳定主体，突出材质与核心卖点
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPromptTemplate('TRENDING')}
+                  className="mt-1 w-full rounded-md px-3 py-2 text-left hover:bg-primary-light"
+                >
+                  <span className="block text-xs font-bold text-slate-800">
+                    爆款节奏复刻
+                  </span>
+                  <span className="mt-1 block text-[10px] text-slate-400">
+                    保留创意结构、镜头节奏和爆点
+                  </span>
+                </button>
               </div>
             )}
           </div>
-        </section>
+          <button
+            type="button"
+            onClick={applyAiSuggestion}
+            className="h-9 rounded-md border border-primary/25 bg-primary-light px-3 text-xs font-bold text-primary"
+          >
+            <span className="material-symbols-outlined mr-1 align-middle text-base">
+              auto_awesome
+            </span>
+            AI 助手
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={submitting}
+            className="h-9 rounded-md bg-primary px-4 text-xs font-bold text-white hover:bg-primary-hover disabled:opacity-50"
+          >
+            {submitting ? '提交中…' : '检查并生成'}
+          </button>
+        </div>
+      </header>
 
-        {/* Column 2: Video Prompt Configuration (Middle Column / Width 50%) */}
-        <section className="flex-1 flex flex-col h-full overflow-y-auto bg-slate-50 relative">
-          <div className="p-8 max-w-3xl mx-auto w-full space-y-6">
-            
-            {/* Title section with Template switcher */}
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-extrabold text-[#0b1c30]">视频 Prompt 配置</h2>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[#424655]">视频提示词模板:</span>
-                <select 
-                  value={promptTemplate}
-                  onChange={(e) => setPromptTemplate(e.target.value)}
-                  className="bg-white border border-[#c2c6d8] rounded-lg text-xs font-bold py-1.5 pl-3 pr-8 text-[#0b1c30] focus:ring-1 focus:ring-[#0054cd] outline-none cursor-pointer"
-                >
-                  <option value="上身展示视频模板">上身展示视频模板</option>
-                  <option value="主图氛围短视频模板">主图氛围短视频模板</option>
-                  <option value="细节质感展示模板">细节质感展示模板</option>
-                  <option value="模特轻动作模板">模特轻动作模板</option>
-                  <option value="场景转场模板">场景转场模板</option>
-                </select>
-              </div>
-            </div>
+      <nav className="shrink-0 border-b border-slate-200 bg-white px-6">
+        <div className="mx-auto flex max-w-[1440px] gap-6 overflow-x-auto">
+          {(Object.keys(MODE_CONFIG) as VideoMode[]).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => switchMode(item)}
+              className={`h-12 shrink-0 border-b-2 text-xs font-bold ${
+                mode === item
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {MODE_CONFIG[item].label}
+            </button>
+          ))}
+        </div>
+      </nav>
 
-            {/* Three-stage Time blocks */}
-            <div className="space-y-6">
-              
-              {/* Stage 1: 0-3s */}
-              <div className="bg-white rounded-xl p-5 shadow-[0px_2px_8px_rgba(0,0,0,0.05)] border border-[#c2c6d8] relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-[#1D6FFF]"></div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-extrabold text-[#0b1c30] flex items-center gap-2">
-                    <span className="bg-[#eff4ff] text-[#0054cd] px-1.5 py-0.5 rounded text-[10px] font-extrabold">0-3s</span>
-                    主视觉建立 (Establishing Shot)
-                  </h3>
+      <main className="flex-1 overflow-y-auto p-5">
+        <div className="mx-auto grid w-full max-w-[1440px] grid-cols-1 items-start gap-5 xl:grid-cols-[300px_minmax(0,1fr)_380px]">
+          <section className="space-y-4">
+            <ProductPickerCard
+              selectedProduct={selectedProductInfo}
+              onPick={() => setProductPickerOpen(true)}
+              onClear={handleClearProduct}
+            />
+            {mode === 'FIRST_FRAME' ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-bold text-primary">输入素材</p>
+                    <h2 className="mt-1 text-sm font-black">视频首帧</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openPicker('FIRST_FRAME', 'IMAGE')}
+                    className="text-xs font-bold text-primary"
+                  >
+                    资源中心
+                  </button>
                 </div>
-                <textarea 
-                  value={shot03}
-                  onChange={(e) => setShot03(e.target.value)}
-                  className="w-full bg-[#F5F7FB] border border-[#c2c6d8] rounded-xl p-3 text-xs font-medium text-[#0b1c30] focus:ring-1 focus:ring-[#0054cd] focus:bg-white outline-none resize-none h-24 transition-all"
-                  placeholder="[建议] 描述镜头如何引入商品。提示：时间轴将根据右侧视频时长自动调整。例如：缓慢推镜头，焦点锁定在商品主体..."
+                <AssetSlot
+                  title="视频首帧"
+                  asset={firstFrame}
+                  acceptLabel="添加首帧素材"
+                  onChoose={() => openPicker('FIRST_FRAME', 'IMAGE')}
+                  onRemove={() => setFirstFrame(null)}
+                  showLabel={false}
                 />
               </div>
-
-              {/* Stage 2: 3-9s */}
-              <div className="bg-white rounded-xl p-5 shadow-[0px_2px_8px_rgba(0,0,0,0.05)] border border-[#c2c6d8] relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-[#00687b]"></div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-extrabold text-[#0b1c30] flex items-center gap-2">
-                    <span className="bg-[#afecff] text-[#005f71] px-1.5 py-0.5 rounded text-[10px] font-extrabold">3-9s</span>
-                    氛围与动作 (Action & Atmosphere)
-                  </h3>
-                </div>
-                <textarea 
-                  value={shot39}
-                  onChange={(e) => setShot39(e.target.value)}
-                  className="w-full bg-[#F5F7FB] border border-[#c2c6d8] rounded-xl p-3 text-xs font-medium text-[#0b1c30] focus:ring-1 focus:ring-[#0054cd] focus:bg-white outline-none resize-none h-24 transition-all"
-                  placeholder="[建议] 描述商品的使用场景或动态变化。例如：展示核心功能点，配合环境氛围渲染..."
-                />
-              </div>
-
-              {/* Stage 3: 9-15s */}
-              <div className="bg-white rounded-xl p-5 shadow-[0px_2px_8px_rgba(0,0,0,0.05)] border border-[#c2c6d8] relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-[#595c60]"></div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-extrabold text-[#0b1c30] flex items-center gap-2">
-                    <span className="bg-[#e0e3e6] text-[#181c1f] px-1.5 py-0.5 rounded text-[10px] font-extrabold">9-15s</span>
-                    细节收尾 (Detail & Closure)
-                  </h3>
-                </div>
-                <textarea 
-                  value={shot915}
-                  onChange={(e) => setShot915(e.target.value)}
-                  className="w-full bg-[#F5F7FB] border border-[#c2c6d8] rounded-xl p-3 text-xs font-medium text-[#0b1c30] focus:ring-1 focus:ring-[#0054cd] focus:bg-white outline-none resize-none h-24 transition-all"
-                  placeholder="[建议] 描述视频的结束方式。例如：镜头拉远，定格在品牌Logo旁，光效逐渐收尾..."
-                />
-              </div>
-
-              {/* Negative constraints card strictly matching design */}
-              <div className="bg-[#eff4ff]/60 rounded-xl p-5 border border-dashed border-[#b2c5ff] mt-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="material-symbols-outlined text-[#FF4D4F] text-lg font-bold">block</span>
-                  <h3 className="text-xs font-extrabold text-[#0b1c30]">负面约束 (Negative Prompts)</h3>
-                </div>
-
-                <div className="flex flex-wrap gap-2 mb-3 items-center">
-                  {negativeTags.map((tag) => (
-                    <span 
-                      key={tag}
-                      className="bg-white border border-[#c2c6d8] px-2.5 py-1 rounded-lg text-[10px] font-bold text-[#424655] flex items-center gap-1.5"
+            ) : (
+              <>
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold text-primary">
+                        爆款视频
+                      </p>
+                      <h2 className="mt-1 text-sm font-black">复刻源视频</h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openPicker('SOURCE_VIDEO', 'VIDEO')}
+                      className="text-xs font-bold text-primary"
                     >
-                      <span>{tag}</span>
-                      <button 
-                        onClick={() => handleDeleteTag(tag)}
-                        className="material-symbols-outlined text-xs text-[#727787] hover:text-[#ba1a1a] cursor-pointer"
-                      >
-                        close
-                      </button>
-                    </span>
-                  ))}
-
-                  {/* Inline adding button helper */}
-                  <div className="flex items-center border border-[#c2c6d8] rounded-lg bg-white overflow-hidden max-w-[150px]">
-                    <input 
-                      type="text" 
-                      placeholder="自定义" 
-                      value={newNegativeInput}
-                      onChange={(e) => setNewNegativeInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleAddTag();
-                      }}
-                      className="w-16 px-2 py-0.5 text-[10px] font-bold outline-none border-none focus:ring-0"
-                    />
-                    <button 
-                      onClick={handleAddTag}
-                      className="bg-blue-50 text-blue-600 px-1.5 py-0.5 text-[10px] font-extrabold border-l border-[#c2c6d8] hover:bg-blue-100 cursor-pointer"
-                    >
-                      添加
+                      资源中心
                     </button>
                   </div>
+                  <AssetSlot
+                    title="爆款原视频"
+                    asset={sourceVideo}
+                    acceptLabel="从资源中心选择复刻源视频"
+                    onChoose={() => openPicker('SOURCE_VIDEO', 'VIDEO')}
+                    onRemove={() => setSourceVideo(null)}
+                    showLabel={false}
+                  />
+                  <p className="mt-3 text-[10px] leading-4 text-slate-400">
+                    支持 MP4/MOV，5～180 秒；源视频仅作为本次任务的镜头结构参考。
+                  </p>
                 </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold text-primary">
+                        替换素材
+                      </p>
+                      <h2 className="mt-1 text-sm font-black">
+                        商品、模特与场景
+                      </h2>
+                      <p className="mt-1 text-[11px] leading-4 text-slate-400">
+                        商品主图会自动作为第 1 张复刻参考图；连同其他替换参考图最多 7 张。
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openPicker('REPLACEMENT_REFERENCE', 'IMAGE', 'PRODUCT')
+                      }
+                      className="text-xs font-bold text-primary"
+                    >
+                      资源中心
+                    </button>
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openPicker('REPLACEMENT_REFERENCE', 'IMAGE', 'PRODUCT')
+                      }
+                      className="aspect-square rounded-md border-2 border-dashed border-slate-300 text-slate-400 hover:border-primary hover:bg-primary-light hover:text-primary"
+                      aria-label="添加替换参考图"
+                    >
+                      <span className="material-symbols-outlined text-2xl">
+                        add
+                      </span>
+                    </button>
+                    {replacementReferences.map((asset) => (
+                      <AssetThumb
+                        key={asset.assetId}
+                        asset={asset}
+                        onRemove={() =>
+                          setReplacementReferences((previous) =>
+                            previous.filter(
+                              (item) => item.assetId !== asset.assetId,
+                            ),
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
-                <textarea 
-                  value={customNegativeText}
-                  onChange={(e) => setCustomNegativeText(e.target.value)}
-                  className="w-full bg-white border border-[#c2c6d8] rounded-xl p-2.5 text-xs font-medium text-[#424655] focus:ring-1 focus:ring-[#0054cd] outline-none resize-none h-14"
-                  placeholder="输入其他负面提示词，用英文逗号分隔..."
-                />
-              </div>
+            <section className="border border-slate-200 bg-white p-4">
+              <p className="text-[11px] font-bold text-primary">输入依据</p>
+              <h2 className="mt-1 text-sm font-black">商品事实</h2>
+              <dl className="mt-3 space-y-2 text-[11px] leading-5">
+              <FactRow label="商品" value={productFacts.name} />
+              <FactRow label="品类" value={productFacts.productCategory} />
+              <FactRow label="卖点" value={productFacts.sellingPoints} />
+              <FactRow label="颜色" value={productFacts.color} />
+              <FactRow label="材质" value={productFacts.fabricTexture} />
+              <FactRow label="版型结构" value={productFacts.fitStructure} />
+              </dl>
+            </section>
+          </section>
 
+          <section className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-5">
+              <p className="text-[11px] font-bold text-primary">任务配置</p>
+              <h2 className="mt-1 font-black">{config.label}</h2>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                {config.description}
+              </p>
+              {mode === 'TRENDING_REPLICATE' && (
+                <div className="mt-5 border-t border-slate-100 pt-5">
+                  <label className="block text-xs font-bold">
+                    复刻目标
+                    <textarea
+                      value={prompt}
+                      onChange={(event) => {
+                        setPrompt(event.target.value);
+                        setStoryboardGenerated(false);
+                      }}
+                      className="mt-1.5 h-20 w-full resize-none rounded-md border border-slate-200 p-2 text-xs font-normal leading-5 outline-none focus:border-primary"
+                      placeholder="描述希望保留的创意结构、镜头节奏和爆点"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={
+                      !sourceVideo ||
+                      (!hasProductReference && replacementReferences.length === 0)
+                    }
+                    onClick={generateStoryboard}
+                    className="mt-3 h-8 rounded bg-slate-900 px-3 text-xs font-bold text-white disabled:bg-slate-200"
+                  >
+                    分析分镜与爆点
+                  </button>
+                </div>
+              )}
             </div>
 
-          </div>
-        </section>
+            <div className="rounded-lg border border-slate-200 bg-white p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold text-primary">内容</p>
+                  <h2 className="mt-1 font-black">本次视频 Prompt</h2>
+                  <p className="mt-2 text-[11px] text-slate-400">
+                    先确认本次视频表达；生成后才按时长拆分为可编辑分镜。
+                  </p>
+                </div>
+                <span className="flex h-9 items-center rounded border border-slate-200 bg-white px-2 text-xs text-slate-700">
+                  {mode === 'TRENDING_REPLICATE' ? duration : `${duration} 秒`}
+                </span>
+              </div>
+              <label className="mt-4 block text-xs font-bold">
+                最终 Prompt
+                <textarea
+                  value={prompt}
+                  maxLength={mode === 'FIRST_FRAME' ? 5000 : 2000}
+                  onChange={(event) => {
+                    setPrompt(event.target.value);
+                    setStoryboardGenerated(false);
+                  }}
+                  className="mt-1.5 h-28 w-full resize-none rounded-md border border-slate-200 p-3 text-xs font-normal leading-5 outline-none focus:border-primary"
+                  placeholder="描述商品、动作、场景和镜头目标"
+                />
+              </label>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[10px] text-slate-400">
+                  {storyboardGenerated
+                    ? `已生成 ${shots.length} 个可编辑分镜`
+                    : '生成提示词后，系统将按时长拆分分镜。'}
+                </p>
+                <button
+                  type="button"
+                  onClick={generateStoryboard}
+                  className="flex h-8 items-center gap-1.5 rounded-md border border-primary bg-white px-3 text-[11px] font-bold text-primary"
+                >
+                  <span className="material-symbols-outlined text-base">
+                    auto_fix_high
+                  </span>
+                  {storyboardGenerated ? '重新生成提示词' : '生成提示词'}
+                </button>
+              </div>
+              {storyboardGenerated && (
+                <details open className="mt-4 border border-slate-200">
+                  <summary className="cursor-pointer bg-slate-50 px-3 py-2 text-xs font-black">
+                    分镜提示词 · {shots.length} 镜
+                  </summary>
+                  <div className="space-y-3 p-3">
+                    {shots.map((shot, index) => (
+                      <label key={index} className="block text-xs font-bold">
+                        分镜 {index + 1}
+                        <textarea
+                          value={shot}
+                          onChange={(event) =>
+                            setShots((previous) =>
+                              previous.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? event.target.value
+                                  : item,
+                              ),
+                            )
+                          }
+                          className="mt-1.5 h-20 w-full resize-none rounded-md border border-slate-200 p-2 text-xs font-normal leading-5 outline-none focus:border-primary"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              )}
+              <label className="mt-3 block text-xs font-bold">
+                负面约束
+                <input
+                  value={negativePrompt}
+                  onChange={(event) => setNegativePrompt(event.target.value)}
+                  className="mt-1.5 h-9 w-full rounded-md border border-slate-200 px-2 text-xs font-normal outline-none focus:border-primary"
+                />
+              </label>
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={applyAiSuggestion}
+                  className="h-8 rounded border border-primary px-3 text-xs font-bold text-primary"
+                >
+                  AI 助手建议
+                </button>
+                <span className="text-[10px] text-slate-400">
+                  内容将在最终提交时统一校验
+                </span>
+              </div>
+            </div>
+          </section>
 
-        {/* Column 3: 任务参数 (Right Column) */}
-        <div className="w-[310px] lg:w-[350px] shrink-0 border-l border-slate-200 flex flex-col bg-[#F9FAFB] overflow-y-auto" id="col-video-params">
-          <TaskParamsPanel
-            group={videoMode}
-            prefill={videoPrefill}
-            unified={{ productName: selectedProduct.name }}
-            aspectRatio={aspectRatio}
-            count={count}
-            onAspectRatioChange={setAspectRatio}
-            onCountChange={setCount}
-            prompt={promptText}
-            onPromptChange={setPromptText}
-            negativePrompt={negativePrompt}
-            onNegativePromptChange={setNegativePrompt}
-            onParamsChange={setTaskParams}
-          />
-          <div className="mt-auto p-4 border-t border-slate-100 flex gap-2">
-            <button onClick={() => setScreen(AppScreen.TASKS)} className="flex-1 py-2 text-sm border border-slate-200 rounded-md">取消</button>
-            <button onClick={handleSubmitTask} className="flex-1 py-2 text-sm text-white rounded-md bg-blue-600">提交任务</button>
-          </div>
+          <aside className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-5">
+              <p className="text-[11px] font-bold text-primary">
+                模型通道与模型能力
+              </p>
+              <h2 className="mt-1 font-black">可用视频规格</h2>
+              <div className="mt-4">
+                <TaskParamsPanel
+                  key={mode}
+                  group={config.group}
+                  prefill={videoParamsPrefill}
+                  unified={{
+                    productName: productFacts.name ?? '',
+                    sellingPoints: productFacts.sellingPoints,
+                  }}
+                  aspectRatio=""
+                  count={count}
+                  onAspectRatioChange={() => undefined}
+                  onCountChange={setCount}
+                  prompt={prompt}
+                  onPromptChange={setPrompt}
+                  negativePrompt={negativePrompt}
+                  onNegativePromptChange={setNegativePrompt}
+                  onParamsChange={setParams}
+                  fixedChannelType="VIDU"
+                  fixedCapability={config.capability}
+                  showAspectRatio={false}
+                  showPromptEditor={false}
+                  showNegativePrompt={false}
+                  showModelSelector={mode === 'FIRST_FRAME'}
+                  showCapabilitySummary={false}
+                  showCount={false}
+                  presentation="videoDemo"
+                />
+              </div>
+              <div className="mt-4 rounded bg-slate-50 p-3 text-xs leading-6">
+                {mode === 'FIRST_FRAME' ? (
+                  <>
+                    <p>输出比例由首帧图片决定</p>
+                    <p>时长与分辨率以当前 Vidu 模型能力为准</p>
+                    <p className="text-amber-700">
+                      提交前请确认生成规格与成本
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p>源视频：MP4/MOV · 5～180 秒</p>
+                    <p>商品主图或替换参考图：合计 1～7 张</p>
+                    <p className="text-amber-700">
+                      仅复刻镜头结构，不复用历史生成结果
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </aside>
         </div>
-
       </main>
 
-      {/* Transit Station Overlay inside Video Task component context */}
-      {isTransitOpen && (
+      {picker && (
         <AssetTransitModal
-          purpose="PRODUCT"
-          productId={selectedProduct?.id}
-          assetKind="IMAGE"
-          initialSource={transitInitialSource}
-          onClose={() => setIsTransitOpen(false)}
-          onConfirmSelection={handleConfirmTransitSelection}
+          purpose={
+            selectedProductInfo?.id &&
+            /^\d+$/.test(selectedProductInfo.id)
+              ? 'PRODUCT'
+              : 'OTHER'
+          }
+          productId={selectedProductInfo?.id}
+          assetKind={picker.assetKind}
+          initialSource={picker.source}
+          multiSelect={picker.role === 'REPLACEMENT_REFERENCE'}
+          targetSlot={picker.role}
+          onClose={() => setPicker(null)}
+          onConfirmSelection={confirmAssets}
         />
       )}
-
+      <ProductPickerModal
+        open={productPickerOpen}
+        onClose={() => setProductPickerOpen(false)}
+        onPick={handleProductPicked}
+      />
     </div>
   );
 };
+
+const AssetSlot: React.FC<{
+  title: string;
+  required?: boolean;
+  asset: SelectedAsset | null;
+  acceptLabel: string;
+  onChoose: () => void;
+  onRemove: () => void;
+  showLabel?: boolean;
+}> = ({
+  title,
+  required,
+  asset,
+  acceptLabel,
+  onChoose,
+  onRemove,
+  showLabel = true,
+}) => (
+  <div>
+    {showLabel && (
+      <div className="mb-2 flex items-center justify-between">
+        <label className="text-xs font-extrabold">
+          {title} {required && <span className="text-red-500">*</span>}
+        </label>
+        {asset && (
+          <button
+            type="button"
+            onClick={onChoose}
+            className="text-xs font-bold text-primary"
+          >
+            更换
+          </button>
+        )}
+      </div>
+    )}
+    {asset ? (
+      <div className={showLabel ? '' : 'mt-4'}>
+        <AssetThumb asset={asset} onRemove={onRemove} large />
+      </div>
+    ) : (
+      <button
+        type="button"
+        onClick={onChoose}
+        className={`${showLabel ? '' : 'mt-4'} h-44 w-full rounded-md border-2 border-dashed border-slate-300 bg-slate-50 text-xs font-bold text-slate-400 hover:border-primary hover:bg-primary-light hover:text-primary`}
+      >
+        <span className="material-symbols-outlined block text-4xl">add</span>
+        <span className="mt-2 block">{acceptLabel}</span>
+      </button>
+    )}
+  </div>
+);
+
+const AssetThumb: React.FC<{
+  asset: SelectedAsset;
+  onRemove: () => void;
+  large?: boolean;
+}> = ({ asset, onRemove, large }) => (
+  <div
+    className={`group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 ${
+      large ? 'h-44 w-full' : 'aspect-square w-full'
+    }`}
+  >
+    {asset.assetKind === 'VIDEO' ? (
+      <video
+        src={asset.originalUrl}
+        poster={asset.thumbnailUrl}
+        controls
+        preload="metadata"
+        className="h-full w-full object-contain"
+      />
+    ) : (
+      <img
+        src={asset.originalUrl}
+        alt={asset.name}
+        className="h-full w-full object-contain"
+        referrerPolicy="no-referrer"
+      />
+    )}
+    <button
+      type="button"
+      onClick={onRemove}
+      className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
+      aria-label={`移除${asset.name}`}
+    >
+      <span className="material-symbols-outlined text-sm">close</span>
+    </button>
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 pb-2 pt-8">
+      <p className="truncate text-[11px] font-bold text-white">{asset.name}</p>
+    </div>
+  </div>
+);
+
+const FactRow: React.FC<{ label: string; value?: string }> = ({
+  label,
+  value,
+}) => (
+  <div className="grid grid-cols-[44px_1fr] gap-2">
+    <dt className="text-slate-400">{label}</dt>
+    <dd className="line-clamp-2 font-medium text-slate-700">
+      {value || '未填写'}
+    </dd>
+  </div>
+);

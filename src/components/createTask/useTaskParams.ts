@@ -15,12 +15,14 @@ import { useTemplateRecommend } from '../../api/hooks/useTemplateRecommend';
 import { useCapabilityMatrixStore } from '../../stores/capabilityMatrix';
 
 export interface PrefillState {
-  templateId: string;
-  templateVersionId: string;
+  templateId?: string;
+  templateVersionId?: string;
   group?: 'IMAGE' | 'VIDEO' | 'SOLUTION';
   channelType: string | null;
   capability: string | null;
   model: string | null;
+  schemaParams?: Record<string, unknown>;
+  lockExecution?: boolean;
 }
 
 export function useTaskParams(
@@ -31,8 +33,12 @@ export function useTaskParams(
   const [capability, setCapabilityRaw] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
   const [schemaParams, setSchemaParams] = useState<Record<string, any>>({});
+  const [lastSchema, setLastSchema] = useState<{
+    identity: string;
+    value: CapabilityDefinition;
+  } | null>(null);
 
-  const locked = !!prefill;
+  const locked = !!prefill && prefill.lockExecution !== false;
 
   // step 1:按 group 拉可用通道实例(group 切时重拉)
   const { data: instancesRaw } = useServiceQuery<ModelChannelDTO[]>(
@@ -73,6 +79,15 @@ export function useTaskParams(
     if (prefill?.capability && !capability) setCapabilityRaw(prefill.capability);
   }, [prefill, capability]);
 
+  useEffect(() => {
+    if (prefill?.model && !modelId) setModelId(prefill.model);
+  }, [prefill, modelId]);
+
+  useEffect(() => {
+    if (!prefill?.schemaParams) return;
+    setSchemaParams({ ...prefill.schemaParams });
+  }, [prefill]);
+
   const setChannelId = (id: string | null) => {
     setChannelIdRaw(id);
     setCapabilityRaw(null);
@@ -102,13 +117,6 @@ export function useTaskParams(
       .filter((cap) => cap.group === group);  // 按 group 过滤(IMAGE/VIDEO/SOLUTION)
   }, [channelType, matrix, supported.supportedCapabilities, group]);
 
-  const { data: schema } = useServiceQuery<CapabilityDefinition | null>(
-    () => (channelType && capability
-      ? fetchCapabilitySchema(channelType, capability)
-      : Promise.resolve(null)),
-    [channelType, capability],
-  );
-
   // step 3
   const { data: models } = useServiceQuery<ChannelGroupModel[]>(
     () => (channelId ? fetchChannelGroupModels(channelId) : Promise.resolve([])),
@@ -118,6 +126,29 @@ export function useTaskParams(
     () => (models ?? []).filter((m) => m.group === group),
     [models, group],
   );
+  const effectiveModelCode = modelId ?? modelsInGroup[0]?.model ?? null;
+  const paramsFingerprint = useMemo(
+    () => JSON.stringify(schemaParams),
+    [schemaParams],
+  );
+
+  const schemaIdentity = `${channelType ?? ''}|${capability ?? ''}|${effectiveModelCode ?? ''}`;
+  const { data: loadedSchema } = useServiceQuery<CapabilityDefinition | null>(
+    () => (channelType && capability
+      ? fetchCapabilitySchema(channelType, capability, {
+          modelCode: effectiveModelCode,
+          taskParams: schemaParams,
+        })
+      : Promise.resolve(null)),
+    [channelType, capability, effectiveModelCode, paramsFingerprint],
+  );
+  useEffect(() => {
+    if (loadedSchema) {
+      setLastSchema({ identity: schemaIdentity, value: loadedSchema });
+    }
+  }, [loadedSchema, schemaIdentity]);
+  const schema = loadedSchema
+    ?? (lastSchema?.identity === schemaIdentity ? lastSchema.value : null);
 
   const { data: recommendListRaw } = useTemplateRecommend(
     prefill?.templateId, prefill?.templateVersionId, channelType ?? undefined, capability ?? undefined,
@@ -135,15 +166,31 @@ export function useTaskParams(
   }, [recommendList, prefill]);
 
   useEffect(() => {
-    if (!schema || prefill) return;
-    const defaults: Record<string, any> = {};
+    if (!schema) return;
+    const next: Record<string, any> = {};
     for (const f of schema.fields ?? []) {
-      if (f.defaultValue !== undefined && f.defaultValue !== null && f.defaultValue !== '') {
-        defaults[f.key] = f.defaultValue;
+      let value = schemaParams[f.key];
+      const hasValue = value !== undefined && value !== null && value !== '';
+      if (!hasValue && f.defaultValue !== undefined && f.defaultValue !== null && f.defaultValue !== '') {
+        value = f.defaultValue;
       }
+      if (value === undefined || value === null || value === '') continue;
+
+      if (f.type === 'BOOLEAN') {
+        value = value === true || value === 'true';
+      } else if (f.type === 'INT' || f.type === 'DECIMAL') {
+        const numericValue = Number(value);
+        value = Number.isFinite(numericValue) ? numericValue : f.defaultValue;
+      } else if (f.type === 'SELECT' && f.options?.length) {
+        const valid = f.options.some((option) => option.value === String(value));
+        if (!valid) value = f.defaultValue ?? f.options[0].value;
+      }
+      next[f.key] = value;
     }
-    setSchemaParams((prev) => ({ ...defaults, ...prev }));
-  }, [schema, prefill]);
+    if (JSON.stringify(next) !== JSON.stringify(schemaParams)) {
+      setSchemaParams(next);
+    }
+  }, [schema, schemaParams]);
 
   const recommendValues = useMemo(() => {
     const m: Record<string, any> = {};
@@ -160,16 +207,17 @@ export function useTaskParams(
   const setModelWithValidation = (id: string | null) => {
     if (locked) return;
     setModelId(id);
+    setSchemaParams({});
   };
 
   return {
-    channelId, channelType, capability, modelId, schema, schemaParams,
+    channelId, channelType, capability, modelId, effectiveModelCode, schema, schemaParams,
     instances,
     capabilitiesInChannel,
     modelsInGroup,
     setChannelId: locked ? () => {} : setChannelId,
     setCapability,
-    setModelId, setSchemaParams,
+    setModelId: setModelWithValidation, setSchemaParams,
     recommendValues, locked, isSupported, setModelWithValidation,
   };
 }

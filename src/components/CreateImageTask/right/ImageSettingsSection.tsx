@@ -6,6 +6,7 @@ import { ParamSchemaForm } from '../../common/ParamSchemaForm';
 import { localValidate } from '../../common/ParamSchemaForm/utils/validate';
 import { UnsupportedNotice } from './UnsupportedNotice';
 import { messages } from '../../../labels/createImageTask';
+import type { PrefillState } from '../../createTask/useTaskParams';
 
 export interface TaskParamsSnapshot {
   channelId: string | null;
@@ -32,13 +33,15 @@ export interface ImageSettingsSectionProps {
   isSupported?: boolean;
   /** 选中状态变化时通知父组件,父组件用于 submit payload 的 channelInstanceId/modelId */
   onParamsChange?: (snapshot: TaskParamsSnapshot) => void;
+  prefill?: PrefillState | null;
 }
 
 export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
   onParamsChange,
+  prefill,
 }) => {
   // 通道实例 / 能力 / 模型 三级联动 — 与 demo 创建图片任务 "任务参数"一致
-  const tp = useTaskParams('IMAGE', null);
+  const tp = useTaskParams('IMAGE', prefill);
 
   // 选中状态变化时通知父组件
   useEffect(() => {

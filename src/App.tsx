@@ -18,12 +18,19 @@ import { AsyncTaskList } from './components/AsyncTaskList';
 import ProductManagePage from './components/ProductManagePage';
 import DictCategoryList from './components/DictCategoryList';
 import DictItemList from './components/DictItemList';
+import { ModelLibrary } from './components/ModelLibrary';
+import {
+  ModelProfileCreator,
+  type ModelCreatorAsset,
+  type ModelCreatorAssetTarget,
+} from './components/ModelProfileCreator';
 
 import { useAuth } from './auth/AuthContext';
 import { setLoginRequiredHandler } from './api/error';
 import { useServiceQuery } from './api/hooks/useServiceQuery';
 import { userApi, type UserDTO } from './api/modules/user';
 import { taskApi } from './api/modules/task';
+import { modelProfileApi } from './api/modules/modelProfile';
 import { toUIGenerationTask } from './components/createTask/taskAdapter';
 
 import {
@@ -81,11 +88,18 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
   const [highlightGroupId, setHighlightGroupId] = useState<string | null>(null);
   const [highlightTaskKind, setHighlightTaskKind] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
+  const [creationTemplateId, setCreationTemplateId] = useState<string | null>(null);
 
-  const setScreen = (screen: AppScreen, payload?: { highlightGroupId?: string }) => {
+  const setScreen = (
+    screen: AppScreen,
+    payload?: { highlightGroupId?: string; creationTemplateId?: string },
+  ) => {
     setCurrentScreen(screen);
     if (payload?.highlightGroupId) {
       setHighlightGroupId(payload.highlightGroupId);
+    }
+    if (screen === AppScreen.CREATE_IMAGE_TASK || screen === AppScreen.CREATE_VIDEO_TASK) {
+      setCreationTemplateId(payload?.creationTemplateId ?? null);
     }
   };
 
@@ -135,6 +149,22 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<ProductAsset>(mockProducts[0]);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
   const [isTransitOpen, setIsTransitOpen] = useState(false);
+  const [modelCreatorOpen, setModelCreatorOpen] = useState(false);
+  const [modelAssetTarget, setModelAssetTarget] = useState<ModelCreatorAssetTarget>();
+  const [modelAssetConsumer, setModelAssetConsumer] = useState<((asset: ModelCreatorAsset) => void)>();
+  const modelProfilesQuery = useServiceQuery(
+    () => modelProfileApi.page({ pageNum: 1, pageSize: 100, status: 'active' }),
+    [],
+  );
+
+  const requestModelAsset = (
+    target: ModelCreatorAssetTarget,
+    onSelected: (asset: ModelCreatorAsset) => void,
+  ) => {
+    setModelAssetTarget(target);
+    setModelAssetConsumer(() => onSelected);
+    setIsTransitOpen(true);
+  };
 
   /**
    * 注册登录态失效回调 —— axios 拦截器抛 A0102xx 时调用
@@ -178,7 +208,7 @@ export default function App() {
           <Dashboard
             tasks={tasks}
             currentUser={currentUser}
-            setScreen={setCurrentScreen}
+            setScreen={setScreen}
           />
         );
       case AppScreen.TASKS:
@@ -209,6 +239,15 @@ export default function App() {
             isDrawerOpen={isProductDrawerOpen}
             setIsDrawerOpen={setIsProductDrawerOpen}
             setScreen={setCurrentScreen}
+          />
+        );
+      case AppScreen.MODEL_LIBRARY:
+        return (
+          <ModelLibrary
+            profiles={modelProfilesQuery.data?.list ?? []}
+            loading={modelProfilesQuery.loading}
+            error={modelProfilesQuery.error?.message}
+            onCreateProfile={() => setModelCreatorOpen(true)}
           />
         );
       case AppScreen.ANALYTICS:
@@ -273,21 +312,42 @@ export default function App() {
           onAddTask={handleAddTask}
           setScreen={setScreen}
           openTransit={() => setIsTransitOpen(true)}
+          onCreateModel={() => setModelCreatorOpen(true)}
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
+          creationTemplateId={creationTemplateId}
         />
         {isTransitOpen && (
           <AssetTransitModal
             purpose="OTHER"
-            mode="manager"
-            onConfirmSelection={(fileResIds) => {
-              // App.tsx 全局兜底:无业务上下文,仅打日志
-              console.log('[Transit] App 全局选中(未消费):', fileResIds);
+            mode={modelAssetConsumer ? 'picker' : 'manager'}
+            targetSlot={modelAssetTarget ? `model-profile-${modelAssetTarget}` : 'main'}
+            onConfirmSelection={(items) => {
+              const first = items[0];
+              if (modelAssetConsumer && first) {
+                modelAssetConsumer({
+                  id: first.id,
+                  name: first.name,
+                  url: first.originalUrl ?? first.thumbnailUrl ?? '',
+                });
+              }
+              setModelAssetConsumer(undefined);
+              setModelAssetTarget(undefined);
               setIsTransitOpen(false);
             }}
-            onClose={() => setIsTransitOpen(false)}
+            onClose={() => {
+              setModelAssetConsumer(undefined);
+              setModelAssetTarget(undefined);
+              setIsTransitOpen(false);
+            }}
           />
         )}
+        <ModelProfileCreator
+          open={modelCreatorOpen}
+          onClose={() => setModelCreatorOpen(false)}
+          onPublished={modelProfilesQuery.refetch}
+          onRequestAsset={requestModelAsset}
+        />
       </div>
     );
   }
@@ -302,6 +362,7 @@ export default function App() {
           openTransit={() => setIsTransitOpen(true)}
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
+          creationTemplateId={creationTemplateId}
         />
         {isTransitOpen && (
           <AssetTransitModal
@@ -369,15 +430,37 @@ export default function App() {
       {isTransitOpen && (
         <AssetTransitModal
           purpose="OTHER"
-          mode="manager"
-          onConfirmSelection={(fileResIds) => {
-            // 全局工具模式 —— 没有明确业务上下文,仅打 console 提示用户
-            console.log('[Transit] App 全局选中(未消费):', fileResIds);
+          mode={modelAssetConsumer ? 'picker' : 'manager'}
+          targetSlot={modelAssetTarget ? `model-profile-${modelAssetTarget}` : 'main'}
+          onConfirmSelection={(items) => {
+            const first = items[0];
+            if (modelAssetConsumer && first) {
+              modelAssetConsumer({
+                id: first.id,
+                name: first.name,
+                url: first.originalUrl ?? first.thumbnailUrl ?? '',
+              });
+            } else {
+              console.log('[Transit] App 全局选中(未消费):', items);
+            }
+            setModelAssetConsumer(undefined);
+            setModelAssetTarget(undefined);
             setIsTransitOpen(false);
           }}
-          onClose={() => setIsTransitOpen(false)}
+          onClose={() => {
+            setModelAssetConsumer(undefined);
+            setModelAssetTarget(undefined);
+            setIsTransitOpen(false);
+          }}
         />
       )}
+
+      <ModelProfileCreator
+        open={modelCreatorOpen}
+        onClose={() => setModelCreatorOpen(false)}
+        onPublished={modelProfilesQuery.refetch}
+        onRequestAsset={requestModelAsset}
+      />
 
     </div>
   );

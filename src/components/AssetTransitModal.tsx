@@ -8,6 +8,7 @@ import {
   type ProductLibraryAsset,
 } from '../api/modules/productLibrary';
 import { assetCategoryApi, type AssetCategoryNode } from '../api/modules/assetCategory';
+import { modelProfileApi, type ModelProfileDTO } from '../api/modules/modelProfile';
 import { useAuth } from '../auth/AuthContext';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { useConfirm } from './common/ConfirmProvider';
@@ -41,7 +42,7 @@ interface ScannedFile {
 
 /** TransitAsset 直接 alias 到后端 AssetResourceItem —— 单一数据源 */
 type TransitAsset = AssetResourceItem;
-export type ResourceCenterSource = 'UPLOAD' | 'PRODUCT';
+export type ResourceCenterSource = 'UPLOAD' | 'PRODUCT' | 'MODEL';
 
 const toTransitAsset = (asset: ProductLibraryAsset): TransitAsset => ({
   id: asset.id,
@@ -66,6 +67,22 @@ const toTransitAsset = (asset: ProductLibraryAsset): TransitAsset => ({
   createTime: asset.createTime,
 });
 
+const modelProfileToTransitAsset = (profile: ModelProfileDTO): TransitAsset => ({
+  id: profile.assetResourceId,
+  name: profile.name,
+  assetKind: 'IMAGE',
+  assetType: 'MODEL_PROFILE',
+  thumbnailUrl: profile.image,
+  originalUrl: profile.image,
+  description: profile.reason,
+  tags: ['模特库', profile.source, ...profile.tags].filter(Boolean).join(','),
+  uploadUserId: '',
+  sourceId: profile.id,
+  status: 'NORMAL',
+  categoryIds: [],
+  createTime: profile.createTime,
+});
+
 interface AssetTransitModalProps {
   /** 已废弃:父组件传 onConfirmSelection 后不再消费 products */
   products?: ProductAsset[];
@@ -88,6 +105,8 @@ interface AssetTransitModalProps {
   productId?: string | number;
   /** 任务创建时的素材槽位提示,CreateImageTask / CreateVideoTask 用 */
   targetSlot?: string;
+  /** 模特参考槽位专用:打开共享的 AI 模特创建流程。 */
+  onCreateModel?: () => void;
   /** 资源类型过滤(默认 IMAGE) */
   assetKind?: 'IMAGE' | 'VIDEO' | 'AUDIO';
   /** 初始数据来源；音频选择器始终降级为上传资源。 */
@@ -103,14 +122,20 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   purpose = 'OTHER',
   productId,
   targetSlot = 'main',
+  onCreateModel,
   assetKind = 'IMAGE',
   multiSelect = false,
   mode = 'picker',
   initialSource = 'UPLOAD',
 }) => {
   const productSourceAvailable = assetKind !== 'AUDIO';
+  const modelSourceAvailable = assetKind === 'IMAGE';
   const [activeSource, setActiveSource] = useState<ResourceCenterSource>(
-    initialSource === 'PRODUCT' && productSourceAvailable ? 'PRODUCT' : 'UPLOAD',
+    initialSource === 'MODEL' && modelSourceAvailable
+      ? 'MODEL'
+      : initialSource === 'PRODUCT' && productSourceAvailable
+        ? 'PRODUCT'
+        : 'UPLOAD',
   );
   const [searchQuery, setSearchQuery] = useState('');
   /** 分类树折叠状态 —— 存被折叠的节点 id,默认空 = 全部展开 */
@@ -164,7 +189,17 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setLoading(true);
     setQueryError(null);
     try {
-      if (activeSource === 'PRODUCT') {
+      if (activeSource === 'MODEL') {
+        const page = await modelProfileApi.page({
+          pageNum: 1,
+          pageSize: 100,
+          keyword: searchQuery || undefined,
+          status: 'active',
+        });
+        setAssets(page.list
+          .filter((profile) => Boolean(profile.assetResourceId && profile.image))
+          .map(modelProfileToTransitAsset));
+      } else if (activeSource === 'PRODUCT') {
         const page = await productLibraryApi.assetPage({
           pageNum: 1,
           pageSize: 100,
@@ -197,7 +232,9 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   }, [searchQuery, currentUserId, productId, selectedCategoryId, activeSource]);
 
   const handleSourceChange = (source: ResourceCenterSource) => {
-    if (source === activeSource || (source === 'PRODUCT' && !productSourceAvailable)) return;
+    if (source === activeSource
+      || (source === 'PRODUCT' && !productSourceAvailable)
+      || (source === 'MODEL' && !modelSourceAvailable)) return;
     setActiveSource(source);
     setSelectedAssetIds([]);
     setSelectedCategoryId(null);
@@ -248,7 +285,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const effectiveMultiSelect = mode === 'manager' ? true : multiSelect;
 
   const handleCardClick = (id: string) => {
-    if (mode === 'manager' && activeSource === 'PRODUCT') return;
+    if (mode === 'manager' && activeSource !== 'UPLOAD') return;
     if (effectiveMultiSelect) {
       // 多选:toggle 累加
       setSelectedAssetIds(prev =>
@@ -755,7 +792,9 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 md:p-10 select-none animate-fadeIn">
+    <div className={`fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 md:p-10 select-none animate-fadeIn ${
+      targetSlot.startsWith('model-profile-') ? 'z-[90]' : 'z-50'
+    }`}>
       
       {/* Hidden Upload Input */}
       <input
@@ -802,6 +841,19 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   商品素材
                 </button>
               )}
+              {modelSourceAvailable && (
+                <button
+                  type="button"
+                  onClick={() => handleSourceChange('MODEL')}
+                  className={`rounded-md px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                    activeSource === 'MODEL'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  模特库
+                </button>
+              )}
             </div>
           </div>
           <button
@@ -819,7 +871,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
           <aside className="w-[240px] border-r border-slate-200 bg-white flex flex-col p-4 gap-4 shrink-0 overflow-y-auto">
 
             {/* 我的分类 —— 真实分类树(从 assetCategoryApi.tree 加载) */}
-            <div className={`flex flex-col gap-2 ${activeSource === 'PRODUCT' ? 'hidden' : ''}`}>
+            <div className={`flex flex-col gap-2 ${activeSource !== 'UPLOAD' ? 'hidden' : ''}`}>
               <p className="text-[10px] font-extrabold text-slate-400 px-3 uppercase tracking-wider">我的分类</p>
               {categoryTreeError ? (
                 <div className="px-3 py-2 text-[10px] text-red-500 font-medium">
@@ -935,9 +987,27 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
               </div>
             )}
 
+            {activeSource === 'MODEL' && (
+              <div className="flex flex-col gap-2">
+                <p className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  模特库
+                </p>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-left text-xs font-bold text-blue-600"
+                >
+                  <span className="material-symbols-outlined text-base">face_3</span>
+                  <span>全部可用模特</span>
+                </button>
+                <p className="px-3 pt-2 text-[10px] leading-5 text-slate-400">
+                  展示已发布的模特档案。选择后会作为标准图片资源用于当前任务。
+                </p>
+              </div>
+            )}
+
             {/* Storage Progress Meter in bottom of navigation */}
             <div className={`mt-auto p-4 bg-blue-50/50 rounded-xl border border-blue-100 ${
-              activeSource === 'PRODUCT' ? 'hidden' : ''
+              activeSource !== 'UPLOAD' ? 'hidden' : ''
             }`}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">存储空间</span>
@@ -971,11 +1041,38 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                     <span className="material-symbols-outlined text-sm">scan</span>
                     <span>目录扫描</span>
                   </button>
+                  {targetSlot === 'reference-model' && onCreateModel && (
+                    <button
+                      type="button"
+                      onClick={onCreateModel}
+                      className="flex items-center gap-2 border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100"
+                    >
+                      <span className="material-symbols-outlined text-sm">person_add</span>
+                      <span>新建 AI 模特</span>
+                    </button>
+                  )}
                 </div>
-              ) : (
+              ) : activeSource === 'PRODUCT' ? (
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
                   <span className="material-symbols-outlined text-base text-blue-500">auto_awesome</span>
                   <span>商品任务生成素材</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                    <span className="material-symbols-outlined text-base text-blue-500">face_3</span>
+                    <span>已发布模特资源</span>
+                  </div>
+                  {onCreateModel && (
+                    <button
+                      type="button"
+                      onClick={onCreateModel}
+                      className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100"
+                    >
+                      <span className="material-symbols-outlined text-sm">person_add</span>
+                      <span>新建 AI 模特</span>
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -985,7 +1082,13 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
                   <input 
                     type="text" 
-                    placeholder={activeSource === 'PRODUCT' ? '搜索商品、任务或素材' : '搜索资源文件名'}
+                    placeholder={
+                      activeSource === 'PRODUCT'
+                        ? '搜索商品、任务或素材'
+                        : activeSource === 'MODEL'
+                          ? '搜索模特名称或标签'
+                          : '搜索资源文件名'
+                    }
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
@@ -993,7 +1096,11 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                 </div>
                 <div className="flex gap-2">
                   <span className="text-[10px] font-bold text-slate-400 self-center">
-                    {activeSource === 'PRODUCT' ? '商品素材' : '左侧选择分类'}
+                    {activeSource === 'PRODUCT'
+                      ? '商品素材'
+                      : activeSource === 'MODEL'
+                        ? '模特资源'
+                        : '左侧选择分类'}
                   </span>
                 </div>
               </div>

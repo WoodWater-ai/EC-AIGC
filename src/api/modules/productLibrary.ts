@@ -70,6 +70,7 @@ export interface ProductLibraryAsset {
   status: ProductLibraryDisplayStatus;
   rawStatus?: string;
   rejectReason?: string;
+  optimizationNote?: string;
   promptVersion?: string;
   createTime?: string;
 }

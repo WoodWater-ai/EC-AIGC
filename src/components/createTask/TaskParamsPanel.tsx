@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useTaskParams, type PrefillState } from './useTaskParams';
 import { ParamSchemaForm } from '../common/ParamSchemaForm';
 import { assembleTaskPrompt, applyAiOptimize } from './assembleTaskPrompt';
@@ -12,6 +12,15 @@ export interface TaskParamsPanelProps {
   prompt: string; onPromptChange: (v: string) => void;
   negativePrompt: string; onNegativePromptChange: (v: string) => void;
   onParamsChange: (p: { channelId: string | null; channelType: string | null; capability: string | null; modelId: string | null; schemaParams: Record<string, any> }) => void;
+  fixedChannelType?: string;
+  fixedCapability?: string;
+  showAspectRatio?: boolean;
+  showPromptEditor?: boolean;
+  showNegativePrompt?: boolean;
+  showModelSelector?: boolean;
+  showCount?: boolean;
+  showCapabilitySummary?: boolean;
+  presentation?: 'default' | 'videoDemo';
 }
 
 const RATIOS = ['1:1', '3:4', '4:5', '9:16', '16:9'];
@@ -21,9 +30,54 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
     group, prefill, unified,
     aspectRatio, count, onAspectRatioChange, onCountChange,
     prompt, onPromptChange, negativePrompt, onNegativePromptChange, onParamsChange,
+    fixedChannelType,
+    fixedCapability,
+    showAspectRatio = true,
+    showPromptEditor = true,
+    showNegativePrompt = true,
+    showModelSelector = true,
+    showCount = true,
+    showCapabilitySummary = true,
+    presentation = 'default',
   } = props;
 
   const tp = useTaskParams(group, prefill);
+
+  // 视频工作台使用业务模式固定供应商能力，避免页面模式与实际 capability 脱节。
+  useEffect(() => {
+    if (!fixedChannelType || tp.channelType === fixedChannelType) return;
+    const instance = tp.instances.find((item) => item.channelType === fixedChannelType);
+    if (instance) tp.setChannelId(instance.id);
+  }, [fixedChannelType, tp.channelType, tp.instances, tp.setChannelId]);
+
+  useEffect(() => {
+    if (!fixedCapability || !tp.channelType || tp.capability === fixedCapability) return;
+    if (tp.capabilitiesInChannel.some((item) => item.code === fixedCapability)) {
+      tp.setCapability(fixedCapability);
+    }
+  }, [
+    fixedCapability,
+    tp.channelType,
+    tp.capability,
+    tp.capabilitiesInChannel,
+    tp.setCapability,
+  ]);
+
+  const visibleInstances = fixedChannelType
+    ? tp.instances.filter((item) => item.channelType === fixedChannelType)
+    : tp.instances;
+  const basicSchema = useMemo(() => tp.schema ? ({
+    ...tp.schema,
+    fields: [...(tp.schema.fields ?? [])]
+      .filter((field) => field.uiGroup !== 'ADVANCED')
+      .sort((left, right) => (left.uiOrder ?? 0) - (right.uiOrder ?? 0)),
+  }) : null, [tp.schema]);
+  const advancedSchema = useMemo(() => tp.schema ? ({
+    ...tp.schema,
+    fields: [...(tp.schema.fields ?? [])]
+      .filter((field) => field.uiGroup === 'ADVANCED')
+      .sort((left, right) => (left.uiOrder ?? 0) - (right.uiOrder ?? 0)),
+  }) : null, [tp.schema]);
 
   // 选择/参数变化回传页面
   useEffect(() => {
@@ -31,10 +85,10 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
       channelId: tp.channelId,
       channelType: tp.channelType,
       capability: tp.capability,
-      modelId: tp.modelId,
+      modelId: tp.effectiveModelCode,
       schemaParams: tp.schemaParams,
     });
-  }, [tp.channelId, tp.channelType, tp.capability, tp.modelId, tp.schemaParams, onParamsChange]);
+  }, [tp.channelId, tp.channelType, tp.capability, tp.effectiveModelCode, tp.schemaParams, onParamsChange]);
 
   // [2026-07-16 P0 修复] 用户编辑优先 —— 不再用 useEffect 自动重算 prompt
   // 修复前:用户在 Prompt 编辑器改了字,unified/schameParams 一变就被 assembleTaskPrompt 覆盖
@@ -54,36 +108,54 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
   };
 
   return (
-    <div className="p-5 space-y-5">
-      <h2 className="text-sm lg:text-base font-bold text-slate-800">任务参数</h2>
+    <div className={presentation === 'videoDemo' ? 'space-y-4' : 'p-5 space-y-5'}>
+      {presentation === 'default' && (
+        <h2 className="text-sm lg:text-base font-bold text-slate-800">任务参数</h2>
+      )}
 
       {/* ① 三级选择器 */}
       <div className="space-y-3">
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">通道实例{tp.locked && ' 🔒'}</label>
-          <div className="flex flex-wrap gap-2">
-            {tp.instances.map((inst) => (
-              <button
-                key={inst.id}
-                type="button"
-                disabled={tp.locked}
-                onClick={() => tp.setChannelId(inst.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1.5 ${
-                  tp.channelId === inst.id
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : tp.locked
-                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                      : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400'
-                }`}
-              >
-                {inst.channelName}
-                <span className="text-[9px] px-1 rounded bg-slate-200 text-slate-700">{inst.channelType}</span>
-              </button>
-            ))}
-          </div>
+          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+            {presentation === 'videoDemo' ? '模型通道' : '通道实例'}
+            {tp.locked && ' 🔒'}
+          </label>
+          {presentation === 'videoDemo' ? (
+            <select
+              value={tp.channelId ?? ''}
+              disabled={tp.locked}
+              onChange={(event) => tp.setChannelId(event.target.value)}
+              className="h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-800 outline-none focus:border-primary"
+            >
+              {visibleInstances.map((inst) => (
+                <option key={inst.id} value={inst.id}>{inst.channelName}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {visibleInstances.map((inst) => (
+                <button
+                  key={inst.id}
+                  type="button"
+                  disabled={tp.locked}
+                  onClick={() => tp.setChannelId(inst.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1.5 ${
+                    tp.channelId === inst.id
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : tp.locked
+                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400'
+                  }`}
+                >
+                  {inst.channelName}
+                  <span className="text-[9px] px-1 rounded bg-slate-200 text-slate-700">{inst.channelType}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {tp.channelType && (
+        {tp.channelType && !fixedCapability && (
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">能力{tp.locked && ' 🔒'}</label>
             <div className="flex flex-wrap gap-2">
@@ -112,7 +184,17 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
           </div>
         )}
 
-        {tp.capability && (
+        {tp.channelType && fixedCapability && showCapabilitySummary && (
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">生成能力</label>
+            <div className="px-3 py-2 rounded-md border border-blue-200 bg-blue-50 text-xs font-bold text-blue-700">
+              {tp.capabilitiesInChannel.find((item) => item.code === fixedCapability)?.label
+                ?? fixedCapability}
+            </div>
+          </div>
+        )}
+
+        {tp.capability && showModelSelector && (
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">模型</label>
             <select
@@ -134,8 +216,8 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
       </div>
 
       {/* ② 固定通用:比例 & 张数 */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
+      <div className={showAspectRatio ? 'grid grid-cols-2 gap-4' : ''}>
+        {showAspectRatio && <div>
           <label className="block text-xs font-bold text-slate-700 mb-1.5">比例</label>
           <div className="flex flex-wrap gap-1.5">
             {RATIOS.map((r) => (
@@ -143,30 +225,58 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
                 className={`px-2.5 py-1 text-xs rounded border ${aspectRatio === r ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-200'}`}>{r}</button>
             ))}
           </div>
-        </div>
-        <div>
+        </div>}
+        {showCount && <div>
           <label className="block text-xs font-bold text-slate-700 mb-1.5">张数</label>
           <input type="number" min={1} max={8} value={count}
             onChange={(e) => onCountChange(Number(e.target.value))}
             className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md" />
-        </div>
+        </div>}
       </div>
 
       {/* ③ schema 差异区 */}
       {tp.schema && (
-        <div>
+        <div className={presentation === 'videoDemo'
+          ? '[&_.param-schema-form]:grid [&_.param-schema-form]:grid-cols-2 [&_.param-schema-form]:gap-x-3 [&_.param-schema-form]:gap-y-3 [&_.param-field]:min-w-0 [&_.param-field_label]:mb-1.5 [&_.param-field_label]:block [&_.param-field_label]:text-xs [&_.param-field_label]:font-bold [&_.param-field_label]:text-slate-700'
+          : ''}>
           <label className="block text-xs font-bold text-slate-700 mb-2">能力参数</label>
-          <ParamSchemaForm
-            schema={tp.schema}
-            value={tp.schemaParams}
-            onChange={tp.setSchemaParams}
-            recommendValues={tp.recommendValues}
-          />
+          {presentation === 'videoDemo' && basicSchema ? (
+            <>
+              <ParamSchemaForm
+                schema={basicSchema}
+                value={tp.schemaParams}
+                onChange={tp.setSchemaParams}
+                recommendValues={tp.recommendValues}
+              />
+              {advancedSchema && advancedSchema.fields.length > 0 && (
+                <details className="col-span-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <summary className="cursor-pointer text-xs font-bold text-slate-700">
+                    高级参数
+                  </summary>
+                  <div className="mt-3">
+                    <ParamSchemaForm
+                      schema={advancedSchema}
+                      value={tp.schemaParams}
+                      onChange={tp.setSchemaParams}
+                      recommendValues={tp.recommendValues}
+                    />
+                  </div>
+                </details>
+              )}
+            </>
+          ) : (
+            <ParamSchemaForm
+              schema={tp.schema}
+              value={tp.schemaParams}
+              onChange={tp.setSchemaParams}
+              recommendValues={tp.recommendValues}
+            />
+          )}
         </div>
       )}
 
       {/* ④ Prompt 编辑器 */}
-      <div>
+      {showPromptEditor && <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-xs font-bold text-slate-700">Prompt 编辑器</label>
           <div className="flex gap-1.5">
@@ -185,14 +295,14 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
         <textarea rows={5} value={prompt} onChange={(e) => onPromptChange(e.target.value)}
           placeholder="支持手写 Prompt;点击「按表单重算」会用商品信息/能力参数自动组装,「AI 建议」会对当前 prompt 包装优化"
           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md" />
-      </div>
+      </div>}
 
       {/* 负面词 */}
-      <div>
+      {showNegativePrompt && <div>
         <label className="block text-xs font-bold text-slate-700 mb-1.5">负面约束</label>
         <textarea rows={2} value={negativePrompt} onChange={(e) => onNegativePromptChange(e.target.value)}
           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md" />
-      </div>
+      </div>}
     </div>
   );
 };

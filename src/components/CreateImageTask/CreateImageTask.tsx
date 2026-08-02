@@ -1,5 +1,5 @@
 // src/components/CreateImageTask/CreateImageTask.tsx
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AppScreen } from '../../types';
 import type { ProductAsset } from '../../types';
@@ -32,14 +32,22 @@ import { useCreateImageTaskState } from '../../hooks/useCreateImageTaskState';
 import { useDictOptions } from '../../api/hooks/useDict';
 import { REFERENCE_SLOTS_INTERNAL } from '../../lib/createImageTask/referencesConfig';
 import { withCosThumbnail } from '../../utils/cosImage';
+import { creationTemplateApi } from '../../api/modules/creationTemplate';
+import { useServiceQuery } from '../../api/hooks/useServiceQuery';
+import type { PrefillState } from '../createTask/useTaskParams';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
   onAddTask: (info: { groupId: string; taskIds: string[]; taskKind?: 'IMAGE' | 'VIDEO' }) => void;
-  setScreen: (screen: AppScreen, payload?: { highlightGroupId?: string }) => void;
+  setScreen: (
+    screen: AppScreen,
+    payload?: { highlightGroupId?: string; creationTemplateId?: string },
+  ) => void;
   openTransit: () => void;
+  onCreateModel?: () => void;
   selectedProduct: ProductAsset;
   setSelectedProduct: (product: ProductAsset) => void;
+  creationTemplateId?: string | null;
 }
 
 /**
@@ -49,17 +57,61 @@ interface CreateImageTaskProps {
  */
 type PendingSlot = 'main' | ReferenceSlot | null;
 
+const IMAGE_TYPE_PREFILL_MAP: Record<string, ImageGenerationType> = {
+  PRODUCT_MAIN: 'product_main',
+  SCENE_DETAIL: 'scene_detail',
+  DETAIL_SCENE: 'scene_detail',
+  DETAIL_CLOSEUP: 'detail_closeup',
+  DETAIL: 'detail_closeup',
+  MODEL_TRIPLE_VIEW: 'model_triple_view',
+  ON_MODEL: 'model_triple_view',
+};
+
+const renderReusablePrompt = (prompt: string, facts: ProductFactsInput) => {
+  const values: Record<string, string> = {
+    name: facts.name,
+    productName: facts.name,
+    sellingPoints: facts.sellingPoints ?? '',
+    productCategory: facts.productCategory ?? '',
+    category: facts.productCategory ?? '',
+    color: facts.colorPattern,
+    colorPattern: facts.colorPattern,
+    fabricTexture: facts.fabricTexture ?? '',
+    fitStructure: facts.fitStructure ?? '',
+  };
+  return prompt.replace(/\{\{([^}]+)}}/g, (match, key: string) =>
+    values[key] || match);
+};
+
 export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
-  const { selectedProduct, setScreen, onAddTask } = props;
+  const { selectedProduct, setScreen, onAddTask, creationTemplateId } = props;
+  const creationPrefillQuery = useServiceQuery(
+    () => creationTemplateId
+      ? creationTemplateApi.reuseContext(creationTemplateId)
+      : Promise.resolve(null),
+    [creationTemplateId],
+  );
+  const creationPrefill = creationPrefillQuery.data;
+  const imageParamsPrefill = useMemo<PrefillState | null>(() => {
+    if (!creationPrefill || creationPrefill.mediaType !== 'IMAGE') return null;
+    const snapshot = creationPrefill.snapshot;
+    return {
+      channelType: snapshot.channelType ?? null,
+      capability: snapshot.capability ?? null,
+      model: snapshot.modelCode ?? null,
+      schemaParams: snapshot.schemaParams,
+      lockExecution: false,
+    };
+  }, [creationPrefill]);
 
   // ---- local form state ----
   const [productFacts, setProductFacts] = useState<ProductFactsInput>({
-    name: selectedProduct.name,
-    sellingPoints: selectedProduct.specs.sellingPoints.join('，'),
-    productCategory: selectedProduct.category,
-    colorPattern: selectedProduct.specs.color[0] || '米白色',
-    fabricTexture: selectedProduct.specs.material || '细腻针织纹理',
-    fitStructure: '修身版型',
+    name: creationTemplateId ? '' : selectedProduct.name,
+    sellingPoints: creationTemplateId ? '' : selectedProduct.specs.sellingPoints.join('，'),
+    productCategory: creationTemplateId ? '' : selectedProduct.category,
+    colorPattern: creationTemplateId ? '' : selectedProduct.specs.color[0] || '米白色',
+    fabricTexture: creationTemplateId ? '' : selectedProduct.specs.material || '细腻针织纹理',
+    fitStructure: creationTemplateId ? '' : '修身版型',
   });
   const [mainValue, setMainValue] = useState<{
     /** asset_resource.id(后端 aiAnalyze + 提交 assetId 用)—— 雪花 ID 必须 string 避免 JS 精度丢失 */
@@ -132,8 +184,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     // ParamSchemaForm 收集的能力参数整体透传给 hook,直接作为 taskParamsJson 提交;
     // 后端 ChannelParamBinder 按 ViduCapabilities schema 字段名映射到 Vidu body。
     schemaParams: paramsSnapshot.schemaParams,
+    sourceCreationTemplateId: creationPrefill?.templateId ?? null,
+    sourceCreationTemplateVersionId: creationPrefill?.versionId ?? null,
     executionParamsReady: paramsSnapshot.executionParamsReady,
-    templateName: '默认模板',
+    templateName: creationPrefill?.templateName ?? '默认模板',
     toSubmit: async () => '',
     onAddTask,
     setScreen,
@@ -151,6 +205,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     prompts, promptsComplete,
     isSupported, totalCount,
     toggleType, changeTypeCount, requestTemplateChange, applyTemplate,
+    setTemplate,
     setStyle, setScene, setPose, setNegativePrompt,
     updateProductFact, setFormFactsExternal,
     setPromptOverride, runAssistantAnalysis,
@@ -158,6 +213,90 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     setReviewEnabled,
     selectReference, updateReferenceOrder, checkAndGenerate, submitTasks,
   } = state;
+  const appliedCreationTemplateRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!creationPrefill || creationPrefill.mediaType !== 'IMAGE') return;
+    if (appliedCreationTemplateRef.current === creationPrefill.templateId) return;
+    const snapshot = creationPrefill.snapshot;
+    appliedCreationTemplateRef.current = creationPrefill.templateId;
+
+    // 做同款只恢复可复用创作信息，明确清空商品、商品事实和主体素材。
+    const emptyFacts: ProductFactsInput = {
+      name: '',
+      sellingPoints: '',
+      productCategory: '',
+      colorPattern: '',
+      fabricTexture: '',
+      fitStructure: '',
+    };
+    setSelectedFromLibrary(null);
+    setMainValue(null);
+    setTemplate(creationPrefill.templateName);
+    setProductFacts(emptyFacts);
+    setFormFactsExternal(emptyFacts);
+    if (snapshot.style) setStyle(snapshot.style);
+    if (snapshot.scene) setScene(snapshot.scene);
+    if (snapshot.pose) setPose(snapshot.pose);
+    if (snapshot.negativePrompt) setNegativePrompt(snapshot.negativePrompt);
+
+    const targetType = snapshot.imageType
+      ? IMAGE_TYPE_PREFILL_MAP[snapshot.imageType]
+      : undefined;
+    if (targetType) {
+      selectedTypes.filter((type) => type !== targetType).forEach(toggleType);
+      if (!selectedTypes.includes(targetType)) toggleType(targetType);
+      const currentCount = typeCounts[targetType] ?? 1;
+      const targetCount = Math.max(1, Math.min(5, snapshot.count ?? 1));
+      for (let index = currentCount; index < targetCount; index += 1) {
+        changeTypeCount(targetType, 1);
+      }
+      for (let index = currentCount; index > targetCount; index -= 1) {
+        changeTypeCount(targetType, -1);
+      }
+      if (snapshot.prompt) setPromptOverride(targetType, snapshot.prompt);
+    }
+
+    const referenceSlotMap: Record<string, ReferenceSlot> = {
+      REFERENCE_DETAIL: 'detail',
+      REFERENCE_STYLE: 'style',
+      REFERENCE_SCENE: 'scene',
+      REFERENCE_POSE: 'pose',
+      REFERENCE_MODEL: 'model',
+      DETAIL_REF: 'detail',
+      STYLE_REF: 'style',
+      SCENE_REF: 'scene',
+      POSE_REF: 'pose',
+      MODEL_REF: 'model',
+    };
+    snapshot.references?.forEach((reference) => {
+      const slot = referenceSlotMap[reference.role];
+      if (!slot || !reference.assetId || !reference.url) return;
+      selectReference(slot, {
+        slot,
+        id: reference.assetId,
+        fileResourceId: reference.assetId,
+        originalUrl: reference.url,
+        thumbnailUrl: reference.thumbnailUrl,
+        name: reference.name,
+      });
+    });
+    toast.success(`已应用模板：${creationPrefill.templateName}，请重新选择商品和主体素材`);
+  }, [
+    changeTypeCount,
+    creationPrefill,
+    selectedTypes,
+    selectReference,
+    setFormFactsExternal,
+    setNegativePrompt,
+    setPose,
+    setPromptOverride,
+    setScene,
+    setStyle,
+    setTemplate,
+    toggleType,
+    typeCounts,
+  ]);
 
   // 字典加载完成后,若 hook 内 style/scene/pose 仍是空串(初始化时字典尚未回来),
   // 自动选 options[0] 的中文 label (itemName),让 select 不再停留在"暂无数据"占位态
@@ -233,6 +372,14 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       setProductFacts(nextFacts);
       // 关键:也回写到 hook 的 formInput,触发 `prompts` useMemo 重算 → 4 类型 Prompt 自动重写
       setFormFactsExternal(nextFacts);
+      const reusablePrompt = creationPrefill?.snapshot.prompt;
+      const sourceImageType = creationPrefill?.snapshot.imageType;
+      const targetType = sourceImageType
+        ? IMAGE_TYPE_PREFILL_MAP[sourceImageType]
+        : undefined;
+      if (reusablePrompt && targetType) {
+        setPromptOverride(targetType, renderReusablePrompt(reusablePrompt, nextFacts));
+      }
       // 主图:imageUrl(ossKey) → withCosThumbnail(256) 拼 COS thumbnail,
       // 与 handleTransitConfirm 的主图分支保持一致缩放规则。
       const compressedThumb = withCosThumbnail(product.imageUrl, 256) ?? product.imageUrl;
@@ -246,7 +393,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       });
       toast.success(`已选择产品:${product.name}`);
     },
-    [setFormFactsExternal],
+    [creationPrefill, setFormFactsExternal, setPromptOverride],
   );
 
   const handleClearProduct = useCallback(() => {
@@ -414,7 +561,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         }
         right={
           <>
-            <ImageSettingsSection onParamsChange={setParamsSnapshot} />
+            <ImageSettingsSection
+              prefill={imageParamsPrefill}
+              onParamsChange={setParamsSnapshot}
+            />
             <ReviewStrategyPanel
               reviewEnabled={reviewEnabled}
               onChange={setReviewEnabled}
@@ -428,9 +578,16 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       {isTransitOpen && (
         <AssetTransitModal
           mode="picker"
-          targetSlot={pendingSlot ?? 'main'}
+          targetSlot={pendingSlot === 'model' ? 'reference-model' : pendingSlot ?? 'main'}
           purpose="OTHER"
           assetKind="IMAGE"
+          initialSource={pendingSlot === 'model' ? 'MODEL' : 'UPLOAD'}
+          onCreateModel={pendingSlot === 'model'
+            ? () => {
+                setPendingSlot(null);
+                props.onCreateModel?.();
+              }
+            : undefined}
           onClose={handleTransitClose}
           onConfirmSelection={handleTransitConfirm}
         />

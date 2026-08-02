@@ -30,7 +30,10 @@ export function NumberField({
         placeholder={field.placeholder}
         status={error ? 'error' : ''}
         disabled={readOnly}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          const raw = e.target.value;
+          onChange(raw === '' ? undefined : Number(raw));
+        }}
         className={isRecommended ? 'input-recommend' : ''}
       />
       {field.helpText && <div className="help">{field.helpText}</div>}

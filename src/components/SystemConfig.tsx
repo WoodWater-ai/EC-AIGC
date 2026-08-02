@@ -3,6 +3,7 @@ import { SystemUser } from '../types';
 import { channelApi } from '../api/modules/channel';
 import {
   type ModelChannelDTO,
+  type ModelChannelQueryRequest,
   type ModelChannelAddRequest,
   type ModelChannelUpdateRequest,
   type ChannelType,

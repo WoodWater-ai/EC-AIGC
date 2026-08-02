@@ -13,6 +13,8 @@ import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { withCosThumbnail } from '../utils/cosImage';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { toast } from 'sonner';
+import { creationTemplateApi } from '../api/modules/creationTemplate';
+import { PublishTemplateDialog } from './common/PublishTemplateDialog';
 
 interface TaskDetailsDrawerProps {
   group: TaskGroupResponse;
@@ -25,6 +27,12 @@ type DetailTab = 'overview' | 'results' | 'inputs' | 'diagnostics';
 
 interface ReviewTarget {
   result: TaskResultPreviewResponse;
+}
+
+interface TemplatePublishTarget {
+  result: TaskResultPreviewResponse;
+  taskId: string;
+  defaultName: string;
 }
 
 const STATUS_META: Record<TaskStatus, { label: string; style: string }> = {
@@ -106,6 +114,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   const [imagePreview, setImagePreview] = useState<{ results: TaskResultPreviewResponse[]; index: number } | null>(null);
   const [videoPreview, setVideoPreview] = useState<TaskResultPreviewResponse | null>(null);
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
+  const [templatePublishTarget, setTemplatePublishTarget] = useState<TemplatePublishTarget | null>(null);
   const [loading, setLoading] = useState(false);
 
   const selectedTask = group.tasks.find((task) => task.id === selectedTaskId)
@@ -225,6 +234,21 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                   onPreviewImages={(results, index) => setImagePreview({ results, index })}
                   onPreviewVideo={setVideoPreview}
                   onReview={(result) => setReviewTarget({ result })}
+                  onPublishTemplate={(result) => setTemplatePublishTarget({
+                    result,
+                    taskId: selectedTask.id,
+                    defaultName: `${taskLabel(selectedTask)}模板`,
+                  })}
+                  onOfflineTemplate={async (result) => {
+                    if (!result.creationTemplateId) return;
+                    try {
+                      await creationTemplateApi.offline(result.creationTemplateId);
+                      toast.success('模板已下架');
+                      await refreshGroup();
+                    } catch {
+                      // 统一请求层展示具体错误。
+                    }
+                  }}
                 />
               )}
               {activeTab === 'inputs' && <InputsTab group={group} task={selectedTask} />}
@@ -270,6 +294,23 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
           }}
         />
       )}
+      <PublishTemplateDialog
+        open={templatePublishTarget !== null}
+        defaultName={templatePublishTarget?.defaultName ?? '我的创作模板'}
+        onClose={() => setTemplatePublishTarget(null)}
+        onConfirm={async (templateName) => {
+          if (!templatePublishTarget) return;
+          await creationTemplateApi.publishFromResult({
+            taskId: templatePublishTarget.taskId,
+            resultId: templatePublishTarget.result.id,
+            mediaType: templatePublishTarget.result.mediaType,
+            templateName,
+          });
+          toast.success('已设为模板并发布到模板营地');
+          setTemplatePublishTarget(null);
+          await refreshGroup();
+        }}
+      />
     </div>
   );
 };
@@ -342,7 +383,16 @@ const ResultsTab: React.FC<{
   onPreviewImages: (results: TaskResultPreviewResponse[], index: number) => void;
   onPreviewVideo: (result: TaskResultPreviewResponse) => void;
   onReview: (result: TaskResultPreviewResponse) => void;
-}> = ({ task, onPreviewImages, onPreviewVideo, onReview }) => {
+  onPublishTemplate: (result: TaskResultPreviewResponse) => void;
+  onOfflineTemplate: (result: TaskResultPreviewResponse) => Promise<void>;
+}> = ({
+  task,
+  onPreviewImages,
+  onPreviewVideo,
+  onReview,
+  onPublishTemplate,
+  onOfflineTemplate,
+}) => {
   const imageResults = task.resultPreviews.filter((result) => result.mediaType === 'IMAGE');
   if (task.resultPreviews.length === 0) {
     return (
@@ -373,31 +423,53 @@ const ResultsTab: React.FC<{
                 <span className="material-symbols-outlined absolute text-5xl text-white drop-shadow-lg">play_circle</span>
               )}
             </button>
-            <div className="flex items-center justify-between p-3">
-              <div>
-                <b className="text-xs text-slate-800">产物 #{index + 1}</b>
-                <p className="mt-1 text-[10px] text-slate-400">
-                  {result.mediaType} · batch {result.batchIdx ?? index}
-                  {result.score != null ? ` · ${result.score} 分` : ''}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">
+            <div className="p-3">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <b className="block truncate text-xs text-slate-800">产物 #{index + 1}</b>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] leading-4 text-slate-400">
+                    <span className="whitespace-nowrap">
+                      {result.mediaType === 'IMAGE' ? '图片' : '视频'}
+                    </span>
+                    <span className="whitespace-nowrap">批次 {result.batchIdx ?? index}</span>
+                    {result.score != null && (
+                      <span className="whitespace-nowrap">{result.score} 分</span>
+                    )}
+                  </div>
+                </div>
+                <span className="shrink-0 whitespace-nowrap rounded bg-slate-100 px-2 py-1 text-[10px] font-bold leading-4 text-slate-600">
                   {resultStatusLabel(result.status)}
                 </span>
-                {result.mediaType === 'IMAGE'
-                  && result.score == null && (
+              </div>
+              <div className="mt-3 flex min-h-8 flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                {result.score == null && (
                     <button
                       onClick={() => onReview(result)}
-                      className="h-8 rounded bg-primary px-3 text-[11px] font-bold text-white"
+                      className="h-8 shrink-0 whitespace-nowrap rounded bg-primary px-3 text-[11px] font-bold text-white"
                     >
                       评分与审核
                     </button>
                 )}
+                {result.templateStatus === 'PUBLISHED' ? (
+                  <button
+                    onClick={() => void onOfflineTemplate(result)}
+                    className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-[#dfc6a4] bg-[#fff8ec] px-3 text-[11px] font-bold text-[#93652d] hover:bg-[#fff0d8]"
+                  >
+                    <span className="material-symbols-outlined text-sm">archive</span>
+                    下架模板
+                  </button>
+                ) : result.status !== 'REJECTED' && (
+                  <button
+                    onClick={() => onPublishTemplate(result)}
+                    className="h-8 shrink-0 whitespace-nowrap rounded border border-slate-200 px-3 text-[11px] font-bold text-slate-700 hover:border-primary hover:text-primary"
+                  >
+                    设为模板
+                  </button>
+                )}
               </div>
             </div>
             {result.rejectReason && (
-              <p className="border-t border-red-100 bg-red-50 px-3 py-2 text-[11px] leading-5 text-red-700">
+              <p className="break-words border-t border-red-100 bg-red-50 px-3 py-2 text-[11px] leading-5 text-red-700">
                 打回原因：{result.rejectReason}
               </p>
             )}
@@ -409,11 +481,19 @@ const ResultsTab: React.FC<{
 };
 
 const InputsTab: React.FC<{ group: TaskGroupResponse; task: TaskGroupItemResponse }> = ({ group, task }) => {
+  const inputVideos = task.inputVideos ?? [];
   const inputUrls = useMemo(() => {
-    const urls = [...(task.inputImages ?? [])];
-    task.inputImageUrls?.split(',').map((url) => url.trim()).filter(Boolean).forEach((url) => {
-      if (!urls.includes(url)) urls.push(url);
-    });
+    const structuredImages = (task.inputImages ?? []).filter(
+      (url) => !/\.(mp4|mov|webm|avi)(?:$|[?#])/i.test(url),
+    );
+    const urls = structuredImages.length > 0 ? [...structuredImages] : [];
+    if (urls.length === 0) {
+      task.inputImageUrls?.split(',').map((url) => url.trim()).filter(Boolean).forEach((url) => {
+        if (!/\.(mp4|mov|webm|avi)(?:$|[?#])/i.test(url) && !urls.includes(url)) {
+          urls.push(url);
+        }
+      });
+    }
     if (group.productImage && !urls.includes(group.productImage)) urls.unshift(group.productImage);
     return urls;
   }, [group.productImage, task.inputImages, task.inputImageUrls]);
@@ -426,8 +506,24 @@ const InputsTab: React.FC<{ group: TaskGroupResponse; task: TaskGroupItemRespons
     <div className="space-y-5">
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <h3 className="text-sm font-black text-slate-800">输入素材</h3>
-        {inputUrls.length > 0 ? (
+        {inputVideos.length > 0 || inputUrls.length > 0 ? (
           <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {inputVideos.map((url, index) => (
+              <div
+                key={`video-${url}-${index}`}
+                className="relative flex aspect-square w-full min-w-0 items-center justify-center overflow-hidden rounded-lg bg-black"
+              >
+                <video
+                  src={url}
+                  controls
+                  preload="metadata"
+                  className="h-full w-full object-contain"
+                />
+                <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/65 px-2 py-1 text-[10px] font-bold text-white">
+                  复刻原视频
+                </span>
+              </div>
+            ))}
             {inputUrls.map((url, index) => (
               <div
                 key={`${url}-${index}`}
@@ -645,7 +741,9 @@ const ReviewDialog: React.FC<{
       <section className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
         <header className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <p className="text-[11px] font-bold text-primary">图片单件评分与审核</p>
+            <p className="text-[11px] font-bold text-primary">
+              {target.mediaType === 'VIDEO' ? '视频' : '图片'}单件评分与审核
+            </p>
             <h2 className="mt-1 text-lg font-black text-slate-900">产物 #{target.batchIdx ?? target.id}</h2>
           </div>
           <button onClick={onClose} className="material-symbols-outlined text-slate-400" aria-label="关闭审核">
@@ -655,12 +753,22 @@ const ReviewDialog: React.FC<{
 
         <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="flex min-h-72 items-center justify-center overflow-hidden bg-slate-100 p-4">
-            <img
-              src={withCosThumbnail(target.url, 960)}
-              alt="待审核产物"
-              className="max-h-[65vh] max-w-full object-contain"
-              referrerPolicy="no-referrer"
-            />
+            {target.mediaType === 'VIDEO' ? (
+              <video
+                src={target.url}
+                poster={withCosThumbnail(target.thumbnailUrl ?? undefined, 960)}
+                controls
+                preload="metadata"
+                className="max-h-[65vh] max-w-full bg-black object-contain"
+              />
+            ) : (
+              <img
+                src={withCosThumbnail(target.url, 960)}
+                alt="待审核图片产物"
+                className="max-h-[65vh] max-w-full object-contain"
+                referrerPolicy="no-referrer"
+              />
+            )}
           </div>
 
           <aside className="space-y-5 overflow-y-auto p-5">
