@@ -272,17 +272,10 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
             </form>
           </div>
 
-          {/* 测试账号提示（dev 环境） */}
+          {/* 账号获取提示 */}
           <div className="mt-5 px-4 py-2.5 rounded-lg bg-primary-light/50 border border-primary/10 text-center">
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              默认账号{' '}
-              <code className="px-1.5 py-0.5 rounded bg-white text-primary font-mono font-semibold">
-                请找相关管理人员获取
-              </code>
-              ，默认密码{' '}
-              <code className="px-1.5 py-0.5 rounded bg-white text-primary font-mono font-semibold">
-                请找相关管理人员获取
-              </code>
+              账号密码请联系系统管理员获取
             </p>
           </div>
 
