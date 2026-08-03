@@ -277,11 +277,11 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
             <p className="text-[11px] text-slate-600 leading-relaxed">
               默认账号{' '}
               <code className="px-1.5 py-0.5 rounded bg-white text-primary font-mono font-semibold">
-                admin
+                请找相关管理人员获取
               </code>
               ，默认密码{' '}
               <code className="px-1.5 py-0.5 rounded bg-white text-primary font-mono font-semibold">
-                123456
+                请找相关管理人员获取
               </code>
             </p>
           </div>
