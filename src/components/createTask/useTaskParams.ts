@@ -1,5 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useServiceQuery } from '../../api/hooks/useServiceQuery';
+import {
+  capabilityDefaultRouteApi,
+  type ExecutionRouteSource,
+  type TaskExecutionRoute,
+} from '../../api/modules/capabilityDefaultRoute';
 import {
   fetchCapabilitySchema,
   fetchSupportedCapabilities,
@@ -14,210 +19,340 @@ import type { ModelChannelDTO } from '../../types';
 import { useTemplateRecommend } from '../../api/hooks/useTemplateRecommend';
 import { useCapabilityMatrixStore } from '../../stores/capabilityMatrix';
 
+export type TaskParamSelectionSource = ExecutionRouteSource | 'NONE';
+
 export interface PrefillState {
   templateId?: string;
   templateVersionId?: string;
   group?: 'IMAGE' | 'VIDEO' | 'SOLUTION';
+  channelInstanceId?: string | null;
   channelType: string | null;
   capability: string | null;
   model: string | null;
   schemaParams?: Record<string, unknown>;
   lockExecution?: boolean;
+  resolved?: boolean;
+  source?: ExecutionRouteSource;
+  fallbackApplied?: boolean;
+  fallbackReason?: string | null;
+  unavailableReason?: string | null;
 }
 
 export function useTaskParams(
   group: 'IMAGE' | 'VIDEO' | 'SOLUTION',
   prefill?: PrefillState | null,
+  requiredCapability?: string,
+  prefillPending = false,
 ) {
   const [channelId, setChannelIdRaw] = useState<string | null>(null);
   const [capability, setCapabilityRaw] = useState<string | null>(null);
-  const [modelId, setModelId] = useState<string | null>(null);
-  const [schemaParams, setSchemaParams] = useState<Record<string, any>>({});
+  const [modelId, setModelIdRaw] = useState<string | null>(null);
+  const [schemaParams, setSchemaParamsRaw] = useState<Record<string, any>>({});
+  const [selectionSource, setSelectionSource] = useState<TaskParamSelectionSource>('NONE');
+  const [fallbackReason, setFallbackReason] = useState<string | null>(null);
+  const [unavailableReason, setUnavailableReason] = useState<string | null>(null);
+  const [initializing, setInitializing] = useState(true);
   const [lastSchema, setLastSchema] = useState<{
     identity: string;
     value: CapabilityDefinition;
   } | null>(null);
 
+  const manualRevisionRef = useRef(0);
+  const initKeyRef = useRef<string | null>(null);
+  const recommendAppliedKeyRef = useRef<string | null>(null);
   const locked = !!prefill && prefill.lockExecution !== false;
 
-  // step 1:按 group 拉可用通道实例(group 切时重拉)
   const { data: instancesRaw } = useServiceQuery<ModelChannelDTO[]>(
     () => channelApi.listAvailableByGroup(group),
     [group],
   );
 
-  // 矩阵兜底:用 matrix 给能力补 label/group/isAsync(group 过滤 + 中文显示)
-  const matrix = useCapabilityMatrixStore((s) => s.matrix);
-  const loadMatrix = useCapabilityMatrixStore((s) => s.loadOnce);
+  const matrix = useCapabilityMatrixStore((state) => state.matrix);
+  const loadMatrix = useCapabilityMatrixStore((state) => state.loadOnce);
   useEffect(() => { loadMatrix(); }, [loadMatrix]);
 
-  // 按 group 过滤:仅显示该 channelType 在 matrix 中有 ≥1 个 group=group 能力的实例
-  // 避免用户在 IMAGE 模式看到 Vidu(无 IMAGE 能力)、或在 SOLUTION 模式看到 QWEN(无 SOLUTION 能力)
   const instances = useMemo(() => {
     const list = instancesRaw ?? [];
-    if (!matrix) return list;  // 矩阵未加载,先返全,避免空(loading 态)
-    return list.filter((inst) => {
-      const channelCaps = matrix.channels.find((c) => c.channelType === inst.channelType)?.capabilities ?? [];
-      return channelCaps.some((cap) => cap.group === group);
+    if (!matrix) return list;
+    return list.filter((instance) => {
+      const channelCapabilities = matrix.channels
+        .find((item) => item.channelType === instance.channelType)?.capabilities ?? [];
+      return channelCapabilities.some((item) => item.group === group);
     });
   }, [instancesRaw, matrix, group]);
 
   const channelType = useMemo(() => {
     if (!channelId) return null;
-    const inst = instances.find((c) => String(c.id) === channelId);
-    return inst?.channelType ?? null;
+    return instances.find((item) => String(item.id) === channelId)?.channelType ?? null;
   }, [channelId, instances]);
 
+  const applyInitialRoute = useCallback((
+    route: TaskExecutionRoute,
+    initialSchemaParams?: Record<string, unknown>,
+  ) => {
+    setChannelIdRaw(route.channelInstanceId);
+    setCapabilityRaw(route.capabilityCode);
+    setModelIdRaw(route.modelCode);
+    setSchemaParamsRaw({ ...(initialSchemaParams ?? {}) });
+    setSelectionSource(route.source);
+    setFallbackReason(route.fallbackApplied ? route.fallbackReason : null);
+    setUnavailableReason(null);
+    setInitializing(false);
+  }, []);
+
   useEffect(() => {
-    if (prefill?.channelType && !channelId && instances.length > 0) {
-      const match = instances.find((c) => c.channelType === prefill.channelType);
-      if (match) setChannelIdRaw(String(match.id));
+    const targetCapability = prefill?.capability ?? requiredCapability;
+    if (prefillPending || !targetCapability) return;
+    const initKey = [
+      group,
+      targetCapability,
+      prefill?.templateId ?? '',
+      prefill?.templateVersionId ?? '',
+      prefill?.channelInstanceId ?? '',
+      prefill?.model ?? '',
+    ].join('|');
+    // 这里只记录“已完成”的 key。React StrictMode 会执行 setup -> cleanup -> setup，
+    // 如果在请求开始前就记录，第一次请求被取消后第二次会被误判为已初始化。
+    if (initKeyRef.current === initKey) return;
+    recommendAppliedKeyRef.current = null;
+    const revision = manualRevisionRef.current;
+    let cancelled = false;
+    setInitializing(true);
+    setUnavailableReason(null);
+
+    if (prefill?.resolved) {
+      if (prefill.unavailableReason || !prefill.channelInstanceId || !prefill.source) {
+        initKeyRef.current = initKey;
+        setChannelIdRaw(null);
+        setCapabilityRaw(targetCapability);
+        setModelIdRaw(null);
+        setSchemaParamsRaw({ ...(prefill.schemaParams ?? {}) });
+        setSelectionSource('NONE');
+        setFallbackReason(null);
+        setUnavailableReason(prefill.unavailableReason ?? '没有可用的默认执行路由');
+        setInitializing(false);
+        return;
+      }
+      initKeyRef.current = initKey;
+      applyInitialRoute({
+        capabilityCode: targetCapability,
+        channelInstanceId: prefill.channelInstanceId,
+        channelName: '',
+        channelType: prefill.channelType ?? '',
+        modelCode: prefill.model,
+        source: prefill.source,
+        fallbackApplied: prefill.fallbackApplied ?? false,
+        fallbackReason: prefill.fallbackReason ?? null,
+      }, prefill.schemaParams);
+      return;
     }
-  }, [prefill, instances, channelId]);
 
-  useEffect(() => {
-    if (prefill?.capability && !capability) setCapabilityRaw(prefill.capability);
-  }, [prefill, capability]);
+    capabilityDefaultRouteApi.resolve({
+      capabilityCode: targetCapability,
+      preferredChannelInstanceId: prefill?.channelInstanceId,
+      preferredChannelType: prefill?.channelType,
+      preferredModelCode: prefill?.model,
+    }).then((route) => {
+      if (cancelled || manualRevisionRef.current !== revision) return;
+      initKeyRef.current = initKey;
+      applyInitialRoute(route, prefill?.schemaParams);
+    }).catch((error: unknown) => {
+      if (cancelled || manualRevisionRef.current !== revision) return;
+      initKeyRef.current = initKey;
+      const message = error instanceof Error ? error.message : '没有可用的默认执行路由';
+      setChannelIdRaw(null);
+      setCapabilityRaw(targetCapability);
+      setModelIdRaw(null);
+      setSelectionSource('NONE');
+      setUnavailableReason(message);
+      setInitializing(false);
+    });
+    return () => { cancelled = true; };
+  }, [
+    applyInitialRoute,
+    group,
+    prefill,
+    prefillPending,
+    requiredCapability,
+  ]);
 
-  useEffect(() => {
-    if (prefill?.model && !modelId) setModelId(prefill.model);
-  }, [prefill, modelId]);
+  const markUserSelection = useCallback(() => {
+    manualRevisionRef.current += 1;
+    setSelectionSource('USER');
+    setFallbackReason(null);
+    setUnavailableReason(null);
+    setInitializing(false);
+  }, []);
 
-  useEffect(() => {
-    if (!prefill?.schemaParams) return;
-    setSchemaParams({ ...prefill.schemaParams });
-  }, [prefill]);
-
-  const setChannelId = (id: string | null) => {
+  const setChannelId = useCallback((id: string | null) => {
+    markUserSelection();
     setChannelIdRaw(id);
-    setCapabilityRaw(null);
-    setModelId(null);
-  };
+    setCapabilityRaw(requiredCapability ?? null);
+    setModelIdRaw(null);
+    setSchemaParamsRaw({});
+  }, [markUserSelection, requiredCapability]);
 
-  const setCapability = locked ? () => {} : setCapabilityRaw;
+  const setCapability = useCallback((code: string | null) => {
+    if (locked) return;
+    markUserSelection();
+    setCapabilityRaw(code);
+    setModelIdRaw(null);
+    setSchemaParamsRaw({});
+  }, [locked, markUserSelection]);
 
-  // step 2
   const { data: supportedRaw } = useServiceQuery<{
     supportedCapabilities: string[];
   }>(
-    () => (channelId ? fetchSupportedCapabilities(channelId) : Promise.resolve({ supportedCapabilities: [] })),
+    () => channelId
+      ? fetchSupportedCapabilities(channelId)
+      : Promise.resolve({ supportedCapabilities: [] }),
     [channelId],
   );
   const supported = supportedRaw ?? { supportedCapabilities: [] };
 
-  // 矩阵兜底:用 matrix 给能力补 label/group/isAsync(group 过滤 + 中文显示)
-  // (matrix 已在前面 line 44-46 加载)
-
   const capabilitiesInChannel = useMemo(() => {
     if (!channelType) return [] as CapabilityDefinition[];
-    const channelCaps = matrix?.channels.find((c) => c.channelType === channelType)?.capabilities ?? [];
-    // 求交集:matrix 的能力 ∩ supported-list 返的 codes
-    return channelCaps
-      .filter((cap) => supported.supportedCapabilities.includes(cap.code))
-      .filter((cap) => cap.group === group);  // 按 group 过滤(IMAGE/VIDEO/SOLUTION)
+    const channelCapabilities = matrix?.channels
+      .find((item) => item.channelType === channelType)?.capabilities ?? [];
+    return channelCapabilities
+      .filter((item) => supported.supportedCapabilities.includes(item.code))
+      .filter((item) => item.group === group);
   }, [channelType, matrix, supported.supportedCapabilities, group]);
 
-  // step 3
   const { data: models } = useServiceQuery<ChannelGroupModel[]>(
-    () => (channelId ? fetchChannelGroupModels(channelId) : Promise.resolve([])),
+    () => channelId ? fetchChannelGroupModels(channelId) : Promise.resolve([]),
     [channelId],
   );
   const modelsInGroup = useMemo(
-    () => (models ?? []).filter((m) => m.group === group),
+    () => (models ?? []).filter((item) => item.group === group),
     [models, group],
   );
-  const effectiveModelCode = modelId ?? modelsInGroup[0]?.model ?? null;
+  const defaultModelCode = modelsInGroup[0]?.model?.trim() || null;
+  const modelOptionsInGroup = useMemo(() => {
+    const catalog = matrix?.channels.find((item) => item.channelType === channelType)
+      ?.modelOptions?.[group] ?? [];
+    return [...new Set(catalog.map((value) => value.trim()).filter(Boolean))]
+      .filter((value) => value !== defaultModelCode);
+  }, [channelType, defaultModelCode, group, matrix]);
+  const effectiveModelCode = modelId ?? defaultModelCode;
+
   const paramsFingerprint = useMemo(
     () => JSON.stringify(schemaParams),
     [schemaParams],
   );
-
   const schemaIdentity = `${channelType ?? ''}|${capability ?? ''}|${effectiveModelCode ?? ''}`;
   const { data: loadedSchema } = useServiceQuery<CapabilityDefinition | null>(
-    () => (channelType && capability
+    () => channelType && capability
       ? fetchCapabilitySchema(channelType, capability, {
           modelCode: effectiveModelCode,
           taskParams: schemaParams,
         })
-      : Promise.resolve(null)),
+      : Promise.resolve(null),
     [channelType, capability, effectiveModelCode, paramsFingerprint],
   );
   useEffect(() => {
-    if (loadedSchema) {
-      setLastSchema({ identity: schemaIdentity, value: loadedSchema });
-    }
+    if (loadedSchema) setLastSchema({ identity: schemaIdentity, value: loadedSchema });
   }, [loadedSchema, schemaIdentity]);
   const schema = loadedSchema
     ?? (lastSchema?.identity === schemaIdentity ? lastSchema.value : null);
 
   const { data: recommendListRaw } = useTemplateRecommend(
-    prefill?.templateId, prefill?.templateVersionId, channelType ?? undefined, capability ?? undefined,
+    prefill?.templateId,
+    prefill?.templateVersionId,
+    channelType ?? undefined,
+    capability ?? undefined,
   );
   const recommendList = recommendListRaw ?? [];
-
   useEffect(() => {
-    if (!prefill || !recommendList || recommendList.length === 0) return;
-    const next: Record<string, any> = {};
-    for (const rec of recommendList) {
-      try { next[rec.paramsKey] = JSON.parse(rec.paramsJson); }
-      catch { next[rec.paramsKey] = rec.paramsJson; }
+    if (!prefill || recommendList.length === 0 || selectionSource === 'USER') return;
+    const recommendKey = `${initKeyRef.current ?? ''}|${channelType ?? ''}|${capability ?? ''}`;
+    if (recommendAppliedKeyRef.current === recommendKey) return;
+    recommendAppliedKeyRef.current = recommendKey;
+    const recommended: Record<string, any> = {};
+    for (const item of recommendList) {
+      try { recommended[item.paramsKey] = JSON.parse(item.paramsJson); }
+      catch { recommended[item.paramsKey] = item.paramsJson; }
     }
-    setSchemaParams(next);
-  }, [recommendList, prefill]);
+    setSchemaParamsRaw((current) => ({ ...recommended, ...current }));
+  }, [capability, channelType, prefill, recommendList, selectionSource]);
 
   useEffect(() => {
     if (!schema) return;
     const next: Record<string, any> = {};
-    for (const f of schema.fields ?? []) {
-      let value = schemaParams[f.key];
+    for (const field of schema.fields ?? []) {
+      let value = schemaParams[field.key];
       const hasValue = value !== undefined && value !== null && value !== '';
-      if (!hasValue && f.defaultValue !== undefined && f.defaultValue !== null && f.defaultValue !== '') {
-        value = f.defaultValue;
+      if (!hasValue && field.defaultValue !== undefined
+          && field.defaultValue !== null && field.defaultValue !== '') {
+        value = field.defaultValue;
       }
       if (value === undefined || value === null || value === '') continue;
-
-      if (f.type === 'BOOLEAN') {
+      if (field.type === 'BOOLEAN') {
         value = value === true || value === 'true';
-      } else if (f.type === 'INT' || f.type === 'DECIMAL') {
+      } else if (field.type === 'INT' || field.type === 'DECIMAL') {
         const numericValue = Number(value);
-        value = Number.isFinite(numericValue) ? numericValue : f.defaultValue;
-      } else if (f.type === 'SELECT' && f.options?.length) {
-        const valid = f.options.some((option) => option.value === String(value));
-        if (!valid) value = f.defaultValue ?? f.options[0].value;
+        value = Number.isFinite(numericValue) ? numericValue : field.defaultValue;
+      } else if (field.type === 'SELECT' && field.options?.length) {
+        const valid = field.options.some((option) => option.value === String(value));
+        if (!valid) value = field.defaultValue ?? field.options[0].value;
       }
-      next[f.key] = value;
+      next[field.key] = value;
     }
     if (JSON.stringify(next) !== JSON.stringify(schemaParams)) {
-      setSchemaParams(next);
+      setSchemaParamsRaw(next);
     }
   }, [schema, schemaParams]);
 
   const recommendValues = useMemo(() => {
-    const m: Record<string, any> = {};
-    for (const r of recommendList ?? []) {
-      try { m[r.paramsKey] = JSON.parse(r.paramsJson); } catch { m[r.paramsKey] = r.paramsJson; }
+    const values: Record<string, any> = {};
+    for (const item of recommendList) {
+      try { values[item.paramsKey] = JSON.parse(item.paramsJson); }
+      catch { values[item.paramsKey] = item.paramsJson; }
     }
-    return m;
+    return values;
   }, [recommendList]);
 
-  // isSupported 占位(简化):只检查 schema 是否存在就返回 true;
-  // 真正的兼容性拒绝入口在 UI 层 useCreateImageTaskState.isSupported
-  const isSupported = useMemo(() => schema != null, [schema]);
-
-  const setModelWithValidation = (id: string | null) => {
+  const setModelWithValidation = useCallback((id: string | null) => {
     if (locked) return;
-    setModelId(id);
-    setSchemaParams({});
-  };
+    markUserSelection();
+    setModelIdRaw(id);
+    setSchemaParamsRaw({});
+  }, [locked, markUserSelection]);
+
+  const setSchemaParams = useCallback((params: Record<string, any>) => {
+    if (locked) return;
+    setSchemaParamsRaw(params);
+  }, [locked]);
+
+  const isSupported = useMemo(
+    () => !initializing && !unavailableReason && schema != null,
+    [initializing, unavailableReason, schema],
+  );
 
   return {
-    channelId, channelType, capability, modelId, effectiveModelCode, schema, schemaParams,
+    channelId,
+    channelType,
+    capability,
+    modelId,
+    effectiveModelCode,
+    schema,
+    schemaParams,
     instances,
     capabilitiesInChannel,
     modelsInGroup,
+    defaultModelCode,
+    modelOptionsInGroup,
     setChannelId: locked ? () => {} : setChannelId,
     setCapability,
-    setModelId: setModelWithValidation, setSchemaParams,
-    recommendValues, locked, isSupported, setModelWithValidation,
+    setModelId: setModelWithValidation,
+    setSchemaParams,
+    recommendValues,
+    locked,
+    isSupported,
+    setModelWithValidation,
+    selectionSource,
+    fallbackReason,
+    unavailableReason,
+    initializing,
   };
 }

@@ -40,6 +40,9 @@ interface ParamsSnapshot {
   capability: string | null;
   modelId: string | null;
   schemaParams: Record<string, unknown>;
+  selectionSource: string;
+  fallbackReason: string | null;
+  executionReady: boolean;
 }
 
 interface CreateVideoTaskProps {
@@ -64,7 +67,13 @@ const EMPTY_PARAMS: ParamsSnapshot = {
   capability: null,
   modelId: null,
   schemaParams: {},
+  selectionSource: 'NONE',
+  fallbackReason: null,
+  executionReady: false,
 };
+
+// 顶部模板入口暂时隐藏；后续需要时改为 true 即可恢复。
+const SHOW_VIDEO_TEMPLATE_PICKER = false;
 
 const MODE_CONFIG: Record<
   VideoMode,
@@ -163,12 +172,21 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   const videoParamsPrefill = useMemo<PrefillState | null>(() => {
     if (!creationPrefill || creationPrefill.mediaType !== 'VIDEO') return null;
     const snapshot = creationPrefill.snapshot;
+    const route = creationPrefill.effectiveExecution;
     return {
-      channelType: snapshot.channelType ?? null,
-      capability: snapshot.capability ?? null,
-      model: snapshot.modelCode ?? null,
+      templateId: creationPrefill.templateId,
+      templateVersionId: creationPrefill.versionId,
+      channelInstanceId: route?.channelInstanceId ?? null,
+      channelType: route?.channelType ?? snapshot.channelType ?? null,
+      capability: route?.capabilityCode ?? snapshot.capability ?? null,
+      model: route?.modelCode ?? null,
       schemaParams: snapshot.schemaParams,
       lockExecution: false,
+      resolved: true,
+      source: route?.source,
+      fallbackApplied: route?.fallbackApplied ?? false,
+      fallbackReason: route?.fallbackReason ?? null,
+      unavailableReason: creationPrefill.executionUnavailableReason ?? null,
     };
   }, [creationPrefill]);
   const [selectedProductInfo, setSelectedProductInfo] = useState<ProductDTO | null>(null);
@@ -275,6 +293,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   }, [creationPrefill]);
 
   const config = MODE_CONFIG[mode];
+  const activeVideoParamsPrefill = videoParamsPrefill?.capability === config.capability
+    ? videoParamsPrefill
+    : null;
   const hasProductReference = Boolean(selectedProductInfo?.imageId);
   const trendingPrompt = useMemo(() => buildTrendingReplicatePrompt({
     replacements: replacementReferences.map((asset) => ({
@@ -295,7 +316,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     effectivePrompt.trim().length > 0,
     params.channelType === 'VIDU' &&
       params.capability === config.capability &&
-      params.channelId !== null,
+      params.channelId !== null &&
+      params.executionReady,
   ].filter(Boolean).length;
   const duration = String(params.schemaParams.duration ?? '5');
   const outputRatio = String(
@@ -540,7 +562,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     if (
       !params.channelId ||
       params.channelType !== 'VIDU' ||
-      params.capability !== config.capability
+      params.capability !== config.capability ||
+      !params.executionReady
     ) {
       toast.warning('Vidu 通道能力尚未准备完成');
       return;
@@ -570,10 +593,11 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       productId: numericProductId,
       productFacts,
       channelInstanceId: params.channelId,
-      channelType: 'VIDU',
+      channelType: params.channelType,
       capability: config.capability,
       videoMode: mode,
       modelCode: params.modelId,
+      executionSelectionSource: params.selectionSource,
       taskParamsJson: JSON.stringify(params.schemaParams ?? {}),
       taskPrompt,
       negativePrompt: negativePrompt.trim() || undefined,
@@ -625,43 +649,45 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
             )}
             {/* 爆款复刻“跟随原视频”规格文案暂时隐藏，后续按需恢复。 */}
           </div>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setTemplateMenuOpen((open) => !open)}
-              className="h-9 rounded-md border border-primary px-3 text-xs font-bold text-primary"
-            >
-              模板
-            </button>
-            {templateMenuOpen && (
-              <div className="absolute right-0 top-11 z-40 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
-                <button
-                  type="button"
-                  onClick={() => applyPromptTemplate('PRODUCT')}
-                  className="w-full rounded-md px-3 py-2 text-left hover:bg-primary-light"
-                >
-                  <span className="block text-xs font-bold text-slate-800">
-                    商品动态展示
-                  </span>
-                  <span className="mt-1 block text-[10px] text-slate-400">
-                    稳定主体，突出材质与核心卖点
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyPromptTemplate('TRENDING')}
-                  className="mt-1 w-full rounded-md px-3 py-2 text-left hover:bg-primary-light"
-                >
-                  <span className="block text-xs font-bold text-slate-800">
-                    爆款节奏复刻
-                  </span>
-                  <span className="mt-1 block text-[10px] text-slate-400">
-                    保留创意结构、镜头节奏和爆点
-                  </span>
-                </button>
-              </div>
-            )}
-          </div>
+          {SHOW_VIDEO_TEMPLATE_PICKER && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setTemplateMenuOpen((open) => !open)}
+                className="h-9 rounded-md border border-primary px-3 text-xs font-bold text-primary"
+              >
+                模板
+              </button>
+              {templateMenuOpen && (
+                <div className="absolute right-0 top-11 z-40 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => applyPromptTemplate('PRODUCT')}
+                    className="w-full rounded-md px-3 py-2 text-left hover:bg-primary-light"
+                  >
+                    <span className="block text-xs font-bold text-slate-800">
+                      商品动态展示
+                    </span>
+                    <span className="mt-1 block text-[10px] text-slate-400">
+                      稳定主体，突出材质与核心卖点
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyPromptTemplate('TRENDING')}
+                    className="mt-1 w-full rounded-md px-3 py-2 text-left hover:bg-primary-light"
+                  >
+                    <span className="block text-xs font-bold text-slate-800">
+                      爆款节奏复刻
+                    </span>
+                    <span className="mt-1 block text-[10px] text-slate-400">
+                      保留创意结构、镜头节奏和爆点
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           {/* AI 助手按钮暂时隐藏，后续按需解除注释。
           <button
             type="button"
@@ -1032,7 +1058,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                 <TaskParamsPanel
                   key={mode}
                   group={config.group}
-                  prefill={videoParamsPrefill}
+                  prefill={activeVideoParamsPrefill}
+                  prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
                   unified={{
                     productName: productFacts.name ?? '',
                     sellingPoints: productFacts.sellingPoints,

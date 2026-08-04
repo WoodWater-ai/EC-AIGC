@@ -56,6 +56,7 @@ import { MenuConfigTab } from './systemConfig/MenuConfigTab';
 import RoleManageTab from './systemConfig/RoleManageTab';
 import { OrgStructureTab, type OrgStructureTabRef } from './systemConfig/OrgStructureTab';
 import { SystemBuiltinChannelTab } from './systemConfig/SystemBuiltinChannelTab';
+import { CapabilityDefaultRoutePanel } from './systemConfig/CapabilityDefaultRoutePanel';
 import { useRef } from 'react';
 import { departmentApi, type DepartmentDTO } from '../api/modules/department';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
@@ -101,6 +102,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const canCreateChannel = hasAnyPermission(['channel:create', 'channel:limit', 'channel:manage']);
   const canEditChannel = hasAnyPermission(['channel:edit', 'channel:limit', 'channel:manage']);
   const canDeleteChannel = hasAnyPermission(['channel:delete', 'channel:limit', 'channel:manage']);
+  const canManageDefaultRoute = hasPermission('channel:manage');
   // 1. High level main tabs
   const [activeMainTab, setActiveMainTab] = useState<'users' | 'org' | 'channels' | 'builtin' | 'logs'>('users');
   
@@ -926,6 +928,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
             </div>
           </div>
 
+          <CapabilityDefaultRoutePanel
+            matrix={matrix}
+            canManage={canManageDefaultRoute}
+          />
+
           {/* Category Tabs Block */}
           <div className="flex gap-6 border-b border-slate-200/60 pb-px">
             {[
@@ -1670,7 +1677,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     默认模型(按能力大类分组)
                   </label>
                   <p className="text-[10px] text-slate-400 -mt-1">
-                    自由输入,可填任意模型名(占位灰字仅为提示)。下方折叠面板仅展示该通道需要配模型的 group。
+                    可从模型目录中选择默认值，也可自由输入；目录模型会同步出现在创建任务的模型下拉中。
                   </p>
                   {([
                     { key: 'TEXT' as CapabilityGroup,     label: '文本类',     icon: '💬' },
@@ -1688,6 +1695,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     }).length;
                     if (groupCapsCount === 0) return null;
                     const hasValue = !!(channelFormDefaultModels[group.key] ?? '').trim();
+                    const catalogModels = matrix?.matrix?.[channelFormProvider]
+                      ?.modelOptions?.[group.key] ?? [];
+                    const modelHint = catalogModels.join(' / ')
+                      || DEFAULT_MODEL_PLACEHOLDERS[channelFormProvider]?.[group.key]
+                      || '请输入模型名称';
                     return (
                       <details
                         key={group.key}
@@ -1721,11 +1733,34 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                                 return next;
                               });
                             }}
-                            placeholder={DEFAULT_MODEL_PLACEHOLDERS[channelFormProvider]?.[group.key] ?? '请输入模型名称'}
+                            placeholder={modelHint}
                             className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white text-slate-800 transition-all font-mono font-bold"
                           />
+                          {catalogModels.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {catalogModels.map((modelCode) => (
+                                <button
+                                  key={modelCode}
+                                  type="button"
+                                  onClick={() => setChannelFormDefaultModels((prev) => ({
+                                    ...prev,
+                                    [group.key]: modelCode,
+                                  }))}
+                                  className={`rounded border px-2 py-1 text-[10px] font-mono transition-colors ${
+                                    channelFormDefaultModels[group.key] === modelCode
+                                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                      : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:text-blue-600'
+                                  }`}
+                                >
+                                  {modelCode}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                           <p className="text-[10px] text-slate-400">
-                            提示:{DEFAULT_MODEL_PLACEHOLDERS[channelFormProvider]?.[group.key] ?? '—'}(仅 UI 提示,可填任意模型名)
+                            {catalogModels.length > 0
+                              ? '点击目录模型可设为默认；创建任务时仍可临时切换其他目录模型。'
+                              : `提示:${modelHint}(可填任意模型名)`}
                           </p>
                         </div>
                       </details>

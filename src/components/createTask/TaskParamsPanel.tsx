@@ -6,12 +6,22 @@ import { assembleTaskPrompt, applyAiOptimize } from './assembleTaskPrompt';
 export interface TaskParamsPanelProps {
   group: 'IMAGE' | 'VIDEO' | 'SOLUTION';
   prefill?: PrefillState | null;
+  prefillPending?: boolean;
   unified: { productName: string; sellingPoints?: string; keyDetails?: string; constraints?: string[] };
   aspectRatio: string; count: number;
   onAspectRatioChange: (v: string) => void; onCountChange: (v: number) => void;
   prompt: string; onPromptChange: (v: string) => void;
   negativePrompt: string; onNegativePromptChange: (v: string) => void;
-  onParamsChange: (p: { channelId: string | null; channelType: string | null; capability: string | null; modelId: string | null; schemaParams: Record<string, any> }) => void;
+  onParamsChange: (p: {
+    channelId: string | null;
+    channelType: string | null;
+    capability: string | null;
+    modelId: string | null;
+    schemaParams: Record<string, any>;
+    selectionSource: string;
+    fallbackReason: string | null;
+    executionReady: boolean;
+  }) => void;
   fixedChannelType?: string;
   fixedCapability?: string;
   showAspectRatio?: boolean;
@@ -27,7 +37,7 @@ const RATIOS = ['1:1', '3:4', '4:5', '9:16', '16:9'];
 
 export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
   const {
-    group, prefill, unified,
+    group, prefill, prefillPending = false, unified,
     aspectRatio, count, onAspectRatioChange, onCountChange,
     prompt, onPromptChange, negativePrompt, onNegativePromptChange, onParamsChange,
     fixedChannelType,
@@ -41,28 +51,9 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
     presentation = 'default',
   } = props;
 
-  const tp = useTaskParams(group, prefill);
+  const tp = useTaskParams(group, prefill, fixedCapability, prefillPending);
 
   // 视频工作台使用业务模式固定供应商能力，避免页面模式与实际 capability 脱节。
-  useEffect(() => {
-    if (!fixedChannelType || tp.channelType === fixedChannelType) return;
-    const instance = tp.instances.find((item) => item.channelType === fixedChannelType);
-    if (instance) tp.setChannelId(instance.id);
-  }, [fixedChannelType, tp.channelType, tp.instances, tp.setChannelId]);
-
-  useEffect(() => {
-    if (!fixedCapability || !tp.channelType || tp.capability === fixedCapability) return;
-    if (tp.capabilitiesInChannel.some((item) => item.code === fixedCapability)) {
-      tp.setCapability(fixedCapability);
-    }
-  }, [
-    fixedCapability,
-    tp.channelType,
-    tp.capability,
-    tp.capabilitiesInChannel,
-    tp.setCapability,
-  ]);
-
   const visibleInstances = fixedChannelType
     ? tp.instances.filter((item) => item.channelType === fixedChannelType)
     : tp.instances;
@@ -87,8 +78,23 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
       capability: tp.capability,
       modelId: tp.effectiveModelCode,
       schemaParams: tp.schemaParams,
+      selectionSource: tp.selectionSource,
+      fallbackReason: tp.fallbackReason,
+      executionReady: !tp.initializing && !tp.unavailableReason && tp.isSupported,
     });
-  }, [tp.channelId, tp.channelType, tp.capability, tp.effectiveModelCode, tp.schemaParams, onParamsChange]);
+  }, [
+    tp.channelId,
+    tp.channelType,
+    tp.capability,
+    tp.effectiveModelCode,
+    tp.schemaParams,
+    tp.selectionSource,
+    tp.fallbackReason,
+    tp.initializing,
+    tp.unavailableReason,
+    tp.isSupported,
+    onParamsChange,
+  ]);
 
   // [2026-07-16 P0 修复] 用户编辑优先 —— 不再用 useEffect 自动重算 prompt
   // 修复前:用户在 Prompt 编辑器改了字,unified/schameParams 一变就被 assembleTaskPrompt 覆盖
@@ -115,6 +121,21 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
 
       {/* ① 三级选择器 */}
       <div className="space-y-3">
+        {tp.initializing && (
+          <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            正在解析默认通道和模型…
+          </div>
+        )}
+        {tp.fallbackReason && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            模板原执行参数已失效,将使用默认配置,你可手动调整。
+          </div>
+        )}
+        {tp.unavailableReason && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {tp.unavailableReason}
+          </div>
+        )}
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1.5">
             {presentation === 'videoDemo' ? '模型通道' : '通道实例'}
@@ -198,19 +219,25 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">模型</label>
             <select
-              value={tp.modelId ?? ''}
+              value={tp.modelId === tp.defaultModelCode ? '' : (tp.modelId ?? '')}
+              disabled={tp.locked}
               onChange={(e) => tp.setModelId(e.target.value || null)}
               className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md bg-white"
             >
               <option value="">
-                {tp.modelsInGroup.length > 0
-                  ? `默认模型 (${tp.modelsInGroup[0].model})`
-                  : '未配默认模型 (手填)'}
+                {tp.defaultModelCode
+                  ? `默认模型 (${tp.defaultModelCode})`
+                  : '未配置默认模型，请选择'}
               </option>
-              {tp.modelsInGroup.map((m) => (
-                <option key={m.model} value={m.model}>{m.model}</option>
+              {tp.modelOptionsInGroup.map((modelCode) => (
+                <option key={modelCode} value={modelCode}>{modelCode}</option>
               ))}
             </select>
+            {tp.modelOptionsInGroup.length > 0 && (
+              <p className="mt-1 text-[10px] text-slate-400">
+                默认值来自系统配置，也可切换为该能力目录中的其他模型。
+              </p>
+            )}
           </div>
         )}
       </div>

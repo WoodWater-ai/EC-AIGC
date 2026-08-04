@@ -1,5 +1,6 @@
 import http from '../client';
 import type { PageInfo } from '../service-result';
+import type { TaskExecutionRoute } from './capabilityDefaultRoute';
 
 export type CreationMediaType = 'IMAGE' | 'VIDEO';
 export type CreationTemplateStatus = 'DRAFT' | 'PUBLISHED' | 'OFFLINE';
@@ -81,6 +82,7 @@ export interface CreationTemplateSnapshot {
   prompt?: string | null;
   negativePrompt?: string | null;
   channelType?: string | null;
+  channelInstanceId?: string | null;
   capability?: string | null;
   modelCode?: string | null;
   schemaParams?: Record<string, unknown>;
@@ -98,6 +100,8 @@ export interface CreationTemplateReuseContext {
   mediaType: CreationMediaType;
   version: string;
   snapshot: CreationTemplateSnapshot;
+  effectiveExecution?: TaskExecutionRoute | null;
+  executionUnavailableReason?: string | null;
 }
 
 export interface CreationTemplateEngagement {

@@ -169,6 +169,27 @@ function VisualTagPicker({
 
       {open && !disabled && (
         <div className="absolute left-0 z-40 mt-2 max-h-80 w-[280px] overflow-y-auto rounded-md border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
+          <button
+            type="button"
+            onClick={() => {
+              onChange('');
+              setOpen(false);
+            }}
+            className={`flex w-full items-center gap-2.5 rounded p-1.5 text-left transition ${
+              value === '' ? 'bg-primary/10' : 'hover:bg-slate-50'
+            }`}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-slate-100 bg-slate-50">
+              <ImageIcon className="h-4 w-4 text-slate-300" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xs font-semibold text-slate-800">不设置</span>
+              <span className="mt-0.5 block truncate text-[11px] text-slate-400">
+                保持{label}为空
+              </span>
+            </span>
+            {value === '' && <Check className="h-4 w-4 shrink-0 text-primary" />}
+          </button>
           {decoratedOptions.map((option) => {
             const active = option.label === value;
             return (

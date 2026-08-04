@@ -268,6 +268,8 @@ export interface CapabilityMatrix {
     supported: string[];   // 后端 EnumCapability 枚举名
     /** [v1.4] 该 channel 在每个 group 下是否需要 default_model(groupCode → boolean) */
     modelRequired: Record<CapabilityGroup, boolean>;
+    /** 可在创建任务时切换的供应商模型目录；默认值仍取具体通道的 defaultModels。 */
+    modelOptions?: Partial<Record<CapabilityGroup, string[]>>;
   }>;
 }
 
@@ -700,7 +702,9 @@ export interface ImageTaskSubmitPayload {
   channelInstanceId: string;
   capability: 'REF_IMG_EDIT';
   channelType: 'VIDU';
-  modelId?: string | null;
+  /** 供应商模型代码（例如 viduimage-2），不是数据库 ID。 */
+  modelCode?: string | null;
+  executionSelectionSource?: string;
   taskParamsJson: string;
   sourceCreationTemplateId?: string;
   sourceCreationTemplateVersionId?: string;
@@ -757,6 +761,7 @@ export interface VideoTaskSubmitPayload {
   channelType: string;
   videoMode: 'FIRST_FRAME' | 'TRENDING_REPLICATE';
   modelCode?: string | null;
+  executionSelectionSource?: string;
   taskParamsJson: string;
   taskPrompt: string;
   negativePrompt?: string;

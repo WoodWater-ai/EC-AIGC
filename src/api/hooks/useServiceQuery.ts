@@ -36,11 +36,10 @@ export function useServiceQuery<T>(
   });
   // trigger counter 累加,每次 refetch 触发 useEffect 重跑 fetcher
   const [trigger, setTrigger] = useState(0);
-  const aliveRef = useRef(true);
   const previousDepsRef = useRef<DependencyList>(deps);
 
   useEffect(() => {
-    aliveRef.current = true;
+    let cancelled = false;
     const previousDeps = previousDepsRef.current;
     const depsChanged = previousDeps.length !== deps.length
       || deps.some((value, index) => !Object.is(value, previousDeps[index]));
@@ -53,24 +52,24 @@ export function useServiceQuery<T>(
 
     if (!enabled) {
       return () => {
-        aliveRef.current = false;
+        cancelled = true;
       };
     }
 
     fetcher()
       .then((data) => {
-        if (aliveRef.current) {
+        if (!cancelled) {
           setState({ data, loading: false, error: null });
         }
       })
       .catch((error: ApiError) => {
-        if (aliveRef.current) {
+        if (!cancelled) {
           setState({ data: null, loading: false, error });
         }
       });
 
     return () => {
-      aliveRef.current = false;
+      cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, enabled, trigger]);

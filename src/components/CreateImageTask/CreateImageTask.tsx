@@ -74,6 +74,9 @@ const EMPTY_PRODUCT_FACTS: ProductFactsInput = {
   fitStructure: '',
 };
 
+// 模板选择入口暂时隐藏；后续需要时改为 true 即可恢复。
+const SHOW_TEMPLATE_PICKER = false;
+
 const renderReusablePrompt = (prompt: string, facts: ProductFactsInput) => {
   const values: Record<string, string> = {
     name: facts.name,
@@ -102,12 +105,21 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const imageParamsPrefill = useMemo<PrefillState | null>(() => {
     if (!creationPrefill || creationPrefill.mediaType !== 'IMAGE') return null;
     const snapshot = creationPrefill.snapshot;
+    const route = creationPrefill.effectiveExecution;
     return {
-      channelType: snapshot.channelType ?? null,
-      capability: snapshot.capability ?? null,
-      model: snapshot.modelCode ?? null,
+      templateId: creationPrefill.templateId,
+      templateVersionId: creationPrefill.versionId,
+      channelInstanceId: route?.channelInstanceId ?? null,
+      channelType: route?.channelType ?? snapshot.channelType ?? null,
+      capability: route?.capabilityCode ?? snapshot.capability ?? 'REF_IMG_EDIT',
+      model: route?.modelCode ?? null,
       schemaParams: snapshot.schemaParams,
       lockExecution: false,
+      resolved: true,
+      source: route?.source,
+      fallbackApplied: route?.fallbackApplied ?? false,
+      fallbackReason: route?.fallbackReason ?? null,
+      unavailableReason: creationPrefill.executionUnavailableReason ?? null,
     };
   }, [creationPrefill]);
 
@@ -137,7 +149,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   // ---- hook ----
   // 通道/能力/模型 真实值由 ImageSettingsSection 内部 useTaskParams 装载(从
   // /v1/admin/capability/supported-list 等接口拉取);子组件通过 onParamsChange
-  // 回调把选中状态冒泡到此处,提交时 channelInstanceId/modelId 必须是真实雪花 ID。
+  // 回调把选中状态冒泡到此处：channelId 是通道雪花 ID，modelId 历史命名实际存供应商 modelCode。
   // 之前写死 channel-1 / gpt-image-1 已被替换,父组件不再自己调 useTaskParams(避免两份独立 state)。
 
   // 风格 / 场景 / 姿势 字典(从后端 dict 实时拉取,后端 categoryCode 由 dafenqi-ai 字典管理配置)
@@ -151,6 +163,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     capability: null,
     modelId: null,
     executionParamsReady: false,
+    selectionSource: 'NONE',
+    fallbackReason: null,
     // [2026-07-25 P0 修复] 加 schemaParams 字段,接收 ImageSettingsSection.onParamsChange
     // 冒泡上来的能力参数(包含 aspect_ratio / resolution 等),透传给 useCreateImageTaskState。
     schemaParams: {},
@@ -183,6 +197,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     // ParamSchemaForm 收集的能力参数整体透传给 hook,直接作为 taskParamsJson 提交;
     // 后端 ChannelParamBinder 按 ViduCapabilities schema 字段名映射到 Vidu body。
     schemaParams: paramsSnapshot.schemaParams,
+    channelType: paramsSnapshot.channelType,
+    capability: paramsSnapshot.capability,
+    executionSelectionSource: paramsSnapshot.selectionSource,
     sourceCreationTemplateId: creationPrefill?.templateId ?? null,
     sourceCreationTemplateVersionId: creationPrefill?.versionId ?? null,
     executionParamsReady: paramsSnapshot.executionParamsReady,
@@ -289,28 +306,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     toggleType,
     typeCounts,
   ]);
-
-  // 字典加载完成后,若 hook 内 style/scene/pose 仍是空串(初始化时字典尚未回来),
-  // 自动选 options[0] 的中文 label (itemName),让 select 不再停留在"暂无数据"占位态
-  // 注:toDictOptions 给的 opt.value 是 itemCode(英文枚举),opt.label 才是中文 itemName,
-  //     这里取 label 才能保证默认值和后续 prompt 拼接都是中文
-  useEffect(() => {
-    if (!loadingStyle && styleOptions.length > 0 && !style) {
-      setStyle(styleOptions[0].label);
-    }
-  }, [styleOptions, loadingStyle, style, setStyle]);
-
-  useEffect(() => {
-    if (!loadingScene && sceneOptions.length > 0 && !scene) {
-      setScene(sceneOptions[0].label);
-    }
-  }, [sceneOptions, loadingScene, scene, setScene]);
-
-  useEffect(() => {
-    if (!loadingPose && poseOptions.length > 0 && !pose) {
-      setPose(poseOptions[0].label);
-    }
-  }, [poseOptions, loadingPose, pose, setPose]);
 
   // ---- 移除参考图:走 selectReference(slot, undefined) 复用现有重排逻辑 ----
   const handleRemoveReference = useCallback(
@@ -532,11 +527,13 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
                 />
               }
               templateSelector={
-                <TemplatePicker
-                  value={template}
-                  options={[{ id: 'default', name: '默认模板' }]}
-                  onPickRequest={requestTemplateChange}
-                />
+                SHOW_TEMPLATE_PICKER ? (
+                  <TemplatePicker
+                    value={template}
+                    options={[{ id: 'default', name: '默认模板' }]}
+                    onPickRequest={requestTemplateChange}
+                  />
+                ) : null
               }
               advancedSettings={
                 <AdvancedSettings
@@ -550,6 +547,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         right={
           <ImageSettingsSection
             prefill={imageParamsPrefill}
+            prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
             onParamsChange={setParamsSnapshot}
           />
         }

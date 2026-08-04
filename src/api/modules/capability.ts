@@ -50,6 +50,8 @@ export interface ChannelCapabilities {
   channelType: string;
   baseUrlPlaceholder: string;
   modelRequiredGroups: string[];
+  /** 后端维护的供应商模型目录；通道自己的默认模型仍由 defaultModels 决定。 */
+  modelOptions?: Partial<Record<'TEXT' | 'IMAGE' | 'VIDEO' | 'SOLUTION', string[]>>;
   capabilities: CapabilityDefinition[];
 }
 

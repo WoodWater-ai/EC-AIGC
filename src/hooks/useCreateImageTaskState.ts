@@ -117,6 +117,9 @@ export interface UseCreateImageTaskStateOpts {
    * 现在让后端 ChannelParamBinder 按 schema 自动映射(单源真相)。
    */
   schemaParams?: Record<string, any>;
+  channelType?: string | null;
+  capability?: string | null;
+  executionSelectionSource?: string;
   sourceCreationTemplateId?: string | null;
   sourceCreationTemplateVersionId?: string | null;
   /** 通道、能力、模型以及能力 Schema 必填参数是否已完成选择。 */
@@ -604,13 +607,14 @@ export function useCreateImageTaskState(
         groupId: crypto.randomUUID(),
         productId: productIdValid ? productIdRaw : null,
         productFacts: formInput,
-        style,
-        scene,
-        action: pose,
+        style: style || undefined,
+        scene: scene || undefined,
+        action: pose || undefined,
         channelInstanceId: opts.channel.id,
-        capability: 'REF_IMG_EDIT',
-        channelType: 'VIDU',
-        modelId: opts.model?.id ?? null,
+        capability: (opts.capability ?? 'REF_IMG_EDIT') as 'REF_IMG_EDIT',
+        channelType: (opts.channelType ?? 'VIDU') as 'VIDU',
+        modelCode: opts.model?.id ?? null,
+        executionSelectionSource: opts.executionSelectionSource ?? 'USER',
         // [2026-07-25 P0 修复] taskParamsJson 直接透传 ParamSchemaForm 收集的 schemaParams
         // (字段名 aspect_ratio / resolution 对齐 ViduCapabilities schema),后端 GenerationTaskServiceImpl
         // 用 schema 字段名解析、ChannelParamBinder 按 targetField 映射到 Vidu body。

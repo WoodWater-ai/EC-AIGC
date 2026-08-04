@@ -89,7 +89,7 @@ export interface ChannelGroupModel {
   model: string;
 }
 
-/** 列某通道各 group 默认模型(建任务模型下拉) */
+/** 列某通道各 group 默认模型；建任务的其他候选由能力矩阵 modelOptions 提供。 */
 export async function fetchChannelGroupModels(channelId: string): Promise<ChannelGroupModel[]> {
   return http.post<ChannelGroupModel[]>(
     `/v1/admin/model-channel/list-group-models?channelId=${encodeURIComponent(channelId)}`,

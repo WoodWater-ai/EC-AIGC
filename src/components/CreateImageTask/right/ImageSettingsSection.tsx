@@ -12,6 +12,7 @@ export interface TaskParamsSnapshot {
   channelId: string | null;
   channelType: string | null;
   capability: string | null;
+  /** 历史字段名；值是供应商 modelCode，不是数据库 ID。 */
   modelId: string | null;
   /**
    * 能力参数(ParamSchemaForm 渲染 Vidu 能力 schema 收集),例如
@@ -21,6 +22,8 @@ export interface TaskParamsSnapshot {
    */
   schemaParams?: Record<string, any>;
   executionParamsReady: boolean;
+  selectionSource: string;
+  fallbackReason: string | null;
 }
 
 /** ratio 由 useCreateImageTaskState 内部维护;本节不再展示。
@@ -34,35 +37,54 @@ export interface ImageSettingsSectionProps {
   /** 选中状态变化时通知父组件,父组件用于 submit payload 的 channelInstanceId/modelId */
   onParamsChange?: (snapshot: TaskParamsSnapshot) => void;
   prefill?: PrefillState | null;
+  prefillPending?: boolean;
 }
 
 export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
   onParamsChange,
   prefill,
+  prefillPending = false,
 }) => {
   // 通道实例 / 能力 / 模型 三级联动 — 与 demo 创建图片任务 "任务参数"一致
-  const tp = useTaskParams('IMAGE', prefill);
+  const tp = useTaskParams('IMAGE', prefill, 'REF_IMG_EDIT', prefillPending);
 
   // 选中状态变化时通知父组件
   useEffect(() => {
     const schemaValid = !!tp.schema
       && localValidate(tp.schemaParams, tp.schema.fields ?? []).length === 0;
-    const modelSelected = !!tp.modelId || tp.modelsInGroup.length > 0;
+    const modelSelected = !!tp.effectiveModelCode;
     onParamsChange?.({
       channelId: tp.channelId,
       channelType: tp.channelType,
       capability: tp.capability,
-      modelId: tp.modelId,
+      // modelId 是历史内部命名，值实际为供应商 modelCode。
+      modelId: tp.effectiveModelCode,
       // [2026-07-25 P0 修复] schemaParams 必须冒泡,否则 ParamSchemaForm 改的
       // aspect_ratio / resolution 等参数不会进提交 payload;
       // 之前 useCreateImageTaskState 写死 ratio='16:9' 正是因为收不到这个值。
       schemaParams: tp.schemaParams,
-      executionParamsReady: !!tp.channelId
+      selectionSource: tp.selectionSource,
+      fallbackReason: tp.fallbackReason,
+      executionParamsReady: !tp.initializing
+        && !tp.unavailableReason
+        && !!tp.channelId
         && !!tp.capability
         && modelSelected
         && schemaValid,
     });
-  }, [tp.channelId, tp.channelType, tp.capability, tp.modelId, tp.modelsInGroup, tp.schema, tp.schemaParams, onParamsChange]);
+  }, [
+    tp.channelId,
+    tp.channelType,
+    tp.capability,
+    tp.effectiveModelCode,
+    tp.schema,
+    tp.schemaParams,
+    tp.selectionSource,
+    tp.fallbackReason,
+    tp.initializing,
+    tp.unavailableReason,
+    onParamsChange,
+  ]);
 
   return (
     <div
@@ -74,13 +96,29 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
         {messages.header.title.replace('新建多类型图片任务', '任务参数与输出规格')}
       </h2>
 
+      {tp.initializing && (
+        <div className="mt-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+          正在解析默认通道和模型…
+        </div>
+      )}
+      {tp.fallbackReason && (
+        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          模板原执行参数已失效,将使用默认配置,你可手动调整。
+        </div>
+      )}
+      {tp.unavailableReason && (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {tp.unavailableReason}
+        </div>
+      )}
+
       {/* ① 通道实例 chips(对齐 demo) */}
       <div className="mt-4">
         <label className="block text-xs font-bold text-slate-700 mb-1.5">
           通道实例{tp.locked && ' 🔒'}
         </label>
         <div className="flex flex-wrap gap-2">
-          {tp.instances.map((inst) => (
+          {tp.instances.filter((inst) => inst.channelType === 'VIDU').map((inst) => (
             <button
               key={inst.id}
               type="button"
@@ -108,7 +146,7 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
             能力{tp.locked && ' 🔒'}
           </label>
           <div className="flex flex-wrap gap-2">
-            {tp.capabilitiesInChannel.map((cap) => (
+            {tp.capabilitiesInChannel.filter((cap) => cap.code === 'REF_IMG_EDIT').map((cap) => (
               <button
                 key={cap.code}
                 type="button"
@@ -142,19 +180,25 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
         <div className="mt-3">
           <label className="block text-xs font-bold text-slate-700 mb-1.5">模型</label>
           <select
-            value={tp.modelId ?? ''}
+            value={tp.modelId === tp.defaultModelCode ? '' : (tp.modelId ?? '')}
+            disabled={tp.locked}
             onChange={(e) => tp.setModelId(e.target.value || null)}
             className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md bg-white"
           >
             <option value="">
-              {tp.modelsInGroup.length > 0
-                ? `默认模型 (${tp.modelsInGroup[0].model})`
-                : '未配默认模型 (手填)'}
+              {tp.defaultModelCode
+                ? `默认模型 (${tp.defaultModelCode})`
+                : '未配置默认模型，请选择'}
             </option>
-            {tp.modelsInGroup.map((m) => (
-              <option key={m.model} value={m.model}>{m.model}</option>
+            {tp.modelOptionsInGroup.map((modelCode) => (
+              <option key={modelCode} value={modelCode}>{modelCode}</option>
             ))}
           </select>
+          {tp.modelOptionsInGroup.length > 0 && (
+            <p className="mt-1 text-[10px] text-slate-400">
+              默认值来自系统配置，也可切换为该能力目录中的其他模型。
+            </p>
+          )}
         </div>
       )}
 
@@ -178,7 +222,7 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
 
       {/* 由 useTaskParams.isSupported 真实判定(基于 Vidu 能力 schema + 当前 schemaParams),
           取代之前用写死 model.capability 的旧判定 */}
-      <UnsupportedNotice show={!tp.isSupported} />
+      <UnsupportedNotice show={!tp.initializing && !tp.unavailableReason && !tp.isSupported} />
     </div>
   );
 };
