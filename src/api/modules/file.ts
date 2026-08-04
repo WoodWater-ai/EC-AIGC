@@ -15,6 +15,7 @@ import http from '../client';
 export type UploadTokenPurpose =
   | 'AVATAR'
   | 'PRODUCT'
+  | 'MODEL'
   | 'DICT'
   | 'IMAGE_EDIT_MASK'
   | 'OTHER'

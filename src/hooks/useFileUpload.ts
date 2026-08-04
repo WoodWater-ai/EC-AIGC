@@ -134,6 +134,7 @@ async function compressImageUnder(file: File, maxBytes = IMAGE_MAX_BYTES): Promi
 export type FileUploadPurpose =
   | 'AVATAR'
   | 'PRODUCT'
+  | 'MODEL'
   | 'DICT'
   | 'IMAGE_EDIT_MASK'
   | 'OTHER'

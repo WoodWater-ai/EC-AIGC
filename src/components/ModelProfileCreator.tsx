@@ -97,7 +97,7 @@ export function ModelProfileCreator({
   const [uploading, setUploading] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const uploadedCandidatesRef = useRef<UploadCandidate[]>([]);
-  const { upload } = useFileUpload({ purpose: 'OTHER' });
+  const { upload } = useFileUpload({ purpose: 'MODEL' });
 
   useEffect(() => {
     uploadedCandidatesRef.current = uploadedCandidates;
