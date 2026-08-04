@@ -481,6 +481,11 @@ const MyWorkCard: React.FC<{
         <img src={work.thumbnailUrl || work.url} alt={work.title} className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.02]" />
       )}
       <span className="absolute left-3 top-3 rounded-md border border-white/80 bg-white/90 px-2 py-1 text-[10px] font-black text-[#393431] shadow-sm">{work.mediaType === 'IMAGE' ? '图片作品' : '视频作品'}</span>
+      {work.productImageUrl && (
+        <div className="transition-opacity duration-200 lg:group-hover:opacity-0">
+          <SourceProduct image={work.productImageUrl} />
+        </div>
+      )}
     </div>
     <div className="p-3">
       <div className="flex items-start justify-between gap-3">

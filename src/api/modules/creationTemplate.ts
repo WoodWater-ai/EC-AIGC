@@ -15,6 +15,7 @@ export interface CreationWork {
   title: string;
   url: string;
   thumbnailUrl?: string | null;
+  productImageUrl?: string | null;
   status?: string | null;
   score?: number | null;
   createTime: string;
