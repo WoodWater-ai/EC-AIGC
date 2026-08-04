@@ -631,7 +631,7 @@ export function useCreateImageTaskState(
 
       setExecutionConfirmOpen(false);
     } catch {
-      toast.error('提交失败,请稍后重试');
+      // 请求层已经直接展示服务端返回的 errMessage，这里只终止提交流程，避免重复提示。
     } finally {
       setIsSubmitting(false);
     }
