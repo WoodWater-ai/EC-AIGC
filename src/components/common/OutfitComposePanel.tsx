@@ -128,10 +128,11 @@ export function OutfitComposePanel(props: OutfitComposePanelProps) {
     try {
       const file = new File([compositePreview.blob], '智能合成套图.png', { type: 'image/png' });
       // upload() 返回 file_resource.id(中间产物,仅用于 assetApi.create 的入参)
-      const { fileResourceId, accessUrl } = await upload(file);
+      const { fileResourceId, accessUrl, fileMd5 } = await upload(file);
       // assetApi.create 返回 asset_resource.id(业务 id,product.image_id 关联的就是这个)
       const assetId = await assetApi.create({
         fileResourceId,
+        fileMd5,
         name: '智能合成套图',
         productId: productId != null ? String(productId) : undefined,
         assetKind: 'IMAGE',

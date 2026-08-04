@@ -11,6 +11,7 @@ import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { withCosThumbnail } from '../utils/cosImage';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { TaskDetailsDrawer } from './TaskDetailsDrawer';
+import { useAuth } from '../auth/AuthContext';
 
 interface TaskListProps {
   highlightGroupId: string | null;
@@ -74,6 +75,8 @@ const resultImageUrl = (result: TaskResultPreviewResponse) =>
     : result.thumbnailUrl || result.url;
 
 export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightTaskKind, setScreen }) => {
+  const { hasPermission } = useAuth();
+  const canCreateTask = hasPermission('task:create');
   const [kind, setKind] = useState<MediaKind>(highlightTaskKind);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [searchInput, setSearchInput] = useState('');
@@ -157,7 +160,7 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
             每次提交为一个批次；展开后按图片类型或视频任务查看产物与执行状态。
           </p>
         </div>
-        <div className="flex gap-2">
+        {canCreateTask && <div className="flex gap-2">
           <button
             onClick={() => setScreen(AppScreen.CREATE_IMAGE_TASK)}
             className="h-10 rounded-lg bg-primary px-4 text-xs font-bold text-white"
@@ -170,7 +173,7 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
           >
             新建视频任务
           </button>
-        </div>
+        </div>}
       </div>
 
       <div className="flex gap-2 rounded-xl border border-slate-200 bg-white p-2">

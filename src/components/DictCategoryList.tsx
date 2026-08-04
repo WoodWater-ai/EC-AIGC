@@ -16,6 +16,7 @@ import {
   type DictCategoryUpdateRequest,
 } from '../api/modules/dict';
 import type { PageInfo } from '../api/service-result';
+import { useAuth } from '../auth/AuthContext';
 
 /**
  * 字典分类管理 — 列表页
@@ -30,6 +31,10 @@ import type { PageInfo } from '../api/service-result';
  * </ul>
  */
 export default function DictCategoryList() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('dict-category:create');
+  const canEdit = hasPermission('dict-category:edit');
+  const canDelete = hasPermission('dict-category:delete');
   // ===== 状态 =====
   const [keyword, setKeyword] = useState('');
   const [pageNum, setPageNum] = useState(1);
@@ -67,18 +72,21 @@ export default function DictCategoryList() {
 
   // ===== 操作 =====
   function openAdd() {
+    if (!canCreate) return;
     setEditing(null);
     setDrawerMode('create');
     setDrawerOpen(true);
   }
 
   function openEdit(cat: DictCategory) {
+    if (!canEdit) return;
     setEditing(cat);
     setDrawerMode('edit');
     setDrawerOpen(true);
   }
 
   async function handleDelete(cat: DictCategory) {
+    if (!canDelete) return;
     const ok = await confirm({
       title: '删除字典分类',
       message: (
@@ -115,12 +123,15 @@ export default function DictCategoryList() {
         onSearch={() => setPageNum(1)}
         onReset={resetFilter}
         onAdd={openAdd}
+        canAdd={canCreate}
       />
       <CategoryTable
         list={pageInfo?.list ?? []}
         loading={loading}
         onEdit={openEdit}
         onDelete={handleDelete}
+        canEdit={canEdit}
+        canDelete={canDelete}
       />
       {pageInfo && pageInfo.pages > 1 && (
         <Pagination pageInfo={pageInfo} setPageNum={setPageNum} />
@@ -169,8 +180,9 @@ interface FilterBarProps {
   onSearch: () => void;
   onReset: () => void;
   onAdd: () => void;
+  canAdd: boolean;
 }
-function FilterBar({ keyword, setKeyword, onSearch, onReset, onAdd }: FilterBarProps) {
+function FilterBar({ keyword, setKeyword, onSearch, onReset, onAdd, canAdd }: FilterBarProps) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3 flex-wrap">
       <div className="relative flex-1 min-w-[240px]">
@@ -184,12 +196,12 @@ function FilterBar({ keyword, setKeyword, onSearch, onReset, onAdd }: FilterBarP
           className="w-full h-9 pl-9 pr-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
         />
       </div>
-      <button
+      {canAdd && <button
         onClick={onSearch}
         className="h-9 px-4 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90"
       >
         查询
-      </button>
+      </button>}
       <button
         onClick={onReset}
         className="h-9 px-4 border border-slate-200 bg-white text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 flex items-center gap-1.5"
@@ -214,8 +226,10 @@ interface CategoryTableProps {
   loading: boolean;
   onEdit: (cat: DictCategory) => void;
   onDelete: (cat: DictCategory) => Promise<void>;
+  canEdit: boolean;
+  canDelete: boolean;
 }
-function CategoryTable({ list, loading, onEdit, onDelete }: CategoryTableProps) {
+function CategoryTable({ list, loading, onEdit, onDelete, canEdit, canDelete }: CategoryTableProps) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       {loading ? (
@@ -245,20 +259,20 @@ function CategoryTable({ list, loading, onEdit, onDelete }: CategoryTableProps) 
                 <td className="px-4 py-3 text-sm text-text-muted">{cat.sort ?? 0}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
+                    {canEdit && <button
                       onClick={() => onEdit(cat)}
                       className="p-1.5 text-slate-500 hover:text-primary hover:bg-primary/5 rounded"
                       title="编辑"
                     >
                       <Edit className="w-3.5 h-3.5" />
-                    </button>
-                    <button
+                    </button>}
+                    {canDelete && <button
                       onClick={() => onDelete(cat)}
                       className="p-1.5 text-slate-500 hover:text-danger hover:bg-danger/5 rounded"
                       title="删除"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </button>}
                   </div>
                 </td>
               </tr>

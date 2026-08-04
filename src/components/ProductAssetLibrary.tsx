@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner';
 import { withCosThumbnail } from '../utils/cosImage';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { useAuth } from '../auth/AuthContext';
 import {
   Grid,
   List,
@@ -198,6 +199,11 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
   setIsDrawerOpen,
   setScreen
 }) => {
+  const { hasPermission } = useAuth();
+  const canCreateTask = hasPermission('task:create');
+  const canArchive = hasPermission('asset:archive');
+  const canExport = hasPermission('asset:export');
+  const canDownload = hasPermission('asset:download');
   // 1. View mode: 'card' (商品卡片视图), 'grid' (素材网格视图), 'table' (表格视图)
   const [viewMode, setViewMode] = useState<'card' | 'grid' | 'table'>('table');
 
@@ -397,6 +403,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
   }, [isDrawerOpen, drawerType, selectedProduct.id, setSelectedProduct]);
 
   const handleArchiveSelected = async () => {
+    if (!canArchive) return;
     const assets = generatedAssets
       .filter((asset) => selectedAssetIds.includes(asset.id))
       .map((asset) => ({ id: asset.id, mediaType: asset.mediaType }));
@@ -563,7 +570,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
           </p>
         </div>
         <div className="flex gap-2">
-          <button 
+          {canCreateTask && <button 
             onClick={() => {
               setScreen(AppScreen.CREATE_IMAGE_TASK);
             }}
@@ -571,7 +578,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
           >
             <Plus className="w-4 h-4" />
             新建任务
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -790,16 +797,16 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
         <div className="flex items-center gap-2">
           {viewMode === 'table' ? (
             <div className="flex gap-2">
-              <button className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg flex items-center gap-1 transition-all">
+              {canExport && <button className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg flex items-center gap-1 transition-all">
                 批量导出
                 <ChevronDown className="w-3 h-3" />
-              </button>
-              <button
+              </button>}
+              {canArchive && <button
                 onClick={handleArchiveSelected}
                 className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition-all"
               >
                 批量归档
-              </button>
+              </button>}
               <button
                 onClick={() => setOnlyShowPending(prev => !prev)}
                 className={`px-3 py-1.5 font-semibold text-xs rounded-lg transition-all border ${
@@ -1596,7 +1603,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                   >
                     查看全部素材
                   </button>
-                  <button
+                  {canCreateTask && <button
                     onClick={() => {
                       setIsDrawerOpen(false);
                       setScreen(AppScreen.CREATE_IMAGE_TASK);
@@ -1605,7 +1612,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                   >
                     <Sparkles className="w-4 h-4" />
                     AI 重新生成
-                  </button>
+                  </button>}
                 </div>
 
               </div>
@@ -1864,10 +1871,10 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                       <Eye className="w-3.5 h-3.5" />
                       预览
                     </a>
-                    <a href={activeAsset.url} target="_blank" rel="noreferrer" download className="px-3.5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-bold hover:bg-slate-100 cursor-pointer flex items-center gap-1 shadow-2xs">
+                    {canDownload && <a href={activeAsset.url} target="_blank" rel="noreferrer" download className="px-3.5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-bold hover:bg-slate-100 cursor-pointer flex items-center gap-1 shadow-2xs">
                       <Download className="w-3.5 h-3.5" />
                       下载
-                    </a>
+                    </a>}
                     <button
                       onClick={() => {
                         if (activeAssetProduct) {
@@ -1882,7 +1889,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                       <ExternalLink className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <button
+                  {canCreateTask && <button
                     onClick={() => {
                       setIsDrawerOpen(false);
                       setScreen(AppScreen.CREATE_IMAGE_TASK);
@@ -1891,7 +1898,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                   >
                     <Sparkles className="w-4 h-4" />
                     AI 重新生成
-                  </button>
+                  </button>}
                 </div>
 
               </div>

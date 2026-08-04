@@ -7,6 +7,7 @@ import { withCosThumbnail } from '../utils/cosImage';
 import { useConfirm } from './common/ConfirmProvider';
 import { productCategoryApi, type ProductCategoryNode } from '../api/modules/productCategory';
 import ProductFormDrawer from './ProductFormDrawer';
+import { useAuth } from '../auth/AuthContext';
 
 /**
  * 产品管理 - 列表页
@@ -19,6 +20,10 @@ import ProductFormDrawer from './ProductFormDrawer';
  *  - 分页器底部对齐
  */
 export default function ProductManagePage() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('product:create');
+  const canEdit = hasPermission('product:edit');
+  const canDelete = hasPermission('product:delete');
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProductStatus | ''>('');
   // 分类筛选(单选):value 为 product_category.id (string 防止精度丢失)
@@ -84,11 +89,13 @@ export default function ProductManagePage() {
   }, [categoryTree]);
 
   function openAdd() {
+    if (!canCreate) return;
     setEditing(null);
     setDrawerOpen(true);
   }
 
   async function openEdit(p: ProductDTO) {
+    if (!canEdit) return;
     try {
       const detail = await productInfoApi.detail({ id: p.id });
       setEditing(detail);
@@ -99,6 +106,7 @@ export default function ProductManagePage() {
   }
 
   async function handleDelete(p: ProductDTO) {
+    if (!canDelete) return;
     const ok = await confirm({
       title: '删除产品',
       message: (
@@ -150,13 +158,13 @@ export default function ProductManagePage() {
             共 <span className="font-semibold text-primary">{total}</span> 个产品
           </p>
         </div>
-        <button
+        {canCreate && <button
           onClick={openAdd}
           className="h-9 px-4 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
         >
           <span className="material-symbols-outlined text-base">add</span>
           新建产品
-        </button>
+        </button>}
       </div>
 
       {/* 筛选 + 表格卡片 */}
@@ -336,20 +344,20 @@ export default function ProductManagePage() {
                     </td>
                     <td className="px-4 py-2 text-left">
                       <div className="inline-flex items-center gap-1">
-                        <button
+                        {canEdit && <button
                           onClick={() => openEdit(p)}
                           className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-primary hover:bg-blue-50 rounded"
                           title="编辑"
                         >
                           <span className="material-symbols-outlined text-base">edit</span>
-                        </button>
-                        <button
+                        </button>}
+                        {canDelete && <button
                           onClick={() => handleDelete(p)}
                           className="w-7 h-7 flex items-center justify-center text-rose-600 hover:bg-rose-50 rounded"
                           title="删除"
                         >
                           <span className="material-symbols-outlined text-base">delete</span>
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>

@@ -2,6 +2,7 @@ import http from '../client';
 import type { PageInfo } from '../service-result';
 
 export type ModelGenerationMode = 'text' | 'reference' | 'face_swap';
+export type ModelProfileSourceMode = ModelGenerationMode | 'upload';
 
 export interface ModelProfileDTO {
   id: string;
@@ -9,7 +10,7 @@ export interface ModelProfileDTO {
   name: string;
   image: string;
   source: string;
-  sourceMode: ModelGenerationMode;
+  sourceMode: ModelProfileSourceMode;
   modelType: string;
   licenseStatus: string;
   tags: string[];
@@ -31,7 +32,7 @@ export interface ModelProfilePageRequest {
   pageSize: number;
   keyword?: string;
   styleTag?: string;
-  sourceMode?: ModelGenerationMode;
+  sourceMode?: ModelProfileSourceMode;
   licenseStatus?: string;
   status?: string;
 }
@@ -96,6 +97,21 @@ export interface ModelProfilePublishRequest {
   reason?: string;
 }
 
+/**
+ * 将已经上传到资源中心的图片直接保存为模特档案。
+ * 多张图片共用基础名称，服务端按顺序追加编号，与候选图发布流程一致。
+ */
+export interface ModelProfileImportRequest {
+  assetResourceIds: string[];
+  name: string;
+  tags: string[];
+  suitableFor?: string[];
+  categories?: string[];
+  ageFeel?: string;
+  bodyRatio?: string;
+  reason?: string;
+}
+
 export const modelProfileApi = {
   page: (request: ModelProfilePageRequest) =>
     http.post<PageInfo<ModelProfileDTO>>('/v1/admin/model-profile/page', request),
@@ -111,4 +127,7 @@ export const modelProfileApi = {
 
   publish: (request: ModelProfilePublishRequest) =>
     http.post<string[]>('/v1/admin/model-profile/publish', request),
+
+  importExisting: (request: ModelProfileImportRequest) =>
+    http.post<string[]>('/v1/admin/model-profile/import', request),
 };

@@ -14,6 +14,12 @@ import { ProductPickerModal } from './CreateImageTask/ProductPickerModal';
 import { creationTemplateApi } from '../api/modules/creationTemplate';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import type { PrefillState } from './createTask/useTaskParams';
+import {
+  buildTrendingReplicatePrompt,
+  extractTrendingUserInstruction,
+  TRENDING_ROLE_LABELS,
+  type TrendingReplacementRole,
+} from '../lib/createVideoTask/buildTrendingReplicatePrompt';
 
 type VideoMode = 'FIRST_FRAME' | 'TRENDING_REPLICATE';
 type InputRole = 'FIRST_FRAME' | 'SOURCE_VIDEO' | 'REPLACEMENT_REFERENCE';
@@ -25,6 +31,7 @@ interface SelectedAsset {
   originalUrl: string;
   thumbnailUrl?: string;
   durationSec?: number;
+  replacementRole?: TrendingReplacementRole;
 }
 
 interface ParamsSnapshot {
@@ -82,13 +89,25 @@ const MODE_CONFIG: Record<
   },
 };
 
-const toSelectedAsset = (asset: AssetResourceItem): SelectedAsset => ({
+const inferReplacementRole = (asset: AssetResourceItem): TrendingReplacementRole => {
+  const hint = `${asset.tags ?? ''},${asset.assetType ?? ''},${asset.name}`;
+  if (/模特|人物|人像/.test(hint)) return 'model';
+  if (/场景|背景|布景/.test(hint)) return 'scene';
+  if (/动作|姿势|姿态/.test(hint)) return 'pose';
+  return 'style';
+};
+
+const toSelectedAsset = (
+  asset: AssetResourceItem,
+  replacementRole?: TrendingReplacementRole,
+): SelectedAsset => ({
   assetId: asset.id,
   name: asset.name,
   assetKind: asset.assetKind,
   originalUrl: asset.originalUrl ?? asset.thumbnailUrl ?? '',
   thumbnailUrl: asset.thumbnailUrl,
   durationSec: asset.durationSec,
+  replacementRole,
 });
 
 const cleanReusableVideoPrompt = (value: string): string => {
@@ -114,6 +133,19 @@ const cleanReusableVideoPrompt = (value: string): string => {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+};
+
+const inferTemplateReplacementRole = (
+  prompt: string,
+  replacementIndex: number,
+): TrendingReplacementRole => {
+  const line = prompt
+    .split(/\r?\n/)
+    .find((item) => item.trim().startsWith(`图${replacementIndex + 2}：`)) ?? '';
+  if (line.includes('人物替换图')) return 'model';
+  if (line.includes('场景替换图')) return 'scene';
+  if (line.includes('动作/姿势')) return 'pose';
+  return 'style';
 };
 
 export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
@@ -148,6 +180,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     SelectedAsset[]
   >([]);
   const [prompt, setPrompt] = useState('');
+  const [manualTrendingPrompt, setManualTrendingPrompt] = useState<string | null>(null);
   const [negativePrompt, setNegativePrompt] = useState(
     '商品漂移、材质闪烁、人物畸形、镜头突变、文字变化',
   );
@@ -213,7 +246,10 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     const replacementReferenceAssets = references
       .filter((reference) => reference.role === 'REPLACEMENT_REFERENCE')
       .sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0))
-      .map((reference) => toTemplateAsset(reference, 'IMAGE'))
+      .map((reference, index) => ({
+        ...toTemplateAsset(reference, 'IMAGE'),
+        replacementRole: inferTemplateReplacementRole(snapshot.prompt ?? '', index),
+      }))
       .filter((asset) => Boolean(asset.originalUrl))
       .slice(0, 7);
     setFirstFrame(
@@ -227,7 +263,10 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
         : null,
     );
     setReplacementReferences(replacementReferenceAssets);
-    setPrompt(cleanReusableVideoPrompt(snapshot.prompt ?? ''));
+    setManualTrendingPrompt(null);
+    setPrompt(nextMode === 'TRENDING_REPLICATE'
+      ? extractTrendingUserInstruction(snapshot.prompt ?? '')
+      : cleanReusableVideoPrompt(snapshot.prompt ?? ''));
     setNegativePrompt(snapshot.negativePrompt ?? '');
     setCount(Math.max(1, Math.min(8, snapshot.count ?? 1)));
     setShots(['', '', '']);
@@ -237,25 +276,30 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
 
   const config = MODE_CONFIG[mode];
   const hasProductReference = Boolean(selectedProductInfo?.imageId);
+  const trendingPrompt = useMemo(() => buildTrendingReplicatePrompt({
+    replacements: replacementReferences.map((asset) => ({
+      replacementRole: asset.replacementRole ?? 'style',
+    })),
+    userInstruction: prompt,
+  }), [prompt, replacementReferences]);
+  const effectivePrompt = mode === 'TRENDING_REPLICATE'
+    ? (manualTrendingPrompt ?? trendingPrompt)
+    : prompt;
   const isInputReady =
     mode === 'FIRST_FRAME'
       ? firstFrame !== null
-      : sourceVideo !== null &&
-        (hasProductReference || replacementReferences.length > 0);
+      : sourceVideo !== null && hasProductReference;
   const readiness = [
     selectedProductInfo !== null,
     isInputReady,
-    prompt.trim().length > 0,
+    effectivePrompt.trim().length > 0,
     params.channelType === 'VIDU' &&
       params.capability === config.capability &&
       params.channelId !== null,
   ].filter(Boolean).length;
-  const duration = mode === 'TRENDING_REPLICATE'
-    ? '跟随原视频'
-    : String(params.schemaParams.duration ?? '5');
+  const duration = String(params.schemaParams.duration ?? '5');
   const outputRatio = String(
-    params.schemaParams.aspect_ratio ??
-      (mode === 'FIRST_FRAME' ? '跟随首帧' : '原视频比例'),
+    params.schemaParams.aspect_ratio ?? '',
   );
 
   const handleProductPicked = (product: ProductDTO) => {
@@ -280,9 +324,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
         return withoutProductImage.slice(0, 6);
       });
     }
-    const reusablePrompt = cleanReusableVideoPrompt(
-      creationPrefill?.snapshot.prompt ?? '',
-    );
+    const reusablePrompt = mode === 'TRENDING_REPLICATE'
+      ? extractTrendingUserInstruction(creationPrefill?.snapshot.prompt ?? '')
+      : cleanReusableVideoPrompt(creationPrefill?.snapshot.prompt ?? '');
     if (reusablePrompt) {
       const values: Record<string, string> = {
         name: nextFacts.name,
@@ -323,6 +367,12 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   };
 
   const generateStoryboard = () => {
+    if (mode === 'TRENDING_REPLICATE') {
+      toast.info('爆款复刻的分镜、动作和剪辑节奏直接采用源视频，无需另行生成分镜');
+      setShots(['', '', '']);
+      setStoryboardGenerated(false);
+      return;
+    }
     setShots([
       '建立主体与环境，镜头保持稳定。',
       '展示核心动作和商品细节，控制主体一致性。',
@@ -334,7 +384,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   const applyPromptTemplate = (template: 'PRODUCT' | 'TRENDING') => {
     setPrompt(
       template === 'TRENDING'
-        ? '保留原视频的创意结构、镜头节奏和爆点，替换为新的商品、模特和场景素材。'
+        ? '严格保留原视频的镜头、动作、剪辑节奏与叙事结构，仅替换图片绑定中明确指定的主体。'
         : '镜头稳定呈现商品主体，突出材质、动作和核心卖点。',
     );
     setNegativePrompt('商品漂移、材质闪烁、人物畸形、镜头突变、文字变化');
@@ -344,10 +394,14 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   };
 
   const applyAiSuggestion = () => {
+    const selectedRoleNames = Array.from(new Set(
+      replacementReferences.map((asset) =>
+        TRENDING_ROLE_LABELS[asset.replacementRole ?? 'style']),
+    ));
     const suggestion =
       mode === 'FIRST_FRAME'
         ? '保持首帧中的商品主体和构图，使用克制流畅的镜头运动，结尾以特写强化材质与核心卖点。'
-        : '保留原视频的镜头节奏与转场逻辑，替换商品和场景后保持主体一致、动作自然、卖点清晰。';
+        : `严格保留原视频的镜头节奏、人物动作和转场逻辑，仅使用商品${selectedRoleNames.length > 0 ? `、${selectedRoleNames.join('、')}` : ''}绑定约束明确内容。`;
     setPrompt((current) =>
       current.trim() ? `${current.trim()}\n${suggestion}` : suggestion,
     );
@@ -365,7 +419,12 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     if (!picker || items.length === 0) return;
     const selected = items
       .filter((item) => item.assetKind === picker.assetKind)
-      .map(toSelectedAsset)
+      .map((item) => toSelectedAsset(
+        item,
+        picker.role === 'REPLACEMENT_REFERENCE'
+          ? inferReplacementRole(item)
+          : undefined,
+      ))
       .filter((item) => item.originalUrl);
     if (selected.length === 0) {
       toast.warning(
@@ -388,18 +447,23 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
             merged.push(item);
           }
         }
-        const maxReferences = selectedProductInfo?.imageId ? 6 : 7;
+        const maxReferences = 6;
         if (merged.length > maxReferences) {
-          toast.warning(
-            selectedProductInfo?.imageId
-              ? '商品主图已自动占用 1 个复刻图片槽位，其他参考图最多选择 6 张'
-              : '替换参考图最多选择 7 张',
-          );
+          toast.warning('商品主图已自动占用 1 个复刻图片槽位，其他参考图最多选择 6 张');
         }
         return merged.slice(0, maxReferences);
       });
     }
     setPicker(null);
+  };
+
+  const updateReplacementRole = (
+    assetId: string,
+    replacementRole: TrendingReplacementRole,
+  ) => {
+    setReplacementReferences((current) => current.map((asset) =>
+      asset.assetId === assetId ? { ...asset, replacementRole } : asset));
+    setStoryboardGenerated(false);
   };
 
   const buildAssets = (): VideoTaskSubmitPayload['assets'] => {
@@ -461,12 +525,16 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       toast.warning(
         mode === 'FIRST_FRAME'
           ? '请先选择视频首帧'
-          : '请先选择爆款原视频，并确保商品有主图或至少选择 1 张替换参考图',
+          : '请先选择爆款原视频，并确保已选商品具有商品主图',
       );
       return;
     }
-    if (!prompt.trim()) {
+    if (!effectivePrompt.trim()) {
       toast.warning('请输入本次视频 Prompt');
+      return;
+    }
+    if (mode === 'TRENDING_REPLICATE' && effectivePrompt.length > 2000) {
+      toast.warning('爆款复刻最终 Prompt 不能超过 2000 字，请精简素材名称或创意补充');
       return;
     }
     if (
@@ -485,8 +553,12 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       .filter(Boolean)
       .join('\n');
     const positivePrompt = storyboard
-      ? `${prompt.trim()}\n\n分镜规划：\n${storyboard}`
-      : prompt.trim();
+      ? `${effectivePrompt.trim()}\n\n分镜规划：\n${storyboard}`
+      : effectivePrompt.trim();
+    if (mode === 'TRENDING_REPLICATE' && positivePrompt.length > 2000) {
+      toast.warning('爆款复刻最终 Prompt（含分镜）不能超过 2000 字，请精简创意补充');
+      return;
+    }
     // 负面约束使用独立字段提交，由后端统一且幂等地组装进供应商 Prompt。
     const taskPrompt = positivePrompt;
     const numericProductId = /^\d+$/.test(selectedProductInfo.id)
@@ -546,9 +618,12 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
             <span className="block text-[10px] font-bold text-slate-400">
               生成准备度 {readiness}/4
             </span>
-            <span className="text-[10px] text-slate-500">
-              {mode === 'TRENDING_REPLICATE' ? duration : `${duration} 秒`} · {outputRatio}
-            </span>
+            {mode === 'FIRST_FRAME' && (
+              <span className="text-[10px] text-slate-500">
+                {duration} 秒{outputRatio ? ` · ${outputRatio}` : ''}
+              </span>
+            )}
+            {/* 爆款复刻“跟随原视频”规格文案暂时隐藏，后续按需恢复。 */}
           </div>
           <div className="relative">
             <button
@@ -587,6 +662,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
               </div>
             )}
           </div>
+          {/* AI 助手按钮暂时隐藏，后续按需解除注释。
           <button
             type="button"
             onClick={applyAiSuggestion}
@@ -597,6 +673,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
             </span>
             AI 助手
           </button>
+          */}
           <button
             type="button"
             onClick={submit}
@@ -696,16 +773,16 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                         替换素材
                       </p>
                       <h2 className="mt-1 text-sm font-black">
-                        商品、模特与场景
+                        模特、场景、风格与动作
                       </h2>
                       <p className="mt-1 text-[11px] leading-4 text-slate-400">
-                        商品主图会自动作为第 1 张复刻参考图；连同其他替换参考图最多 7 张。
+                        商品主图固定为图 1；其他素材选择用途后动态编译图片绑定，最多再选 6 张。
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() =>
-                        openPicker('REPLACEMENT_REFERENCE', 'IMAGE', 'PRODUCT')
+                        openPicker('REPLACEMENT_REFERENCE', 'IMAGE', 'UPLOAD')
                       }
                       className="text-xs font-bold text-primary"
                     >
@@ -713,10 +790,59 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                     </button>
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-2">
+                    {selectedProductInfo?.imageUrl && (
+                      <div className="min-w-0">
+                        <div className="relative aspect-square overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50">
+                          <img
+                            src={selectedProductInfo.imageUrl}
+                            alt={selectedProductInfo.name}
+                            className="h-full w-full object-contain"
+                            referrerPolicy="no-referrer"
+                          />
+                          <span className="absolute left-1 top-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                            图1
+                          </span>
+                        </div>
+                        <div className="mt-1 h-7 truncate rounded border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-[10px] font-bold text-emerald-700">
+                          固定使用产品
+                        </div>
+                      </div>
+                    )}
+                    {replacementReferences.map((asset, index) => (
+                      <div key={asset.assetId} className="min-w-0">
+                        <AssetThumb
+                          asset={asset}
+                          badge={`图${index + 2}`}
+                          onRemove={() =>
+                            setReplacementReferences((previous) =>
+                              previous.filter(
+                                (item) => item.assetId !== asset.assetId,
+                              ),
+                            )
+                          }
+                        />
+                        <select
+                          value={asset.replacementRole ?? 'style'}
+                          onChange={(event) => updateReplacementRole(
+                            asset.assetId,
+                            event.target.value as TrendingReplacementRole,
+                          )}
+                          className="mt-1 h-7 w-full rounded border border-slate-200 bg-white px-1 text-[10px] font-bold text-slate-600 outline-none focus:border-primary"
+                          aria-label={`${asset.name}素材用途`}
+                        >
+                          {(Object.entries(TRENDING_ROLE_LABELS) as Array<[
+                            TrendingReplacementRole,
+                            string,
+                          ]>).map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
                     <button
                       type="button"
                       onClick={() =>
-                        openPicker('REPLACEMENT_REFERENCE', 'IMAGE', 'PRODUCT')
+                        openPicker('REPLACEMENT_REFERENCE', 'IMAGE', 'UPLOAD')
                       }
                       className="aspect-square rounded-md border-2 border-dashed border-slate-300 text-slate-400 hover:border-primary hover:bg-primary-light hover:text-primary"
                       aria-label="添加替换参考图"
@@ -725,19 +851,6 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                         add
                       </span>
                     </button>
-                    {replacementReferences.map((asset) => (
-                      <AssetThumb
-                        key={asset.assetId}
-                        asset={asset}
-                        onRemove={() =>
-                          setReplacementReferences((previous) =>
-                            previous.filter(
-                              (item) => item.assetId !== asset.assetId,
-                            ),
-                          )
-                        }
-                      />
-                    ))}
                   </div>
                 </div>
               </>
@@ -767,28 +880,21 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
               {mode === 'TRENDING_REPLICATE' && (
                 <div className="mt-5 border-t border-slate-100 pt-5">
                   <label className="block text-xs font-bold">
-                    复刻目标
+                    用户创意补充
                     <textarea
                       value={prompt}
+                      maxLength={500}
                       onChange={(event) => {
                         setPrompt(event.target.value);
                         setStoryboardGenerated(false);
                       }}
                       className="mt-1.5 h-20 w-full resize-none rounded-md border border-slate-200 p-2 text-xs font-normal leading-5 outline-none focus:border-primary"
-                      placeholder="描述希望保留的创意结构、镜头节奏和爆点"
+                      placeholder="补充品牌调性、画面禁忌或其他创意要求；镜头、动作和节奏默认严格跟随源视频"
                     />
                   </label>
-                  <button
-                    type="button"
-                    disabled={
-                      !sourceVideo ||
-                      (!hasProductReference && replacementReferences.length === 0)
-                    }
-                    onClick={generateStoryboard}
-                    className="mt-3 h-8 rounded bg-slate-900 px-3 text-xs font-bold text-white disabled:bg-slate-200"
-                  >
-                    分析分镜与爆点
-                  </button>
+                  <p className="mt-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] leading-5 text-blue-700">
+                    爆款复刻直接以源视频作为唯一分镜与节奏依据，不额外生成或覆盖分镜。
+                  </p>
                 </div>
               )}
             </div>
@@ -802,23 +908,50 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                     先确认本次视频表达；生成后才按时长拆分为可编辑分镜。
                   </p>
                 </div>
-                <span className="flex h-9 items-center rounded border border-slate-200 bg-white px-2 text-xs text-slate-700">
-                  {mode === 'TRENDING_REPLICATE' ? duration : `${duration} 秒`}
-                </span>
+                {mode === 'FIRST_FRAME' && (
+                  <span className="flex h-9 items-center rounded border border-slate-200 bg-white px-2 text-xs text-slate-700">
+                    {duration} 秒
+                  </span>
+                )}
               </div>
               <label className="mt-4 block text-xs font-bold">
                 最终 Prompt
                 <textarea
-                  value={prompt}
+                  value={effectivePrompt}
                   maxLength={mode === 'FIRST_FRAME' ? 5000 : 2000}
                   onChange={(event) => {
-                    setPrompt(event.target.value);
+                    if (mode === 'TRENDING_REPLICATE') {
+                      setManualTrendingPrompt(event.target.value);
+                    } else {
+                      setPrompt(event.target.value);
+                    }
                     setStoryboardGenerated(false);
                   }}
-                  className="mt-1.5 h-28 w-full resize-none rounded-md border border-slate-200 p-3 text-xs font-normal leading-5 outline-none focus:border-primary"
+                  className="mt-1.5 h-64 w-full resize-y rounded-md border border-slate-200 p-3 text-xs font-normal leading-5 outline-none focus:border-primary"
                   placeholder="描述商品、动作、场景和镜头目标"
                 />
+                {mode === 'TRENDING_REPLICATE' && (
+                  <div className="mt-1 flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-normal text-slate-400">
+                      {manualTrendingPrompt !== null
+                        ? '已手动编辑，素材或槽位变化不会覆盖当前内容'
+                        : '已根据商品主图、素材用途和用户创意补充自动计算'}
+                      （{effectivePrompt.length}/2000）
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManualTrendingPrompt(null);
+                        setStoryboardGenerated(false);
+                      }}
+                      className="shrink-0 rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-primary hover:text-primary"
+                    >
+                      根据表单计算
+                    </button>
+                  </div>
+                )}
               </label>
+              {mode === 'FIRST_FRAME' && (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[10px] text-slate-400">
                   {storyboardGenerated
@@ -836,6 +969,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                   {storyboardGenerated ? '重新生成提示词' : '生成提示词'}
                 </button>
               </div>
+              )}
               {storyboardGenerated && (
                 <details open className="mt-4 border border-slate-200">
                   <summary className="cursor-pointer bg-slate-50 px-3 py-2 text-xs font-black">
@@ -872,6 +1006,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                 />
               </label>
               <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                {/* AI 助手建议按钮暂时隐藏，后续按需解除注释。
                 <button
                   type="button"
                   onClick={applyAiSuggestion}
@@ -879,6 +1014,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                 >
                   AI 助手建议
                 </button>
+                */}
                 <span className="text-[10px] text-slate-400">
                   内容将在最终提交时统一校验
                 </span>
@@ -905,7 +1041,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                   count={count}
                   onAspectRatioChange={() => undefined}
                   onCountChange={setCount}
-                  prompt={prompt}
+                  prompt={effectivePrompt}
                   onPromptChange={setPrompt}
                   negativePrompt={negativePrompt}
                   onNegativePromptChange={setNegativePrompt}
@@ -933,7 +1069,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                 ) : (
                   <>
                     <p>源视频：MP4/MOV · 5～180 秒</p>
-                    <p>商品主图或替换参考图：合计 1～7 张</p>
+                    <p>商品主图固定为图 1，其他角色图最多 6 张</p>
                     <p className="text-amber-700">
                       仅复刻镜头结构，不复用历史生成结果
                     </p>
@@ -1026,12 +1162,18 @@ const AssetThumb: React.FC<{
   asset: SelectedAsset;
   onRemove: () => void;
   large?: boolean;
-}> = ({ asset, onRemove, large }) => (
+  badge?: string;
+}> = ({ asset, onRemove, large, badge }) => (
   <div
     className={`group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 ${
       large ? 'h-44 w-full' : 'aspect-square w-full'
     }`}
   >
+    {badge && (
+      <span className="absolute left-1 top-1 z-10 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+        {badge}
+      </span>
+    )}
     {asset.assetKind === 'VIDEO' ? (
       <video
         src={asset.originalUrl}

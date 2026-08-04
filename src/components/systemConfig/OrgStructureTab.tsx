@@ -7,6 +7,7 @@ import { departmentApi, type DepartmentDTO, type DepartmentStatus } from '../../
 import { useServiceQuery } from '../../api/hooks/useServiceQuery';
 import { useConfirm } from '../common/ConfirmProvider';
 import type { SystemUser } from '../../types';
+import { useAuth } from '../../auth/AuthContext';
 
 // —— Props interface + ref(给 SystemConfig 反查部门用) ——
 export interface OrgStructureTabRef {
@@ -23,6 +24,8 @@ export interface OrgStructureTabProps {
 
 export const OrgStructureTab = forwardRef<OrgStructureTabRef, OrgStructureTabProps>(
   ({ users: propUsers, onAssignUser: _onAssignUser }, ref) => {
+    const { hasPermission } = useAuth();
+    const canManageOrg = hasPermission('org:manage');
     // —— 1. 加载部门列表(后端 list 是平铺,前端 useMemo 转 Map) ——
     const { data: deptList, loading, refetch } = useServiceQuery<DepartmentDTO[]>(
       () => departmentApi.list({ pageNum: 1, pageSize: 1000 }),
@@ -83,6 +86,7 @@ export const OrgStructureTab = forwardRef<OrgStructureTabRef, OrgStructureTabPro
 
     // —— 9. 打开 Drawer(create / edit) ——
     const handleOpenCreateDeptDrawer = (initialParentId: string | null = null) => {
+      if (!canManageOrg) return;
       setDeptDrawerMode('create');
       setDeptFormName('');
       setDeptFormCode('');
@@ -94,6 +98,7 @@ export const OrgStructureTab = forwardRef<OrgStructureTabRef, OrgStructureTabPro
     };
 
     const handleOpenEditDeptDrawer = (dept: DepartmentDTO) => {
+      if (!canManageOrg) return;
       setDeptDrawerMode('edit');
       setDeptFormName(dept.deptName);
       setDeptFormCode(dept.deptCode);
@@ -120,6 +125,7 @@ export const OrgStructureTab = forwardRef<OrgStructureTabRef, OrgStructureTabPro
 
     // —— 11. 保存部门 ——
     const handleSaveDepartment = async () => {
+      if (!canManageOrg) return;
       if (!deptFormName.trim() || !deptFormCode.trim()) {
         triggerToast('请填写完整的部门名称和唯一编码');
         return;
@@ -161,6 +167,7 @@ export const OrgStructureTab = forwardRef<OrgStructureTabRef, OrgStructureTabPro
 
     // —— 12. 删除部门(用 useConfirm) ——
     const handleDeleteDepartment = async (dept: DepartmentDTO) => {
+      if (!canManageOrg) return;
       // 前端双重检查
       const hasChildren = departments.some(d => d.pid === dept.id);
       if (hasChildren) {
@@ -268,7 +275,7 @@ export const OrgStructureTab = forwardRef<OrgStructureTabRef, OrgStructureTabPro
                 </span>
               </div>
 
-              <div className="flex items-center gap-1.5 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+              {canManageOrg && <div className="flex items-center gap-1.5 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => handleOpenCreateDeptDrawer(dept.id)}
                   title="添加子部门"
@@ -290,7 +297,7 @@ export const OrgStructureTab = forwardRef<OrgStructureTabRef, OrgStructureTabPro
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-              </div>
+              </div>}
             </div>
           </div>
 
@@ -358,13 +365,13 @@ export const OrgStructureTab = forwardRef<OrgStructureTabRef, OrgStructureTabPro
               <Network className="w-4 h-4 text-blue-600" />
               企业多级组织部门树状图
             </span>
-            <button
+            {canManageOrg && <button
               onClick={() => handleOpenCreateDeptDrawer(null)}
               className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               新增一级部门
-            </button>
+            </button>}
           </div>
 
           <div className="p-5 md:p-6 space-y-3.5 bg-slate-50/30">
@@ -493,12 +500,12 @@ export const OrgStructureTab = forwardRef<OrgStructureTabRef, OrgStructureTabPro
                 >
                   取消
                 </button>
-                <button
+                {canManageOrg && <button
                   onClick={handleSaveDepartment}
                   className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
                 >
                   {deptDrawerMode === 'create' ? '确认创建' : '保存修改'}
-                </button>
+                </button>}
               </div>
             </div>
           </div>

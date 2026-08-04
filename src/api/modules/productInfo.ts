@@ -120,7 +120,7 @@ export const productInfoApi = {
     http.post<PageInfo<ProductDTO>>('/v1/admin/product-info/list', req),
 
   add: (req: ProductAddReq) =>
-    http.post<void>('/v1/admin/product-info/add', req),
+    http.post<string>('/v1/admin/product-info/add', req),
 
   update: (req: ProductUpdateReq) =>
     http.post<void>('/v1/admin/product-info/update', req),

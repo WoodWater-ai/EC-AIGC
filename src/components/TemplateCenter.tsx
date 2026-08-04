@@ -21,6 +21,7 @@ import {
   type TemplateUpdateRequest,
 } from '../api/modules/template';
 import { recommendParamsApi } from '../api/modules/templateRecommend';
+import { useAuth } from '../auth/AuthContext';
 import { AppScreen } from '../types';
 
 /** 从 templateKind 派生 group,决定建任务页 group */
@@ -69,6 +70,9 @@ interface DrawerState {
 }
 
 export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('template:manage');
+  const canUse = hasPermission('template:use');
   const [activeTab, setActiveTab] = useState<TabKey>('image_task');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'NORMAL' | 'DISABLED'>('all');
@@ -204,6 +208,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   // ===== 事件处理 =====
 
   const handleCopyPrompt = async (tpl: TemplateDTO) => {
+    if (!canUse) return;
     try {
       await navigator.clipboard.writeText(tpl.promptBody);
       toast.success(`已成功复制「${tpl.templateName}」提示词指令！`);
@@ -213,6 +218,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   };
 
   const handleBatchCopy = async () => {
+    if (!canUse) return;
     if (selectedIds.length === 0) {
       toast.info('请选择要复制提示词的模板！');
       return;
@@ -233,6 +239,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   };
 
   const handleBatchDeactivate = async () => {
+    if (!canManage) return;
     if (selectedIds.length === 0) {
       toast.info('请先选择要停用的模板！');
       return;
@@ -265,6 +272,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   };
 
   const handleNew = () => {
+    if (!canManage) return;
     setDrawer({
       mode: 'create',
       tab: activeTab,
@@ -289,6 +297,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   };
 
   const handleRowClick = (tpl: TemplateDTO) => {
+    if (!canManage) return;
     const tabKey = (Object.keys(TAB_TO_KIND) as TabKey[]).find((k) => TAB_TO_KIND[k] === tpl.templateKind) ?? activeTab;
     setDrawer({
       mode: 'edit',
@@ -303,6 +312,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     if (!drawer) return;
     if (!drawer.data.templateName?.trim()) {
       toast.error('请填写模板名称！');
@@ -332,6 +342,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
   };
 
   const launchWithTemplate = async (tpl: TemplateDTO) => {
+    if (!canUse) return;
     // 1. 写 prefill 基础字段
     const group = deriveGroup(tpl.templateKind);
     const prefill: {
@@ -387,7 +398,7 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
         <div className="flex items-center gap-2 bg-blue-50/50 px-3 py-2 rounded-xl border border-blue-100 border-dashed">
           <Info className="w-4 h-4 text-blue-600" />
           <p className="text-xs text-slate-600">
-            当前权限：<span className="font-semibold text-blue-600">管理员</span>,可编辑和发布模板。普通员工仅可查看及复制。
+            当前权限：<span className="font-semibold text-blue-600">{canManage ? '模板管理' : canUse ? '查看与使用' : '仅查看'}</span>
           </p>
         </div>
       </div>
@@ -441,29 +452,29 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
             </select>
           </div>
           <div className="flex items-center gap-2 w-full xl:w-auto justify-end">
-            <button
+            {canUse && <button
               onClick={handleBatchCopy}
               className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors flex items-center gap-1 border border-slate-200 cursor-pointer"
             >
               <span className="material-symbols-outlined text-sm">content_copy</span>
               复制
-            </button>
-            <button
+            </button>}
+            {canManage && <button
               onClick={handleBatchDeactivate}
               className="px-3 py-1.5 text-xs font-semibold text-rose-500 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-1 border border-slate-200 cursor-pointer"
               data-testid="template-batch-deactivate"
             >
               <span className="material-symbols-outlined text-sm text-rose-500">block</span>
               批量停用
-            </button>
-            <button
+            </button>}
+            {canManage && <button
               onClick={handleNew}
               className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 hover:bg-blue-700 transition-colors shadow-xs ml-2 cursor-pointer"
               data-testid="template-new"
             >
               <span className="material-symbols-outlined text-sm">add</span>
               新建模板
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -488,6 +499,8 @@ export default function TemplateCenter({ setScreen }: TemplateCenterProps) {
             onRowClick={handleRowClick}
             onCopy={handleCopyPrompt}
             launchWithTemplate={launchWithTemplate}
+            canManage={canManage}
+            canUse={canUse}
           />
         )}
 
@@ -548,10 +561,12 @@ interface TemplateTableAreaProps {
   onRowClick: (tpl: TemplateDTO) => void;
   onCopy: (tpl: TemplateDTO) => void;
   launchWithTemplate: (tpl: TemplateDTO) => Promise<void>;
+  canManage: boolean;
+  canUse: boolean;
 }
 
 function TemplateTableArea(props: TemplateTableAreaProps) {
-  const { templates, activeTab, selectedIds, onSelectAll, onSelectRow, onRowClick, onCopy, launchWithTemplate } = props;
+  const { templates, activeTab, selectedIds, onSelectAll, onSelectRow, onRowClick, onCopy, launchWithTemplate, canManage, canUse } = props;
   if (templates.length === 0) {
     return (
       <div className="py-16 text-center text-slate-400 font-medium">
@@ -645,8 +660,8 @@ function TemplateTableArea(props: TemplateTableAreaProps) {
             return (
               <tr
                 key={tpl.id}
-                onClick={() => onRowClick(tpl)}
-                className={`hover:bg-slate-50/50 transition-colors cursor-pointer group ${
+                onClick={() => canManage && onRowClick(tpl)}
+                className={`hover:bg-slate-50/50 transition-colors group ${canManage ? 'cursor-pointer' : ''} ${
                   isChecked ? 'bg-blue-50/20' : ''
                 } ${tpl.status === 'DISABLED' ? 'opacity-75 bg-slate-50/30' : ''}`}
               >
@@ -675,27 +690,27 @@ function TemplateTableArea(props: TemplateTableAreaProps) {
                 )}
                 <td className="p-4 text-right font-semibold" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end gap-1.5">
-                    <button
+                    {canUse && <button
                       onClick={() => onCopy(tpl)}
                       title="复制正文指令"
                       className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-sm font-bold">content_copy</span>
-                    </button>
-                    <button
+                    </button>}
+                    {canManage && <button
                       onClick={() => onRowClick(tpl)}
                       title="编辑修改规则"
                       className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-sm font-bold">edit</span>
-                    </button>
-                    <button
+                    </button>}
+                    {canUse && <button
                       onClick={() => launchWithTemplate(tpl)}
                       title="以此规则发布新任务"
                       className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-sm font-bold">rocket_launch</span>
-                    </button>
+                    </button>}
                   </div>
                 </td>
               </tr>

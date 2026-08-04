@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import COS from 'cos-js-sdk-v5';
 import { fileApi } from '../api/modules/file';
 import { toast } from 'sonner';
+import { md5FileHex } from '../utils/crypto';
 
 /** [2026-07-16 P0] 图片最大 32 MB(产品/avatar/合成都适用),后端 file-size-limit 是 200 MB 但太松 */
 const IMAGE_MAX_BYTES = 32 * 1024 * 1024;
@@ -149,6 +150,8 @@ export interface FileUploadResult {
   fileResourceId: string;
   fileKey: string;
   accessUrl: string;
+  /** 压缩后实际上传内容的 MD5。 */
+  fileMd5: string;
 }
 
 /** 懒加载 SDK 实例(避免每次 hook 调用都创建) */
@@ -258,6 +261,8 @@ export function useFileUpload(options: UseFileUploadOptions) {
           );
         }
 
+        const fileMd5 = await md5FileHex(uploadFile);
+
         // Step 1: 签发 token
         const tokenResp = await fileApi.uploadToken({
           purpose,
@@ -328,6 +333,7 @@ export function useFileUpload(options: UseFileUploadOptions) {
           fileResourceId: completeResp.fileResourceId,
           fileKey: completeResp.fileKey,
           accessUrl: completeResp.accessUrl,
+          fileMd5,
         };
         setResult(out);
         return out;

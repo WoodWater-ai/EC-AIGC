@@ -38,6 +38,7 @@ export const ImageContentSection: React.FC<ImageContentSectionProps> = (props) =
           <p className="text-[11px] font-bold text-primary">内容</p>
           <h2 className="mt-0.5 text-sm font-black">最终 Prompt</h2>
         </div>
+        {/* AI 助手按钮暂时隐藏，后续按需解除注释。
         <button
           type="button"
           onClick={onAssistantClick}
@@ -51,6 +52,7 @@ export const ImageContentSection: React.FC<ImageContentSectionProps> = (props) =
           <span className="material-symbols-outlined text-base">{assistantState === 'processing' ? 'progress_activity' : 'auto_fix_high'}</span>
           {assistantState === 'processing' ? messages.assistant.processing : assistantState === 'complete' ? messages.assistant.retry : messages.assistant.idle}
         </button>
+        */}
       </div>
 
       {!isProductBound && (

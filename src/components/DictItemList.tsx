@@ -22,6 +22,7 @@ import {
 import type { PageInfo } from '../api/service-result';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { withCosThumbnail } from '../utils/cosImage';
+import { useAuth } from '../auth/AuthContext';
 
 /**
  * 字典管理(字典项) — 列表页
@@ -36,6 +37,10 @@ import { withCosThumbnail } from '../utils/cosImage';
  * </ul>
  */
 export default function DictItemList() {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('dict:create');
+  const canEdit = hasPermission('dict:edit');
+  const canChangeStatus = hasPermission('dict:status');
   // ===== 状态 =====
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<DictItemStatus | ''>('');
@@ -94,18 +99,21 @@ export default function DictItemList() {
 
   // ===== 操作 =====
   function openAdd() {
+    if (!canCreate) return;
     setEditing(null);
     setDrawerMode('create');
     setDrawerOpen(true);
   }
 
   function openEdit(item: DictItem) {
+    if (!canEdit) return;
     setEditing(item);
     setDrawerMode('edit');
     setDrawerOpen(true);
   }
 
   async function handleChangeStatus(item: DictItem) {
+    if (!canChangeStatus) return;
     const next: DictItemStatus = item.status === 'NORMAL' ? 'DISABLED' : 'NORMAL';
     const verb = next === 'DISABLED' ? '停用' : '启用';
     const ok = await confirm({
@@ -153,6 +161,7 @@ export default function DictItemList() {
         onSearch={() => setPageNum(1)}
         onReset={resetFilter}
         onAdd={openAdd}
+        canAdd={canCreate}
       />
       <ItemTable
         list={pageInfo?.list ?? []}
@@ -160,6 +169,8 @@ export default function DictItemList() {
         renderCategoryName={renderCategoryName}
         onEdit={openEdit}
         onChangeStatus={handleChangeStatus}
+        canEdit={canEdit}
+        canChangeStatus={canChangeStatus}
       />
       {pageInfo && pageInfo.pages > 1 && (
         <Pagination pageInfo={pageInfo} setPageNum={setPageNum} />
@@ -214,6 +225,7 @@ interface FilterBarProps {
   onSearch: () => void;
   onReset: () => void;
   onAdd: () => void;
+  canAdd: boolean;
 }
 function FilterBar(p: FilterBarProps) {
   return (
@@ -248,12 +260,12 @@ function FilterBar(p: FilterBarProps) {
           className="w-full h-9 pl-9 pr-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
         />
       </div>
-      <button
+      {p.canAdd && <button
         onClick={p.onSearch}
         className="h-9 px-4 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90"
       >
         查询
-      </button>
+      </button>}
       <button
         onClick={p.onReset}
         className="h-9 px-4 border border-slate-200 bg-white text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 flex items-center gap-1.5"
@@ -279,8 +291,10 @@ interface ItemTableProps {
   renderCategoryName: (item: DictItem) => string;
   onEdit: (item: DictItem) => void;
   onChangeStatus: (item: DictItem) => Promise<void>;
+  canEdit: boolean;
+  canChangeStatus: boolean;
 }
-function ItemTable({ list, loading, renderCategoryName, onEdit, onChangeStatus }: ItemTableProps) {
+function ItemTable({ list, loading, renderCategoryName, onEdit, onChangeStatus, canEdit, canChangeStatus }: ItemTableProps) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       {loading ? (
@@ -339,14 +353,14 @@ function ItemTable({ list, loading, renderCategoryName, onEdit, onChangeStatus }
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
+                    {canEdit && <button
                       onClick={() => onEdit(item)}
                       className="p-1.5 text-slate-500 hover:text-primary hover:bg-primary/5 rounded"
                       title="编辑"
                     >
                       <Edit className="w-3.5 h-3.5" />
-                    </button>
-                    <button
+                    </button>}
+                    {canChangeStatus && <button
                       onClick={() => onChangeStatus(item)}
                       className={`px-2 py-1 text-xs font-semibold rounded ${
                         item.status === 'NORMAL'
@@ -356,7 +370,7 @@ function ItemTable({ list, loading, renderCategoryName, onEdit, onChangeStatus }
                       title={item.status === 'NORMAL' ? '停用' : '启用'}
                     >
                       {item.status === 'NORMAL' ? '停用' : '启用'}
-                    </button>
+                    </button>}
                   </div>
                 </td>
               </tr>

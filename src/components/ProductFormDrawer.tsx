@@ -68,7 +68,6 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
   const [category, setCategory] = useState('');
   const [imageRef, setImageRef] = useState<ProductImageRef | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [composeOpen, setComposeOpen] = useState(false);
   const [status, setStatus] = useState<ProductStatus>('ON_SHELF');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -254,14 +253,14 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
     setImageRef(null);
   }
 
-  function handleAppliedComposite(asset: AppliedCompositeAsset): void {
+  /** 合成套图上传成功后，直接作为当前产品图片回填。 */
+  function handleCompositeApplied(asset: AppliedCompositeAsset) {
     setImageRef({
-      id: asset.fileResourceId, // 已是 string
+      id: asset.fileResourceId,
       thumbnailUrl: asset.thumbnailUrl,
       originalUrl: asset.originalUrl,
       name: asset.name,
     });
-    setComposeOpen(false);
   }
 
   function toggleCategory(id: string, categoryName: string) {
@@ -499,19 +498,6 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
                     恢复原值
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setComposeOpen((o) => !o)}
-                  className={`h-8 px-3 text-xs font-semibold rounded-md border flex items-center gap-1.5 transition-colors ${
-                    composeOpen
-                      ? 'bg-blue-50 text-primary border-blue-200 hover:bg-blue-100'
-                      : 'bg-white text-primary border-slate-300 hover:bg-blue-50'
-                  }`}
-                  title="基于两张图片合成新的产品主图"
-                >
-                  <span className="material-symbols-outlined text-base">layers</span>
-                  上下装合成套图
-                </button>
               </div>
             </div>
             <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
@@ -519,10 +505,10 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
             </p>
           </div>
 
-          {/* 上下装合成套图 —— 替换产品主图 */}
+          {/* 上下装合成套图：合成并上传成功后直接回填为产品图片 */}
           <OutfitComposePanel
             productId={initial?.id}
-            onApplied={handleAppliedComposite}
+            onApplied={handleCompositeApplied}
             defaultCollapsed
           />
 
@@ -730,6 +716,7 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
           multiSelect={false}
           mode="picker"
           assetKind="IMAGE"
+          allowedSources={['UPLOAD']}
           onClose={() => setPickerOpen(false)}
           onConfirmSelection={handlePickerConfirm}
         />

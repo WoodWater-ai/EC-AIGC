@@ -74,14 +74,14 @@ export interface UserAddRequest {
 export interface UserUpdateRequest {
   id: string;
   userName?: string;         // 可选(编辑可不改)
+  phone?: string;            // 可选,空字符串表示清空
   name?: string;
   code?: string;
   headUrl?: string;
   isAdmin?: 'Y' | 'N';
   roleIds?: number[];        // 可选;不传则不动角色
-  // ★ 不含 phone / password(后端 UserUpdateRequest 暂不支持)
+  // ★ password 不随编辑接口提交,改走 resetPassword 端点
   // password 改走 resetPassword 端点
-  // phone 改留 P2 补 schema
 }
 
 export interface UserStatusRequest {

@@ -31,6 +31,7 @@ import {
   type AssetCategoryUpdateRequest,
 } from '../api/modules/assetCategory';
 import type { AppScreen } from '../types';
+import { useAuth } from '../auth/AuthContext';
 
 interface ResourceCategoryListProps {
   setScreen: (screen: AppScreen) => void;
@@ -104,6 +105,9 @@ interface TreeNodeProps {
   onAddChild: (parentId: number) => void;
   onEdit: (node: AssetCategoryNode) => void;
   onDelete: (node: AssetCategoryNode) => void;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
 const TreeNode: React.FC<TreeNodeProps> = ({
@@ -116,6 +120,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   onAddChild,
   onEdit,
   onDelete,
+  canCreate,
+  canEdit,
+  canDelete,
 }) => {
   const hasChildren = !!node.children && node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
@@ -181,7 +188,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
         {/* hover 操作图标(默认 opacity-0) */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button
+          {canCreate && <button
             onClick={(e) => {
               e.stopPropagation();
               onAddChild(node.id);
@@ -190,8 +197,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
           >
             <Plus className="w-3 h-3" />
-          </button>
-          <button
+          </button>}
+          {canEdit && <button
             onClick={(e) => {
               e.stopPropagation();
               onEdit(node);
@@ -200,8 +207,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
           >
             <Edit className="w-3 h-3" />
-          </button>
-          <button
+          </button>}
+          {canDelete && <button
             onClick={(e) => {
               e.stopPropagation();
               onDelete(node);
@@ -210,7 +217,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50"
           >
             <Trash2 className="w-3 h-3" />
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -229,6 +236,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               onAddChild={onAddChild}
               onEdit={onEdit}
               onDelete={onDelete}
+              canCreate={canCreate}
+              canEdit={canEdit}
+              canDelete={canDelete}
             />
           ))}
         </div>
@@ -247,6 +257,9 @@ interface CategoryDetailPanelProps {
   onEdit: () => void;
   onAddChild: () => void;
   onDelete: () => void;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
 const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
@@ -255,6 +268,9 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   onEdit,
   onAddChild,
   onDelete,
+  canCreate,
+  canEdit,
+  canDelete,
 }) => {
   const isPublic = node.isPublic === 'Y';
   const kind = node.categoryKind ?? 'IMAGE';
@@ -362,30 +378,30 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
 
       {/* 主操作按钮区 */}
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        {canEdit && <button
           onClick={onEdit}
           className="flex items-center gap-1.5 px-4 h-9 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer shadow-sm"
           id="btn-detail-edit"
         >
           <Edit className="w-3.5 h-3.5" />
           编辑
-        </button>
-        <button
+        </button>}
+        {canCreate && <button
           onClick={onAddChild}
           className="flex items-center gap-1.5 px-4 h-9 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer"
           id="btn-detail-add-child"
         >
           <Plus className="w-3.5 h-3.5" />
           添加子分类
-        </button>
-        <button
+        </button>}
+        {canDelete && <button
           onClick={onDelete}
           className="flex items-center gap-1.5 px-4 h-9 bg-white border border-rose-200 text-rose-600 rounded-lg text-xs font-bold hover:bg-rose-50 transition-colors cursor-pointer ml-auto"
           id="btn-detail-delete"
         >
           <Trash2 className="w-3.5 h-3.5" />
           删除
-        </button>
+        </button>}
       </div>
 
       {/* 提示:不能修改的字段 */}
@@ -756,6 +772,10 @@ const CategoryDrawer: React.FC<CategoryDrawerProps> = ({
 export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
   setScreen: _setScreen,
 }) => {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('asset-category:create');
+  const canEdit = hasPermission('asset-category:edit');
+  const canDelete = hasPermission('asset-category:delete');
   const confirm = useConfirm();
   // ---------- state ----------
   const [tree, setTree] = useState<AssetCategoryNode[]>([]);
@@ -832,6 +852,7 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
   };
 
   const handleAddRoot = () => {
+    if (!canCreate) return;
     setDrawerMode('create');
     setDrawerDefaultParentId(0);
     setDrawerEditingNode(null);
@@ -839,6 +860,7 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
   };
 
   const handleAddChild = (parentId: number) => {
+    if (!canCreate) return;
     setDrawerMode('create');
     setDrawerDefaultParentId(parentId);
     setDrawerEditingNode(null);
@@ -852,6 +874,7 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
   };
 
   const handleEdit = (node: AssetCategoryNode) => {
+    if (!canEdit) return;
     setDrawerMode('edit');
     setDrawerEditingNode(node);
     setDrawerDefaultParentId(node.parentId);
@@ -859,6 +882,7 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
   };
 
   const handleDelete = async (node: AssetCategoryNode) => {
+    if (!canDelete) return;
     const ok = await confirm({
       title: '删除分类',
       message: `确认要删除分类「${node.categoryName}」吗?此操作不可恢复。`,
@@ -887,6 +911,8 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
   };
 
   const handleDrawerSubmit = async (form: DrawerFormData): Promise<void> => {
+    if (drawerMode === 'create' && !canCreate) return;
+    if (drawerMode === 'edit' && !canEdit) return;
     if (drawerMode === 'create') {
       const req: AssetCategoryCreateRequest = {
         parentId: drawerDefaultParentId,
@@ -959,14 +985,14 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
               <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">我的分类</h3>
               <p className="text-[10px] text-slate-400 mt-0.5 font-medium">共 {totalCount} 项</p>
             </div>
-            <button
+            {canCreate && <button
               onClick={handleAddRoot}
               className="flex items-center gap-1 px-2.5 h-7 bg-blue-600 text-white rounded-md text-[11px] font-bold hover:bg-blue-700 transition-colors cursor-pointer"
               id="btn-add-root"
             >
               <Plus className="w-3 h-3" />
               新建顶级
-            </button>
+            </button>}
           </div>
 
           {/* 树主体 */}
@@ -983,13 +1009,13 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
                 <p className="text-[10px] text-slate-400 mb-3 text-center px-4">
                   点击右上角"新建顶级"开始创建第一个资源分类
                 </p>
-                <button
+                {canCreate && <button
                   onClick={handleAddRoot}
                   className="flex items-center gap-1 px-3 h-7 bg-blue-600 text-white rounded-md text-[11px] font-bold hover:bg-blue-700 transition-colors cursor-pointer"
                 >
                   <Plus className="w-3 h-3" />
                   新建顶级分类
-                </button>
+                </button>}
               </div>
             ) : (
               <nav className="flex flex-col gap-0.5">
@@ -1005,6 +1031,9 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
                     onAddChild={handleAddChild}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
+                    canCreate={canCreate}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
                   />
                 ))}
               </nav>
@@ -1025,6 +1054,9 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
               onEdit={() => handleEdit(selectedNode)}
               onAddChild={() => handleAddChild(selectedNode.id)}
               onDelete={() => handleDelete(selectedNode)}
+              canCreate={canCreate}
+              canEdit={canEdit}
+              canDelete={canDelete}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-400">
@@ -1033,13 +1065,13 @@ export const ResourceCategoryList: React.FC<ResourceCategoryListProps> = ({
               <p className="text-xs text-slate-400 mb-5 text-center max-w-md">
                 选择一个分类节点后,这里会显示该分类的详细信息和操作按钮。你也可以创建一个新的顶级分类。
               </p>
-              <button
+              {canCreate && <button
                 onClick={handleAddRoot}
                 className="flex items-center gap-1.5 px-4 h-9 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 新建顶级分类
-              </button>
+              </button>}
             </div>
           )}
         </main>

@@ -1,14 +1,67 @@
-import type { ImageGenerationType } from './readinessChecks';
+import type { ReferenceSlot } from './extractReferenceInsights';
 import type { ProductFacts } from './extractProductFacts';
+import type { ImageGenerationType } from './readinessChecks';
+
+const TYPE_INSTRUCTIONS: Record<ImageGenerationType, string> = {
+  product_main: '商品完整居中，背景低干扰，轮廓、材质和细节清晰可辨。',
+  scene_detail: '商品为画面中心，场景仅服务于氛围、尺度和使用感。',
+  detail_closeup: '微距聚焦商品材质、工艺与关键细节，背景干净虚化，细节必须可核验。',
+  model_triple_view: '相同人物、光线和机位展示正面、侧面、背面；手部不得遮挡商品关键结构。',
+};
+
+const referenceBinding = (slot: ReferenceSlot, imageNo: number): string => {
+  switch (slot) {
+    case 'detail':
+      return `图${imageNo}为细节参考，仅用于锁定重点展示的细节部位和可核验工艺，不得改变图1商品。`;
+    case 'style':
+      return `图${imageNo}为风格参考，仅用于锁定摄影质感、色调和视觉语言，不得改变图1商品。`;
+    case 'scene':
+      return `图${imageNo}为场景参考，仅用于锁定空间、布景和光线，不得改变图1商品。`;
+    case 'pose':
+      return `图${imageNo}为姿势或构图参考，仅用于锁定人物姿态和构图关系，不得改变图1商品。`;
+    case 'model':
+      return `图${imageNo}为模特参考，仅用于锁定人物外貌、体型和发型，不得改变图1商品。`;
+  }
+};
+
+const factsText = (facts: ProductFacts): string => {
+  const values = [
+    facts.category && `品类：${facts.category}`,
+    facts.sellingPoints && `核心卖点：${facts.sellingPoints}`,
+    facts.color && `颜色：${facts.color}`,
+    facts.patternAndMaterial && `图案/材质：${facts.patternAndMaterial}`,
+    facts.structure && `版型/结构：${facts.structure}`,
+  ].filter(Boolean);
+  return values.length > 0 ? values.join('；') : '以图1中可核验的商品信息为准';
+};
+
+const lockedAttributesText = (facts: ProductFacts): string => {
+  const values = [
+    facts.color && `颜色（${facts.color}）`,
+    facts.patternAndMaterial && `图案与材质（${facts.patternAndMaterial}）`,
+    facts.structure && `版型与结构（${facts.structure}）`,
+    facts.sellingPoints && `可见关键卖点（${facts.sellingPoints}）`,
+  ].filter(Boolean);
+  return values.length > 0
+    ? `图1商品的${values.join('、')}`
+    : '图1商品中可见的颜色、图案、材质、版型、结构和关键工艺';
+};
+
+const visualParam = (
+  value: string,
+  referenceSlots: ReferenceSlot[],
+  slot: ReferenceSlot,
+  fallback: string,
+): string => {
+  const index = referenceSlots.indexOf(slot);
+  const reference = index >= 0 ? `图${index + 2}` : '';
+  if (value && reference) return `${value}，并以${reference}为参考`;
+  return value || (reference ? `以${reference}为参考` : fallback);
+};
 
 /**
- * 单张图片类型的 prompt 组装。
- *
- * 命名规则:[imageType 目标句] + 商品事实 + 风格/场景/姿势 + 参考图解析 + 负面约束。
- * 每个 imageType 有专属目标句,使"主图/场景/细节/模特"Prompt 模板名实相符。
- * [v1 2026-07-25 重写]:把通用外壳改成 per-type 模板段;
- *   取消原"3D High-fidelity product photoshoot of {name}"固定首句,改为各 type 自己的目标句;
- *   参考图索引按 appearance 顺序编号,如"参考图 1: 白色吊带睡裙"形式拼入。
+ * image.ecommerce-reference Profile 编译器。
+ * 图1固定为主体商品，后续图号严格跟随当前参考图拖拽顺序。
  */
 export function buildPromptFromFacts(
   type: ImageGenerationType,
@@ -16,55 +69,38 @@ export function buildPromptFromFacts(
   style: string,
   scene: string,
   pose: string,
-  referenceInsights: string[],
+  referenceSlots: ReferenceSlot[],
+  userInstruction = '',
 ): string {
-  const segments: string[] = [];
-  // 1. imageType 目标句
-  segments.push(typeTargetSentence(type));
-  // 2. 商品事实
-  const factSegments: string[] = [];
-  if (facts.name) factSegments.push(`商品：${facts.name}`);
-  if (facts.category) factSegments.push(`品类：${facts.category}`);
-  if (facts.sellingPoints) factSegments.push(`核心卖点：${facts.sellingPoints}`);
-  if (facts.color) factSegments.push(`颜色：${facts.color}`);
-  if (facts.patternAndMaterial) factSegments.push(`图案/材质：${facts.patternAndMaterial}`);
-  if (facts.structure) factSegments.push(`版型/结构：${facts.structure}`);
-  if (factSegments.length > 0) {
-    segments.push(factSegments.join('；') + '。');
-  }
-  // 3. 风格 / 场景 / 姿势(仅模特展示需要姿势)
-  if (style) segments.push(`风格：${style}。`);
-  if (scene) segments.push(`场景：${scene}。`);
-  if (pose && type === 'model_triple_view') segments.push(`动作/姿势：${pose}。`);
-  // 4. 参考图解析(按序号拼接)
-  if (referenceInsights.length > 0) {
-    const refLines = referenceInsights.map(
-      (insight, idx) => `参考图 ${idx + 1}：${insight}`,
-    );
-    segments.push(refLines.join('\n'));
-  }
-  return segments.join(' ');
-}
+  if (!facts.name.trim()) return '';
 
-/**
- * 每种 imageType 的"目标句"——给 Vidu 的类型语义指令。
- * 这些是首句,放在所有内容前面,使 Vidu 直接理解任务意图。
- *
- * 主图/场景/细节/模特展示 4 类各自明确具体拍摄要求,
- * 避免共用"3D High-fidelity product photoshoot"通用外壳。
- */
-function typeTargetSentence(type: ImageGenerationType): string {
-  switch (type) {
-    case 'product_main':
-      return '纯净商业主图，商品主体完整、边缘清晰，保留品牌与材质细节；白底居中构图、主体占比 80% 以上、文字区预留 20%，符合电商主图规范。';
-    case 'scene_detail':
-      return '商品融入指定场景，强化氛围、使用感和商业叙事；中景镜头突出商品与人物/场景的互动关系，主体占比 40-60%。';
-    case 'detail_closeup':
-      return '聚焦材质、工艺与关键卖点，使用微距镜头（85mm+ 微距/特写光圈）和局部光影；展示纹理、缝线、印花、配件等细节部位。';
-    case 'model_triple_view':
-      return '生成一张服装电商模特三视图，横向三联依次展示同一位成年模特的正面、严格 90 度侧面和背面；三个视图保持人物、发型、身材比例、服装、机位高度、光线和背景完全一致，完整清晰展示商品结构，不遮挡领口、袖口、腰头和下摆，不凭空增加图案、配饰、文字或水印。';
-    default:
-      // 兜底:防御性,不应触发(enum 限制 4 值)
-      return '商品展示图。';
-  }
+  const bindings = [
+    '图1为商品主体，仅用于锁定颜色、图案、材质、版型、结构和可见品牌信息。',
+    ...referenceSlots.map((slot, index) => referenceBinding(slot, index + 2)),
+  ];
+  const detailFocus = facts.sellingPoints
+    || facts.patternAndMaterial
+    || '商品材质、工艺与关键细节';
+  const typeInstruction = type === 'detail_closeup'
+    ? `微距聚焦${detailFocus}，背景干净虚化，细节必须可核验。`
+    : TYPE_INSTRUCTIONS[type];
+
+  return `【任务目标】
+为电商生成${typeInstruction}主体为“${facts.name}”，画面真实、清晰、可用于商品展示。
+
+【参考图绑定】
+${bindings.join('\n')}
+
+【视觉参数】
+摄影风格：${visualParam(style, referenceSlots, 'style', '真实、清晰的电商摄影风格')}。
+场景：${visualParam(scene, referenceSlots, 'scene', type === 'scene_detail' ? '符合商品使用逻辑的低干扰场景' : '简洁低干扰背景')}。
+姿势或构图：${visualParam(pose, referenceSlots, 'pose', type === 'model_triple_view' ? '同一模特正面、侧面、背面三视图' : '商品主体稳定、结构完整')}。
+
+【商品事实与保真】
+商品事实：${factsText(facts)}。
+必须保持：${lockedAttributesText(facts)}。
+不得新增未提供的商品、文字、Logo 或配饰；不得改变商品颜色、图案、版型、材质和关键工艺。
+
+【用户创意补充】
+${userInstruction.trim() || '无额外补充。'}`;
 }

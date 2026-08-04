@@ -52,15 +52,21 @@ function adaptAuthUser(authUser: ReturnType<typeof useAuth>['user']): SystemUser
     return {
       id: '0',
       name: '匿名',
+      userName: '',
+      phone: '',
       avatar: '',
       role: '管理员',
-      email: '',
       status: 'offline',
       joinedDate: '',
     };
   }
   // 把 roles[0] (string) 映到 SystemUser.role 的字面量联合
   const ROLE_MAP: Record<string, SystemUser['role']> = {
+    ADMIN: '管理员',
+    OPERATOR: '运营策划',
+    DESIGNER: '高级设计师',
+    AUDITOR: '协同客户',
+    MANAGER: '管理员',
     管理员: '管理员',
     高级设计师: '高级设计师',
     运营策划: '运营策划',
@@ -71,16 +77,24 @@ function adaptAuthUser(authUser: ReturnType<typeof useAuth>['user']): SystemUser
   return {
     id: String(authUser.userId ?? authUser.username ?? '0'),
     name: authUser.name || authUser.username || '匿名',
+    userName: authUser.username || '',
+    phone: authUser.phone || '',
     avatar: '', // LoginResponse 无 headUrl
     role: mappedRole ?? ('管理员' as SystemUser['role']),
-    email: authUser.phone || '',
     status: 'online',
     joinedDate: '',
   };
 }
 
 export default function App() {
-  const { user, isAuthenticated, initializing, logout } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    initializing,
+    logout,
+    canAccessScreen,
+    firstAccessibleScreen,
+  } = useAuth();
 
   // 初次加载默认 DASHBOARD —— initializing=true 时显示 spinner 不进 switch；
   // initializing=false 后根据 isAuthenticated 决定 LOGIN 还是 DASHBOARD。
@@ -94,13 +108,16 @@ export default function App() {
     screen: AppScreen,
     payload?: { highlightGroupId?: string; creationTemplateId?: string },
   ) => {
+    if (!canAccessScreen(screen)) return;
     setCurrentScreen(screen);
     if (payload?.highlightGroupId) {
       setHighlightGroupId(payload.highlightGroupId);
     }
-    if (screen === AppScreen.CREATE_IMAGE_TASK || screen === AppScreen.CREATE_VIDEO_TASK) {
-      setCreationTemplateId(payload?.creationTemplateId ?? null);
-    }
+    setCreationTemplateId(
+      screen === AppScreen.CREATE_IMAGE_TASK || screen === AppScreen.CREATE_VIDEO_TASK
+        ? payload?.creationTemplateId ?? null
+        : null,
+    );
   };
 
   // Core local states
@@ -133,9 +150,10 @@ export default function App() {
     setUsers(userListQuery.data.map(u => ({
       id: u.id,
       name: u.name || u.userName || u.phone || '(未命名)',
+      userName: u.userName || '',
+      phone: u.phone || '',
       avatar: u.headUrl || '',
       role: u.isAdmin ? '管理员' : '运营策划',  // P1 TODO:从 roleIds 查角色名
-      email: u.email || u.phone || '',
       status: u.status === 'DISABLED' ? 'offline' : 'online',
       joinedDate: '',  // UserResponse 无此字段
       deptId: u.deptId || undefined,
@@ -166,6 +184,12 @@ export default function App() {
     setIsTransitOpen(true);
   };
 
+  useEffect(() => {
+    if (isAuthenticated && !canAccessScreen(currentScreen)) {
+      setCurrentScreen(firstAccessibleScreen);
+    }
+  }, [isAuthenticated, currentScreen, canAccessScreen, firstAccessibleScreen]);
+
   /**
    * 注册登录态失效回调 —— axios 拦截器抛 A0102xx 时调用
    *
@@ -186,7 +210,7 @@ export default function App() {
   const handleAddTask = (info: { groupId: string; taskIds: string[]; taskKind?: 'IMAGE' | 'VIDEO' }) => {
     setHighlightGroupId(info.groupId);
     if (info.taskKind) setHighlightTaskKind(info.taskKind);
-    setCurrentScreen(AppScreen.TASKS);
+    setScreen(AppScreen.TASKS);
   };
 
   const handleUpdateUserRole = (userId: string, newRole: any, newDeptId?: string) => {
@@ -229,7 +253,7 @@ export default function App() {
         );
       case AppScreen.TEMPLATES:
         return (
-          <TemplateCenter setScreen={setCurrentScreen} />
+          <TemplateCenter setScreen={setScreen} />
         );
       case AppScreen.ASSETS:
         return (
@@ -238,7 +262,7 @@ export default function App() {
             setSelectedProduct={setSelectedProduct}
             isDrawerOpen={isProductDrawerOpen}
             setIsDrawerOpen={setIsProductDrawerOpen}
-            setScreen={setCurrentScreen}
+            setScreen={setScreen}
           />
         );
       case AppScreen.MODEL_LIBRARY:
@@ -260,11 +284,11 @@ export default function App() {
         );
       case AppScreen.ASSET_CATEGORY:
         return (
-          <ResourceCategoryList setScreen={setCurrentScreen} />
+          <ResourceCategoryList setScreen={setScreen} />
         );
       case AppScreen.PRODUCT_CATEGORY:
         return (
-          <ProductCategoryList setScreen={setCurrentScreen} />
+          <ProductCategoryList setScreen={setScreen} />
         );
       case AppScreen.ASYNC_TASKS:
         return <AsyncTaskList />;
@@ -384,7 +408,7 @@ export default function App() {
   if (currentScreen === AppScreen.LOGIN || !isAuthenticated) {
     return (
       <LoginPage
-        onSuccess={(target) => setCurrentScreen(target ?? AppScreen.DASHBOARD)}
+        onSuccess={(target) => setScreen(target ?? firstAccessibleScreen)}
       />
     );
   }
@@ -396,7 +420,7 @@ export default function App() {
       {/* 1. Sidebar Nav */}
       <Sidebar
         currentScreen={currentScreen}
-        setScreen={setCurrentScreen}
+        setScreen={setScreen}
         users={users}
         currentUser={currentUser}
         setCurrentUser={() => {
@@ -414,7 +438,7 @@ export default function App() {
         {/* Header toolbar */}
         <Header
           currentScreen={currentScreen}
-          setScreen={setCurrentScreen}
+          setScreen={setScreen}
           currentUser={currentUser}
           notifications={notifications}
           markAllAsRead={handleMarkAllNotificationsAsRead}

@@ -22,6 +22,7 @@ import {
 } from '../types';
 import { asyncTaskApi } from '../api/modules/asyncTask';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
+import { useAuth } from '../auth/AuthContext';
 
 /**
  * 通道异步任务列表(Vidu 异步任务管理)
@@ -34,6 +35,9 @@ import { useServiceQuery } from '../api/hooks/useServiceQuery';
  * - 不写"同步排队"任务(留二期)
  */
 export const AsyncTaskList: React.FC = () => {
+  const { hasPermission } = useAuth();
+  const canRetry = hasPermission('async-task:retry');
+  const canCancel = hasPermission('async-task:cancel');
   // 筛选条件
   const [channelType, setChannelType] = useState<ChannelType | ''>('');
   const [status, setStatus] = useState<AsyncTaskStatus | ''>('');
@@ -74,6 +78,7 @@ export const AsyncTaskList: React.FC = () => {
 
   // 操作
   const handleRetry = async (id: string) => {
+    if (!canRetry) return;
     if (!confirm(`确认重试异步任务 #${id}?`)) return;
     try {
       await asyncTaskApi.retry(id);
@@ -84,6 +89,7 @@ export const AsyncTaskList: React.FC = () => {
   };
 
   const handleCancel = async (id: string) => {
+    if (!canCancel) return;
     if (!confirm(`确认取消异步任务 #${id}?`)) return;
     try {
       await asyncTaskApi.cancel(id);
@@ -233,7 +239,14 @@ export const AsyncTaskList: React.FC = () => {
                     {t.durationMs != null ? `${t.durationMs}ms` : '-'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <ActionButtons task={t} onDetail={setDetail} onRetry={handleRetry} onCancel={handleCancel} />
+                    <ActionButtons
+                      task={t}
+                      onDetail={setDetail}
+                      onRetry={handleRetry}
+                      onCancel={handleCancel}
+                      canRetry={canRetry}
+                      canCancel={canCancel}
+                    />
                   </td>
                 </tr>
               ))
@@ -289,7 +302,9 @@ const ActionButtons: React.FC<{
   onDetail: (t: ChannelAsyncTask) => void;
   onRetry: (id: string) => void;
   onCancel: (id: string) => void;
-}> = ({ task, onDetail, onRetry, onCancel }) => {
+  canRetry: boolean;
+  canCancel: boolean;
+}> = ({ task, onDetail, onRetry, onCancel, canRetry, canCancel }) => {
   const showRetry = task.status === 'DEAD_LETTER' || task.status === 'FAILED';
   const showCancel = task.status === 'PENDING' || task.status === 'PENDING_SUBMIT' || task.status === 'PROCESSING';
   return (
@@ -301,7 +316,7 @@ const ActionButtons: React.FC<{
       >
         <Code2 size={14} />
       </button>
-      {showRetry && (
+      {showRetry && canRetry && (
         <button
           onClick={() => onRetry(task.id)}
           className="h-7 px-2 rounded text-xs text-primary hover:bg-primary/10 inline-flex items-center gap-1"
@@ -310,7 +325,7 @@ const ActionButtons: React.FC<{
           <RotateCcw size={12} />重试
         </button>
       )}
-      {showCancel && (
+      {showCancel && canCancel && (
         <button
           onClick={() => onCancel(task.id)}
           className="h-7 px-2 rounded text-xs text-rose-600 hover:bg-rose-50 inline-flex items-center gap-1"

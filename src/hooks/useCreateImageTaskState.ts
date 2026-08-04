@@ -1,5 +1,5 @@
 // src/hooks/useCreateImageTaskState.ts
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { AppScreen } from '../types';
@@ -191,27 +191,11 @@ export interface UseCreateImageTaskStateReturn {
   setConflictOpen(v: boolean): void;
   setTemplateOverwriteOpen(v: boolean): void;
   setExecutionConfirmOpen(v: boolean): void;
-  // autosave wiring
-  hydrated: boolean;
 }
 
-const DRAFT_KEY = 'create-image-task-draft-v3';
-const DRAFT_THROTTLE_MS = 800;
+const LEGACY_DRAFT_KEY = 'create-image-task-draft-v3';
 const MIN_TYPE_COUNT = 1;
 const MAX_TYPE_COUNT = 5;
-
-/** Shape of what is persisted to sessionStorage (subset of state) */
-interface PersistedDraft {
-  selectedTypes?: ImageGenerationType[];
-  typeCounts?: Record<ImageGenerationType, number>;
-  template?: string;
-  style?: string;
-  scene?: string;
-  pose?: string;
-  negativePrompt?: string;
-  reviewEnabled?: boolean;
-  formInput?: ProductFactsInput;
-}
 
 export function useCreateImageTaskState(
   opts: UseCreateImageTaskStateOpts,
@@ -250,7 +234,6 @@ export function useCreateImageTaskState(
   const [templateOverwriteOpen, setTemplateOverwriteOpen] = useState<boolean>(false);
   const [executionConfirmOpen, setExecutionConfirmOpen] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [hydrated, setHydrated] = useState<boolean>(false);
   const [productFacts, setProductFacts] = useState<ReturnType<typeof extractProductFacts> | null>(null);
 
   const [formInput, setFormInput] = useState<ProductFactsInput>({
@@ -258,78 +241,14 @@ export function useCreateImageTaskState(
     colorPattern: '', fabricTexture: '', fitStructure: '',
   });
 
-  // ---------- hydrate from sessionStorage ----------
+  // 创建页不保留编辑草稿；挂载时顺便清理旧版本遗留的 sessionStorage 数据。
   useEffect(() => {
     try {
-      const VALID_TYPES: ImageGenerationType[] = [
-        'product_main',
-        'scene_detail',
-        'detail_closeup',
-        'model_triple_view',
-      ];
-      const raw = sessionStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const data = JSON.parse(raw) as PersistedDraft;
-        // 过滤掉已废弃的 imageType 键(如 on_model)避免渲染空卡片
-        if (data.selectedTypes) {
-          const validSelected = data.selectedTypes.filter((t): t is ImageGenerationType => VALID_TYPES.includes(t as ImageGenerationType));
-          setSelectedTypes(validSelected);
-        }
-        if (data.typeCounts) {
-          const tc = data.typeCounts as Record<string, number>;
-          const validCounts: Record<ImageGenerationType, number> = { product_main: 1, scene_detail: 1, detail_closeup: 1, model_triple_view: 1 };
-          (Object.keys(tc) as ImageGenerationType[]).forEach((k) => {
-            if (VALID_TYPES.includes(k)) validCounts[k] = tc[k] ?? 1;
-          });
-          setTypeCounts(validCounts);
-        }
-        if (data.template) setTemplateName(data.template);
-        if (data.style) setStyle(data.style);
-        if (data.scene) setScene(data.scene);
-        if (data.pose) setPose(data.pose);
-        if (data.negativePrompt) setNegativePrompt(data.negativePrompt);
-        if (typeof data.reviewEnabled === 'boolean') setReviewEnabled(data.reviewEnabled);
-        if (data.formInput) setFormInput(data.formInput);
-      }
-      setHydrated(true);
-      if (raw) toast.success('已恢复上次编辑');
-      // [v1 2026-07-25] 清理已废弃 imageType 键(on_model)避免空卡片:
-      // 老版本(enum 改名 model_front 之前)sessionStorage 仍带 on_model 残留,
-      // filter 后如果 selectedTypes 全部被清空,说明草稿不兼容,直接清掉。
-      try {
-        const rawAfter = sessionStorage.getItem(DRAFT_KEY);
-        if (rawAfter) {
-          const d = JSON.parse(rawAfter) as PersistedDraft;
-          if (Array.isArray(d.selectedTypes) && d.selectedTypes.length > 0
-              && d.selectedTypes.every((t) => !VALID_TYPES.includes(t as ImageGenerationType))) {
-            sessionStorage.removeItem(DRAFT_KEY);
-          }
-        }
-      } catch { /* ignore */ }
+      sessionStorage.removeItem(LEGACY_DRAFT_KEY);
     } catch {
-      sessionStorage.removeItem(DRAFT_KEY);
-      toast.error('已清除无法识别的草稿');
-      setHydrated(true);
+      // 浏览器禁用 storage 时无需处理，页面状态仍只存在于当前组件生命周期。
     }
   }, []);
-
-  // ---------- autosave throttle ----------
-  const saveTimer = useRef<number | null>(null);
-  useEffect(() => {
-    if (!hydrated) return;
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => {
-      try {
-        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
-          selectedTypes, typeCounts, template, style, scene, pose,
-          negativePrompt, reviewEnabled, formInput,
-        }));
-      } catch { /* quota */ }
-    }, DRAFT_THROTTLE_MS);
-    return () => {
-      if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    };
-  }, [hydrated, selectedTypes, typeCounts, template, style, scene, pose, negativePrompt, reviewEnabled, formInput]);
 
   // ---------- computed ----------
   const orderedReferenceInsights = useMemo(
@@ -355,14 +274,19 @@ export function useCreateImageTaskState(
     return filled.map(({ slot, ref }) => ({ slot, ref }));
   }, [references, referenceOrder]);
 
+  const orderedReferenceSlots = useMemo<ReferenceSlot[]>(
+    () => orderedRefs.map(({ slot }) => slot),
+    [orderedRefs],
+  );
+
   const prompts = useMemo<AllTypePrompts>(() => {
     const facts = productFacts ?? extractProductFacts(formInput);
     const result: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_triple_view: '' };
     (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[]).forEach((t) => {
-      result[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
+      result[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceSlots);
     });
     return result;
-  }, [productFacts, formInput, style, scene, pose, orderedReferenceInsights]);
+  }, [productFacts, formInput, style, scene, pose, orderedReferenceSlots]);
 
   const promptsComplete = useMemo(() => {
     if (selectedTypes.length === 0) return false;
@@ -476,7 +400,7 @@ export function useCreateImageTaskState(
   const fallbackToLocalPrompts = (facts: ProductFacts) => {
     const nextOverrides: Partial<Record<ImageGenerationType, string>> = {};
     selectedTypes.forEach((t) => {
-      nextOverrides[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
+      nextOverrides[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceSlots);
     });
     setPromptOverrides(nextOverrides);
     setPromptHasEdits(true);
@@ -537,17 +461,18 @@ export function useCreateImageTaskState(
 
       // 回填
       const analyzedFacts = normalizeAnalyzedProductFacts(resp.productFacts);
+      const extractedFacts = extractProductFacts(analyzedFacts);
       setFormInput(analyzedFacts);
-      setProductFacts(extractProductFacts(analyzedFacts));
-      // [2026-07-26] 后端 Map<EnumImageTaskType, String> 序列化为大写 enum name(),
-      // 写入 promptOverrides(小写 ImageGenerationType)时做 toLowerCase 转换,
-      // 否则 UI 用 promptOverrides['product_main'] 取值会拿到 undefined,fallback 到本地拼,
-      // AI 助手失灵。
+      setProductFacts(extractedFacts);
+      // 后端负责识别商品事实；最终 Prompt 统一由前端 Profile 编译器生成，
+      // 避免模型自由输出改变区块结构、参考图编号或保真约束。
       const nextOverrides: Partial<Record<ImageGenerationType, string>> = {};
-      for (const k of Object.keys(resp.prompts)) {
-        const t = k.toLowerCase() as ImageGenerationType;
-        nextOverrides[t] = resp.prompts[k];
-      }
+      (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[])
+        .forEach((t) => {
+          nextOverrides[t] = buildPromptFromFacts(
+            t, extractedFacts, style, scene, pose, orderedReferenceSlots,
+          );
+        });
       setPromptOverrides(nextOverrides);
       setNegativePrompt(resp.negativePrompt);
       setPromptHasEdits(true);
@@ -569,7 +494,7 @@ export function useCreateImageTaskState(
     }
   }, [
     opts.isProductBound, opts.mainAssetId, opts.mainImage, opts.onAiComplete,
-    assistantState, formInput, selectedTypes, style, scene, pose, orderedReferenceInsights,
+    assistantState, formInput, selectedTypes, style, scene, pose, orderedReferenceSlots,
   ]);
 
   const regeneratePrompts = useCallback(() => {
@@ -584,7 +509,7 @@ export function useCreateImageTaskState(
     const facts = productFacts ?? extractProductFacts(formInput);
     const basePrompts: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_triple_view: '' };
     (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[]).forEach((t) => {
-      basePrompts[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceInsights);
+      basePrompts[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceSlots);
     });
     const optimized = applyAiOptimizePerType(basePrompts, selected);
     setPromptOverrides((prev) => {
@@ -593,7 +518,7 @@ export function useCreateImageTaskState(
       return next;
     });
     setPromptHasEdits(true);
-  }, [productFacts, formInput, style, scene, pose, orderedReferenceInsights]);
+  }, [productFacts, formInput, style, scene, pose, orderedReferenceSlots]);
 
   const checkAndGenerate = useCallback(() => {
     const issue = readinessChecks.find((c) => !c.complete);
@@ -704,7 +629,6 @@ export function useCreateImageTaskState(
       opts.onAddTask?.({ groupId: resp.groupId, taskIds: resp.taskIds, taskKind: 'IMAGE' });
       opts.setScreen(AppScreen.TASKS, { highlightGroupId: resp.groupId });
 
-      try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* quota */ }
       setExecutionConfirmOpen(false);
     } catch {
       toast.error('提交失败,请稍后重试');
@@ -783,7 +707,6 @@ export function useCreateImageTaskState(
     templateOverwriteOpen,
     executionConfirmOpen,
     isSubmitting,
-    hydrated,
     readinessChecks,
     readinessCount,
     prompts,

@@ -34,6 +34,7 @@ export const PerTypePromptEditor: React.FC<PerTypePromptEditorProps> = ({
           >
             {messages.prompt.regen}
           </button>
+          {/* AI 建议按钮暂时隐藏，后续按需解除注释。
           <button
             type="button"
             onClick={onAiOptimizeSelected}
@@ -42,6 +43,7 @@ export const PerTypePromptEditor: React.FC<PerTypePromptEditorProps> = ({
           >
             {messages.prompt.aiOptimize}
           </button>
+          */}
         </div>
       </div>
       <div className="mt-2 space-y-3">
@@ -55,16 +57,19 @@ export const PerTypePromptEditor: React.FC<PerTypePromptEditorProps> = ({
                   <span className="text-xs font-black">{messages.type[t]}</span>
                   <span className="text-[10px] text-slate-400">{templateName} · {typeCounts[t]} 张</span>
                 </div>
-                <span className={`text-[10px] font-bold ${overrides[t] == null ? 'text-emerald-700' : 'text-amber-700'}`}>
-                  {overrides[t] == null ? 'AI 生成' : '已手动编辑'}
-                </span>
+                {overrides[t] != null && (
+                  <span className="text-[10px] font-bold text-amber-700">
+                    已手动编辑
+                  </span>
+                )}
+                {/* 默认 Prompt 的“AI 生成”状态文案暂时隐藏，后续按需恢复。 */}
               </div>
               <textarea
                 disabled={!isProductBound}
                 value={value}
                 onChange={(e) => onChangeOverride(t, e.target.value)}
                 aria-label={`${messages.type[t]} Prompt`}
-                placeholder="选择主体素材后，点击 AI 助手生成 Prompt"
+                placeholder="选择主体素材后，可编辑最终 Prompt"
                 className="h-48 w-full resize-y p-3 text-xs leading-6 text-slate-700 outline-none placeholder:text-slate-300 disabled:bg-slate-50 disabled:text-slate-400"
               />
             </div>

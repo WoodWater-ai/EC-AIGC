@@ -4,6 +4,8 @@ import { TransitPickerButton } from '../../common/TransitPickerButton';
 
 export interface ImageSourceSectionProps {
   mainValue: import('../../createTask/slots').SlotRef | null;
+  productName?: string;
+  matchingProduct?: boolean;
   onPickMain: () => void;
 }
 
@@ -13,7 +15,12 @@ export interface ImageSourceSectionProps {
  * - 未选:虚线占位引导添加
  * 内部复用 TransitPickerButton(main slot),点击统一由 onPickMain 回调父容器打开 picker
  */
-export const ImageSourceSection: React.FC<ImageSourceSectionProps> = ({ mainValue, onPickMain }) => {
+export const ImageSourceSection: React.FC<ImageSourceSectionProps> = ({
+  mainValue,
+  productName,
+  matchingProduct,
+  onPickMain,
+}) => {
   return (
     <div id="image-source-section" className="bg-white border border-slate-200 rounded-lg p-4">
       <div className="flex items-center justify-between">
@@ -59,6 +66,14 @@ export const ImageSourceSection: React.FC<ImageSourceSectionProps> = ({ mainValu
           </button>
         )}
       </div>
+      {mainValue && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2">
+          <span className="shrink-0 text-[11px] font-bold text-slate-500">关联商品</span>
+          <span className="min-w-0 truncate text-xs font-black text-primary">
+            {matchingProduct ? '正在匹配商品…' : productName || '待创建商品'}
+          </span>
+        </div>
+      )}
     </div>
   );
 };

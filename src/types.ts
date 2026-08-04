@@ -124,9 +124,10 @@ export interface ProductAsset {
 export interface SystemUser {
   id: string;
   name: string;
+  userName: string;
+  phone: string;
   avatar: string;
   role: '管理员' | '高级设计师' | '运营策划' | '协同客户';
-  email: string;
   status: 'online' | 'offline';
   joinedDate: string;
   // 后端 UserResponse.deptId 映射,前端"员工账号"Tab 反查部门用
@@ -479,12 +480,12 @@ export interface ModelProfile {
   id: string;
   name: string;
   image: string;
-  source: '虚拟模特' | '授权参考' | '内部素材' | '用户授权上传';
+  source: '虚拟模特' | '授权参考' | '内部素材' | '用户授权上传' | '已有模特';
   tags: string[];
   suitableFor: ImageGenerationType[];
   reason: string;
   status: 'draft' | 'active' | 'disabled';
-  sourceMode: 'text' | 'reference' | 'face_swap';
+  sourceMode: 'text' | 'reference' | 'face_swap' | 'upload';
   faceAnchor: ModelProfileAnchor;
   appearanceAnchor?: ModelProfileAnchor;
   declaration?: ModelRightsDeclaration;

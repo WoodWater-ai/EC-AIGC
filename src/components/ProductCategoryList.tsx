@@ -6,6 +6,7 @@ import {
   type ProductCategoryCreateRequest,
   type ProductCategoryUpdateRequest,
 } from '../api/modules/productCategory';
+import { useAuth } from '../auth/AuthContext';
 
 interface ProductCategoryListProps {
   setScreen: (screen: AppScreen) => void;
@@ -36,6 +37,10 @@ function findParentId(tree: ProductCategoryNode[], id: string, parentId: string 
 }
 
 export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('product-category:create');
+  const canEdit = hasPermission('product-category:edit');
+  const canDelete = hasPermission('product-category:delete');
   const [tree, setTree] = useState<ProductCategoryNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -134,7 +139,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
 
           {/* hover 行内操作 */}
           <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-            <button
+            {canCreate && <button
               title="添加子分类"
               onClick={(e) => {
                 e.stopPropagation();
@@ -147,8 +152,8 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
               className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-primary"
             >
               <span className="material-symbols-outlined text-base">add</span>
-            </button>
-            <button
+            </button>}
+            {canEdit && <button
               title="编辑"
               onClick={(e) => {
                 e.stopPropagation();
@@ -160,8 +165,8 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
               className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-primary"
             >
               <span className="material-symbols-outlined text-base">edit</span>
-            </button>
-            <button
+            </button>}
+            {canDelete && <button
               title="删除"
               onClick={(e) => {
                 e.stopPropagation();
@@ -175,7 +180,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
               className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-danger"
             >
               <span className="material-symbols-outlined text-base">delete</span>
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -202,7 +207,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
         <div className="flex flex-col items-center justify-center h-full text-slate-400">
           <span className="material-symbols-outlined text-5xl mb-3">account_tree</span>
           <p className="text-sm">请从左侧选择一个商品分类</p>
-          <button
+          {canCreate && <button
             onClick={() => {
               setDrawerMode('create');
               setDrawerDefaultParentId('0');
@@ -214,7 +219,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
           >
             <span className="material-symbols-outlined text-base">add</span>
             新建顶级分类
-          </button>
+          </button>}
         </div>
       );
     }
@@ -227,7 +232,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
               <p className="text-xs text-slate-400 mt-1">商品分类详情</p>
             </div>
             <div className="flex items-center gap-2">
-              <button
+              {canEdit && <button
                 onClick={() => {
                   setDrawerMode('edit');
                   setDrawerEditingNode(selectedNode);
@@ -238,8 +243,8 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
               >
                 <span className="material-symbols-outlined text-sm">edit</span>
                 编辑
-              </button>
-              <button
+              </button>}
+              {canCreate && <button
                 onClick={() => {
                   setDrawerMode('create');
                   setDrawerDefaultParentId(selectedNode.id);
@@ -251,8 +256,8 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
               >
                 <span className="material-symbols-outlined text-sm">add</span>
                 添加子分类
-              </button>
-              <button
+              </button>}
+              {canDelete && <button
                 onClick={() => {
                   if (window.confirm(`确认删除「${selectedNode.categoryName}」?`)) {
                     void productCategoryApi.delete(selectedNode.id).then(() => {
@@ -265,7 +270,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
               >
                 <span className="material-symbols-outlined text-sm">delete</span>
                 删除
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -311,6 +316,8 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
     description: string;
     sort: number;
   }) => {
+    if (drawerMode === 'create' && !canCreate) return;
+    if (drawerMode === 'edit' && !canEdit) return;
     if (!form.categoryName.trim()) return;
     setDrawerSubmitting(true);
     try {
@@ -355,7 +362,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
             共 <span className="font-semibold text-primary">{totalCount}</span> 个商品分类
           </p>
         </div>
-        <button
+        {canCreate && <button
           onClick={() => {
             setDrawerMode('create');
             setDrawerDefaultParentId(0);
@@ -367,7 +374,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
         >
           <span className="material-symbols-outlined text-base">add</span>
           新建顶级分类
-        </button>
+        </button>}
       </div>
 
       {/* 左树 + 右详情 */}
@@ -382,7 +389,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
             tree.map(n => <TreeNode key={n.id} node={n} depth={0} />)
           )}
           <div className="mt-3 pt-3 border-t border-slate-100">
-            <button
+            {canCreate && <button
               onClick={() => {
                 setDrawerMode('create');
                 setDrawerDefaultParentId(0);
@@ -394,7 +401,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
             >
               <span className="material-symbols-outlined text-base">add</span>
               新建顶级分类
-            </button>
+            </button>}
           </div>
         </div>
 

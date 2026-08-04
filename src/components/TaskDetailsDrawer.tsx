@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { creationTemplateApi } from '../api/modules/creationTemplate';
 import { PublishTemplateDialog } from './common/PublishTemplateDialog';
 import { ImageRevisionDialog } from './task/ImageRevisionDialog';
+import { useAuth } from '../auth/AuthContext';
 
 interface TaskDetailsDrawerProps {
   group: TaskGroupResponse;
@@ -107,6 +108,11 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   onClose,
   onChanged,
 }) => {
+  const { hasPermission } = useAuth();
+  const canAudit = hasPermission('task:audit');
+  const canRetryTask = hasPermission('task:retry');
+  const canReviseTask = hasPermission('task:revise');
+  const canManageTemplate = hasPermission('template:manage');
   const [group, setGroup] = useState(initialGroup);
   const [selectedTaskId, setSelectedTaskId] = useState(
     initialTaskId ?? initialGroup.tasks[0]?.id,
@@ -239,19 +245,21 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                   task={selectedTask}
                   onPreviewImages={(results, index) => setImagePreview({ results, index })}
                   onPreviewVideo={setVideoPreview}
-                  onReview={(result) => setReviewTarget({ result })}
-                  onRevise={setRevisionTarget}
+                  onReview={(result) => canAudit && setReviewTarget({ result })}
+                  onRevise={(result) => canReviseTask && setRevisionTarget(result)}
                   onRevisionRetry={async (taskId) => {
+                    if (!canRetryTask) return;
                     await taskApi.retryImageRevision(taskId);
                     toast.success('已重新提交二次编辑任务');
                     await refreshGroup();
                   }}
-                  onPublishTemplate={(result) => setTemplatePublishTarget({
+                  onPublishTemplate={(result) => canManageTemplate && setTemplatePublishTarget({
                     result,
                     taskId: result.taskId,
                     defaultName: `${taskLabel(selectedTask)}模板`,
                   })}
                   onOfflineTemplate={async (result) => {
+                    if (!canManageTemplate) return;
                     if (!result.creationTemplateId) return;
                     try {
                       await creationTemplateApi.offline(result.creationTemplateId);
@@ -261,6 +269,10 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                       // 统一请求层展示具体错误。
                     }
                   }}
+                  canAudit={canAudit}
+                  canRetry={canRetryTask}
+                  canRevise={canReviseTask}
+                  canManageTemplate={canManageTemplate}
                 />
               )}
               {activeTab === 'inputs' && <InputsTab group={group} task={selectedTask} />}
@@ -410,6 +422,10 @@ const ResultsTab: React.FC<{
   onRevisionRetry: (taskId: string) => Promise<void>;
   onPublishTemplate: (result: TaskResultPreviewResponse) => void;
   onOfflineTemplate: (result: TaskResultPreviewResponse) => Promise<void>;
+  canAudit: boolean;
+  canRetry: boolean;
+  canRevise: boolean;
+  canManageTemplate: boolean;
 }> = ({
   task,
   onPreviewImages,
@@ -419,6 +435,10 @@ const ResultsTab: React.FC<{
   onRevisionRetry,
   onPublishTemplate,
   onOfflineTemplate,
+  canAudit,
+  canRetry,
+  canRevise,
+  canManageTemplate,
 }) => {
   const imageResults = task.resultPreviews.filter((result) => result.mediaType === 'IMAGE');
   const revisionJobs = task.revisionJobs ?? [];
@@ -483,7 +503,7 @@ const ResultsTab: React.FC<{
                 </span>
               </div>
               <div className="mt-3 flex min-h-8 flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
-                {result.mediaType === 'IMAGE' && (
+                {canRevise && result.mediaType === 'IMAGE' && (
                   <button
                     onClick={() => onRevise(result)}
                     className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-primary/25 bg-blue-50 px-3 text-[11px] font-bold text-primary hover:border-primary"
@@ -492,7 +512,7 @@ const ResultsTab: React.FC<{
                     二次编辑
                   </button>
                 )}
-                {result.score == null && (
+                {canAudit && result.score == null && (
                     <button
                       onClick={() => onReview(result)}
                       className="h-8 shrink-0 whitespace-nowrap rounded bg-primary px-3 text-[11px] font-bold text-white"
@@ -500,7 +520,7 @@ const ResultsTab: React.FC<{
                       评分与审核
                     </button>
                 )}
-                {result.templateStatus === 'PUBLISHED' ? (
+                {canManageTemplate && (result.templateStatus === 'PUBLISHED' ? (
                   <button
                     onClick={() => void onOfflineTemplate(result)}
                     className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-[#dfc6a4] bg-[#fff8ec] px-3 text-[11px] font-bold text-[#93652d] hover:bg-[#fff0d8]"
@@ -515,7 +535,7 @@ const ResultsTab: React.FC<{
                   >
                     设为模板
                   </button>
-                )}
+                ))}
               </div>
             </div>
             {result.rejectReason && (
@@ -554,7 +574,7 @@ const ResultsTab: React.FC<{
             <p className="break-words text-[10px] leading-5 text-slate-500">
               编辑要求：{job.editInstruction || '未记录'}
             </p>
-            {job.status === 'FAILED' && (
+            {canRetry && job.status === 'FAILED' && (
               <div className="mt-3 flex justify-end border-t border-slate-100 pt-3">
                 <button
                   onClick={async () => {
@@ -667,6 +687,8 @@ const DiagnosticsTab: React.FC<{
   task: TaskGroupItemResponse;
   onTaskChanged: () => void;
 }> = ({ task, onTaskChanged }) => {
+  const { hasPermission } = useAuth();
+  const canRetryTask = hasPermission('task:retry');
   const executionsQuery = useServiceQuery(
     () => asyncTaskApi.page({ bizId: task.id, page: 1, size: 50 }),
     [task.id],
@@ -674,6 +696,7 @@ const DiagnosticsTab: React.FC<{
   const executions = executionsQuery.data?.list ?? [];
 
   const retryBusinessTask = async () => {
+    if (!canRetryTask) return;
     try {
       await taskApi.retry(task.id);
       toast.success('任务已重新提交');
@@ -691,7 +714,7 @@ const DiagnosticsTab: React.FC<{
             <h3 className="text-sm font-black text-slate-800">业务任务诊断</h3>
             <p className="mt-1 font-mono text-[10px] text-slate-400">{task.taskCode || task.id}</p>
           </div>
-          {task.status === 'FAILED' && (
+          {canRetryTask && task.status === 'FAILED' && (
             <button onClick={() => void retryBusinessTask()} className="h-8 rounded-lg bg-primary px-3 text-xs font-bold text-white">
               重试业务任务
             </button>
@@ -735,7 +758,10 @@ const DiagnosticsTab: React.FC<{
 };
 
 const ExecutionCard: React.FC<{ execution: ChannelAsyncTask; onChanged: () => void }> = ({ execution, onChanged }) => {
+  const { hasPermission } = useAuth();
+  const canRetryAsyncTask = hasPermission('async-task:retry');
   const retry = async () => {
+    if (!canRetryAsyncTask) return;
     try {
       await asyncTaskApi.retry(execution.id);
       toast.success('渠道执行已重试');
@@ -758,7 +784,7 @@ const ExecutionCard: React.FC<{ execution: ChannelAsyncTask; onChanged: () => vo
           </div>
           <div className="flex items-center gap-2">
             <span className="rounded bg-white px-2 py-1 text-[10px] font-bold text-slate-600">{execution.status}</span>
-            {['FAILED', 'DEAD_LETTER'].includes(execution.status) && (
+            {canRetryAsyncTask && ['FAILED', 'DEAD_LETTER'].includes(execution.status) && (
               <button onClick={(event) => { event.preventDefault(); void retry(); }} className="h-7 rounded bg-primary px-2 text-[10px] font-bold text-white">
                 重试
               </button>
@@ -787,6 +813,8 @@ const ReviewDialog: React.FC<{
   onClose: () => void;
   onCompleted: () => Promise<void>;
 }> = ({ target, onClose, onCompleted }) => {
+  const { hasPermission } = useAuth();
+  const canAudit = hasPermission('task:audit');
   const [rating, setRating] = useState(Math.round(target.score ?? 4));
   const [defectTags, setDefectTags] = useState<string[]>([]);
   const [advantageTags, setAdvantageTags] = useState<string[]>([]);
@@ -803,6 +831,7 @@ const ReviewDialog: React.FC<{
       : [...current, tag]);
 
   const submit = async () => {
+    if (!canAudit) return;
     if (decision === 'REJECTED' && !note.trim()) {
       toast.error('打回时必须填写审核原因');
       return;

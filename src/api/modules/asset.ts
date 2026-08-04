@@ -20,8 +20,6 @@ export interface AssetResourceQueryRequest {
   productId?: number;
   categoryId?: number;
   keyword?: string;
-  /** 上传人 ID,用于筛'我上传的' */
-  uploadUserId?: number;
   /** 创建时间起点(包含,ISO 字符串) */
   startTime?: string;
   /** 创建时间终点(包含,ISO 字符串) */
@@ -55,6 +53,7 @@ export interface AssetResourceItem {
   sourceType?: 'UPLOAD' | 'GENERATED_IMAGE' | 'GENERATED_VIDEO';
   sourceId?: string;
   status: 'NORMAL' | 'ARCHIVED';
+  visibility?: 'PRIVATE' | 'PUBLIC';
   categoryIds: string[];
   createTime?: string;
 }
@@ -62,6 +61,8 @@ export interface AssetResourceItem {
 export interface AssetResourceCreateRequest {
   /** file_resource.id(由 /file/upload-complete 返回);string 防 JS 精度丢失 */
   fileResourceId: string;
+  /** 文件内容 MD5；后端按登录用户去重。 */
+  fileMd5: string;
   name: string;
   assetKind?: 'IMAGE' | 'VIDEO';
   assetType?: string;

@@ -14,6 +14,12 @@ import {
   clearToken,
 } from '../api/auth';
 import * as authApi from '../api/modules/auth';
+import { AppScreen } from '../types';
+import {
+  ACCESSIBLE_SCREEN_ORDER,
+  ADMIN_ROLE_CODE,
+  canAccessScreenByPermissions,
+} from './accessControl';
 
 /**
  * 鉴权 Context —— 跨组件共享 user / roles / permissions / menuTree
@@ -44,6 +50,8 @@ interface AuthState {
   menuTree: MenuResponse[];
   /** 是否已登录 */
   isAuthenticated: boolean;
+  /** 是否管理员。管理员不依赖菜单配置，始终拥有全部前端页面和操作权限。 */
+  isAdmin: boolean;
   /**
    * 是否正在恢复登录态 —— AuthProvider 挂载后调 /v1/auth/me 的过程中为 true
    * App 层用它在挂载瞬间展示全屏 spinner，避免"闪过 LOGIN → 再进 dashboard"
@@ -74,12 +82,21 @@ interface AuthContextValue extends AuthState {
    */
   hasPermission: (code: string) => boolean;
 
+  /** 任一权限命中 */
+  hasAnyPermission: (codes: readonly string[]) => boolean;
+
   /**
    * 角色检查
    *
    * 用法：{hasRole('ADMIN') && <AdminPanel />}
    */
   hasRole: (code: string) => boolean;
+
+  /** 页面访问检查（路由守卫与菜单过滤共用） */
+  canAccessScreen: (screen: AppScreen) => boolean;
+
+  /** 当前账号登录后的第一个可访问页面 */
+  firstAccessibleScreen: AppScreen;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -90,9 +107,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [initializing, setInitializing] = useState<boolean>(true);
 
   const roles = useMemo<readonly string[]>(() => user?.roles ?? [], [user]);
-  const permissions = useMemo<readonly string[]>(() => user?.permissions ?? [], [user]);
   const menuTree = useMemo<MenuResponse[]>(() => user?.menuTree ?? [], [user]);
+  const menuPermissions = useMemo(() => {
+    const result = new Set<string>();
+    const walk = (nodes: MenuResponse[]) => {
+      nodes.forEach((node) => {
+        if (node.permission) result.add(node.permission);
+        if (node.children?.length) walk(node.children);
+      });
+    };
+    walk(menuTree);
+    return result;
+  }, [menuTree]);
+  const permissions = useMemo<readonly string[]>(
+    () => Array.from(new Set([...(user?.permissions ?? []), ...menuPermissions])),
+    [user, menuPermissions]
+  );
+  const permissionSet = useMemo(() => new Set(permissions), [permissions]);
   const isAuthenticated = user != null;
+  const isAdmin = useMemo(
+    () => roles.some((code) => code.toUpperCase() === ADMIN_ROLE_CODE),
+    [roles]
+  );
 
   /**
    * 启动恢复 —— 挂载时如有 token 则调 me() 恢复 user
@@ -166,13 +202,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasPermission = useCallback(
-    (code: string) => permissions.includes(code),
-    [permissions]
+    (code: string) => isAdmin || permissionSet.has(code),
+    [isAdmin, permissionSet]
+  );
+
+  const hasAnyPermission = useCallback(
+    (codes: readonly string[]) => isAdmin || codes.some((code) => permissionSet.has(code)),
+    [isAdmin, permissionSet]
   );
 
   const hasRole = useCallback(
-    (code: string) => roles.includes(code),
+    (code: string) => roles.some((role) => role.toUpperCase() === code.toUpperCase()),
     [roles]
+  );
+
+  const canAccessScreen = useCallback(
+    (screen: AppScreen) => canAccessScreenByPermissions(screen, permissionSet, isAdmin),
+    [permissionSet, isAdmin]
+  );
+
+  const firstAccessibleScreen = useMemo(
+    () => ACCESSIBLE_SCREEN_ORDER.find((screen) => canAccessScreen(screen)) ?? AppScreen.DASHBOARD,
+    [canAccessScreen]
   );
 
   const value = useMemo<AuthContextValue>(
@@ -182,13 +233,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       permissions,
       menuTree,
       isAuthenticated,
+      isAdmin,
       initializing,
       login,
       logout,
       hasPermission,
+      hasAnyPermission,
       hasRole,
+      canAccessScreen,
+      firstAccessibleScreen,
     }),
-    [user, roles, permissions, menuTree, isAuthenticated, initializing, login, logout, hasPermission, hasRole]
+    [user, roles, permissions, menuTree, isAuthenticated, isAdmin, initializing, login, logout, hasPermission, hasAnyPermission, hasRole, canAccessScreen, firstAccessibleScreen]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

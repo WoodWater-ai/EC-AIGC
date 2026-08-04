@@ -24,6 +24,17 @@ export function md5UpperCase(input: string): string {
   return CryptoJS.MD5(input).toString().toUpperCase();
 }
 
+/** 计算上传文件的内容 MD5（小写），供个人资源去重。 */
+export async function md5FileHex(file: Blob): Promise<string> {
+  const hasher = CryptoJS.algo.MD5.create();
+  const chunkSize = 4 * 1024 * 1024;
+  for (let offset = 0; offset < file.size; offset += chunkSize) {
+    const buffer = await file.slice(offset, offset + chunkSize).arrayBuffer();
+    hasher.update(CryptoJS.lib.WordArray.create(buffer));
+  }
+  return hasher.finalize().toString(CryptoJS.enc.Hex).toLowerCase();
+}
+
 /**
  * HMAC-SHA256 加密（用于请求签名）
  *

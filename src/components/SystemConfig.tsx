@@ -64,6 +64,7 @@ import { userApi, type UserDTO } from '../api/modules/user';
 import { toast } from 'sonner';
 import { getRoleList, type RoleInfo } from '../api/roleMenu';
 import { useConfirm } from './common/ConfirmProvider';
+import { useAuth } from '../auth/AuthContext';
 
 interface SystemConfigProps {
   onUpdateUserRole: (id: string, role: any, deptId?: string) => void;
@@ -84,11 +85,49 @@ interface OperationLog {
 export const SystemConfig: React.FC<SystemConfigProps> = ({
   onUpdateUserRole
 }) => {
+  const { hasAnyPermission, hasPermission, isAdmin } = useAuth();
+  const canViewAccounts = hasAnyPermission(['user:view', 'admin:user-mgmt']);
+  const canViewRoles = hasAnyPermission(['role:view', 'admin:role-mgmt']);
+  const canViewMenus = hasPermission('menu:view');
+  const canViewOrg = hasAnyPermission(['org:view', 'org:manage', 'admin:user-mgmt']);
+  const canViewChannels = hasAnyPermission(['channel:view', 'channel:manage']);
+  const canViewLogs = hasPermission('admin:op-log');
+  const canCreateUser = hasPermission('user:create');
+  const canEditUser = hasPermission('user:edit');
+  const canChangeUserStatus = hasPermission('user:status');
+  const canResetUserPassword = hasAnyPermission(['user:reset-password', 'user:edit']);
+  const canDeleteUser = hasAnyPermission(['user:delete', 'user:edit']);
+  const canToggleChannel = hasPermission('channel:toggle');
+  const canCreateChannel = hasAnyPermission(['channel:create', 'channel:limit', 'channel:manage']);
+  const canEditChannel = hasAnyPermission(['channel:edit', 'channel:limit', 'channel:manage']);
+  const canDeleteChannel = hasAnyPermission(['channel:delete', 'channel:limit', 'channel:manage']);
   // 1. High level main tabs
   const [activeMainTab, setActiveMainTab] = useState<'users' | 'org' | 'channels' | 'builtin' | 'logs'>('users');
   
   // 2. User management sub-tabs
   const [activeUserSubTab, setActiveUserSubTab] = useState<'accounts' | 'roles' | 'menu'>('accounts');
+
+  useEffect(() => {
+    const allowedMainTabs: Array<'users' | 'org' | 'channels' | 'builtin' | 'logs'> = [];
+    if (canViewAccounts || canViewRoles || canViewMenus || isAdmin) allowedMainTabs.push('users');
+    if (canViewOrg) allowedMainTabs.push('org');
+    if (canViewChannels) allowedMainTabs.push('channels');
+    if (isAdmin) allowedMainTabs.push('builtin');
+    if (canViewLogs) allowedMainTabs.push('logs');
+    if (!allowedMainTabs.includes(activeMainTab) && allowedMainTabs[0]) {
+      setActiveMainTab(allowedMainTabs[0]);
+    }
+  }, [activeMainTab, canViewAccounts, canViewRoles, canViewMenus, canViewOrg, canViewChannels, canViewLogs, isAdmin]);
+
+  useEffect(() => {
+    const allowedSubTabs: Array<'accounts' | 'roles' | 'menu'> = [];
+    if (canViewAccounts) allowedSubTabs.push('accounts');
+    if (canViewRoles) allowedSubTabs.push('roles');
+    if (canViewMenus) allowedSubTabs.push('menu');
+    if (!allowedSubTabs.includes(activeUserSubTab) && allowedSubTabs[0]) {
+      setActiveUserSubTab(allowedSubTabs[0]);
+    }
+  }, [activeUserSubTab, canViewAccounts, canViewRoles, canViewMenus]);
 
   // 3. Search and department filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,25 +139,29 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   // 注意:useServiceQuery 内部 data 初始为 null,ES6 解构 `= []` 只对 undefined 生效,所以用 ?? [] 显式 nullish
   const userListQuery = useServiceQuery<UserDTO[]>(
     () => userApi.listAll(),
-    []
+    [],
+    canViewAccounts || canViewOrg,
   );
 
   // Dynamic role list (from backend, replaces hardcoded 4 roles)
   const { data: roleList = [] } = useServiceQuery<RoleInfo[]>(
     async () => (await getRoleList({ pageNum: 1, pageSize: 50 })).list ?? [],
-    []
+    [],
+    canViewAccounts || canViewRoles,
   );
   // Department list (direct backend query, decoupled from OrgStructureTab ref timing)
   const { data: deptList = [] } = useServiceQuery<DepartmentDTO[]>(
     () => departmentApi.list({ pageNum: 1, pageSize: 1000 }),
-    []
+    [],
+    canViewAccounts || canViewOrg,
   );
   const allDepartments = deptList ?? [];
 
   // 通道能力矩阵(后端下发,驱动 chip 渲染 + baseUrl placeholder)
   const matrixQuery = useServiceQuery<CapabilityMatrix>(
     () => channelApi.getCapabilityMatrix(),
-    []
+    [],
+    canViewChannels,
   );
   const matrix = matrixQuery.data ?? null;
   const realUsers = userListQuery.data ?? [];
@@ -129,7 +172,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       name: u.name || u.userName || u.phone || '(未命名)',
       avatar: u.headUrl || '',
       role: u.isAdmin ? '管理员' : '运营策划',  // P1 TODO:从 roleIds 查角色名
-      email: u.email || u.phone || '',
+      userName: u.userName || '',
+      phone: u.phone || '',
       status: (u.status as 'NORMAL' | 'DISABLED') ?? 'NORMAL',  // 2026-07-11:对齐项目惯例 NORMAL/DISABLED(同 template/dict/role)
       joinedDate: '',  // UserResponse 无此字段
       deptId: u.deptId || undefined,
@@ -153,7 +197,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       // 'all' 不传任何过滤
       return channelApi.page(req);
     },
-    [channelFilter]
+    [channelFilter],
+    canViewChannels,
   );
   const channels: ModelChannelDTO[] = channelListQuery.data?.list ?? [];
 
@@ -182,6 +227,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const userDetailRequestRef = useRef(0);
 
   // Drawer Form fields
   const [formUserName, setFormUserName] = useState('');
@@ -222,7 +268,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     return localUsers.filter(u => {
       const matchSearch = searchQuery === '' ||
         u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchQuery.toLowerCase());
+        u.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.phone.toLowerCase().includes(searchQuery.toLowerCase());
 
       const userDept = userDeptName(u);
       const matchDept = selectedDept === '全部部门' || userDept === selectedDept;
@@ -245,6 +292,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Helper: assign user to department (calls department API + syncs local state + notifies App)
   const handleAssignUser = async (userId: string, deptId: string) => {
+    if (!canEditUser) return;
     const user = localUsers.find(u => u.id === userId);
     const oldDeptId = user?.deptId;
     try {
@@ -268,6 +316,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Open Drawer for creating new user
   const handleOpenCreateDrawer = () => {
+    if (!canCreateUser) return;
+    userDetailRequestRef.current += 1;
     setDrawerMode('create');
     setFormUserName('');
     setFormPhone('');
@@ -283,11 +333,15 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Open Drawer for editing user
   const handleOpenEditDrawer = async (user: SystemUser) => {
+    if (!canEditUser) return;
+    const requestSequence = userDetailRequestRef.current + 1;
+    userDetailRequestRef.current = requestSequence;
     setDrawerMode('edit');
     setSelectedUserId(user.id);
     try {
       // 详情走 userApi.detail(已修 GET)
       const detail = await userApi.detail(user.id);
+      if (userDetailRequestRef.current !== requestSequence) return;
       setFormUserName(detail.userName ?? '');
       setFormPhone(detail.phone ?? '');
       setFormName(detail.name ?? '');
@@ -304,8 +358,14 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     setIsDrawerOpen(true);
   };
 
+  const handleCloseUserDrawer = () => {
+    userDetailRequestRef.current += 1;
+    setIsDrawerOpen(false);
+  };
+
   // Save drawer form
   const handleSaveUser = async () => {
+    if ((drawerMode === 'create' && !canCreateUser) || (drawerMode === 'edit' && !canEditUser)) return;
     if (!formUserName.trim() || !formName.trim()) {
       toast.error('请填写账号和姓名');
       return;
@@ -322,7 +382,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       if (drawerMode === 'create') {
         await userApi.add({
           userName: formUserName,
-          phone: formPhone || undefined,
+          phone: formPhone.trim() || undefined,
           name: formName,
           code: formCode || undefined,
           password: formPassword,
@@ -334,7 +394,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
         await userApi.update({
           id: selectedUserId,
           userName: formUserName,
-          // ★ phone / password 后端 UserUpdateRequest 暂不支持,本次不传
+          phone: formPhone.trim(),
           name: formName,
           code: formCode || undefined,
           roleIds: formRoleIds,  // 直接发 string[] 防 Long 精度丢失(后端 @JsonSerialize 对齐)
@@ -348,7 +408,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
         toast.success(`账号「${formName}」修改成功`);
       }
       await userListQuery.refetch();
-      setIsDrawerOpen(false);
+      handleCloseUserDrawer();
     } catch {
       // toast 由 http 拦截器统一处理
     }
@@ -356,6 +416,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Toggle user active status (NORMAL ↔ DISABLED)
   const handleToggleUserStatus = async (userId: string, currentStatus: 'NORMAL' | 'DISABLED') => {
+    if (!canChangeUserStatus) return;
     const nextStatus = currentStatus === 'NORMAL' ? 'DISABLED' : 'NORMAL';
     const target = localUsers.find(u => u.id === userId);
     try {
@@ -369,6 +430,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Delete user (with confirm)
   const handleDeleteUser = async (user: SystemUser) => {
+    if (!canDeleteUser) return;
     const ok = await confirm({
       title: '删除账号',
       message: `将删除「${user.name}」,该操作不可恢复,请确认。`,
@@ -387,6 +449,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Reset password (opens modal)
   const handleResetPassword = async () => {
+    if (!canResetUserPassword) return;
     if (!resetPwdFor || !resetPwdNew.trim()) {
       toast.error('请输入新密码');
       return;
@@ -403,6 +466,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Toggle Model Channel Status (走 channelApi.updateStatus 专用端点,不走 update 全量流程)
   const handleToggleChannelStatus = async (channelId: string) => {
+    if (!canToggleChannel) return;
     const target = channels.find(ch => ch.id === channelId);
     if (!target) return;
     const nextStatus = target.status === 'NORMAL' ? 'DISABLED' : 'NORMAL';
@@ -417,6 +481,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Open create channel drawer
   const handleOpenCreateChannelDrawer = () => {
+    if (!canCreateChannel) return;
     setChannelDrawerMode('create');
     setChannelFormName('');
     setChannelFormProvider('OPENAI');
@@ -437,6 +502,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   // Open edit channel drawer — 必须先调 detail 接口拿完整数据(含 capabilities)
   // page 接口 toResponse 不查 capability 关联表,只有 detail 查;list 拿的 ch.capabilities 永远是 null
   const handleOpenEditChannelDrawer = async (ch: ModelChannelDTO) => {
+    if (!canEditChannel) return;
     setChannelDrawerMode('edit');
     setSelectedChannelId(ch.id);
     setIsChannelDrawerOpen(true);
@@ -466,6 +532,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Save channel (create or edit) - 走 channelApi
   const handleSaveChannel = async () => {
+    if ((channelDrawerMode === 'create' && !canCreateChannel) || (channelDrawerMode === 'edit' && !canEditChannel)) return;
     if (!channelFormName.trim()) {
       toast.error('请填写通道名称!');
       return;
@@ -521,6 +588,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Delete channel - 走 channelApi.delete
   const handleDeleteChannel = async (channelId: string) => {
+    if (!canDeleteChannel) return;
     const ch = channels.find(c => c.id === channelId);
     if (!ch) return;
     const ok = await confirm({
@@ -553,7 +621,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       {/* Header Tabs for System Config (Replaces hidden brand logo/old dashboard) */}
       <div className="flex justify-between items-center border-b border-slate-200 pb-0">
         <div className="flex h-12">
-          <button
+          {(canViewAccounts || canViewRoles || canViewMenus || isAdmin) && <button
             onClick={() => setActiveMainTab('users')}
             className={`h-full px-6 flex items-center gap-2 text-xs font-bold relative transition-all duration-200 cursor-pointer ${
               activeMainTab === 'users' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-700'
@@ -561,8 +629,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           >
             <Shield className="w-4 h-4 shrink-0" />
             账号与角色 (用户管理)
-          </button>
-          <button
+          </button>}
+          {canViewOrg && <button
             onClick={() => setActiveMainTab('org')}
             className={`h-full px-6 flex items-center gap-2 text-xs font-bold relative transition-all duration-200 cursor-pointer ${
               activeMainTab === 'org' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-700'
@@ -570,8 +638,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           >
             <Network className="w-4 h-4 shrink-0" />
             组织架构 (部门管理)
-          </button>
-          <button
+          </button>}
+          {canViewChannels && <button
             onClick={() => setActiveMainTab('channels')}
             className={`h-full px-6 flex items-center gap-2 text-xs font-bold relative transition-all duration-200 cursor-pointer ${
               activeMainTab === 'channels' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-700'
@@ -579,8 +647,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           >
             <Sliders className="w-4 h-4 shrink-0" />
             模型通道统管
-          </button>
-          <button
+          </button>}
+          {isAdmin && <button
             onClick={() => setActiveMainTab('builtin')}
             className={`h-full px-6 flex items-center gap-2 text-xs font-bold relative transition-all duration-200 cursor-pointer ${
               activeMainTab === 'builtin' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-700'
@@ -588,8 +656,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           >
             <Sliders className="w-4 h-4 shrink-0" />
             系统内置通道配置
-          </button>
-          <button
+          </button>}
+          {canViewLogs && <button
             onClick={() => setActiveMainTab('logs')}
             className={`h-full px-6 flex items-center gap-2 text-xs font-bold relative transition-all duration-200 cursor-pointer ${
               activeMainTab === 'logs' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-700'
@@ -597,35 +665,35 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           >
             <Clock className="w-4 h-4 shrink-0" />
             操作日志
-          </button>
+          </button>}
         </div>
 
         {activeMainTab === 'users' && (
           <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 select-none">
-            <button
+            {canViewAccounts && <button
               onClick={() => setActiveUserSubTab('accounts')}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-all ${
                 activeUserSubTab === 'accounts' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               员工账号
-            </button>
-            <button
+            </button>}
+            {canViewRoles && <button
               onClick={() => setActiveUserSubTab('roles')}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-all ${
                 activeUserSubTab === 'roles' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               角色管理
-            </button>
-            <button
+            </button>}
+            {canViewMenus && <button
               onClick={() => setActiveUserSubTab('menu')}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-all ${
                 activeUserSubTab === 'menu' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               菜单配置
-            </button>
+            </button>}
           </div>
         )}
       </div>
@@ -635,7 +703,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
         <div className="space-y-6">
           
           {/* Inner Tab 1: 员工账号 (Employee accounts list) */}
-          {activeUserSubTab === 'accounts' && (
+          {activeUserSubTab === 'accounts' && canViewAccounts && (
             <div className="space-y-4">
               {/* Info System Tip Banner */}
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3 shadow-xs">
@@ -675,13 +743,13 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     </select>
                   </div>
 
-                  <button
+                  {canCreateUser && <button
                     onClick={handleOpenCreateDrawer}
                     className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <UserPlus className="w-4 h-4" />
                     新建账号
-                  </button>
+                  </button>}
                 </div>
 
                 {/* Employees list table */}
@@ -691,6 +759,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                       <tr className="bg-slate-50/75 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                         <th className="py-3 px-5">姓名</th>
                         <th className="py-3 px-5">登录账号</th>
+                        <th className="py-3 px-5">手机号</th>
                         <th className="py-3 px-5">所属部门</th>
                         <th className="py-3 px-5">系统角色</th>
                         <th className="py-3 px-5">状态</th>
@@ -701,7 +770,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <tbody className="divide-y divide-slate-100 font-medium text-slate-600">
                       {filteredUsers.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="text-center py-10 text-slate-400 font-semibold">
+                          <td colSpan={8} className="text-center py-10 text-slate-400 font-semibold">
                             暂无符合条件的员工账号记录
                           </td>
                         </tr>
@@ -721,7 +790,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                                   <span className="font-bold text-slate-800 text-sm">{user.name}</span>
                                 </div>
                               </td>
-                              <td className="py-3.5 px-5 font-mono text-slate-500">{user.email}</td>
+                              <td className="py-3.5 px-5 font-mono text-slate-500">{user.userName}</td>
+                              <td className="py-3.5 px-5 font-mono text-slate-500">{user.phone || '-'}</td>
                               <td className="py-3.5 px-5 text-slate-600">{userDept}</td>
                               <td className="py-3.5 px-5">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
@@ -745,35 +815,35 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                               <td className="py-3.5 px-5 font-mono text-slate-400">{user.joinedDate}</td>
                               <td className="py-3.5 px-5 text-right font-semibold">
                                 <div className="flex items-center justify-end gap-2.5">
-                                  <button
+                                  {canResetUserPassword && <button
                                     onClick={() => handleOpenEditDrawer(user)}
                                     className="text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer"
                                   >
                                     <Edit className="w-3.5 h-3.5" />
                                     编辑
-                                  </button>
-                                  <button
+                                  </button>}
+                                  {canChangeUserStatus && <button
                                     onClick={() => handleToggleUserStatus(user.id, user.status)}
                                     className={`flex items-center gap-0.5 cursor-pointer ${
                                       isEnabled ? 'text-rose-500 hover:text-rose-700' : 'text-emerald-500 hover:text-emerald-700'
                                     }`}
                                   >
                                     {isEnabled ? '停用' : '启用'}
-                                  </button>
-                                  <button
+                                  </button>}
+                                  {canDeleteUser && <button
                                     onClick={() => { setResetPwdFor(user); setResetPwdNew(''); }}
                                     className="text-amber-600 hover:text-amber-800 flex items-center gap-0.5 cursor-pointer"
                                   >
                                     <Key className="w-3.5 h-3.5" />
                                     重置密码
-                                  </button>
-                                  <button
+                                  </button>}
+                                  {canEditUser && <button
                                     onClick={() => handleDeleteUser(user)}
                                     className="text-rose-500 hover:text-rose-700 flex items-center gap-0.5 cursor-pointer"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                     删除
-                                  </button>
+                                  </button>}
                                 </div>
                               </td>
                             </tr>
@@ -804,16 +874,16 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           )}
 
           {/* Inner Tab 2: 角色管理 (RBAC Role configuration matrices) */}
-          {activeUserSubTab === 'roles' && <RoleManageTab />}
+          {activeUserSubTab === 'roles' && canViewRoles && <RoleManageTab />}
 
           {/* Inner Tab 3: 菜单配置 (Menu configuration) */}
-          {activeUserSubTab === 'menu' && <MenuConfigTab />}
+          {activeUserSubTab === 'menu' && canViewMenus && <MenuConfigTab />}
 
         </div>
       )}
 
       {/* MAIN VIEW: 组织架构 (Organization Structure Management) */}
-      {activeMainTab === 'org' && (
+      {activeMainTab === 'org' && canViewOrg && (
         <OrgStructureTab
           ref={orgTabRef}
           users={localUsers}
@@ -822,7 +892,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       )}
 
       {/* MAIN VIEW B: 模型通道统管 (Model Channels Management) */}
-      {activeMainTab === 'channels' && (
+      {activeMainTab === 'channels' && canViewChannels && (
         <div className="space-y-6">
           
           {/* Top Row Title & Actions */}
@@ -836,13 +906,13 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 管理并监控所有云端、中转站及本地 AI 模型服务的连接状态。
               </p>
             </div>
-            <button
+            {canCreateChannel && <button
               onClick={handleOpenCreateChannelDrawer}
               className="sm:self-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer self-start"
             >
               <Plus className="w-4 h-4" />
               新建通道
-            </button>
+            </button>}
           </div>
 
           {/* Security Alert Banner */}
@@ -943,14 +1013,14 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                       </div>
 
                       {/* Switch Toggle */}
-                      <button
+                      {canToggleChannel && <button
                         onClick={() => handleToggleChannelStatus(ch.id)}
                         className={`p-0.5 rounded-full w-9 h-5.5 transition-all focus:outline-none cursor-pointer flex items-center ${
                           isActive ? 'bg-blue-600 justify-end' : 'bg-slate-300 justify-start'
                         }`}
                       >
                         <span className="w-4.5 h-4.5 rounded-full bg-white shadow-xs" />
-                      </button>
+                      </button>}
                     </div>
 
                     {/* Channel type label */}
@@ -1004,22 +1074,22 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     </div>
 
                     {/* Footer Action Row — 永远显示,放卡片底部(跟 stats 平级),与 Switch 完全分离不遮挡 */}
-                    <div className="pt-3 mt-1 border-t border-slate-100 flex items-center gap-1.5">
-                      <button
+                    {(canEditChannel || canDeleteChannel) && <div className="pt-3 mt-1 border-t border-slate-100 flex items-center gap-1.5">
+                      {canEditChannel && <button
                         onClick={() => handleOpenEditChannelDrawer(ch)}
                         className="px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer flex items-center gap-1"
                       >
                         <Edit className="w-3 h-3" />
                         编辑
-                      </button>
-                      <button
+                      </button>}
+                      {canDeleteChannel && <button
                         onClick={() => handleDeleteChannel(ch.id)}
                         className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer flex items-center gap-1"
                       >
                         <Trash2 className="w-3 h-3" />
                         删除
-                      </button>
-                    </div>
+                      </button>}
+                    </div>}
 
                   </div>
                 );
@@ -1031,10 +1101,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       )}
 
       {/* MAIN VIEW: 系统内置通道配置 (System Builtin Channel) */}
-      {activeMainTab === 'builtin' && <SystemBuiltinChannelTab />}
+      {activeMainTab === 'builtin' && isAdmin && <SystemBuiltinChannelTab />}
 
       {/* MAIN VIEW C: 操作日志 (Operation Logs) */}
-      {activeMainTab === 'logs' && (
+      {activeMainTab === 'logs' && canViewLogs && (
         <div className="bg-white rounded-xl border border-slate-200/60 overflow-hidden shadow-xs">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <div>
@@ -1107,7 +1177,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           {/* Backdrop blur overlay */}
           <div
             className="absolute inset-0 bg-[#0B1C30]/40 backdrop-blur-xs transition-opacity cursor-pointer"
-            onClick={() => setIsDrawerOpen(false)}
+            onClick={handleCloseUserDrawer}
           />
 
           {/* Sliding Drawer Container */}
@@ -1120,7 +1190,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 {drawerMode === 'create' ? '新建协作账号' : '编辑账号配置'}
               </h3>
               <button
-                onClick={() => setIsDrawerOpen(false)}
+                onClick={handleCloseUserDrawer}
                 className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -1157,6 +1227,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   </label>
                   <input
                     type="text"
+                    name="username"
+                    autoComplete="username"
                     value={formUserName}
                     onChange={(e) => setFormUserName(e.target.value)}
                     placeholder="请输入登录账号"
@@ -1187,6 +1259,9 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   </label>
                   <input
                     type="text"
+                    name="phone"
+                    inputMode="numeric"
+                    autoComplete="tel"
                     value={formPhone}
                     onChange={(e) => setFormPhone(e.target.value)}
                     placeholder="请输入手机号(选填)"
@@ -1292,7 +1367,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
             {/* Drawer Actions Footer */}
             <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 shrink-0">
               <button
-                onClick={() => setIsDrawerOpen(false)}
+                onClick={handleCloseUserDrawer}
                 className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-lg transition-colors cursor-pointer"
               >
                 取消

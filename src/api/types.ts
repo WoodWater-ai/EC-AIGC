@@ -44,7 +44,7 @@ export interface LoginRequest {
 /** POST /v1/auth/login 响应 data（ServiceResult 已由 axios 拦截器解） */
 export interface LoginResponse {
   /** 用户 ID */
-  userId?: number;
+  userId?: string;
   /** 用户名 */
   username?: string;
   /** 姓名 */
@@ -63,8 +63,8 @@ export interface LoginResponse {
 
 /** 菜单树节点 —— 与后端 MenuResponse 对齐 */
 export interface MenuResponse {
-  id?: number;
-  pid?: number;
+  id?: string;
+  pid?: string;
   menuName?: string;
   menuPath?: string;
   routerName?: string;

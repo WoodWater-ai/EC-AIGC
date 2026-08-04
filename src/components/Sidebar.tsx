@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AppScreen, SystemUser } from '../types';
+import { useAuth } from '../auth/AuthContext';
 
 interface SidebarProps {
   currentScreen: AppScreen;
@@ -13,12 +14,10 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   currentScreen,
   setScreen,
-  users,
   currentUser,
-  setCurrentUser,
   openTransit
 }) => {
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const { canAccessScreen, hasPermission } = useAuth();
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
 
   const menuItems = [
@@ -36,9 +35,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { screen: AppScreen.DICT_ITEM, label: '字典管理', icon: 'menu_book' },
   ];
 
-  const mobileMenuItems = menuItems.filter((item) =>
+  const visibleMenuItems = menuItems.filter((item) => canAccessScreen(item.screen));
+  const mobileMenuItems = visibleMenuItems.filter((item) =>
     [AppScreen.DASHBOARD, AppScreen.TASKS, AppScreen.TEMPLATES, AppScreen.ASSETS].includes(item.screen)
   );
+  const canCreateTask = hasPermission('task:create');
+  const canOpenResourceCenter = hasPermission('asset-center:view');
 
   return (
     <>
@@ -58,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Global Action Button with dropdown */}
-        <div className="relative p-3">
+        {canCreateTask && <div className="relative p-3">
           <button
             onClick={() => setShowCreateDropdown(!showCreateDropdown)}
             className="flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md bg-primary text-xs font-bold text-white shadow-[0_6px_16px_rgba(216,92,66,0.18)] transition-all duration-150 hover:bg-primary-hover active:scale-[0.98]"
@@ -102,12 +104,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </>
           )}
-        </div>
+        </div>}
 
         {/* Menu Items List */}
         <nav className="space-y-0.5 px-2">
           <span className="mb-1.5 block px-2.5 text-[9px] font-bold uppercase tracking-[0.12em] text-stone-500">主模块</span>
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const isActive = currentScreen === item.screen;
             return (
               <button
@@ -139,14 +141,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Shortcuts / Utilities */}
         <div className="mt-5 px-2">
           <span className="mb-1.5 block px-2.5 text-[9px] font-bold uppercase tracking-[0.12em] text-stone-500">快捷工具</span>
-          <button
+          {canOpenResourceCenter && <button
             onClick={openTransit}
             className="flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-xs font-medium text-stone-400 transition-all duration-150 hover:bg-[#2a2724] hover:text-stone-100"
           >
             <span className="material-symbols-outlined text-lg text-stone-500">grid_view</span>
             资源中心
-          </button>
-          <button
+          </button>}
+          {canAccessScreen(AppScreen.MODEL_LIBRARY) && <button
             onClick={() => setScreen(AppScreen.MODEL_LIBRARY)}
             className={`group flex h-8 w-full cursor-pointer items-center justify-between rounded-md px-2.5 text-xs font-medium transition-all duration-150 ${
               currentScreen === AppScreen.MODEL_LIBRARY
@@ -168,44 +170,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {currentScreen === AppScreen.MODEL_LIBRARY && (
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
             )}
-          </button>
+          </button>}
         </div>
       </div>
 
-      {/* User Session Swapper Section */}
+      {/* 当前登录账号只读展示；真实 RBAC 不允许在前端切换成其他账号。 */}
       <div className="border-t border-[#302d29] bg-[#191816] p-3">
-        <div className="relative">
-          {showUserDropdown && (
-            <div className="absolute bottom-12 left-0 z-50 w-full rounded-md border border-[#48423d] bg-[#302d29] p-2 shadow-xl">
-              <span className="mb-1 block border-b border-[#48423d] px-2 pb-1.5 text-[10px] text-stone-500">切换协作账号角色</span>
-              {users.map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => {
-                    setCurrentUser(u);
-                    setShowUserDropdown(false);
-                  }}
-                  className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition-all ${
-                    currentUser.id === u.id ? 'bg-[#403a35] text-white' : 'text-stone-300 hover:bg-[#403a35]'
-                  }`}
-                >
-                  <img src={u.avatar} alt={u.name} className="w-7 h-7 rounded-full object-cover" referrerPolicy="no-referrer" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate">{u.name}</p>
-                    <p className="text-[10px] text-stone-500">{u.role}</p>
-                  </div>
-                  {currentUser.id === u.id && (
-                    <span className="material-symbols-outlined text-success text-sm font-bold">check</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div
-            onClick={() => setShowUserDropdown(!showUserDropdown)}
-            className="flex cursor-pointer items-center gap-2.5 rounded-md p-2 transition-all duration-150 hover:bg-[#2a2724]"
-          >
+        <div className="flex items-center gap-2.5 rounded-md p-2">
             <div className="relative">
               <img
                 src={currentUser.avatar || undefined}
@@ -216,13 +187,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-bg-dark bg-success" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <p className="mb-1 truncate text-xs font-bold leading-none text-white">{currentUser.name}</p>
-                <span className="material-symbols-outlined text-xs text-stone-500">unfold_more</span>
-              </div>
+              <p className="mb-1 truncate text-xs font-bold leading-none text-white">{currentUser.name}</p>
               <p className="truncate text-[10px] leading-none text-stone-400">{currentUser.role}</p>
             </div>
-          </div>
         </div>
       </div>
     </aside>

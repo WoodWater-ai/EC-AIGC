@@ -26,7 +26,8 @@ export interface QueryState<T> {
  */
 export function useServiceQuery<T>(
   fetcher: () => Promise<T>,
-  deps: DependencyList = []
+  deps: DependencyList = [],
+  enabled = true,
 ): QueryState<T> {
   const [state, setState] = useState<Omit<QueryState<T>, 'refetch'>>({
     data: null,
@@ -46,9 +47,15 @@ export function useServiceQuery<T>(
     previousDepsRef.current = deps;
     setState((current) => ({
       data: depsChanged ? null : current.data,
-      loading: true,
+      loading: enabled,
       error: null,
     }));
+
+    if (!enabled) {
+      return () => {
+        aliveRef.current = false;
+      };
+    }
 
     fetcher()
       .then((data) => {
@@ -66,7 +73,7 @@ export function useServiceQuery<T>(
       aliveRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, trigger]);
+  }, [...deps, enabled, trigger]);
 
   const refetch = useCallback(() => {
     setTrigger((t) => t + 1);

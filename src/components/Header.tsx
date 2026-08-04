@@ -18,7 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   notifications,
   markAllAsRead
 }) => {
-  const { logout } = useAuth();
+  const { logout, hasPermission } = useAuth();
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -91,7 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Action icons */}
         <div className="flex items-center gap-1">
           {/* Quick Creator Button (Header context) with dropdown */}
-          {currentScreen !== AppScreen.CREATE_IMAGE_TASK && currentScreen !== AppScreen.CREATE_VIDEO_TASK && (
+          {hasPermission('task:create') && currentScreen !== AppScreen.CREATE_IMAGE_TASK && currentScreen !== AppScreen.CREATE_VIDEO_TASK && (
             <div className="relative">
               <button
                 onClick={() => setShowCreateDropdown(!showCreateDropdown)}

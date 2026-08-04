@@ -12,6 +12,7 @@ import {
 } from '../../api/roleMenu';
 import { useConfirm } from '../common/ConfirmProvider';
 import { MenuEditDrawer } from './MenuEditDrawer';
+import { useAuth } from '../../auth/AuthContext';
 
 type FilterType = MenuNodeType | 'ALL';
 
@@ -28,6 +29,10 @@ const TYPE_BADGE: Record<MenuNodeType, string> = {
 };
 
 export const MenuConfigTab: React.FC = () => {
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('menu:create');
+  const canEdit = hasPermission('menu:edit');
+  const canDelete = hasPermission('menu:delete');
   const [tree, setTree] = useState<MenuNode[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<FilterType>('ALL');
@@ -111,6 +116,7 @@ export const MenuConfigTab: React.FC = () => {
   const selectedNode = selectedId ? findNode(tree, selectedId) : null;
 
   const openCreateRoot = () => {
+    if (!canCreate) return;
     setDrawerMode('create');
     setDrawerInitial(null);
     setDrawerDefaultPid('0');
@@ -119,6 +125,7 @@ export const MenuConfigTab: React.FC = () => {
   };
 
   const openCreateChild = (parent: MenuNode) => {
+    if (!canCreate) return;
     setDrawerMode('create');
     setDrawerInitial(null);
     setDrawerDefaultPid(String(parent.id));
@@ -127,6 +134,7 @@ export const MenuConfigTab: React.FC = () => {
   };
 
   const openEdit = (node: MenuNode) => {
+    if (!canEdit) return;
     setDrawerMode('edit');
     setDrawerInitial(node);
     setDrawerDefaultPid(undefined);
@@ -153,6 +161,7 @@ export const MenuConfigTab: React.FC = () => {
   };
 
   const handleDelete = async () => {
+    if (!canDelete) return;
     if (!selectedNode) return;
     if (selectedNode.children && selectedNode.children.length > 0) {
       toast.error('请先删除子节点');
@@ -188,7 +197,7 @@ export const MenuConfigTab: React.FC = () => {
       <div key={id}>
         <div
           onClick={() => handleSelect(id)}
-          onDoubleClick={() => openEdit(node)}
+          onDoubleClick={() => canEdit && openEdit(node)}
           className={`flex items-center gap-2 py-2 px-3 rounded-lg cursor-pointer transition-colors ${
             isSelected
               ? 'bg-blue-50 border border-blue-200'
@@ -253,13 +262,13 @@ export const MenuConfigTab: React.FC = () => {
     <div className="space-y-4">
       {/* 顶部工具栏 */}
       <div className="flex flex-wrap items-center gap-3 bg-white rounded-xl border border-slate-200 px-4 py-3">
-        <button
+        {canCreate && <button
           onClick={openCreateRoot}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm"
         >
           <Plus className="w-3.5 h-3.5" />
           新增根节点
-        </button>
+        </button>}
 
         <button
           onClick={loadTree}
@@ -363,15 +372,15 @@ export const MenuConfigTab: React.FC = () => {
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex flex-wrap gap-2">
-                <button
+                {canEdit && <button
                   onClick={() => openEdit(selectedNode)}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                   编辑
-                </button>
+                </button>}
 
-                {selectedNode.type !== 'BUTTON' && (
+                {canCreate && selectedNode.type !== 'BUTTON' && (
                   <button
                     onClick={() => openCreateChild(selectedNode)}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg"
@@ -381,14 +390,14 @@ export const MenuConfigTab: React.FC = () => {
                   </button>
                 )}
 
-                <button
+                {canDelete && <button
                   onClick={handleDelete}
                   disabled={deleting}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 text-xs font-semibold rounded-lg disabled:opacity-60 ml-auto"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   删除
-                </button>
+                </button>}
               </div>
             </div>
           )}

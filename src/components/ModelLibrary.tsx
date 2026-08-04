@@ -3,6 +3,7 @@ import type { ModelProfileDTO } from '../api/modules/modelProfile';
 import type { ImageGenerationType } from '../types';
 import { withCosThumbnail } from '../utils/cosImage';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { useAuth } from '../auth/AuthContext';
 
 const FILTERS = ['全部', '清透', '甜美', '成熟', '居家'] as const;
 const TASK_LABELS: Record<ImageGenerationType, string> = {
@@ -25,6 +26,8 @@ export function ModelLibrary({
   loading,
   error,
 }: ModelLibraryProps) {
+  const { hasPermission } = useAuth();
+  const canCreateProfile = hasPermission('model-profile:create');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('全部');
   const [previewProfile, setPreviewProfile] = useState<ModelProfileDTO>();
   const profiles = useMemo(
@@ -42,9 +45,9 @@ export function ModelLibrary({
           <h2 className="font-display text-2xl font-black text-slate-900">模特资源库</h2>
           <p className="mt-2 text-sm text-slate-500">选择已保存的人物资产，用于商品图片和视频任务。</p>
         </div>
-        <button onClick={onCreateProfile} className="h-9 rounded-md bg-primary px-4 text-xs font-bold text-white hover:bg-primary-hover">
+        {canCreateProfile && <button onClick={onCreateProfile} className="h-9 rounded-md bg-primary px-4 text-xs font-bold text-white hover:bg-primary-hover">
           新建 AI 模特
-        </button>
+        </button>}
       </div>
 
       <div className="flex flex-wrap gap-2">

@@ -3,7 +3,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner';
 import { AppScreen } from '../../types';
 import type { ProductAsset } from '../../types';
-import type { ProductDTO } from '../../api/modules/productInfo';
+import { productInfoApi, type ProductDTO } from '../../api/modules/productInfo';
+import type { AssetResourceItem } from '../../api/modules/asset';
 import type { ImageGenerationType } from '../../lib/createImageTask/readinessChecks';
 import type { ReferenceSlot } from '../../lib/createImageTask/extractReferenceInsights';
 import type { ProductFactsInput } from '../../lib/createImageTask/extractProductFacts';
@@ -11,11 +12,8 @@ import { toSlotRef } from '../common/TransitPickerButton';
 
 import { TopHeader } from './header/TopHeader';
 import { ThreeColumnLayout } from './layout/ThreeColumnLayout';
-import { ProductPickerCard } from './left/ProductPickerCard';
-import { ProductPickerModal } from './ProductPickerModal';
 import { ImageSourceSection } from './left/ImageSourceSection';
-import { CompositeSection } from './left/CompositeSection';
-import { ReferenceGrid, type ReferenceRef } from './left/ReferenceGrid';
+import { ReferenceGrid } from './left/ReferenceGrid';
 import { ImageTypeSelector } from './center/ImageTypeSelector';
 import { TemplatePicker } from './center/TemplatePicker';
 import { StyleScenePoseRow } from './center/StyleScenePoseRow';
@@ -23,10 +21,10 @@ import { AdvancedSettings } from './center/AdvancedSettings';
 import { ImageContentSection } from './center/ImageContentSection';
 import { ProductFactsEditor } from './center/ProductFactsEditor';
 import { ImageSettingsSection, type TaskParamsSnapshot } from './right/ImageSettingsSection';
-import { ReviewStrategyPanel } from './right/ReviewStrategyPanel';
 import { ConflictDialog } from './dialogs/ConflictDialog';
 import { TemplateOverwriteDialog } from './dialogs/TemplateOverwriteDialog';
 import { ExecutionConfirmDialog } from './dialogs/ExecutionConfirmDialog';
+import { CreateProductFromAssetDialog } from './dialogs/CreateProductFromAssetDialog';
 import { AssetTransitModal } from '../AssetTransitModal';
 import { useCreateImageTaskState } from '../../hooks/useCreateImageTaskState';
 import { useDictOptions } from '../../api/hooks/useDict';
@@ -67,6 +65,15 @@ const IMAGE_TYPE_PREFILL_MAP: Record<string, ImageGenerationType> = {
   ON_MODEL: 'model_triple_view',
 };
 
+const EMPTY_PRODUCT_FACTS: ProductFactsInput = {
+  name: '',
+  sellingPoints: '',
+  productCategory: '',
+  colorPattern: '',
+  fabricTexture: '',
+  fitStructure: '',
+};
+
 const renderReusablePrompt = (prompt: string, facts: ProductFactsInput) => {
   const values: Record<string, string> = {
     name: facts.name,
@@ -84,7 +91,7 @@ const renderReusablePrompt = (prompt: string, facts: ProductFactsInput) => {
 };
 
 export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
-  const { selectedProduct, setScreen, onAddTask, creationTemplateId } = props;
+  const { setScreen, onAddTask, creationTemplateId } = props;
   const creationPrefillQuery = useServiceQuery(
     () => creationTemplateId
       ? creationTemplateApi.reuseContext(creationTemplateId)
@@ -105,14 +112,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   }, [creationPrefill]);
 
   // ---- local form state ----
-  const [productFacts, setProductFacts] = useState<ProductFactsInput>({
-    name: creationTemplateId ? '' : selectedProduct.name,
-    sellingPoints: creationTemplateId ? '' : selectedProduct.specs.sellingPoints.join('，'),
-    productCategory: creationTemplateId ? '' : selectedProduct.category,
-    colorPattern: creationTemplateId ? '' : selectedProduct.specs.color[0] || '米白色',
-    fabricTexture: creationTemplateId ? '' : selectedProduct.specs.material || '细腻针织纹理',
-    fitStructure: creationTemplateId ? '' : '修身版型',
-  });
+  const [productFacts, setProductFacts] = useState<ProductFactsInput>(EMPTY_PRODUCT_FACTS);
   const [mainValue, setMainValue] = useState<{
     /** asset_resource.id(后端 aiAnalyze + 提交 assetId 用)—— 雪花 ID 必须 string 避免 JS 精度丢失 */
     id?: string;
@@ -123,11 +123,11 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     name?: string;
   } | null>(null);
 
-  // ---- 选择产品 ----
-  // selectedFromLibrary:从 ProductPickerModal 选中的 ProductDTO(与 App 注入的 ProductAsset 不同——后者是 SKU)
-  // productPickerOpen:modal 显示
+  // 商品不再单独选择，由主体素材上的 productId 自动匹配。
   const [selectedFromLibrary, setSelectedFromLibrary] = useState<ProductDTO | null>(null);
-  const [productPickerOpen, setProductPickerOpen] = useState<boolean>(false);
+  const [unboundMainAsset, setUnboundMainAsset] = useState<AssetResourceItem | null>(null);
+  const [matchingProduct, setMatchingProduct] = useState(false);
+  const selectedMainResourceIdRef = useRef<string | null>(null);
 
   // ---- 本页自己的资源中心 picker(替代 App.tsx 全局 manager modal)----
   // 由 pendingSlot 路由:点击主图 → 'main';点击参考图 slot → 该 slot id
@@ -156,11 +156,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     schemaParams: {},
   });
   const state = useCreateImageTaskState({
-    isProductBound: !!mainValue,
+    isProductBound: !!mainValue && !!selectedFromLibrary,
     mainAssetId: mainValue?.id ?? null,
     mainImage: mainValue,
-    // 选产品(从 ProductPickerModal)用 selectedFromLibrary 的 id(真实 ProductDTO.id,雪花 ID string)
-    // 顶层 selectedProduct 是 SKU(ProductAsset),仅用于初始化 form state 6 字段,不是提交用的 productId 源。
+    // productId 由主体素材关联的商品提供，雪花 ID 全程保持 string。
     productId: selectedFromLibrary?.id ?? null,
     // AI 助手成功后,把后端 6 字段一次回写到顶层 productFacts state,
     // 让 ProductFactsEditor 的 input 实时刷新。
@@ -197,7 +196,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     selectedTypes, typeCounts, template,
     style, scene, pose, negativePrompt,
     promptOverrides,
-    assistantState, reviewEnabled, references,
+    assistantState, references,
     conflictOpen, templatePickerOpen, pendingTemplate,
     templateOverwriteOpen, executionConfirmOpen,
     isSubmitting,
@@ -210,7 +209,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     updateProductFact, setFormFactsExternal,
     setPromptOverride, runAssistantAnalysis,
     regeneratePrompts, applyAiOptimizeToSelected,
-    setReviewEnabled,
     selectReference, updateReferenceOrder, checkAndGenerate, submitTasks,
   } = state;
   const appliedCreationTemplateRef = useRef<string | null>(null);
@@ -222,19 +220,13 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     appliedCreationTemplateRef.current = creationPrefill.templateId;
 
     // 做同款只恢复可复用创作信息，明确清空商品、商品事实和主体素材。
-    const emptyFacts: ProductFactsInput = {
-      name: '',
-      sellingPoints: '',
-      productCategory: '',
-      colorPattern: '',
-      fabricTexture: '',
-      fitStructure: '',
-    };
     setSelectedFromLibrary(null);
     setMainValue(null);
+    setUnboundMainAsset(null);
+    selectedMainResourceIdRef.current = null;
     setTemplate(creationPrefill.templateName);
-    setProductFacts(emptyFacts);
-    setFormFactsExternal(emptyFacts);
+    setProductFacts(EMPTY_PRODUCT_FACTS);
+    setFormFactsExternal(EMPTY_PRODUCT_FACTS);
     if (snapshot.style) setStyle(snapshot.style);
     if (snapshot.scene) setScene(snapshot.scene);
     if (snapshot.pose) setPose(snapshot.pose);
@@ -281,7 +273,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         name: reference.name,
       });
     });
-    toast.success(`已应用模板：${creationPrefill.templateName}，请重新选择商品和主体素材`);
+    toast.success(`已应用模板：${creationPrefill.templateName}，请重新选择主体素材`);
   }, [
     changeTypeCount,
     creationPrefill,
@@ -341,27 +333,11 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     applyAiOptimizeToSelected(selectedTypes);
   }, [applyAiOptimizeToSelected, selectedTypes]);
 
-  // ---- composite applied: set as main (上下装合成预览后写主图) ----
-  const handleCompositeApplied = useCallback(
-    (asset: { fileResourceId?: string; originalUrl?: string; thumbnailUrl?: string; name?: string }) => {
-      // 合成图通常无 asset_resource.id(file_resource 走专用合成流程),
-      // 主图分支不调 AI 助手 → id 可为空。
-      setMainValue({
-        id: undefined,
-        fileResourceId: asset.fileResourceId,
-        originalUrl: asset.originalUrl,
-        thumbnailUrl: withCosThumbnail(asset.thumbnailUrl, 256) ?? asset.originalUrl,
-        name: asset.name,
-      });
-    },
-    [],
-  );
-
-  // ---- 选择产品:把选中产品的 6 字段填入商品事实 + 主图写入 mainValue ----
-  const handleProductPicked = useCallback(
+  // 主体素材匹配到商品后，把商品字段同步到商品事实和可复用模板 Prompt。
+  const applyMatchedProduct = useCallback(
     (product: ProductDTO) => {
       setSelectedFromLibrary(product);
-      const nextFacts = {
+      const nextFacts: ProductFactsInput = {
         name: (product.name ?? '').trim(),
         sellingPoints: (product.sellingPoints ?? '').trim(),
         productCategory: (product.category ?? '').trim(),
@@ -380,26 +356,30 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       if (reusablePrompt && targetType) {
         setPromptOverride(targetType, renderReusablePrompt(reusablePrompt, nextFacts));
       }
-      // 主图:imageUrl(ossKey) → withCosThumbnail(256) 拼 COS thumbnail,
-      // 与 handleTransitConfirm 的主图分支保持一致缩放规则。
-      const compressedThumb = withCosThumbnail(product.imageUrl, 256) ?? product.imageUrl;
-      // product.imageId 是后端 product.image_id 的字符串形式(雪花 ID),
-      // 必须保持 string,绝不能 Number()(19 位 ID 超出 number 安全范围)
-      setMainValue({
-        id: product.imageId,
-        thumbnailUrl: compressedThumb,
-        originalUrl: product.imageUrl,
-        name: product.name,
-      });
-      toast.success(`已选择产品:${product.name}`);
     },
     [creationPrefill, setFormFactsExternal, setPromptOverride],
   );
 
-  const handleClearProduct = useCallback(() => {
+  const resetProductContext = useCallback(() => {
     setSelectedFromLibrary(null);
-    toast.info('已清除产品卡片选择');
-  }, []);
+    setProductFacts(EMPTY_PRODUCT_FACTS);
+    setFormFactsExternal(EMPTY_PRODUCT_FACTS);
+  }, [setFormFactsExternal]);
+
+  const clearMainSelection = useCallback((showToast = true) => {
+    selectedMainResourceIdRef.current = null;
+    setMainValue(null);
+    setUnboundMainAsset(null);
+    setMatchingProduct(false);
+    resetProductContext();
+    if (showToast) toast.info('已取消主体素材选择');
+  }, [resetProductContext]);
+
+  const handleProductCreated = useCallback((product: ProductDTO) => {
+    if (!unboundMainAsset || selectedMainResourceIdRef.current !== unboundMainAsset.id) return;
+    applyMatchedProduct(product);
+    setUnboundMainAsset(null);
+  }, [applyMatchedProduct, unboundMainAsset]);
 
   // ---- 主图点击 → 打开 picker,target='main' ----
   const openMainPicker = useCallback(() => {
@@ -413,7 +393,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
 
   // ---- picker 确认:按 pendingSlot 路由写值 ----
   const handleTransitConfirm = useCallback(
-    (items: import('../../api/modules/asset').AssetResourceItem[]) => {
+    async (items: AssetResourceItem[]) => {
       if (items.length === 0) return;
       const item = items[0];
       // CI 缩略图参数拼接(与 OutfitComposePanel.tsx:142 同款)
@@ -421,6 +401,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       // - 参考图容器 w-10 h-10(40px):用 64,与 ProductManagePage.tsx:271 一致(避免浪费带宽)
       const slotRef = toSlotRef(item);
       if (pendingSlot === 'main') {
+        selectedMainResourceIdRef.current = item.id;
+        resetProductContext();
+        setUnboundMainAsset(null);
         const compressedThumb = withCosThumbnail(slotRef.thumbnailUrl, 256) ?? slotRef.thumbnailUrl ?? slotRef.originalUrl;
         // 主图要保留 item.id(asset_resource.id,string),给后端 aiAnalyze + 提交 assetId 用;
         // toSlotRef 不带 id 字段,所以这里手写。
@@ -431,6 +414,25 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
           originalUrl: slotRef.originalUrl,
           name: slotRef.name,
         });
+        setPendingSlot(null);
+
+        if (!item.productId) {
+          setMatchingProduct(false);
+          setUnboundMainAsset(item);
+          return;
+        }
+
+        setMatchingProduct(true);
+        try {
+          const product = await productInfoApi.detail({ id: item.productId });
+          if (selectedMainResourceIdRef.current !== item.id) return;
+          applyMatchedProduct(product);
+          toast.success(`已匹配商品：${product.name}`);
+        } catch {
+          if (selectedMainResourceIdRef.current === item.id) clearMainSelection(false);
+        } finally {
+          if (selectedMainResourceIdRef.current === item.id) setMatchingProduct(false);
+        }
       } else if (pendingSlot !== null) {
         // 5 个参考图 slot 之一
         // 关键:必须携带 fileResourceId(实际是 asset_resource.id)和 id,否则后端
@@ -447,14 +449,14 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       }
       setPendingSlot(null);
     },
-    [pendingSlot, selectReference],
+    [applyMatchedProduct, clearMainSelection, pendingSlot, resetProductContext, selectReference],
   );
 
   const handleTransitClose = useCallback(() => {
     setPendingSlot(null);
   }, []);
 
-  const isProductBound = !!mainValue;
+  const isProductBound = !!mainValue && !!selectedFromLibrary && !matchingProduct;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#f5f7fb] text-slate-800">
@@ -470,26 +472,12 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       <ThreeColumnLayout
         left={
           <>
-            {/* 选择产品卡片 —— 在输入素材上方,宽度与下方 ImageSourceSection 一致 */}
-            <ProductPickerCard
-              selectedProduct={selectedFromLibrary}
-              onPick={() => setProductPickerOpen(true)}
-              onClear={handleClearProduct}
-            />
             <ImageSourceSection
               mainValue={mainValue}
+              productName={selectedFromLibrary?.name}
+              matchingProduct={matchingProduct}
               onPickMain={openMainPicker}
             />
-            {selectedProduct.category === '户外服饰' && (
-              <CompositeSection
-                productId={
-                  /^\d+$/.test(String(selectedProduct.id))
-                    ? selectedProduct.id
-                    : undefined
-                }
-                onApplied={handleCompositeApplied}
-              />
-            )}
             <ReferenceGrid
               orderedRefs={state.orderedRefs}
               onMove={state.moveReference}
@@ -560,16 +548,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
           </>
         }
         right={
-          <>
-            <ImageSettingsSection
-              prefill={imageParamsPrefill}
-              onParamsChange={setParamsSnapshot}
-            />
-            <ReviewStrategyPanel
-              reviewEnabled={reviewEnabled}
-              onChange={setReviewEnabled}
-            />
-          </>
+          <ImageSettingsSection
+            prefill={imageParamsPrefill}
+            onParamsChange={setParamsSnapshot}
+          />
         }
       />
 
@@ -625,11 +607,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         onConfirm={() => setConflictOpen(false)}
       />
 
-      {/* 选择产品 picker modal —— 复用 productInfoApi.list */}
-      <ProductPickerModal
-        open={productPickerOpen}
-        onClose={() => setProductPickerOpen(false)}
-        onPick={handleProductPicked}
+      <CreateProductFromAssetDialog
+        asset={unboundMainAsset}
+        onCancel={clearMainSelection}
+        onCreated={handleProductCreated}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import { getRoleList, deleteRole, type RoleInfo } from '../../api/roleMenu';
 import RolePermissionMatrixModal from './RolePermissionMatrixModal';
 import RoleEditDrawer from './RoleEditDrawer';
 import { useConfirm } from '../common/ConfirmProvider';
+import { useAuth } from '../../auth/AuthContext';
 
 interface RoleManageTabProps {
   onRolePermissionChange?: () => void;
@@ -17,6 +18,11 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
 };
 
 export const RoleManageTab: React.FC<RoleManageTabProps> = ({ onRolePermissionChange }) => {
+  const { hasPermission, hasAnyPermission } = useAuth();
+  const canCreateRole = hasAnyPermission(['role:create', 'role:config']);
+  const canEditRole = hasAnyPermission(['role:edit', 'role:config']);
+  const canDeleteRole = hasAnyPermission(['role:delete', 'role:config']);
+  const canConfigureRole = hasPermission('role:config');
   const [roles, setRoles] = useState<RoleInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [matrixOpen, setMatrixOpen] = useState(false);
@@ -42,22 +48,25 @@ export const RoleManageTab: React.FC<RoleManageTabProps> = ({ onRolePermissionCh
   }, []);
 
   const openMatrix = (role: RoleInfo) => {
-    if (role.sysRole) return;
+    if (role.sysRole || !canConfigureRole) return;
     setActiveRole(role);
     setMatrixOpen(true);
   };
 
   const openCreateDrawer = () => {
+    if (!canCreateRole) return;
     setEditingRole(null);
     setEditDrawerOpen(true);
   };
 
   const openEditDrawer = (role: RoleInfo) => {
+    if (role.sysRole || !canEditRole) return;
     setEditingRole(role);
     setEditDrawerOpen(true);
   };
 
   const handleDeleteRole = async (role: RoleInfo) => {
+    if (role.sysRole || !canDeleteRole) return;
     const ok = await confirm({
       title: '删除角色',
       message: `将删除「${role.roleName}」角色。该角色下若仍有关联用户,删除会失败。请确认。`,
@@ -84,13 +93,13 @@ export const RoleManageTab: React.FC<RoleManageTabProps> = ({ onRolePermissionCh
             系统采用标准基于角色的权限控制模型(RBAC)。每个员工账号通过分配系统角色,自动继承对应的功能细分权限。请选择下方角色进行"配置授权权限矩阵"。
           </p>
         </div>
-        <button
+        {canCreateRole && <button
           onClick={openCreateDrawer}
           className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm"
         >
           <Plus className="w-3.5 h-3.5" />
           新建角色
-        </button>
+        </button>}
       </div>
 
       {loading ? (
@@ -128,30 +137,30 @@ export const RoleManageTab: React.FC<RoleManageTabProps> = ({ onRolePermissionCh
                     功能权限点(详见矩阵)
                   </span>
                   <div className="flex items-center gap-1.5">
-                    {!isBuiltIn && (
+                    {!isBuiltIn && (canEditRole || canDeleteRole) && (
                       <>
-                        <button
+                        {canEditRole && <button
                           onClick={() => openEditDrawer(role)}
                           title="编辑角色"
                           className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
                         >
                           <Edit className="w-3.5 h-3.5" />
-                        </button>
-                        <button
+                        </button>}
+                        {canDeleteRole && <button
                           onClick={() => handleDeleteRole(role)}
                           title="删除角色"
                           className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        </button>}
                       </>
                     )}
                     <button
                       onClick={() => openMatrix(role)}
-                      disabled={isBuiltIn}
-                      title={isBuiltIn ? '系统内置角色不允许修改权限' : ''}
+                      disabled={isBuiltIn || !canConfigureRole}
+                      title={isBuiltIn ? '系统内置角色不允许修改权限' : !canConfigureRole ? '当前账号没有角色配置权限' : ''}
                       className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
-                        isBuiltIn
+                        isBuiltIn || !canConfigureRole
                           ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                           : 'text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100'
                       }`}
