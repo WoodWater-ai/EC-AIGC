@@ -345,6 +345,7 @@ export default function App() {
           <AssetTransitModal
             purpose="OTHER"
             mode={modelAssetConsumer ? 'picker' : 'manager'}
+            onModelImported={modelProfilesQuery.refetch}
             targetSlot={modelAssetTarget ? `model-profile-${modelAssetTarget}` : 'main'}
             onConfirmSelection={(items) => {
               const first = items[0];
@@ -392,6 +393,7 @@ export default function App() {
           <AssetTransitModal
             purpose="OTHER"
             mode="manager"
+            onModelImported={modelProfilesQuery.refetch}
             onConfirmSelection={(fileResIds) => {
               // App.tsx 全局兜底:无业务上下文,仅打日志
               console.log('[Transit] App 全局选中(未消费):', fileResIds);
@@ -455,6 +457,7 @@ export default function App() {
         <AssetTransitModal
           purpose="OTHER"
           mode={modelAssetConsumer ? 'picker' : 'manager'}
+          onModelImported={modelProfilesQuery.refetch}
           targetSlot={modelAssetTarget ? `model-profile-${modelAssetTarget}` : 'main'}
           onConfirmSelection={(items) => {
             const first = items[0];

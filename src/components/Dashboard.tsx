@@ -49,7 +49,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks, setScreen }) => {
   const [media, setMedia] = useState<TemplateMediaType>('image');
   const [category, setCategory] = useState('全部');
   const [style, setStyle] = useState('全部');
-  const [order, setOrder] = useState<'recommended' | 'latest'>('recommended');
+  const [order, setOrder] = useState<'recommended' | 'latest'>('latest');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [favoritePendingIds, setFavoritePendingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [publishTarget, setPublishTarget] = useState<CreationWork | null>(null);
@@ -110,7 +110,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks, setScreen }) => {
   const resetFilters = () => {
     setCategory('全部');
     setStyle('全部');
-    setOrder('recommended');
+    setOrder('latest');
   };
 
   const useTemplate = (template: DashboardTemplate) => {
@@ -274,6 +274,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks, setScreen }) => {
           });
           toast.success('已设为模板并发布到模板营地');
           setPublishTarget(null);
+          setCategory('全部');
+          setStyle('全部');
+          setOrder('latest');
           await Promise.all([worksQuery.refetch(), campQuery.refetch()]);
         }}
       />

@@ -759,7 +759,7 @@ export interface VideoTaskSubmitPayload {
   channelInstanceId: string;
   capability: string;
   channelType: string;
-  videoMode: 'FIRST_FRAME' | 'TRENDING_REPLICATE';
+  videoMode: 'FIRST_FRAME' | 'TRENDING_REPLICATE' | 'ECOMMERCE_REPLICATE';
   modelCode?: string | null;
   executionSelectionSource?: string;
   taskParamsJson: string;

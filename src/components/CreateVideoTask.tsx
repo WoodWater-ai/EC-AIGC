@@ -21,7 +21,7 @@ import {
   type TrendingReplacementRole,
 } from '../lib/createVideoTask/buildTrendingReplicatePrompt';
 
-type VideoMode = 'FIRST_FRAME' | 'TRENDING_REPLICATE';
+type VideoMode = 'FIRST_FRAME' | 'TRENDING_REPLICATE' | 'ECOMMERCE_REPLICATE';
 type InputRole = 'FIRST_FRAME' | 'SOURCE_VIDEO' | 'REPLACEMENT_REFERENCE';
 
 interface SelectedAsset {
@@ -80,7 +80,7 @@ const MODE_CONFIG: Record<
   {
     label: string;
     description: string;
-    capability: 'IMG2VIDEO' | 'SOLUTION_TRENDING_REPL';
+    capability: 'IMG2VIDEO' | 'SOLUTION_TRENDING_REPL' | 'SOLUTION_AD_VIDEO_EDIT';
     group: 'VIDEO' | 'SOLUTION';
   }
 > = {
@@ -94,6 +94,12 @@ const MODE_CONFIG: Record<
     label: '爆款复刻',
     description: '参考原视频结构，替换为所选商品或模特素材',
     capability: 'SOLUTION_TRENDING_REPL',
+    group: 'SOLUTION',
+  },
+  ECOMMERCE_REPLICATE: {
+    label: '电商复刻',
+    description: '参考源视频结构，使用商品和模特等图片复刻电商成片',
+    capability: 'SOLUTION_AD_VIDEO_EDIT',
     group: 'SOLUTION',
   },
 };
@@ -207,6 +213,10 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
   const [count, setCount] = useState(1);
   const [params, setParams] = useState<ParamsSnapshot>(EMPTY_PARAMS);
+  const [sourceDurationPatch, setSourceDurationPatch] = useState<{
+    revision: string;
+    values: { duration: number };
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [productFacts, setProductFacts] = useState<
     VideoTaskSubmitPayload['productFacts']
@@ -230,9 +240,11 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     if (appliedCreationTemplateRef.current === creationPrefill.templateId) return;
     appliedCreationTemplateRef.current = creationPrefill.templateId;
     const snapshot = creationPrefill.snapshot;
-    const nextMode = snapshot.videoMode === 'TRENDING_REPLICATE'
+    const nextMode: VideoMode = snapshot.videoMode === 'TRENDING_REPLICATE'
       ? 'TRENDING_REPLICATE'
-      : 'FIRST_FRAME';
+      : snapshot.videoMode === 'ECOMMERCE_REPLICATE'
+        ? 'ECOMMERCE_REPLICATE'
+        : 'FIRST_FRAME';
     setMode(nextMode);
     setSelectedProductInfo(null);
     setProductFacts({
@@ -269,7 +281,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
         replacementRole: inferTemplateReplacementRole(snapshot.prompt ?? '', index),
       }))
       .filter((asset) => Boolean(asset.originalUrl))
-      .slice(0, 7);
+      .slice(0, nextMode === 'ECOMMERCE_REPLICATE' ? 8 : 6);
     setFirstFrame(
       firstFrameReference?.url
         ? toTemplateAsset(firstFrameReference, 'IMAGE')
@@ -282,7 +294,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     );
     setReplacementReferences(replacementReferenceAssets);
     setManualTrendingPrompt(null);
-    setPrompt(nextMode === 'TRENDING_REPLICATE'
+    setPrompt(nextMode !== 'FIRST_FRAME'
       ? extractTrendingUserInstruction(snapshot.prompt ?? '')
       : cleanReusableVideoPrompt(snapshot.prompt ?? ''));
     setNegativePrompt(snapshot.negativePrompt ?? '');
@@ -293,6 +305,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   }, [creationPrefill]);
 
   const config = MODE_CONFIG[mode];
+  const isReplicateMode = mode !== 'FIRST_FRAME';
+  const isEcommerceReplicate = mode === 'ECOMMERCE_REPLICATE';
+  const maxAdditionalReferences = isEcommerceReplicate ? 8 : 6;
   const activeVideoParamsPrefill = videoParamsPrefill?.capability === config.capability
     ? videoParamsPrefill
     : null;
@@ -303,7 +318,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     })),
     userInstruction: prompt,
   }), [prompt, replacementReferences]);
-  const effectivePrompt = mode === 'TRENDING_REPLICATE'
+  const effectivePrompt = isReplicateMode
     ? (manualTrendingPrompt ?? trendingPrompt)
     : prompt;
   const isInputReady =
@@ -340,13 +355,13 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
         const withoutProductImage = previous.filter(
           (asset) => asset.assetId !== product.imageId,
         );
-        if (withoutProductImage.length > 6) {
-          toast.info('商品主图将自动用于爆款复刻，其他替换参考图最多保留 6 张');
+        if (withoutProductImage.length > maxAdditionalReferences) {
+          toast.info(`商品主图将自动用于${config.label}，其他替换参考图最多保留 ${maxAdditionalReferences} 张`);
         }
-        return withoutProductImage.slice(0, 6);
+        return withoutProductImage.slice(0, maxAdditionalReferences);
       });
     }
-    const reusablePrompt = mode === 'TRENDING_REPLICATE'
+    const reusablePrompt = isReplicateMode
       ? extractTrendingUserInstruction(creationPrefill?.snapshot.prompt ?? '')
       : cleanReusableVideoPrompt(creationPrefill?.snapshot.prompt ?? '');
     if (reusablePrompt) {
@@ -379,18 +394,44 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     toast.info('已清除产品选择');
   };
 
+  const syncEcommerceDurationFromVideo = (asset: SelectedAsset) => {
+    if (asset.durationSec == null || asset.durationSec <= 0) return;
+    const sourceDuration = asset.durationSec;
+    const generationDuration = Math.min(15, Math.max(4, Math.round(sourceDuration)));
+    const durationLabel = Number.isInteger(sourceDuration)
+      ? String(sourceDuration)
+      : sourceDuration.toFixed(1);
+    setSourceDurationPatch({
+      revision: `${asset.assetId}:${asset.durationSec}:${Date.now()}`,
+      values: { duration: generationDuration },
+    });
+    if (sourceDuration < 4) {
+      toast.warning(`当前视频为 ${durationLabel} 秒，低于 4 秒，将按最低 4 秒生成`);
+    } else if (sourceDuration > 15) {
+      toast.warning(`当前视频为 ${durationLabel} 秒，高于 15 秒，将按最高 15 秒生成`);
+    } else {
+      toast.success(`已根据源视频自动设置生成视频时长为 ${generationDuration} 秒`);
+    }
+  };
+
   const switchMode = (nextMode: VideoMode) => {
     if (nextMode === mode) return;
     setMode(nextMode);
     setParams(EMPTY_PARAMS);
+    setManualTrendingPrompt(null);
+    if (nextMode === 'TRENDING_REPLICATE') {
+      setReplacementReferences((previous) => previous.slice(0, 6));
+    } else if (nextMode === 'ECOMMERCE_REPLICATE' && sourceVideo) {
+      syncEcommerceDurationFromVideo(sourceVideo);
+    }
     setShots(['', '', '']);
     setStoryboardGenerated(false);
     setTemplateMenuOpen(false);
   };
 
   const generateStoryboard = () => {
-    if (mode === 'TRENDING_REPLICATE') {
-      toast.info('爆款复刻的分镜、动作和剪辑节奏直接采用源视频，无需另行生成分镜');
+    if (isReplicateMode) {
+      toast.info(`${config.label}的分镜、动作和剪辑节奏直接采用源视频，无需另行生成分镜`);
       setShots(['', '', '']);
       setStoryboardGenerated(false);
       return;
@@ -460,6 +501,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       setFirstFrame(selected[0]);
     } else if (picker.role === 'SOURCE_VIDEO') {
       setSourceVideo(selected[0]);
+      if (mode === 'ECOMMERCE_REPLICATE') {
+        syncEcommerceDurationFromVideo(selected[0]);
+      }
     } else {
       setReplacementReferences((previous) => {
         const merged = [...previous];
@@ -469,9 +513,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
             merged.push(item);
           }
         }
-        const maxReferences = 6;
+        const maxReferences = maxAdditionalReferences;
         if (merged.length > maxReferences) {
-          toast.warning('商品主图已自动占用 1 个复刻图片槽位，其他参考图最多选择 6 张');
+          toast.warning(`商品主图已自动占用 1 个复刻图片槽位，其他参考图最多选择 ${maxReferences} 张`);
         }
         return merged.slice(0, maxReferences);
       });
@@ -501,7 +545,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
         },
       ];
     }
-    if (mode === 'TRENDING_REPLICATE' && sourceVideo) {
+    if (isReplicateMode && sourceVideo) {
       const productReference = selectedProductInfo?.imageId
         ? {
             assetId: selectedProductInfo.imageId,
@@ -514,7 +558,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
         : null;
       const references = replacementReferences
         .filter((asset) => asset.assetId !== productReference?.assetId)
-        .slice(0, productReference ? 6 : 7);
+        .slice(0, productReference
+          ? maxAdditionalReferences
+          : (isEcommerceReplicate ? 9 : 7));
       return [
         {
           assetId: sourceVideo.assetId,
@@ -547,7 +593,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       toast.warning(
         mode === 'FIRST_FRAME'
           ? '请先选择视频首帧'
-          : '请先选择爆款原视频，并确保已选商品具有商品主图',
+          : `请先选择${config.label}原视频，并确保已选商品具有商品主图`,
       );
       return;
     }
@@ -555,8 +601,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       toast.warning('请输入本次视频 Prompt');
       return;
     }
-    if (mode === 'TRENDING_REPLICATE' && effectivePrompt.length > 2000) {
-      toast.warning('爆款复刻最终 Prompt 不能超过 2000 字，请精简素材名称或创意补充');
+    if (isReplicateMode && effectivePrompt.length > 2000) {
+      toast.warning(`${config.label}最终 Prompt 不能超过 2000 字，请精简素材名称或创意补充`);
       return;
     }
     if (
@@ -578,8 +624,14 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     const positivePrompt = storyboard
       ? `${effectivePrompt.trim()}\n\n分镜规划：\n${storyboard}`
       : effectivePrompt.trim();
-    if (mode === 'TRENDING_REPLICATE' && positivePrompt.length > 2000) {
-      toast.warning('爆款复刻最终 Prompt（含分镜）不能超过 2000 字，请精简创意补充');
+    if (isReplicateMode && positivePrompt.length > 2000) {
+      toast.warning(`${config.label}最终 Prompt（含分镜）不能超过 2000 字，请精简创意补充`);
+      return;
+    }
+    if (isEcommerceReplicate
+      && params.schemaParams.template === 'ad_video_edit_fast'
+      && params.schemaParams.resolution === '1080p') {
+      toast.warning('电商复刻快速版仅支持 720P，请调整生成档位或清晰度');
       return;
     }
     // 负面约束使用独立字段提交，由后端统一且幂等地组装进供应商 Prompt。
@@ -588,6 +640,10 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       ? selectedProductInfo.id
       : null;
 
+    const schemaParams = Object.fromEntries(
+      Object.entries(params.schemaParams ?? {}).filter(([, value]) =>
+        value !== undefined && value !== null && value !== ''),
+    );
     const payload: VideoTaskSubmitPayload = {
       title: `${config.label}_${productFacts.name}`,
       productId: numericProductId,
@@ -598,7 +654,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       videoMode: mode,
       modelCode: params.modelId,
       executionSelectionSource: params.selectionSource,
-      taskParamsJson: JSON.stringify(params.schemaParams ?? {}),
+      taskParamsJson: JSON.stringify(schemaParams),
       taskPrompt,
       negativePrompt: negativePrompt.trim() || undefined,
       assets: buildAssets(),
@@ -768,7 +824,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-bold text-primary">
-                        爆款视频
+                        {isEcommerceReplicate ? '电商视频' : '爆款视频'}
                       </p>
                       <h2 className="mt-1 text-sm font-black">复刻源视频</h2>
                     </div>
@@ -781,7 +837,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                     </button>
                   </div>
                   <AssetSlot
-                    title="爆款原视频"
+                    title={`${config.label}原视频`}
                     asset={sourceVideo}
                     acceptLabel="从资源中心选择复刻源视频"
                     onChoose={() => openPicker('SOURCE_VIDEO', 'VIDEO')}
@@ -789,7 +845,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                     showLabel={false}
                   />
                   <p className="mt-3 text-[10px] leading-4 text-slate-400">
-                    支持 MP4/MOV，5～180 秒；源视频仅作为本次任务的镜头结构参考。
+                    {isEcommerceReplicate
+                      ? '支持 MP4/MOV；选择后自动同步生成时长，低于 4 秒按 4 秒、高于 15 秒按 15 秒生成。'
+                      : '支持 MP4/MOV，5～180 秒；源视频仅作为本次任务的镜头结构参考。'}
                   </p>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -802,7 +860,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                         模特、场景、风格与动作
                       </h2>
                       <p className="mt-1 text-[11px] leading-4 text-slate-400">
-                        商品主图固定为图 1；其他素材选择用途后动态编译图片绑定，最多再选 6 张。
+                        商品主图固定为图 1；其他素材选择用途后动态编译图片绑定，最多再选 {maxAdditionalReferences} 张。
                       </p>
                     </div>
                     <button
@@ -903,7 +961,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
               <p className="mt-2 text-xs leading-5 text-slate-500">
                 {config.description}
               </p>
-              {mode === 'TRENDING_REPLICATE' && (
+              {isReplicateMode && (
                 <div className="mt-5 border-t border-slate-100 pt-5">
                   <label className="block text-xs font-bold">
                     用户创意补充
@@ -919,7 +977,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                     />
                   </label>
                   <p className="mt-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] leading-5 text-blue-700">
-                    爆款复刻直接以源视频作为唯一分镜与节奏依据，不额外生成或覆盖分镜。
+                    {config.label}直接以源视频作为唯一分镜与节奏依据，不额外生成或覆盖分镜。
                   </p>
                 </div>
               )}
@@ -946,7 +1004,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                   value={effectivePrompt}
                   maxLength={mode === 'FIRST_FRAME' ? 5000 : 2000}
                   onChange={(event) => {
-                    if (mode === 'TRENDING_REPLICATE') {
+                    if (isReplicateMode) {
                       setManualTrendingPrompt(event.target.value);
                     } else {
                       setPrompt(event.target.value);
@@ -956,7 +1014,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                   className="mt-1.5 h-64 w-full resize-y rounded-md border border-slate-200 p-3 text-xs font-normal leading-5 outline-none focus:border-primary"
                   placeholder="描述商品、动作、场景和镜头目标"
                 />
-                {mode === 'TRENDING_REPLICATE' && (
+                {isReplicateMode && (
                   <div className="mt-1 flex items-center justify-between gap-3">
                     <span className="text-[10px] font-normal text-slate-400">
                       {manualTrendingPrompt !== null
@@ -1075,6 +1133,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                   onParamsChange={setParams}
                   fixedChannelType="VIDU"
                   fixedCapability={config.capability}
+                  schemaParamsPatch={isEcommerceReplicate ? sourceDurationPatch : null}
                   showAspectRatio={false}
                   showPromptEditor={false}
                   showNegativePrompt={false}
@@ -1091,6 +1150,16 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                     <p>时长与分辨率以当前 Vidu 模型能力为准</p>
                     <p className="text-amber-700">
                       提交前请确认生成规格与成本
+                    </p>
+                  </>
+                ) : isEcommerceReplicate ? (
+                  <>
+                    <p>源视频选择后自动填充生成视频时长</p>
+                    <p>低于 4 秒按 4 秒，高于 15 秒按 15 秒生成</p>
+                    <p>生成视频时长：可留空，Vidu 默认生成 5 秒</p>
+                    <p>商品主图固定为图 1，其他角色图最多 8 张</p>
+                    <p className="text-amber-700">
+                      快速版仅支持 720P，其他档位可选 1080P
                     </p>
                   </>
                 ) : (

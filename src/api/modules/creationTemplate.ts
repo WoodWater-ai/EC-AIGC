@@ -87,7 +87,7 @@ export interface CreationTemplateSnapshot {
   modelCode?: string | null;
   schemaParams?: Record<string, unknown>;
   references?: CreationTemplateReference[];
-  videoMode?: 'FIRST_FRAME' | 'TRENDING_REPLICATE' | null;
+  videoMode?: 'FIRST_FRAME' | 'TRENDING_REPLICATE' | 'ECOMMERCE_REPLICATE' | null;
   videoDurationSec?: number | null;
   videoResolution?: string | null;
   videoMotion?: string | null;

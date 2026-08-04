@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useTaskParams, type PrefillState } from './useTaskParams';
 import { ParamSchemaForm } from '../common/ParamSchemaForm';
 import { assembleTaskPrompt, applyAiOptimize } from './assembleTaskPrompt';
@@ -24,6 +24,10 @@ export interface TaskParamsPanelProps {
   }) => void;
   fixedChannelType?: string;
   fixedCapability?: string;
+  schemaParamsPatch?: {
+    revision: string;
+    values: Record<string, unknown>;
+  } | null;
   showAspectRatio?: boolean;
   showPromptEditor?: boolean;
   showNegativePrompt?: boolean;
@@ -42,6 +46,7 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
     prompt, onPromptChange, negativePrompt, onNegativePromptChange, onParamsChange,
     fixedChannelType,
     fixedCapability,
+    schemaParamsPatch = null,
     showAspectRatio = true,
     showPromptEditor = true,
     showNegativePrompt = true,
@@ -52,6 +57,22 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
   } = props;
 
   const tp = useTaskParams(group, prefill, fixedCapability, prefillPending);
+  const appliedSchemaPatchRef = useRef<string | null>(null);
+
+  // 外部素材选择可联动能力参数；同一 revision 只应用一次，之后允许用户手工修改。
+  useEffect(() => {
+    if (!schemaParamsPatch || !tp.schema
+      || appliedSchemaPatchRef.current === schemaParamsPatch.revision) return;
+    const declaredKeys = new Set((tp.schema.fields ?? []).map((field) => field.key));
+    const patchValues = Object.fromEntries(
+      Object.entries(schemaParamsPatch.values)
+        .filter(([key]) => declaredKeys.has(key)),
+    );
+    appliedSchemaPatchRef.current = schemaParamsPatch.revision;
+    if (Object.keys(patchValues).length > 0) {
+      tp.setSchemaParams({ ...tp.schemaParams, ...patchValues });
+    }
+  }, [schemaParamsPatch, tp.schema, tp.schemaParams, tp.setSchemaParams]);
 
   // 视频工作台使用业务模式固定供应商能力，避免页面模式与实际 capability 脱节。
   const visibleInstances = fixedChannelType

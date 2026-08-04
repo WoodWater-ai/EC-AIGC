@@ -45,6 +45,8 @@ export interface AssetResourceItem {
   description?: string;
   /** 标签(逗号分隔) */
   tags?: string;
+  /** 是否已经添加到模特资源库 */
+  inModelLibrary?: boolean;
   uploadUserId: string;
   productId?: string;
   recognitionId?: string;

@@ -45,14 +45,14 @@ export function localValidate(
     if (f.type === 'INT' || f.type === 'DECIMAL') {
       const num = Number(v);
       if (Number.isNaN(num)) {
-        errors.push({ field: f.key, message: `${f.label} 必须是数字` });
+        errors.push({ field: f.key, message: '请输入有效数字' });
         continue;
       }
       if (f.min !== undefined && num < Number(f.min)) {
-        errors.push({ field: f.key, message: `${f.label} 最小值 ${f.min}` });
+        errors.push({ field: f.key, message: `不能小于 ${f.min}` });
       }
       if (f.max !== undefined && num > Number(f.max)) {
-        errors.push({ field: f.key, message: `${f.label} 最大值 ${f.max}` });
+        errors.push({ field: f.key, message: `不能大于 ${f.max}` });
       }
     }
     if (f.type === 'SELECT' && f.options) {

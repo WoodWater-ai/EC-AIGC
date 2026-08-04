@@ -117,6 +117,8 @@ interface AssetTransitModalProps {
   initialSource?: ResourceCenterSource;
   /** 限定业务选择器可见的数据源；产品管理只开放上传资源。 */
   allowedSources?: ResourceCenterSource[];
+  /** 从资源中心成功添加模特后通知上层刷新模特资源库。 */
+  onModelImported?: () => void;
 }
 
 export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
@@ -134,6 +136,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   mode = 'picker',
   initialSource = 'UPLOAD',
   allowedSources = ['UPLOAD', 'PRODUCT', 'MODEL'],
+  onModelImported,
 }) => {
   const productSourceAvailable = allowedSources.includes('PRODUCT') && assetKind !== 'AUDIO';
   const modelSourceAvailable = allowedSources.includes('MODEL') && assetKind === 'IMAGE';
@@ -165,6 +168,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   /** 合并抽屉使用打开瞬间的选择快照，避免合成过程中素材顺序被列表操作改变。 */
   const [mergeDrawerItems, setMergeDrawerItems] = useState<AssetResourceItem[] | null>(null);
+  const [isSettingAsModel, setIsSettingAsModel] = useState(false);
 
   // ============ 真后端数据 ============
   const { user, hasPermission } = useAuth();
@@ -312,6 +316,23 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     && selectedItems.length >= 2
     && selectedItems.length === selectedAssetIds.length
     && selectedItems.every((item) => item.assetKind === 'IMAGE');
+  const showSetAsModel = canCreateModel
+    && mode === 'manager'
+    && activeSource === 'UPLOAD'
+    && selectedAssetIds.length > 0;
+  const setAsModelDisabledReason = (() => {
+    if (isSettingAsModel) return '正在添加到模特资源库';
+    if (selectedItems.length !== selectedAssetIds.length) return '部分所选资源已不存在，请重新选择';
+    if (selectedItems.length > 20) return '单次最多可将 20 张图片设为模特';
+    if (selectedItems.some((item) => item.assetKind !== 'IMAGE')) return '只有图片资源可以设为模特';
+    if (selectedItems.some((item) => item.status !== 'NORMAL')) return '已归档的图片不能设为模特';
+    if (selectedItems.some((item) => item.inModelLibrary)) return '选择中包含已在模特库的图片';
+    if (selectedItems.some((item) => String(item.uploadUserId) !== currentUserId)) {
+      return '只能将本人上传的图片设为模特';
+    }
+    return undefined;
+  })();
+  const canSetSelectedAsModel = showSetAsModel && setAsModelDisabledReason === undefined;
 
   // mode='manager' 强制多选;picker 模式尊重调用方的 multiSelect
   const effectiveMultiSelect = mode === 'manager' ? true : multiSelect;
@@ -337,6 +358,39 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const handleMergeClick = () => {
     if (!canMerge || !canMergeSelected) return;
     setMergeDrawerItems(selectedItems);
+  };
+
+  const handleSetAsModel = async () => {
+    if (!canSetSelectedAsModel) return;
+    const count = selectedItems.length;
+    const ok = await confirm({
+      title: '设为模特',
+      message: `确认将选中的 ${count} 张图片设为模特并添加到模特资源库吗？`,
+      confirmText: '确认添加',
+    });
+    if (!ok) return;
+
+    setIsSettingAsModel(true);
+    try {
+      const firstName = selectedItems[0]?.name.trim().replace(/\.[^/.]+$/, '') || '已有模特';
+      const profileIds = await modelProfileApi.importExisting({
+        assetResourceIds: selectedItems.map((item) => item.id),
+        name: firstName,
+        tags: ['已有模特', '人物资产'],
+        suitableFor: ['product_main', 'scene_detail', 'model_triple_view'],
+        reason: '由资源中心已有图片创建。',
+      });
+      toast.success(`${profileIds.length} 张图片已添加到模特资源库`);
+      setSelectedAssetIds([]);
+      await refetch();
+      onModelImported?.();
+    } catch (err) {
+      if (!(err instanceof ApiError)) {
+        toast.error(`设为模特失败: ${(err as Error).message}`);
+      }
+    } finally {
+      setIsSettingAsModel(false);
+    }
   };
 
   // ============ 移动到分类(批量) ============
@@ -1193,6 +1247,9 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   return filteredAssets.map((asset) => {
                     const isSelected = selectedAssetIds.includes(asset.id);
                     const selectIndex = selectedAssetIds.indexOf(asset.id) + 1;
+                    const resourceLabel = asset.inModelLibrary
+                      ? '模特库'
+                      : asset.tags?.split(',')[0] ?? '';
                     return (
                       <div
                         key={asset.id}
@@ -1261,11 +1318,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                           </div>
                           <div className="flex items-center justify-between">
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold ${
+                              asset.inModelLibrary ? 'bg-violet-50 text-violet-600' :
                               asset.tags?.includes('商品原图') ? 'bg-slate-100 text-slate-600' :
                               asset.tags?.includes('白底图') ? 'bg-emerald-50 text-emerald-600' :
                               'bg-blue-50 text-blue-600'
                             }`}>
-                              {asset.tags?.split(',')[0] ?? ''}
+                              {resourceLabel}
                             </span>
                             <span className="text-[9px] text-slate-400 font-mono font-medium">{asset.createTime?.split('T')[0] ?? ''}</span>
                           </div>
@@ -1309,6 +1367,18 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                           >
                             <span className="material-symbols-outlined text-sm">view_quilt</span>
                             合并
+                          </button>
+                        )}
+                        {showSetAsModel && (
+                          <button
+                            type="button"
+                            onClick={handleSetAsModel}
+                            disabled={!canSetSelectedAsModel}
+                            title={setAsModelDisabledReason}
+                            className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+                          >
+                            <span className="material-symbols-outlined text-sm">person_add</span>
+                            {isSettingAsModel ? '添加中...' : '设为模特'}
                           </button>
                         )}
                       </>

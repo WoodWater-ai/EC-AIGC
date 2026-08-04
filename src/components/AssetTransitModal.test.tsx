@@ -37,6 +37,11 @@ test('AssetTransitModal 默认 multiSelect 应为 false', () => {
   assert.ok(el);
 });
 
+test('AssetTransitModal 接受模特导入完成回调', () => {
+  const el = <AssetTransitModal onClose={() => {}} onModelImported={() => {}} />;
+  assert.ok(el);
+});
+
 test('空选中时不应调用 onConfirmSelection(items 应为空数组或干脆未调)', () => {
   // 行为由 AssetTransitModal 内部实现,这里用类型断言保护
   const items: AssetResourceItem[] = [];
