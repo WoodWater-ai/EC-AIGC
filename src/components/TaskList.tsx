@@ -61,6 +61,10 @@ const IMAGE_TYPE_LABELS: Record<string, string> = {
 const isActiveStatus = (status: TaskStatus) =>
   ['DRAFT', 'PENDING', 'GENERATING'].includes(status);
 
+const COLLAPSED_GROUP_STATUSES: TaskStatus[] = ['FAILED', 'CANCELED'];
+const isGroupExpanded = (group: TaskGroupResponse) =>
+  !COLLAPSED_GROUP_STATUSES.includes(group.status);
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return '—';
   return value.replace('T', ' ').slice(0, 16);
@@ -82,8 +86,8 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
   const [searchInput, setSearchInput] = useState('');
   const [keyword, setKeyword] = useState('');
   const [pageNum, setPageNum] = useState(1);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedGroup, setSelectedGroup] = useState<TaskGroupResponse | null>(null);
+  const [userOverrides, setUserOverrides] = useState<Set<string>>(new Set());
   const [selectedTaskId, setSelectedTaskId] = useState<string>();
   const [imagePreview, setImagePreview] = useState<{ results: TaskResultPreviewResponse[]; index: number } | null>(null);
   const [videoPreview, setVideoPreview] = useState<TaskResultPreviewResponse | null>(null);
@@ -133,11 +137,10 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
     setSearchInput('');
     setKeyword('');
     setPageNum(1);
-    setExpandedGroups((current) => new Set(current).add(highlightGroupId));
   }, [highlightGroupId, highlightTaskKind]);
 
   const toggleGroup = (groupId: string) => {
-    setExpandedGroups((current) => {
+    setUserOverrides((current) => {
       const next = new Set(current);
       if (next.has(groupId)) next.delete(groupId);
       else next.add(groupId);
@@ -187,7 +190,6 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
               setKind(value);
               setStatusFilter('all');
               setPageNum(1);
-              setExpandedGroups(new Set());
             }}
             className={`h-9 rounded-lg px-4 text-xs font-bold ${
               kind === value ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'
@@ -255,7 +257,7 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
             </thead>
             <tbody className="divide-y divide-slate-100">
               {groups.map((group) => {
-                const expanded = expandedGroups.has(group.groupId);
+                const expanded = isGroupExpanded(group) !== userOverrides.has(group.groupId);
                 const meta = STATUS_META[group.status];
                 const highlighted = highlightGroupId === group.groupId;
                 return (
@@ -273,11 +275,11 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
                             </span>
                           </button>
                           {group.productImage ? (
-                            <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1">
+                            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                               <img
-                                src={withCosThumbnail(group.productImage, 96)}
+                                src={withCosThumbnail(group.productImage, 240)}
                                 alt=""
-                                className="block h-auto max-h-full w-auto max-w-full object-contain object-center"
+                                className="h-full w-full object-contain"
                                 referrerPolicy="no-referrer"
                               />
                             </div>
