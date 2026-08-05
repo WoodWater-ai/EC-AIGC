@@ -2,30 +2,19 @@
 import React from 'react';
 
 export interface TopHeaderProps {
-  /** 已选图片类型数量 */
-  selectedTypesCount: number;
-  /** 本次总张数 */
-  totalCount: number;
-  /** 生成准备度(0-4,4 项 readinessCheck) */
   /** 返回任务列表 */
   onBack: () => void;
-  /** 检查并生成 —— 由父容器接 readiness 流程 */
-  onCheckAndGenerate: () => void;
 }
 
 /**
  * 顶部导航栏(对齐 demo 主版):
  * - 左:返回按钮 + 面包屑(eyebrow + title)
- * - 右:生成准备度 N/4 + 任务摘要 + 检查并生成 CTA
- *
- * 注意:评分审核(reviewEnabled)不在顶部,在右栏 ReviewStrategyPanel 独立区域;
- * demo 也只在右栏展示 review toggle。
+ * 生成操作与任务摘要位于右栏动态参数卡片底部。
  */
 export const TopHeader: React.FC<TopHeaderProps> = ({
-  selectedTypesCount, totalCount,
-  onBack, onCheckAndGenerate,
+  onBack,
 }) => (
-  <header className="h-16 shrink-0 px-6 bg-white border-b border-slate-200 flex items-center justify-between">
+  <header className="h-16 shrink-0 px-6 bg-white border-b border-slate-200 flex items-center">
     <div className="flex items-center gap-3">
       <button
         type="button"
@@ -40,16 +29,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         <p className="text-[11px] font-bold text-primary">图片任务</p>
         <h1 className="text-base font-black text-slate-800">新建图片任务</h1>
       </div>
-    </div>
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-slate-500">{selectedTypesCount} 个类型 · 共 {totalCount} 张</span>
-      <button
-        type="button"
-        onClick={onCheckAndGenerate}
-        className="h-9 px-4 rounded-md bg-primary text-white text-xs font-bold shadow-sm hover:opacity-90"
-      >
-        生成
-      </button>
     </div>
   </header>
 );

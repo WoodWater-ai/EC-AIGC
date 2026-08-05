@@ -59,6 +59,8 @@ interface CreateVideoTaskProps {
   selectedProduct: ProductAsset;
   setSelectedProduct: (product: ProductAsset) => void;
   creationTemplateId?: string | null;
+  /** 返回按钮回调;不传则 fallback 到跳工作台首页(原行为) */
+  goBack?: () => void;
 }
 
 const EMPTY_PARAMS: ParamsSnapshot = {
@@ -167,6 +169,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   onAddTask,
   setScreen,
   creationTemplateId,
+  goBack,
 }) => {
   const creationPrefillQuery = useServiceQuery(
     () => creationTemplateId
@@ -680,9 +683,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setScreen(AppScreen.TASKS)}
+            onClick={goBack ?? (() => setScreen(AppScreen.DASHBOARD))}
             className="h-8 w-8 rounded-md text-slate-500 hover:bg-slate-100"
-            title="返回任务列表"
+            title={goBack ? '返回上一页' : '返回工作台首页'}
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
@@ -694,17 +697,6 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="mr-1 text-right">
-            <span className="block text-[10px] font-bold text-slate-400">
-              生成准备度 {readiness}/4
-            </span>
-            {mode === 'FIRST_FRAME' && (
-              <span className="text-[10px] text-slate-500">
-                {duration} 秒{outputRatio ? ` · ${outputRatio}` : ''}
-              </span>
-            )}
-            {/* 爆款复刻“跟随原视频”规格文案暂时隐藏，后续按需恢复。 */}
-          </div>
           {SHOW_VIDEO_TEMPLATE_PICKER && (
             <div className="relative">
               <button
@@ -756,14 +748,6 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
             AI 助手
           </button>
           */}
-          <button
-            type="button"
-            onClick={submit}
-            disabled={submitting}
-            className="h-9 rounded-md bg-primary px-4 text-xs font-bold text-white hover:bg-primary-hover disabled:opacity-50"
-          >
-            {submitting ? '提交中…' : '检查并生成'}
-          </button>
         </div>
       </header>
 
@@ -1171,6 +1155,27 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                     </p>
                   </>
                 )}
+              </div>
+              <div className="mt-5 flex items-end justify-between gap-3 border-t border-slate-100 pt-4">
+                <div className="min-w-0 text-right">
+                  <span className="block text-[10px] font-bold text-slate-400">
+                    生成准备度 {readiness}/4
+                  </span>
+                  {mode === 'FIRST_FRAME' && (
+                    <span className="text-[10px] text-slate-500">
+                      {duration} 秒{outputRatio ? ` · ${outputRatio}` : ''}
+                    </span>
+                  )}
+                  {/* 爆款复刻“跟随原视频”规格文案暂时隐藏，后续按需恢复。 */}
+                </div>
+                <button
+                  type="button"
+                  onClick={submit}
+                  disabled={submitting}
+                  className="h-9 shrink-0 rounded-md bg-primary px-4 text-xs font-bold text-white hover:bg-primary-hover disabled:opacity-50"
+                >
+                  {submitting ? '提交中…' : '检查并生成'}
+                </button>
               </div>
             </div>
           </aside>

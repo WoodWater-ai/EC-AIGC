@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner';
 import { withCosThumbnail } from '../utils/cosImage';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { VideoPreviewModal, type PreviewVideo } from './VideoPreviewModal';
 import { useAuth } from '../auth/AuthContext';
 import {
   Grid,
@@ -236,6 +237,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
   const [drawerProductReviews, setDrawerProductReviews] = useState<ProductLibraryReview[]>([]);
   const [loadedAssetDetail, setLoadedAssetDetail] = useState<ProductLibraryAsset | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [videoPreview, setVideoPreview] = useState<{ videos: PreviewVideo[]; initialIndex: number } | null>(null);
 
   // Expanded costs detail panel toggle inside Asset Drawer
   const [costCollapse, setCostCollapse] = useState(true);
@@ -982,7 +984,17 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                             />
                           </td>
                           <td className="py-3 px-3">
-                            <div className="w-10 h-10 rounded overflow-hidden bg-slate-50 border border-slate-200/60 relative shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => asset.mediaType === 'VIDEO'
+                                ? setVideoPreview({
+                                    videos: [{ url: asset.url, poster: asset.thumbnail, label: asset.productName }],
+                                    initialIndex: 0,
+                                  })
+                                : setPreviewImageUrl(asset.url)}
+                              className="w-10 h-10 rounded overflow-hidden bg-slate-50 border border-slate-200/60 relative shrink-0 p-0 block cursor-pointer transition-colors hover:border-primary"
+                              title={asset.mediaType === 'VIDEO' ? '点击放大播放' : '点击查看大图'}
+                            >
                               <img
                                 src={asset.thumbnail}
                                 alt={asset.productName}
@@ -990,11 +1002,11 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                                 referrerPolicy="no-referrer"
                               />
                               {asset.type === '视频' && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
                                   <Play className="w-3 h-3 text-white fill-white" />
                                 </div>
                               )}
-                            </div>
+                            </button>
                           </td>
                           <td className="py-3 px-3 font-semibold text-slate-800">
                             <div>{asset.productName}</div>
@@ -1912,6 +1924,13 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
         <ImagePreviewModal
           images={[{ url: previewImageUrl, label: activeAsset.productName }]}
           onClose={() => setPreviewImageUrl(null)}
+        />
+      )}
+      {videoPreview && (
+        <VideoPreviewModal
+          videos={videoPreview.videos}
+          initialIndex={videoPreview.initialIndex}
+          onClose={() => setVideoPreview(null)}
         />
       )}
 

@@ -38,12 +38,18 @@ export interface ImageSettingsSectionProps {
   onParamsChange?: (snapshot: TaskParamsSnapshot) => void;
   prefill?: PrefillState | null;
   prefillPending?: boolean;
+  selectedTypesCount: number;
+  totalCount: number;
+  onCheckAndGenerate: () => void;
 }
 
 export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
   onParamsChange,
   prefill,
   prefillPending = false,
+  selectedTypesCount,
+  totalCount,
+  onCheckAndGenerate,
 }) => {
   // 通道实例 / 能力 / 模型 三级联动 — 与 demo 创建图片任务 "任务参数"一致
   const tp = useTaskParams('IMAGE', prefill, 'REF_IMG_EDIT', prefillPending);
@@ -223,6 +229,19 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
       {/* 由 useTaskParams.isSupported 真实判定(基于 Vidu 能力 schema + 当前 schemaParams),
           取代之前用写死 model.capability 的旧判定 */}
       <UnsupportedNotice show={!tp.initializing && !tp.unavailableReason && !tp.isSupported} />
+
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+        <span className="text-xs text-slate-500">
+          {selectedTypesCount} 个类型 · 共 {totalCount} 张
+        </span>
+        <button
+          type="button"
+          onClick={onCheckAndGenerate}
+          className="h-9 shrink-0 rounded-md bg-primary px-4 text-xs font-bold text-white shadow-sm hover:opacity-90"
+        >
+          生成
+        </button>
+      </div>
     </div>
   );
 };

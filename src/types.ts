@@ -589,6 +589,7 @@ export interface TaskGroupItemResponse {
   aspectRatio?: string | null;
   modelChannelId?: string | null;
   modelChannelName?: string | null;
+  modelCode?: string | null;
   templateId?: string | null;
   templateName?: string | null;
   taskPrompt?: string | null;

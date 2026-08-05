@@ -46,6 +46,8 @@ interface CreateImageTaskProps {
   selectedProduct: ProductAsset;
   setSelectedProduct: (product: ProductAsset) => void;
   creationTemplateId?: string | null;
+  /** 返回按钮回调;不传则 fallback 到跳工作台首页(原行为) */
+  onBack?: () => void;
 }
 
 /**
@@ -94,7 +96,7 @@ const renderReusablePrompt = (prompt: string, facts: ProductFactsInput) => {
 };
 
 export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
-  const { setScreen, onAddTask, creationTemplateId } = props;
+  const { setScreen, onAddTask, creationTemplateId, onBack } = props;
   const creationPrefillQuery = useServiceQuery(
     () => creationTemplateId
       ? creationTemplateApi.reuseContext(creationTemplateId)
@@ -253,8 +255,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       ? IMAGE_TYPE_PREFILL_MAP[snapshot.imageType]
       : undefined;
     if (targetType) {
-      selectedTypes.filter((type) => type !== targetType).forEach(toggleType);
+      // toggleType 不允许取消最后一个已选类型。先加入做同款的目标类型，
+      // 再移除其余类型，避免非商品主图模板与默认“商品主图”同时被选中。
       if (!selectedTypes.includes(targetType)) toggleType(targetType);
+      selectedTypes.filter((type) => type !== targetType).forEach(toggleType);
       const currentCount = typeCounts[targetType] ?? 1;
       const targetCount = Math.max(1, Math.min(5, snapshot.count ?? 1));
       for (let index = currentCount; index < targetCount; index += 1) {
@@ -457,10 +461,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     <div className="flex h-screen flex-col overflow-hidden bg-[#f5f7fb] text-slate-800">
       {/* Header */}
       <TopHeader
-        selectedTypesCount={selectedTypes.length}
-        totalCount={totalCount}
-        onBack={() => setScreen(AppScreen.TASKS)}
-        onCheckAndGenerate={checkAndGenerate}
+        onBack={onBack ?? (() => setScreen(AppScreen.DASHBOARD))}
       />
 
       {/* 3-column layout */}
@@ -549,6 +550,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
             prefill={imageParamsPrefill}
             prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
             onParamsChange={setParamsSnapshot}
+            selectedTypesCount={selectedTypes.length}
+            totalCount={totalCount}
+            onCheckAndGenerate={checkAndGenerate}
           />
         }
       />

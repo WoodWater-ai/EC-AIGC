@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppScreen, GenerationTask, ProductAsset, SystemUser, SystemNotification } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -118,6 +118,26 @@ export default function App() {
         ? payload?.creationTemplateId ?? null
         : null,
     );
+  };
+
+  // 记录"进入创建任务页之前的菜单",onBack 时回到那里。
+  // - lastScreenRef 跟踪上一次的 currentScreen(在 useEffect 里维护)
+  // - previousScreenRef 只在进入 CREATE_* 时刷新,记录"进入那一刻的上一个菜单"
+  const lastScreenRef = useRef<AppScreen>(AppScreen.DASHBOARD);
+  const previousScreenRef = useRef<AppScreen>(AppScreen.DASHBOARD);
+
+  useEffect(() => {
+    if (
+      currentScreen === AppScreen.CREATE_IMAGE_TASK ||
+      currentScreen === AppScreen.CREATE_VIDEO_TASK
+    ) {
+      previousScreenRef.current = lastScreenRef.current;
+    }
+    lastScreenRef.current = currentScreen;
+  }, [currentScreen]);
+
+  const handleBack = () => {
+    setCurrentScreen(previousScreenRef.current);
   };
 
   // Core local states
@@ -340,6 +360,7 @@ export default function App() {
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
           creationTemplateId={creationTemplateId}
+          onBack={handleBack}
         />
         {isTransitOpen && (
           <AssetTransitModal
@@ -388,6 +409,7 @@ export default function App() {
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
           creationTemplateId={creationTemplateId}
+          goBack={handleBack}
         />
         {isTransitOpen && (
           <AssetTransitModal

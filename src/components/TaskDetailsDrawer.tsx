@@ -358,12 +358,13 @@ const OverviewTab: React.FC<{
   const params = useMemo(() => parseParams(task.taskParamsJson), [task.taskParamsJson]);
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <InfoCard label="任务状态">
           <span className={`inline-block rounded-md px-2 py-1 text-xs font-bold ${meta.style}`}>{meta.label}</span>
         </InfoCard>
         <InfoCard label="生成进度" value={`${task.progressPercent}%`} />
         <InfoCard label="模型通道" value={task.modelChannelName || task.modelChannelId || '未记录'} />
+        <InfoCard label="模型名称" value={task.modelCode || '未记录'} />
         <InfoCard label="产物数量" value={`${task.resultPreviews.length} / ${task.count ?? 0}`} />
       </div>
 
@@ -502,20 +503,20 @@ const ResultsTab: React.FC<{
                   {resultStatusLabel(result.status)}
                 </span>
               </div>
-              <div className="mt-3 flex min-h-8 flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+              <div className="mt-3 flex min-h-7 flex-nowrap items-center justify-between gap-1 border-t border-slate-100 pt-3">
                 {canRevise && result.mediaType === 'IMAGE' && (
                   <button
                     onClick={() => onRevise(result)}
-                    className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-primary/25 bg-blue-50 px-3 text-[11px] font-bold text-primary hover:border-primary"
+                    className="inline-flex h-7 shrink-0 items-center gap-0.5 whitespace-nowrap rounded border border-primary/25 bg-blue-50 px-2 text-[10px] font-bold text-primary hover:border-primary"
                   >
-                    <span className="material-symbols-outlined text-sm">brush</span>
+                    <span className="material-symbols-outlined text-xs">brush</span>
                     二次编辑
                   </button>
                 )}
                 {canAudit && result.score == null && (
                     <button
                       onClick={() => onReview(result)}
-                      className="h-8 shrink-0 whitespace-nowrap rounded bg-primary px-3 text-[11px] font-bold text-white"
+                      className="h-7 shrink-0 whitespace-nowrap rounded bg-primary px-2 text-[10px] font-bold text-white"
                     >
                       评分与审核
                     </button>
@@ -523,15 +524,15 @@ const ResultsTab: React.FC<{
                 {canManageTemplate && (result.templateStatus === 'PUBLISHED' ? (
                   <button
                     onClick={() => void onOfflineTemplate(result)}
-                    className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-[#dfc6a4] bg-[#fff8ec] px-3 text-[11px] font-bold text-[#93652d] hover:bg-[#fff0d8]"
+                    className="inline-flex h-7 shrink-0 items-center gap-0.5 whitespace-nowrap rounded border border-[#dfc6a4] bg-[#fff8ec] px-2 text-[10px] font-bold text-[#93652d] hover:bg-[#fff0d8]"
                   >
-                    <span className="material-symbols-outlined text-sm">archive</span>
+                    <span className="material-symbols-outlined text-xs">archive</span>
                     下架模板
                   </button>
                 ) : result.status !== 'REJECTED' && (
                   <button
                     onClick={() => onPublishTemplate(result)}
-                    className="h-8 shrink-0 whitespace-nowrap rounded border border-slate-200 px-3 text-[11px] font-bold text-slate-700 hover:border-primary hover:text-primary"
+                    className="h-7 shrink-0 whitespace-nowrap rounded border border-slate-200 px-2 text-[10px] font-bold text-slate-700 hover:border-primary hover:text-primary"
                   >
                     设为模板
                   </button>
