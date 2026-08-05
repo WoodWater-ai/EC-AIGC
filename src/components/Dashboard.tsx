@@ -9,6 +9,8 @@ import {
 } from '../api/modules/creationTemplate';
 import { toast } from 'sonner';
 import { PublishTemplateDialog } from './common/PublishTemplateDialog';
+import { ImagePreviewModal } from './ImagePreviewModal';
+import { VideoPreviewModal } from './VideoPreviewModal';
 
 interface DashboardProps {
   tasks: GenerationTask[];
@@ -53,6 +55,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks, setScreen }) => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [favoritePendingIds, setFavoritePendingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [publishTarget, setPublishTarget] = useState<CreationWork | null>(null);
+  const [previewWork, setPreviewWork] = useState<CreationWork | null>(null);
   const viewedTemplateIdsRef = useRef<Set<string>>(new Set());
   const imageCampQuery = useServiceQuery(
     () => creationTemplateApi.camp('IMAGE'),
@@ -234,6 +237,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks, setScreen }) => {
                 isPublished={task.templateStatus === 'PUBLISHED'}
                 onPublish={() => void togglePublished(task)}
                 onView={() => setScreen(AppScreen.TASKS, { highlightGroupId: task.groupId })}
+                onPreview={() => setPreviewWork(task)}
                 onReuse={() => task.creationTemplateId && setScreen(
                   task.mediaType === 'IMAGE' ? AppScreen.CREATE_IMAGE_TASK : AppScreen.CREATE_VIDEO_TASK,
                   { creationTemplateId: task.creationTemplateId },
@@ -258,6 +262,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks, setScreen }) => {
           onClose={() => setSelectedTemplateId(null)}
           onUse={() => useTemplate(selectedTemplate)}
           onToggleFavorite={() => void toggleFavorite(selectedTemplate)}
+        />
+      )}
+      {previewWork?.mediaType === 'IMAGE' && (
+        <ImagePreviewModal
+          images={[{ url: previewWork.url, label: previewWork.title }]}
+          onClose={() => setPreviewWork(null)}
+        />
+      )}
+      {previewWork?.mediaType === 'VIDEO' && (
+        <VideoPreviewModal
+          videos={[{
+            url: previewWork.url,
+            poster: previewWork.thumbnailUrl,
+            label: previewWork.title,
+          }]}
+          onClose={() => setPreviewWork(null)}
         />
       )}
       <PublishTemplateDialog
@@ -467,25 +487,50 @@ const MyWorkCard: React.FC<{
   isPublished: boolean;
   onPublish: () => void;
   onView: () => void;
+  onPreview: () => void;
   onReuse: () => void;
-}> = ({ work, isPublished, onPublish, onView, onReuse }) => (
+}> = ({ work, isPublished, onPublish, onView, onPreview, onReuse }) => (
   <article className="group overflow-hidden rounded-lg border border-[#e8e4df] bg-white transition-all duration-300 hover:-translate-y-1 hover:border-[#c6beb6] hover:shadow-[0_16px_32px_rgba(53,44,37,0.1)]">
     <div className="relative aspect-[4/5] overflow-hidden bg-[#f4f1ed]">
       {work.mediaType === 'VIDEO' ? (
-        <video
-          src={work.url}
-          poster={work.thumbnailUrl ?? undefined}
-          muted
-          playsInline
-          preload="metadata"
-          className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.02]"
-        />
+        <button
+          type="button"
+          onClick={onPreview}
+          className="absolute inset-0 h-full w-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+          aria-label={`播放视频：${work.title}`}
+        >
+          <video
+            src={work.url}
+            poster={work.thumbnailUrl ?? undefined}
+            muted
+            playsInline
+            preload="metadata"
+            className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.02]"
+          />
+          <span className="absolute inset-0 grid place-items-center bg-black/5 transition-colors duration-200 group-hover:bg-black/20">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-white/90 text-[#393431] shadow-lg transition-transform duration-200 group-hover:scale-110">
+              <span className="material-symbols-outlined text-[26px]">play_arrow</span>
+            </span>
+          </span>
+        </button>
       ) : (
-        <img src={work.thumbnailUrl || work.url} alt={work.title} className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.02]" />
+        <button
+          type="button"
+          onClick={onPreview}
+          className="absolute inset-0 h-full w-full cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+          aria-label={`放大查看图片：${work.title}`}
+        >
+          <img src={work.thumbnailUrl || work.url} alt={work.title} className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.02]" />
+          <span className="absolute inset-0 grid place-items-center bg-black/0 opacity-0 transition-all duration-200 group-hover:bg-black/15 group-hover:opacity-100">
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-[#393431] shadow-lg">
+              <span className="material-symbols-outlined text-[21px]">zoom_in</span>
+            </span>
+          </span>
+        </button>
       )}
-      <span className="absolute left-3 top-3 rounded-md border border-white/80 bg-white/90 px-2 py-1 text-[10px] font-black text-[#393431] shadow-sm">{work.mediaType === 'IMAGE' ? '图片作品' : '视频作品'}</span>
+      <span className="pointer-events-none absolute left-3 top-3 rounded-md border border-white/80 bg-white/90 px-2 py-1 text-[10px] font-black text-[#393431] shadow-sm">{work.mediaType === 'IMAGE' ? '图片作品' : '视频作品'}</span>
       {work.productImageUrl && (
-        <div className="transition-opacity duration-200 lg:group-hover:opacity-0">
+        <div className="pointer-events-none transition-opacity duration-200 lg:group-hover:opacity-0">
           <SourceProduct image={work.productImageUrl} />
         </div>
       )}
