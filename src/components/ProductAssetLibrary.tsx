@@ -67,6 +67,7 @@ interface GeneratedAsset {
   action: string;
   ratioDuration: string;
   channel: string;
+  modelName: string;
   status: '生成中' | '生成失败' | '待审美评分' | '审核通过' | '已打回';
   rawStatus?: string;
   score: number | null;
@@ -119,6 +120,7 @@ const EMPTY_ASSET: GeneratedAsset = {
   action: '—',
   ratioDuration: '—',
   channel: '—',
+  modelName: '—',
   status: '生成中',
   score: null,
   promptVersion: '—',
@@ -154,6 +156,7 @@ const toGeneratedAsset = (asset: ProductLibraryAsset): GeneratedAsset => ({
     ? [asset.durationSec ? `${asset.durationSec}s` : '', asset.aspectRatio, asset.width && asset.height ? `${asset.width}x${asset.height}` : ''].filter(Boolean).join(' · ')
     : [asset.aspectRatio, asset.width && asset.height ? `${asset.width}x${asset.height}` : ''].filter(Boolean).join(' · '),
   channel: asset.modelChannelName || asset.channelType || '—',
+  modelName: asset.modelCode || '—',
   status: STATUS_LABELS[asset.status],
   rawStatus: asset.rawStatus,
   score: asset.score ?? null,
@@ -949,6 +952,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                     <th className="py-3 px-3">姿势</th>
                     <th className="py-3 px-3">比例/时长</th>
                     <th className="py-3 px-3">模型通道</th>
+                    <th className="py-3 px-3">模型名称</th>
                     <th className="py-3 px-3">审核状态</th>
                     <th className="py-3 px-3">评分</th>
                     <th className="py-3 px-3">Prompt 版本</th>
@@ -960,7 +964,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {filteredAssets.length === 0 ? (
                     <tr>
-                      <td colSpan={17} className="text-center py-10 text-slate-400 font-medium">
+                      <td colSpan={18} className="text-center py-10 text-slate-400 font-medium">
                         暂无符合筛选条件的素材资产
                       </td>
                     </tr>
@@ -1028,6 +1032,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                           <td className="py-3 px-3 text-slate-500">{asset.action}</td>
                           <td className="py-3 px-3 font-mono text-[10px] text-slate-500">{asset.ratioDuration}</td>
                           <td className="py-3 px-3 font-medium text-slate-600">{asset.channel}</td>
+                          <td className="py-3 px-3 font-mono text-[10px] font-medium text-slate-600">{asset.modelName}</td>
                           <td className="py-3 px-3">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${statusClass(asset.status)}`}>
                               {asset.status}
@@ -1753,6 +1758,10 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
                           <span className="text-slate-400 font-medium">模型通道</span>
                           <span className="font-bold text-slate-700">{activeAsset.channel}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
+                          <span className="text-slate-400 font-medium">模型名称</span>
+                          <span className="font-mono font-bold text-slate-700">{activeAsset.modelName}</span>
                         </div>
                         <div className="flex justify-between items-center border-b border-slate-200/65 pb-2">
                           <span className="text-slate-400 font-medium">审核评分</span>

@@ -63,6 +63,7 @@ export interface ProductLibraryAsset {
   channelType?: string;
   modelChannelId?: string;
   modelChannelName?: string;
+  modelCode?: string;
   url: string;
   thumbnailUrl?: string;
   cost?: number;
