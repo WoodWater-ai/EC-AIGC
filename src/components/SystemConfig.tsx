@@ -83,6 +83,55 @@ interface OperationLog {
   status: 'success' | 'failed';
 }
 
+interface DepartmentTreeOption {
+  department: DepartmentDTO;
+  depth: number;
+}
+
+const buildDepartmentTreeOptions = (
+  departments: DepartmentDTO[],
+): DepartmentTreeOption[] => {
+  const departmentIds = new Set(departments.map((department) => department.id));
+  const childrenByParent = new Map<string, DepartmentDTO[]>();
+  const compareDepartments = (left: DepartmentDTO, right: DepartmentDTO) =>
+    (left.sort ?? 0) - (right.sort ?? 0)
+      || left.deptName.localeCompare(right.deptName, 'zh-CN');
+
+  departments.forEach((department) => {
+    const parentId = department.pid !== '0' && departmentIds.has(department.pid)
+      ? department.pid
+      : '0';
+    const siblings = childrenByParent.get(parentId) ?? [];
+    siblings.push(department);
+    childrenByParent.set(parentId, siblings);
+  });
+  childrenByParent.forEach((children) => children.sort(compareDepartments));
+
+  const options: DepartmentTreeOption[] = [];
+  const visited = new Set<string>();
+  const appendChildren = (parentId: string, depth: number) => {
+    (childrenByParent.get(parentId) ?? []).forEach((department) => {
+      if (visited.has(department.id)) return;
+      visited.add(department.id);
+      options.push({ department, depth });
+      appendChildren(department.id, depth + 1);
+    });
+  };
+
+  appendChildren('0', 0);
+  departments
+    .filter((department) => !visited.has(department.id))
+    .sort(compareDepartments)
+    .forEach((department) => {
+      if (visited.has(department.id)) return;
+      visited.add(department.id);
+      options.push({ department, depth: 0 });
+      appendChildren(department.id, 1);
+    });
+
+  return options;
+};
+
 export const SystemConfig: React.FC<SystemConfigProps> = ({
   onUpdateUserRole
 }) => {
@@ -158,6 +207,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     canViewAccounts || canViewOrg,
   );
   const allDepartments = deptList ?? [];
+  const departmentTreeOptions = useMemo(
+    () => buildDepartmentTreeOptions(allDepartments),
+    [allDepartments],
+  );
 
   // 通道能力矩阵(后端下发,驱动 chip 渲染 + baseUrl placeholder)
   const matrixQuery = useServiceQuery<CapabilityMatrix>(
@@ -1303,8 +1356,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     className="w-full px-3 py-2 text-xs border border-slate-200 bg-slate-50 rounded-lg outline-none text-slate-700 font-semibold"
                   >
                     <option value="">(未分配)</option>
-                    {allDepartments.map(d => (
-                      <option key={d.id} value={d.id}>{d.deptName}</option>
+                    {departmentTreeOptions.map(({ department, depth }) => (
+                      <option key={department.id} value={department.id}>
+                        {depth > 0 ? `${'　'.repeat(depth - 1)}└─ ` : ''}
+                        {department.deptName}
+                      </option>
                     ))}
                   </select>
                 </div>
