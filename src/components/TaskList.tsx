@@ -9,7 +9,8 @@ import {
 import { taskApi } from '../api/modules/task';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import { withCosThumbnail } from '../utils/cosImage';
-import { ImagePreviewModal } from './ImagePreviewModal';
+import { ImagePreviewModal, type PreviewImage } from './ImagePreviewModal';
+import { VideoPreviewModal, type PreviewVideo } from './VideoPreviewModal';
 import { TaskDetailsDrawer } from './TaskDetailsDrawer';
 import { useAuth } from '../auth/AuthContext';
 
@@ -89,8 +90,8 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
   const [selectedGroup, setSelectedGroup] = useState<TaskGroupResponse | null>(null);
   const [userOverrides, setUserOverrides] = useState<Set<string>>(new Set());
   const [selectedTaskId, setSelectedTaskId] = useState<string>();
-  const [imagePreview, setImagePreview] = useState<{ results: TaskResultPreviewResponse[]; index: number } | null>(null);
-  const [videoPreview, setVideoPreview] = useState<TaskResultPreviewResponse | null>(null);
+  const [imagePreview, setImagePreview] = useState<{ images: PreviewImage[]; initialIndex: number } | null>(null);
+  const [videoPreview, setVideoPreview] = useState<{ videos: PreviewVideo[]; initialIndex: number } | null>(null);
 
   const activeFilter = STATUS_FILTERS.find((item) => item.id === statusFilter);
   const groupsQuery = useServiceQuery(
@@ -275,14 +276,22 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
                             </span>
                           </button>
                           {group.productImage ? (
-                            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                            <button
+                              type="button"
+                              onClick={() => setImagePreview({
+                                images: [{ url: group.productImage, label: group.productName || '商品图' }],
+                                initialIndex: 0,
+                              })}
+                              className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 cursor-pointer transition-colors hover:border-primary"
+                              title="点击查看大图"
+                            >
                               <img
                                 src={withCosThumbnail(group.productImage, 240)}
-                                alt=""
+                                alt={group.productName || '商品图'}
                                 className="h-full w-full object-contain"
                                 referrerPolicy="no-referrer"
                               />
-                            </div>
+                            </button>
                           ) : (
                             <div className="grid h-11 w-11 place-items-center rounded-lg bg-slate-100 text-slate-300">
                               <span className="material-symbols-outlined">inventory_2</span>
@@ -339,8 +348,21 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
                         key={task.id}
                         task={task}
                         onOpen={() => openDrawer(group, task.id)}
-                        onPreviewImage={(results, index) => setImagePreview({ results, index })}
-                        onPreviewVideo={setVideoPreview}
+                        onPreviewImage={(results, index) => setImagePreview({
+                          images: results.map((result, i) => ({
+                            url: result.url,
+                            label: `产物 ${i + 1}`,
+                          })),
+                          initialIndex: index,
+                        })}
+                        onPreviewVideo={(result) => setVideoPreview({
+                          videos: [{
+                            url: result.url,
+                            poster: result.thumbnailUrl || result.url,
+                            label: '预览视频',
+                          }],
+                          initialIndex: 0,
+                        })}
                       />
                     ))}
                   </React.Fragment>
@@ -395,27 +417,17 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
       )}
       {imagePreview && (
         <ImagePreviewModal
-          images={imagePreview.results.map((result, index) => ({
-            url: result.url,
-            label: `产物 ${index + 1}`,
-          }))}
-          initialIndex={imagePreview.index}
+          images={imagePreview.images}
+          initialIndex={imagePreview.initialIndex}
           onClose={() => setImagePreview(null)}
         />
       )}
       {videoPreview && (
-        <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/70 p-6" onClick={() => setVideoPreview(null)}>
-          <div className="relative w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
-            <button
-              onClick={() => setVideoPreview(null)}
-              className="absolute -right-3 -top-10 text-white"
-              aria-label="关闭视频预览"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
-            <video src={videoPreview.url} controls autoPlay className="max-h-[82vh] w-full bg-black object-contain" />
-          </div>
-        </div>
+        <VideoPreviewModal
+          videos={videoPreview.videos}
+          initialIndex={videoPreview.initialIndex}
+          onClose={() => setVideoPreview(null)}
+        />
       )}
     </div>
   );
