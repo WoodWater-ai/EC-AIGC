@@ -1,7 +1,7 @@
 import http from '../client';
 import type { PageInfo } from '../service-result';
 
-export type ModelGenerationMode = 'text' | 'reference' | 'face_swap';
+export type ModelGenerationMode = 'text' | 'reference' | 'face_swap' | 'face_merge';
 export type ModelProfileSourceMode = ModelGenerationMode | 'upload';
 
 export interface ModelProfileDTO {
@@ -43,6 +43,7 @@ export interface ModelCandidateGenerateRequest {
   referenceAssetId?: string;
   faceSourceAssetId?: string;
   targetAppearanceAssetId?: string;
+  faceAssetIds?: string[];
   candidateCount: number;
   aspectRatio: string;
   resolution: string;

@@ -79,6 +79,47 @@ interface GeneratedAsset {
   size?: string;
 }
 
+const InputAssetMedia: React.FC<{
+  file: ProductAsset['files'][number];
+  compact?: boolean;
+  onPreview: () => void;
+}> = ({ file, compact = false, onPreview }) => (
+  <button
+    type="button"
+    onClick={onPreview}
+    className={`relative block w-full overflow-hidden rounded bg-slate-50 ${compact ? 'h-16' : 'h-32'}`}
+    title={file.type === 'video' ? '点击播放视频' : '点击查看图片'}
+  >
+    {file.type === 'video' ? (
+      <>
+        <video
+          src={file.url}
+          poster={file.thumbnailUrl}
+          muted
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-contain"
+        />
+        <span className="pointer-events-none absolute inset-0 grid place-items-center bg-black/10">
+          <span className={`${compact ? 'h-7 w-7' : 'h-9 w-9'} grid place-items-center rounded-full bg-black/60 text-white shadow-md`}>
+            <Play className={`${compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} ml-0.5 fill-white`} />
+          </span>
+        </span>
+        <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-bold text-white">
+          视频
+        </span>
+      </>
+    ) : (
+      <img
+        src={file.thumbnailUrl || file.url}
+        alt={file.name}
+        className="h-full w-full object-contain"
+        referrerPolicy="no-referrer"
+      />
+    )}
+  </button>
+);
+
 const STATUS_LABELS: Record<ProductLibraryDisplayStatus, GeneratedAsset['status']> = {
   GENERATING: '生成中',
   FAILED: '生成失败',
@@ -366,7 +407,12 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
           files: detail.inputAssets.map((asset) => ({
             id: asset.id,
             name: asset.name,
-            url: withCosThumbnail(asset.thumbnailUrl || asset.url, 480) || asset.thumbnailUrl || asset.url,
+            url: asset.url,
+            thumbnailUrl: asset.mediaType === 'VIDEO'
+              ? (asset.thumbnailUrl
+                  ? withCosThumbnail(asset.thumbnailUrl, 480) || asset.thumbnailUrl
+                  : undefined)
+              : withCosThumbnail(asset.thumbnailUrl || asset.url, 480) || asset.thumbnailUrl || asset.url,
             size: asset.fileSize ? `${(asset.fileSize / 1024 / 1024).toFixed(2)} MB` : '—',
             type: asset.mediaType === 'VIDEO' ? 'video' : 'image',
           })),
@@ -1430,7 +1476,20 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         <div className="grid grid-cols-3 gap-2">
                           {selectedProduct.files.length > 0 ? selectedProduct.files.slice(0, 6).map((file) => (
                             <div key={file.id} className="border border-slate-100 rounded-lg overflow-hidden bg-white p-1 relative">
-                              <img src={file.url} className="w-full h-16 object-contain rounded bg-slate-50" referrerPolicy="no-referrer" />
+                              <InputAssetMedia
+                                file={file}
+                                compact
+                                onPreview={() => file.type === 'video'
+                                  ? setVideoPreview({
+                                      videos: [{
+                                        url: file.url,
+                                        poster: file.thumbnailUrl,
+                                        label: file.name,
+                                      }],
+                                      initialIndex: 0,
+                                    })
+                                  : setPreviewImageUrl(file.url)}
+                              />
                               <div className="text-[9px] text-slate-400 mt-1 text-center font-semibold truncate">{file.name}</div>
                             </div>
                           )) : (
@@ -1531,7 +1590,19 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
                         <div className="grid grid-cols-2 gap-3">
                           {selectedProduct.files.map((file) => (
                             <div key={file.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                              <img src={file.url} className="h-32 w-full object-contain" referrerPolicy="no-referrer" />
+                              <InputAssetMedia
+                                file={file}
+                                onPreview={() => file.type === 'video'
+                                  ? setVideoPreview({
+                                      videos: [{
+                                        url: file.url,
+                                        poster: file.thumbnailUrl,
+                                        label: file.name,
+                                      }],
+                                      initialIndex: 0,
+                                    })
+                                  : setPreviewImageUrl(file.url)}
+                              />
                               <div className="mt-2 truncate font-bold text-slate-700">{file.name}</div>
                               <div className="text-[10px] text-slate-400">{file.size}</div>
                             </div>

@@ -189,7 +189,7 @@ export default function App() {
   const [isTransitOpen, setIsTransitOpen] = useState(false);
   const [modelCreatorOpen, setModelCreatorOpen] = useState(false);
   const [modelAssetTarget, setModelAssetTarget] = useState<ModelCreatorAssetTarget>();
-  const [modelAssetConsumer, setModelAssetConsumer] = useState<((asset: ModelCreatorAsset) => void)>();
+  const [modelAssetConsumer, setModelAssetConsumer] = useState<((assets: ModelCreatorAsset[]) => void)>();
   const modelProfilesQuery = useServiceQuery(
     () => modelProfileApi.page({ pageNum: 1, pageSize: 100, status: 'active' }),
     [],
@@ -197,7 +197,7 @@ export default function App() {
 
   const requestModelAsset = (
     target: ModelCreatorAssetTarget,
-    onSelected: (asset: ModelCreatorAsset) => void,
+    onSelected: (assets: ModelCreatorAsset[]) => void,
   ) => {
     setModelAssetTarget(target);
     setModelAssetConsumer(() => onSelected);
@@ -366,16 +366,16 @@ export default function App() {
           <AssetTransitModal
             purpose="OTHER"
             mode={modelAssetConsumer ? 'picker' : 'manager'}
+            multiSelect={modelAssetTarget === 'face_merge'}
             onModelImported={modelProfilesQuery.refetch}
             targetSlot={modelAssetTarget ? `model-profile-${modelAssetTarget}` : 'main'}
             onConfirmSelection={(items) => {
-              const first = items[0];
-              if (modelAssetConsumer && first) {
-                modelAssetConsumer({
-                  id: first.id,
-                  name: first.name,
-                  url: first.originalUrl ?? first.thumbnailUrl ?? '',
-                });
+              if (modelAssetConsumer && items.length > 0) {
+                modelAssetConsumer(items.map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  url: item.originalUrl ?? item.thumbnailUrl ?? '',
+                })));
               }
               setModelAssetConsumer(undefined);
               setModelAssetTarget(undefined);
@@ -479,16 +479,16 @@ export default function App() {
         <AssetTransitModal
           purpose="OTHER"
           mode={modelAssetConsumer ? 'picker' : 'manager'}
+          multiSelect={modelAssetTarget === 'face_merge'}
           onModelImported={modelProfilesQuery.refetch}
           targetSlot={modelAssetTarget ? `model-profile-${modelAssetTarget}` : 'main'}
           onConfirmSelection={(items) => {
-            const first = items[0];
-            if (modelAssetConsumer && first) {
-              modelAssetConsumer({
-                id: first.id,
-                name: first.name,
-                url: first.originalUrl ?? first.thumbnailUrl ?? '',
-              });
+            if (modelAssetConsumer && items.length > 0) {
+              modelAssetConsumer(items.map((item) => ({
+                id: item.id,
+                name: item.name,
+                url: item.originalUrl ?? item.thumbnailUrl ?? '',
+              })));
             } else {
               console.log('[Transit] App 全局选中(未消费):', items);
             }

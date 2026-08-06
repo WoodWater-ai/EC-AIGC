@@ -12,7 +12,7 @@ import { useFileUpload } from '../hooks/useFileUpload';
 import { withCosThumbnail } from '../utils/cosImage';
 import { ImagePreviewModal } from './ImagePreviewModal';
 
-export type ModelCreatorAssetTarget = 'reference' | 'face_source' | 'target_appearance';
+export type ModelCreatorAssetTarget = 'reference' | 'face_source' | 'target_appearance' | 'face_merge';
 
 export interface ModelCreatorAsset {
   id: string;
@@ -26,7 +26,7 @@ interface Props {
   onPublished: () => void;
   onRequestAsset: (
     target: ModelCreatorAssetTarget,
-    onSelected: (asset: ModelCreatorAsset) => void,
+    onSelected: (assets: ModelCreatorAsset[]) => void,
   ) => void;
 }
 
@@ -53,6 +53,7 @@ const MODES: Array<{
   { id: 'text', label: '文本生成', description: '用人物描述生成候选图', icon: 'auto_awesome' },
   { id: 'reference', label: '参考图生成', description: '参考人物气质与画面', icon: 'image' },
   { id: 'face_swap', label: '换脸生成', description: '授权脸部替换到目标形象', icon: 'face_retouching_natural' },
+  { id: 'face_merge', label: '人脸合成', description: '多张人脸与提示词合成新面孔', icon: 'group' },
   { id: 'upload', label: '上传已有模特', description: '批量上传已有模特图片', icon: 'upload_file' },
 ];
 
@@ -92,7 +93,9 @@ export function ModelProfileCreator({
   const [working, setWorking] = useState(false);
   const [failReason, setFailReason] = useState<string>();
   const [previewIndex, setPreviewIndex] = useState<number>();
+  const [faceMergePreviewIndex, setFaceMergePreviewIndex] = useState<number>();
   const [uploadedCandidates, setUploadedCandidates] = useState<UploadCandidate[]>([]);
+  const [faceMergeAssets, setFaceMergeAssets] = useState<ModelCreatorAsset[]>([]);
   const [selectedUploadIds, setSelectedUploadIds] = useState<Set<string>>(() => new Set());
   const [uploading, setUploading] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -127,6 +130,8 @@ export function ModelProfileCreator({
     setWorking(false);
     setFailReason(undefined);
     setPreviewIndex(undefined);
+    setFaceMergePreviewIndex(undefined);
+    setFaceMergeAssets([]);
     uploadedCandidates.forEach((candidate) => URL.revokeObjectURL(candidate.previewUrl));
     setUploadedCandidates([]);
     setSelectedUploadIds(new Set());
@@ -164,8 +169,11 @@ export function ModelProfileCreator({
     () => (mode === 'text' && Boolean(prompt.trim()))
       || (mode === 'reference' && Boolean(reference))
       || (mode === 'face_swap'
-        && Boolean(faceSource && targetAppearance && rightsAccepted && sourceDescription.trim())),
-    [faceSource, mode, prompt, reference, rightsAccepted, sourceDescription, targetAppearance],
+        && Boolean(faceSource && targetAppearance && rightsAccepted && sourceDescription.trim()))
+      || (mode === 'face_merge'
+        && faceMergeAssets.length >= 2
+        && Boolean(prompt.trim() && rightsAccepted && sourceDescription.trim())),
+    [faceMergeAssets, faceSource, mode, prompt, reference, rightsAccepted, sourceDescription, targetAppearance, uploading],
   );
 
   const requestBody = (): ModelCandidateGenerateRequest => ({
@@ -174,8 +182,11 @@ export function ModelProfileCreator({
     referenceAssetId: reference?.id,
     faceSourceAssetId: faceSource?.id,
     targetAppearanceAssetId: targetAppearance?.id,
+    faceAssetIds: mode === 'face_merge'
+      ? faceMergeAssets.map((asset) => asset.id)
+      : undefined,
     candidateCount,
-    aspectRatio: '3:4',
+    aspectRatio: mode === 'face_merge' ? '1:1' : '3:4',
     resolution: '1K',
     sourceDescription: sourceDescription.trim() || undefined,
     rightsAccepted,
@@ -278,6 +289,38 @@ export function ModelProfileCreator({
     if (files.length > 0) void uploadFiles(files);
   };
 
+  const selectFaceMergeAssets = (assets: ModelCreatorAsset[]) => {
+    const uniqueSelection = assets.filter(
+      (asset, index, items) => items.findIndex((item) => item.id === asset.id) === index,
+    );
+    const merged = [...faceMergeAssets, ...uniqueSelection].filter(
+      (asset, index, items) => items.findIndex((item) => item.id === asset.id) === index,
+    );
+    const duplicateCount = faceMergeAssets.length + uniqueSelection.length - merged.length;
+    if (duplicateCount > 0) {
+      toast.info(`已忽略 ${duplicateCount} 张重复人脸图`);
+    }
+    if (merged.length > 4) {
+      toast.warning(`人脸合成最多选择 4 张，已忽略 ${merged.length - 4} 张`);
+    }
+    setFaceMergeAssets(merged.slice(0, 4));
+  };
+
+  const removeFaceMergeAsset = (assetId: string) => {
+    setFaceMergeAssets((current) => current.filter((asset) => asset.id !== assetId));
+  };
+
+  const moveFaceMergeAsset = (assetId: string, offset: -1 | 1) => {
+    setFaceMergeAssets((current) => {
+      const from = current.findIndex((asset) => asset.id === assetId);
+      const to = from + offset;
+      if (from < 0 || to < 0 || to >= current.length) return current;
+      const next = [...current];
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+  };
+
   const removeUploadCandidate = (clientId: string) => {
     setUploadedCandidates((current) => {
       const target = current.find((candidate) => candidate.clientId === clientId);
@@ -316,7 +359,13 @@ export function ModelProfileCreator({
       setSelectedResultIds(new Set());
       setPreflight(undefined);
       setProfileName(
-        mode === 'text' ? 'AI 模特' : mode === 'reference' ? '参考图模特' : '授权换脸模特',
+        mode === 'text'
+          ? 'AI 模特'
+          : mode === 'reference'
+            ? '参考图模特'
+            : mode === 'face_merge'
+              ? '合成人脸模特'
+              : '授权换脸模特',
       );
       toast.success('候选生成任务已提交');
     } catch (error) {
@@ -349,6 +398,14 @@ export function ModelProfileCreator({
           tags: ['已有模特', '人物资产'],
           suitableFor: ['product_main', 'scene_detail', 'model_triple_view'],
           reason: '由用户上传的已有模特图片创建。',
+        });
+      } else if (mode === 'face_merge') {
+        await modelProfileApi.publish({
+          generationResultIds: Array.from(selectedResultIds),
+          name: profileName.trim(),
+          tags: ['人脸合成', '人物资产'],
+          suitableFor: ['product_main', 'scene_detail', 'model_triple_view'],
+          reason: '由多张已授权人脸来源合成。',
         });
       } else {
         await modelProfileApi.publish({
@@ -442,7 +499,7 @@ export function ModelProfileCreator({
         </header>
 
         <div className="p-6">
-          <div className="grid grid-cols-2 border-b border-slate-200 sm:grid-cols-4">
+          <div className="grid grid-cols-2 border-b border-slate-200 sm:grid-cols-5">
             {MODES.map((item) => (
               <button
                 key={item.id}
@@ -482,7 +539,7 @@ export function ModelProfileCreator({
                     asset={reference}
                     label="选择形象或风格参考图"
                     disabled={Boolean(taskId)}
-                    onClick={() => onRequestAsset('reference', setReference)}
+                    onClick={() => onRequestAsset('reference', (assets) => setReference(assets[0]))}
                   />
                   <input
                     value={prompt}
@@ -501,13 +558,13 @@ export function ModelProfileCreator({
                       asset={faceSource}
                       label="1. 选择脸部来源"
                       disabled={Boolean(taskId)}
-                      onClick={() => onRequestAsset('face_source', setFaceSource)}
+                      onClick={() => onRequestAsset('face_source', (assets) => setFaceSource(assets[0]))}
                     />
                     <AssetTile
                       asset={targetAppearance}
                       label="2. 选择目标形象"
                       disabled={Boolean(taskId)}
-                      onClick={() => onRequestAsset('target_appearance', setTargetAppearance)}
+                      onClick={() => onRequestAsset('target_appearance', (assets) => setTargetAppearance(assets[0]))}
                     />
                   </div>
                   <input
@@ -528,6 +585,108 @@ export function ModelProfileCreator({
                     我确认对脸部来源拥有合法肖像及生成使用授权，并同意记录来源、操作者、时间和声明版本。
                   </label>
                 </>
+              )}
+
+              {mode === 'face_merge' && (
+                <div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {faceMergeAssets.map((asset, index) => (
+                      <div
+                        key={asset.id}
+                        title={asset.name}
+                        className="group relative aspect-square overflow-hidden rounded border-2 border-slate-200 transition-all duration-200 hover:border-primary hover:shadow-md"
+                      >
+                        <button
+                          type="button"
+                          aria-label={`放大查看人脸 ${index + 1}`}
+                          onClick={() => setFaceMergePreviewIndex(index)}
+                          className="absolute inset-0 cursor-zoom-in"
+                        >
+                          <img
+                            src={withCosThumbnail(asset.url, 480)}
+                            alt={asset.name || `人脸 ${index + 1}`}
+                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                          />
+                        </button>
+                        <span className="pointer-events-none absolute left-1.5 top-1.5 z-10 rounded bg-slate-950/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                          人脸 {index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`移除人脸 ${index + 1}`}
+                          onClick={() => removeFaceMergeAsset(asset.id)}
+                          disabled={Boolean(taskId)}
+                          className="absolute right-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded-full bg-slate-950/65 text-white disabled:hidden"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">close</span>
+                        </button>
+                        {!taskId && (
+                          <div className="absolute bottom-1.5 right-1.5 z-10 flex gap-1">
+                            <button
+                              type="button"
+                              aria-label={`人脸 ${index + 1} 前移`}
+                              onClick={() => moveFaceMergeAsset(asset.id, -1)}
+                              disabled={index === 0}
+                              className="grid h-6 w-6 place-items-center rounded bg-slate-950/65 text-white disabled:opacity-30"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">arrow_back</span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`人脸 ${index + 1} 后移`}
+                              onClick={() => moveFaceMergeAsset(asset.id, 1)}
+                              disabled={index === faceMergeAssets.length - 1}
+                              className="grid h-6 w-6 place-items-center rounded bg-slate-950/65 text-white disabled:opacity-30"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {!taskId && faceMergeAssets.length < 4 && (
+                      <button
+                        type="button"
+                        onClick={() => onRequestAsset('face_merge', selectFaceMergeAssets)}
+                        className="grid aspect-square place-items-center rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-center text-slate-500 hover:border-primary hover:text-primary"
+                      >
+                        <span>
+                          <span className="material-symbols-outlined text-3xl">photo_library</span>
+                          <span className="mt-1 block text-[10px] font-bold">
+                            {faceMergeAssets.length > 0 ? '继续选择' : '从资源库选择'}
+                          </span>
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-3 text-[11px] leading-5 text-slate-500">
+                    从资源库选择 2–4 张人脸图；图片将按编号顺序传给 Vidu Image 2，输出固定为 1K。
+                  </p>
+                  <textarea
+                    value={prompt}
+                    onChange={(event) => setPrompt(event.target.value)}
+                    disabled={Boolean(taskId)}
+                    placeholder="描述融合偏好，例如：以人脸 1 的脸型为主，融合人脸 2 的眼睛和人脸 3 的鼻唇特征，生成自然、真实的新面孔"
+                    className="mt-4 h-24 w-full resize-none rounded border border-slate-200 p-3 text-xs outline-none focus:border-primary disabled:bg-slate-50"
+                  />
+                  <input
+                    value={sourceDescription}
+                    onChange={(event) => setSourceDescription(event.target.value)}
+                    disabled={Boolean(taskId)}
+                    placeholder="授权来源说明（必填）"
+                    className="mt-3 h-9 w-full rounded border border-slate-200 px-3 text-xs outline-none focus:border-primary"
+                  />
+                  <label className="mt-3 flex gap-2 text-[11px] leading-5 text-slate-600">
+                    <input
+                      checked={rightsAccepted}
+                      onChange={(event) => setRightsAccepted(event.target.checked)}
+                      disabled={Boolean(taskId)}
+                      type="checkbox"
+                      className="mt-1"
+                    />
+                    我确认对全部人脸图片拥有合法肖像及生成使用授权，并同意记录来源、操作人、时间和声明版本。
+                  </label>
+                </div>
               )}
 
               {mode === 'upload' && (
@@ -733,7 +892,7 @@ export function ModelProfileCreator({
                   {candidates.map((candidate, index) => (
                     <div
                       key={candidate.generationResultId}
-                      className={`relative aspect-[3/4] overflow-hidden border-2 ${
+                      className={`relative ${mode === 'face_merge' ? 'aspect-square' : 'aspect-[3/4]'} overflow-hidden border-2 ${
                         selectedResultIds.has(candidate.generationResultId)
                           ? 'border-primary'
                           : 'border-transparent hover:border-slate-300'
@@ -846,6 +1005,17 @@ export function ModelProfileCreator({
               }))}
           initialIndex={previewIndex}
           onClose={() => setPreviewIndex(undefined)}
+        />
+      )}
+
+      {faceMergePreviewIndex !== undefined && faceMergeAssets.length > 0 && (
+        <ImagePreviewModal
+          images={faceMergeAssets.map((asset, index) => ({
+            url: asset.url,
+            label: asset.name || `人脸 ${index + 1}`,
+          }))}
+          initialIndex={Math.min(faceMergePreviewIndex, faceMergeAssets.length - 1)}
+          onClose={() => setFaceMergePreviewIndex(undefined)}
         />
       )}
     </div>

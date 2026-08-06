@@ -100,6 +100,7 @@ export interface ProductAsset {
     id: string;
     name: string;
     url: string;
+    thumbnailUrl?: string;
     size: string;
     type: 'image' | 'video';
   }[];
@@ -482,12 +483,12 @@ export interface ModelProfile {
   id: string;
   name: string;
   image: string;
-  source: '虚拟模特' | '授权参考' | '内部素材' | '用户授权上传' | '已有模特';
+  source: '虚拟模特' | '授权参考' | '内部素材' | '用户授权上传' | '人脸合成' | '已有模特';
   tags: string[];
   suitableFor: ImageGenerationType[];
   reason: string;
   status: 'draft' | 'active' | 'disabled';
-  sourceMode: 'text' | 'reference' | 'face_swap' | 'upload';
+  sourceMode: 'text' | 'reference' | 'face_swap' | 'face_merge' | 'upload';
   faceAnchor: ModelProfileAnchor;
   appearanceAnchor?: ModelProfileAnchor;
   declaration?: ModelRightsDeclaration;
