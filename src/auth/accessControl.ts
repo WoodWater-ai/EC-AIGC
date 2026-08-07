@@ -11,6 +11,7 @@ export const ADMIN_ROLE_CODE = 'ADMIN';
 const SCREEN_PERMISSION_MAP: Readonly<Record<AppScreen, readonly string[]>> = {
   [AppScreen.LOGIN]: [],
   [AppScreen.DASHBOARD]: ['dashboard:view'],
+  [AppScreen.ASSISTANT]: ['assistant:view'],
   [AppScreen.TASKS]: ['task:view'],
   [AppScreen.CREATE_IMAGE_TASK]: ['task:create'],
   [AppScreen.CREATE_VIDEO_TASK]: ['task:create'],
@@ -39,6 +40,7 @@ const SCREEN_PERMISSION_MAP: Readonly<Record<AppScreen, readonly string[]>> = {
 
 export const ACCESSIBLE_SCREEN_ORDER: readonly AppScreen[] = [
   AppScreen.DASHBOARD,
+  AppScreen.ASSISTANT,
   AppScreen.TASKS,
   AppScreen.TEMPLATES,
   AppScreen.ASSETS,

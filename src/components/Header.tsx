@@ -51,6 +51,8 @@ export const Header: React.FC<HeaderProps> = ({
     switch (currentScreen) {
       case AppScreen.DASHBOARD:
         return { parent: '达芬奇密码 AI', child: '工作台首页' };
+      case AppScreen.ASSISTANT:
+        return { parent: '智能创作', child: '创作助手' };
       case AppScreen.TASKS:
         return { parent: '批次素材生产', child: '任务列表' };
       case AppScreen.CREATE_IMAGE_TASK:

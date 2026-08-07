@@ -22,6 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const menuItems = [
     { screen: AppScreen.DASHBOARD, label: '工作台首页', icon: 'dashboard' },
+    { screen: AppScreen.ASSISTANT, label: '创作助手', icon: 'auto_awesome' },
     { screen: AppScreen.TASKS, label: '任务列表', icon: 'auto_schedule' },
     { screen: AppScreen.TEMPLATES, label: '智能模板中心', icon: 'dashboard_customize' },
     { screen: AppScreen.ASSETS, label: '商品素材库', icon: 'inventory_2' },
@@ -37,7 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const visibleMenuItems = menuItems.filter((item) => canAccessScreen(item.screen));
   const mobileMenuItems = visibleMenuItems.filter((item) =>
-    [AppScreen.DASHBOARD, AppScreen.TASKS, AppScreen.TEMPLATES, AppScreen.ASSETS].includes(item.screen)
+    [AppScreen.DASHBOARD, AppScreen.ASSISTANT, AppScreen.TASKS, AppScreen.ASSETS].includes(item.screen)
   );
   const canCreateTask = hasPermission('task:create');
   const canOpenResourceCenter = hasPermission('asset-center:view');

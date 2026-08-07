@@ -119,6 +119,8 @@ interface AssetTransitModalProps {
   allowedSources?: ResourceCenterSource[];
   /** 从资源中心成功添加模特后通知上层刷新模特资源库。 */
   onModelImported?: () => void;
+  /** 仅用于业务素材选择，隐藏上传、移动、删除、合并等资源管理能力。 */
+  selectionOnly?: boolean;
 }
 
 export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
@@ -137,6 +139,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   initialSource = 'UPLOAD',
   allowedSources = ['UPLOAD', 'PRODUCT', 'MODEL'],
   onModelImported,
+  selectionOnly = false,
 }) => {
   const productSourceAvailable = allowedSources.includes('PRODUCT') && assetKind !== 'AUDIO';
   const modelSourceAvailable = allowedSources.includes('MODEL') && assetKind === 'IMAGE';
@@ -172,11 +175,11 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
   // ============ 真后端数据 ============
   const { user, hasPermission } = useAuth();
-  const canUpload = hasPermission('asset:upload');
-  const canMove = hasPermission('asset:move');
-  const canDelete = hasPermission('asset:delete');
-  const canMerge = hasPermission('asset:merge');
-  const canCreateModel = hasPermission('model-profile:create');
+  const canUpload = !selectionOnly && hasPermission('asset:upload');
+  const canMove = !selectionOnly && hasPermission('asset:move');
+  const canDelete = !selectionOnly && hasPermission('asset:delete');
+  const canMerge = !selectionOnly && hasPermission('asset:merge');
+  const canCreateModel = !selectionOnly && hasPermission('model-profile:create');
   const confirm = useConfirm();
   const currentUserId = user?.userId == null ? undefined : String(user.userId);
 
@@ -901,14 +904,16 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     }`}>
       
       {/* Hidden Upload Input */}
-      <input
-        type="file"
-        multiple
-        accept="image/*,video/*"
-        ref={fileInputRef}
-        onChange={handleLocalUploadChange}
-        className="hidden" 
-      />
+      {canUpload && (
+        <input
+          type="file"
+          multiple
+          accept="image/*,video/*"
+          ref={fileInputRef}
+          onChange={handleLocalUploadChange}
+          className="hidden"
+        />
+      )}
 
       {/* Main Modal Container */}
       <div className="bg-white w-full max-w-[1040px] h-[720px] rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
@@ -930,7 +935,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
-                上传资源
+                {selectionOnly ? '素材库' : '上传资源'}
               </button>
               {productSourceAvailable && (
                 <button

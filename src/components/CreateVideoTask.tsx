@@ -14,6 +14,7 @@ import { ProductPickerModal } from './CreateImageTask/ProductPickerModal';
 import { creationTemplateApi } from '../api/modules/creationTemplate';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import type { PrefillState } from './createTask/useTaskParams';
+import type { AssistantTaskPrefill } from '../api/modules/assistant';
 import {
   buildTrendingReplicatePrompt,
   extractTrendingUserInstruction,
@@ -59,6 +60,7 @@ interface CreateVideoTaskProps {
   selectedProduct: ProductAsset;
   setSelectedProduct: (product: ProductAsset) => void;
   creationTemplateId?: string | null;
+  assistantPrefill?: AssistantTaskPrefill | null;
   /** 返回按钮回调;不传则 fallback 到跳工作台首页(原行为) */
   goBack?: () => void;
 }
@@ -169,6 +171,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   onAddTask,
   setScreen,
   creationTemplateId,
+  assistantPrefill,
   goBack,
 }) => {
   const creationPrefillQuery = useServiceQuery(
@@ -179,6 +182,19 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   );
   const creationPrefill = creationPrefillQuery.data;
   const videoParamsPrefill = useMemo<PrefillState | null>(() => {
+    if (assistantPrefill && assistantPrefill.targetScreen === 'CREATE_VIDEO_TASK') {
+      return {
+        channelInstanceId: assistantPrefill.execution.channelInstanceId,
+        channelType: assistantPrefill.execution.channelType,
+        capability: assistantPrefill.capability,
+        model: assistantPrefill.execution.modelCode ?? null,
+        schemaParams: assistantPrefill.schemaParams,
+        lockExecution: false,
+        resolved: true,
+        source: assistantPrefill.execution.source,
+        fallbackApplied: false,
+      };
+    }
     if (!creationPrefill || creationPrefill.mediaType !== 'VIDEO') return null;
     const snapshot = creationPrefill.snapshot;
     const route = creationPrefill.effectiveExecution;
@@ -197,7 +213,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       fallbackReason: route?.fallbackReason ?? null,
       unavailableReason: creationPrefill.executionUnavailableReason ?? null,
     };
-  }, [creationPrefill]);
+  }, [assistantPrefill, creationPrefill]);
   const [selectedProductInfo, setSelectedProductInfo] = useState<ProductDTO | null>(null);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [mode, setMode] = useState<VideoMode>('FIRST_FRAME');
@@ -237,6 +253,38 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     source: ResourceCenterSource;
   } | null>(null);
   const appliedCreationTemplateRef = useRef<string | null>(null);
+  const appliedAssistantPrefillRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!assistantPrefill || assistantPrefill.targetScreen !== 'CREATE_VIDEO_TASK') return;
+    if (appliedAssistantPrefillRef.current === assistantPrefill.sourceResultId) return;
+    const reference = assistantPrefill.references[0];
+    if (!reference?.assetResourceId || !reference.url) return;
+    appliedAssistantPrefillRef.current = assistantPrefill.sourceResultId;
+    const nextMode: VideoMode = assistantPrefill.capability === 'IMG2VIDEO'
+      ? 'FIRST_FRAME'
+      : assistantPrefill.capability === 'SOLUTION_AD_VIDEO_EDIT'
+        ? 'ECOMMERCE_REPLICATE'
+        : 'TRENDING_REPLICATE';
+    const selected: SelectedAsset = {
+      assetId: reference.assetResourceId,
+      name: reference.type === 'VIDEO' ? '助手生成视频' : '助手生成图片',
+      assetKind: reference.type,
+      originalUrl: reference.url,
+      thumbnailUrl: reference.url,
+    };
+    setMode(nextMode);
+    if (nextMode === 'FIRST_FRAME') {
+      setFirstFrame(selected);
+      setSourceVideo(null);
+    } else {
+      setSourceVideo(selected);
+      setFirstFrame(null);
+    }
+    setPrompt(assistantPrefill.prompt ?? '');
+    setNegativePrompt(assistantPrefill.negativePrompt ?? '');
+    toast.success('已一次性带入助手产物与 Prompt；离开本页后不会恢复');
+  }, [assistantPrefill]);
 
   useEffect(() => {
     if (!creationPrefill || creationPrefill.mediaType !== 'VIDEO') return;

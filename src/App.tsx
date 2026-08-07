@@ -19,6 +19,8 @@ import ProductManagePage from './components/ProductManagePage';
 import DictCategoryList from './components/DictCategoryList';
 import DictItemList from './components/DictItemList';
 import { ModelLibrary } from './components/ModelLibrary';
+import { AssistantPage } from './components/Assistant/AssistantPage';
+import type { AssistantTaskPrefill } from './api/modules/assistant';
 import {
   ModelProfileCreator,
   type ModelCreatorAsset,
@@ -103,12 +105,15 @@ export default function App() {
   const [highlightGroupId, setHighlightGroupId] = useState<string | null>(null);
   const [highlightTaskKind, setHighlightTaskKind] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
   const [creationTemplateId, setCreationTemplateId] = useState<string | null>(null);
+  // 仅在“助手 → 创建任务”的这次跳转中使用；离开创建页即清空，不做草稿恢复。
+  const [assistantTaskPrefill, setAssistantTaskPrefill] = useState<AssistantTaskPrefill | null>(null);
 
   const setScreen = (
     screen: AppScreen,
     payload?: { highlightGroupId?: string; creationTemplateId?: string },
   ) => {
     if (!canAccessScreen(screen)) return;
+    setAssistantTaskPrefill(null);
     setCurrentScreen(screen);
     if (payload?.highlightGroupId) {
       setHighlightGroupId(payload.highlightGroupId);
@@ -137,6 +142,7 @@ export default function App() {
   }, [currentScreen]);
 
   const handleBack = () => {
+    setAssistantTaskPrefill(null);
     setCurrentScreen(previousScreenRef.current);
   };
 
@@ -255,6 +261,17 @@ export default function App() {
             setScreen={setScreen}
           />
         );
+      case AppScreen.ASSISTANT:
+        return (
+          <AssistantPage
+            onCreateTask={(screen, prefill) => {
+              if (!canAccessScreen(screen)) return;
+              setAssistantTaskPrefill(prefill);
+              setCreationTemplateId(null);
+              setCurrentScreen(screen);
+            }}
+          />
+        );
       case AppScreen.TASKS:
         return (
           <TaskList
@@ -360,6 +377,7 @@ export default function App() {
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
           creationTemplateId={creationTemplateId}
+          assistantPrefill={assistantTaskPrefill}
           onBack={handleBack}
         />
         {isTransitOpen && (
@@ -409,6 +427,7 @@ export default function App() {
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
           creationTemplateId={creationTemplateId}
+          assistantPrefill={assistantTaskPrefill}
           goBack={handleBack}
         />
         {isTransitOpen && (

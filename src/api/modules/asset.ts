@@ -52,7 +52,7 @@ export interface AssetResourceItem {
   recognitionId?: string;
   /** 关联 file_resource.id(Spec-B 主路径;长 string 防 JS 精度丢失) */
   fileResourceId?: string;
-  sourceType?: 'UPLOAD' | 'GENERATED_IMAGE' | 'GENERATED_VIDEO';
+  sourceType?: 'UPLOAD' | 'GENERATED_IMAGE' | 'GENERATED_VIDEO' | 'ASSISTANT_GENERATED_IMAGE' | 'ASSISTANT_GENERATED_VIDEO';
   sourceId?: string;
   status: 'NORMAL' | 'ARCHIVED';
   visibility?: 'PRIVATE' | 'PUBLIC';
