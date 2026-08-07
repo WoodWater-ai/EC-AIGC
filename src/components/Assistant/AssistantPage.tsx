@@ -6,6 +6,7 @@ import {
   type AssistantAttachmentInput,
   type AssistantGenerationResult,
   type AssistantMessage,
+  type AssistantPromptRiskResult,
   type AssistantSession,
   type AssistantTaskTargetCapability,
   type AssistantTaskPrefill,
@@ -32,7 +33,111 @@ interface TaskChoiceState {
   result: AssistantGenerationResult;
 }
 
+interface PromptRiskReviewState {
+  prompt: string;
+  result?: AssistantPromptRiskResult;
+  stage: 'review' | 'optimizing' | 'ready' | 'error';
+  optimizedPrompt?: string;
+  errorMessage?: string;
+}
+
 const RUNNING_STATUSES = new Set(['PENDING', 'TOOL_RUNNING']);
+
+type ProcessStepState = 'done' | 'active' | 'failed' | 'pending';
+
+interface ProcessStep {
+  title: string;
+  description: string;
+  state: ProcessStepState;
+}
+
+const CAPABILITY_LABELS: Record<string, string> = {
+  REF_IMG_EDIT: '图片生成与编辑',
+  IMG2VIDEO: '让图片动起来',
+  SOLUTION_TRENDING_REPL: '爆款复刻',
+  SOLUTION_AD_VIDEO_EDIT: '电商复刻',
+};
+
+const INTENT_LABELS: Record<string, string> = {
+  IMAGE_GENERATION: '图片创作需求',
+  VIDEO_GENERATION: '视频创作需求',
+  CHITCHAT: '对话咨询',
+};
+
+const buildProcessSteps = (message: AssistantMessage): ProcessStep[] => {
+  const capability = message.capability ?? '';
+  const isPending = message.status === 'PENDING';
+  const isRunning = message.status === 'TOOL_RUNNING';
+  const isCompleted = message.status === 'COMPLETED';
+  const isFailed = message.status === 'FAILED';
+  const isCancelled = message.status === 'CANCELLED';
+
+  if (!capability) {
+    const promptOptimization = message.suggestionType === 'OPTIMIZE_PROMPT';
+    return [{
+      title: promptOptimization ? '优化提示词' : isCompleted ? '理解并回复' : '理解需求',
+      description: isPending
+        ? (promptOptimization ? '正在保持原意并优化提示词表达' : '正在结合当前会话和已选资源分析你的需求')
+        : isFailed
+          ? (message.errorMessage || '需求处理未完成')
+          : isCancelled
+            ? '本次处理已停止'
+            : promptOptimization
+              ? '已完成表达增强与风险歧义优化，可回填后继续创作'
+              : `已识别为${INTENT_LABELS[message.intent ?? ''] ?? '普通对话需求'}`,
+      state: isPending ? 'active' : isFailed ? 'failed' : isCancelled ? 'pending' : 'done',
+    }];
+  }
+
+  const attachmentCount = message.attachments?.length ?? 0;
+  const routeName = [message.executionChannelType, message.executionModelCode]
+    .filter(Boolean).join(' · ');
+  const finalState: ProcessStepState = isRunning
+    ? 'active'
+    : isCompleted
+      ? 'done'
+      : isFailed
+        ? 'failed'
+        : isCancelled
+          ? 'pending'
+          : 'active';
+
+  return [
+    {
+      title: '理解需求',
+      description: `已识别为${INTENT_LABELS[message.intent ?? ''] ?? '创作需求'}`,
+      state: 'done',
+    },
+    {
+      title: '制定创作方案',
+      description: `选择“${CAPABILITY_LABELS[capability] ?? capability}”能力`,
+      state: 'done',
+    },
+    {
+      title: '检查素材与参数',
+      description: attachmentCount > 0
+        ? `已检查 ${attachmentCount} 项引用素材及生成参数`
+        : '已检查生成参数，本次无需引用素材',
+      state: 'done',
+    },
+    {
+      title: '提交生成',
+      description: routeName ? `已提交至 ${routeName}` : '已提交至任务能力默认路由',
+      state: 'done',
+    },
+    {
+      title: isCompleted ? '完成作品' : isFailed ? '生成未完成' : '生成作品',
+      description: isCompleted
+        ? `已生成 ${message.results?.length ?? 0} 个作品`
+        : isFailed
+          ? (message.errorMessage || '生成任务处理失败')
+          : isCancelled
+            ? '本次生成已停止'
+            : '模型正在生成并处理结果',
+      state: finalState,
+    },
+  ];
+};
 
 const createRequestId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
@@ -108,6 +213,8 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [optimizingPrompt, setOptimizingPrompt] = useState(false);
+  const [promptRiskReview, setPromptRiskReview] = useState<PromptRiskReviewState | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
@@ -117,6 +224,7 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const promptOptimizationRequestRef = useRef(0);
 
   const refreshSessions = useCallback(async () => {
     const page = await assistantApi.listSessions();
@@ -196,14 +304,25 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
     messageScrollRef.current?.scrollTo({ top: 0 });
   }, [messages, submitting]);
 
-  const send = async () => {
+  const send = async (options: {
+    skipRiskCheck?: boolean;
+    promptOverride?: string;
+  } = {}) => {
     if (!sessionId || submitting) return;
-    if (!content.trim() && selectedResources.length === 0) {
+    const prompt = (options.promptOverride ?? content).trim();
+    if (!prompt && selectedResources.length === 0) {
       toast.info('请输入创作需求，或从资源中心选择素材');
       return;
     }
     setSubmitting(true);
     try {
+      if (!options.skipRiskCheck && prompt) {
+        const riskResult = await assistantApi.checkPromptRisk(prompt);
+        if (riskResult.riskDetected) {
+          setPromptRiskReview({ prompt, result: riskResult, stage: 'review' });
+          return;
+        }
+      }
       const attachments: AssistantAttachmentInput[] = selectedResources.map((item, index) => ({
         sourceType: item.sourceType,
         sourceId: item.sourceId,
@@ -214,7 +333,7 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
       const response = await assistantApi.chat({
         sessionId,
         clientRequestId: createRequestId(),
-        content: content.trim(),
+        content: prompt,
         attachments,
       });
       setMessages((current) => {
@@ -228,6 +347,55 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const closePromptDialog = () => {
+    promptOptimizationRequestRef.current += 1;
+    setPromptRiskReview(null);
+    setOptimizingPrompt(false);
+  };
+
+  const startPromptOptimization = async (
+    prompt: string,
+    riskResult?: AssistantPromptRiskResult,
+  ) => {
+    if (!prompt.trim() || optimizingPrompt) return;
+    const requestId = promptOptimizationRequestRef.current + 1;
+    promptOptimizationRequestRef.current = requestId;
+    setOptimizingPrompt(true);
+    setPromptRiskReview({ prompt: prompt.trim(), result: riskResult, stage: 'optimizing' });
+    try {
+      const optimized = await assistantApi.optimizePrompt(prompt.trim());
+      if (promptOptimizationRequestRef.current !== requestId) return;
+      setPromptRiskReview({
+        prompt: prompt.trim(),
+        result: riskResult ?? optimized,
+        stage: 'ready',
+        optimizedPrompt: optimized.optimizedPrompt,
+      });
+    } catch (error) {
+      if (promptOptimizationRequestRef.current !== requestId) return;
+      setPromptRiskReview({
+        prompt: prompt.trim(),
+        result: riskResult,
+        stage: 'error',
+        errorMessage: error instanceof Error ? error.message : '提示词优化失败，请重试',
+      });
+    } finally {
+      if (promptOptimizationRequestRef.current === requestId) setOptimizingPrompt(false);
+    }
+  };
+
+  const applyOptimizedPrompt = async (message: AssistantMessage) => {
+    setContent(message.content);
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
+    if (!message.appliedAction) {
+      await assistantApi.applySuggestion(message.id, 'APPLY_OPTIMIZED_PROMPT');
+      setMessages((current) => current.map((item) => item.id === message.id
+        ? { ...item, appliedAction: 'APPLY_OPTIMIZED_PROMPT' }
+        : item));
+    }
+    toast.success('优化后的提示词已填入输入框');
   };
 
   const cancel = async (messageId: string) => {
@@ -572,6 +740,7 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
                   onRegenerate={regenerate}
                   onContinue={continueWith}
                   onSave={saveResult}
+                  onApplyPrompt={applyOptimizedPrompt}
                   onCreateTask={(message, result) => setTaskChoice({ message, result })}
                 />
               </div>
@@ -657,6 +826,15 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
                     视频素材
                   </button>
                   <span className="hidden text-[10px] text-[#aaa39c] sm:inline">从资源中心选择</span>
+                  <button
+                    type="button"
+                    disabled={submitting || optimizingPrompt || !content.trim()}
+                    onClick={() => { void startPromptOptimization(content); }}
+                    className="flex items-center gap-1.5 rounded-lg border border-transparent px-2.5 py-2 text-[11px] font-bold text-primary transition hover:border-primary/20 hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <span className={`material-symbols-outlined text-[17px] ${optimizingPrompt ? 'animate-spin' : ''}`}>{optimizingPrompt ? 'progress_activity' : 'auto_fix_high'}</span>
+                    {optimizingPrompt ? '优化中' : '优化提示词'}
+                  </button>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <span className="hidden text-[9px] tabular-nums text-[#aaa39c] sm:inline">{content.length}/5000</span>
@@ -707,6 +885,32 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
           }}
         />
       )}
+      {promptRiskReview && (
+        <PromptRiskReviewModal
+          review={promptRiskReview}
+          onClose={closePromptDialog}
+          onSendOriginal={() => {
+            const prompt = promptRiskReview.prompt;
+            closePromptDialog();
+            void send({ skipRiskCheck: true, promptOverride: prompt });
+          }}
+          onOptimize={() => {
+            void startPromptOptimization(promptRiskReview.prompt, promptRiskReview.result);
+          }}
+          onRetry={() => {
+            void startPromptOptimization(promptRiskReview.prompt, promptRiskReview.result);
+          }}
+          onOptimizedPromptChange={(value) => {
+            setPromptRiskReview((current) => current ? { ...current, optimizedPrompt: value } : current);
+          }}
+          onConfirmSend={() => {
+            const optimizedPrompt = promptRiskReview.optimizedPrompt?.trim();
+            if (!optimizedPrompt) return;
+            closePromptDialog();
+            void send({ skipRiskCheck: true, promptOverride: optimizedPrompt });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -717,6 +921,7 @@ function MessageCard({
   onRegenerate,
   onContinue,
   onSave,
+  onApplyPrompt,
   onCreateTask,
 }: {
   message: AssistantMessage;
@@ -724,6 +929,7 @@ function MessageCard({
   onRegenerate: (messageId: string) => Promise<void>;
   onContinue: (result: AssistantGenerationResult) => void;
   onSave: (message: AssistantMessage, result: AssistantGenerationResult) => Promise<string>;
+  onApplyPrompt: (message: AssistantMessage) => Promise<void>;
   onCreateTask: (message: AssistantMessage, result: AssistantGenerationResult) => void;
 }) {
   const assistant = message.role === 'ASSISTANT';
@@ -760,6 +966,7 @@ function MessageCard({
           : 'rounded-tr-md border border-[#e3ddd6] bg-[#f3f0ec] text-[#3d3935]'}`}
         >
           <p className="whitespace-pre-wrap">{message.content}</p>
+          {assistant && <AssistantProcessPanel message={message} />}
           {message.attachments && message.attachments.length > 0 && (
             <div className="mt-3 grid max-w-lg grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {message.attachments.map((attachment) => attachment.url && (
@@ -842,6 +1049,16 @@ function MessageCard({
         ))}
         {assistant && (
           <div className="mt-1.5 flex items-center gap-1 text-[10px] text-[#aaa39c]">
+            {message.status === 'COMPLETED' && message.suggestionType === 'OPTIMIZE_PROMPT' && (
+              <button
+                type="button"
+                onClick={() => { void onApplyPrompt(message); }}
+                className="flex items-center gap-1 rounded-lg bg-primary-light px-2.5 py-1.5 font-bold text-primary transition hover:bg-primary/15"
+              >
+                <span className="material-symbols-outlined text-sm">keyboard_return</span>
+                {message.appliedAction ? '再次使用' : '使用优化提示词'}
+              </button>
+            )}
             {RUNNING_STATUSES.has(message.status) && (
               <button type="button" onClick={() => { void onCancel(message.id); }} className="rounded-lg px-2 py-1 hover:bg-[#f2efeb] hover:text-text-main">停止生成</button>
             )}
@@ -867,6 +1084,215 @@ function MessageCard({
         />
       )}
     </>
+  );
+}
+
+function AssistantProcessPanel({ message }: { message: AssistantMessage }) {
+  const steps = buildProcessSteps(message);
+  const completedCount = steps.filter((step) => step.state === 'done').length;
+  const stateLabel = message.status === 'PENDING'
+    ? '思考中'
+    : message.status === 'TOOL_RUNNING'
+      ? '生成中'
+      : message.status === 'COMPLETED'
+        ? '已完成'
+        : message.status === 'FAILED'
+          ? '未完成'
+          : '已停止';
+  const stateClass = message.status === 'FAILED'
+    ? 'bg-rose-50 text-rose-600'
+    : RUNNING_STATUSES.has(message.status)
+      ? 'bg-primary-light text-primary'
+      : 'bg-[#f2f0ed] text-[#77716b]';
+
+  return (
+    <details className="group mt-3 overflow-hidden rounded-xl border border-[#e7e2dc] bg-[#faf9f7]">
+      <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2.5 select-none [&::-webkit-details-marker]:hidden">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white text-primary shadow-sm ring-1 ring-[#ebe6e0]">
+          <span className="material-symbols-outlined text-[15px]">psychology</span>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] font-bold text-[#514c47]">思考过程</span>
+          <span className="block text-[9px] text-[#a09a94]">过程摘要 · {completedCount}/{steps.length} 步完成</span>
+        </span>
+        <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold ${stateClass}`}>{stateLabel}</span>
+        <span className="material-symbols-outlined text-[17px] text-[#aaa39c] transition-transform group-open:rotate-180">expand_more</span>
+      </summary>
+      <div className="border-t border-[#ebe7e1] px-3 py-3">
+        <div className="space-y-0.5">
+          {steps.map((step, index) => {
+            const icon = step.state === 'done'
+              ? 'check'
+              : step.state === 'failed'
+                ? 'close'
+                : step.state === 'active'
+                  ? 'progress_activity'
+                  : 'more_horiz';
+            const iconClass = step.state === 'done'
+              ? 'bg-emerald-50 text-emerald-600'
+              : step.state === 'failed'
+                ? 'bg-rose-50 text-rose-600'
+                : step.state === 'active'
+                  ? 'bg-primary-light text-primary'
+                  : 'bg-[#efede9] text-[#aaa39c]';
+            return (
+              <div key={`${step.title}-${index}`} className="relative flex gap-2.5 pb-2.5 last:pb-0">
+                {index < steps.length - 1 && <span className="absolute left-[10px] top-5 h-[calc(100%-12px)] w-px bg-[#e3ded8]" />}
+                <span className={`relative z-[1] flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${iconClass}`}>
+                  <span className={`material-symbols-outlined text-[12px] ${step.state === 'active' ? 'animate-spin' : ''}`}>{icon}</span>
+                </span>
+                <span className="min-w-0 pt-px">
+                  <span className="block text-[10px] font-bold leading-4 text-[#5b5550]">{step.title}</span>
+                  <span className="block break-words text-[9px] leading-4 text-[#99928b]">{step.description}</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {message.prompt && (
+          <div className="mt-3 rounded-lg border border-[#ebe6e0] bg-white px-2.5 py-2">
+            <div className="mb-1 text-[9px] font-bold text-[#77716b]">整理后的生成指令</div>
+            <p className="max-h-28 overflow-y-auto whitespace-pre-wrap break-words text-[9px] leading-4 text-[#99928b]">{message.prompt}</p>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function PromptRiskReviewModal({
+  review,
+  onClose,
+  onSendOriginal,
+  onOptimize,
+  onRetry,
+  onOptimizedPromptChange,
+  onConfirmSend,
+}: {
+  review: PromptRiskReviewState;
+  onClose: () => void;
+  onSendOriginal: () => void;
+  onOptimize: () => void;
+  onRetry: () => void;
+  onOptimizedPromptChange: (value: string) => void;
+  onConfirmSend: () => void;
+}) {
+  const optimizing = review.stage === 'optimizing';
+  const ready = review.stage === 'ready';
+  const error = review.stage === 'error';
+  const title = optimizing
+    ? '正在优化提示词'
+    : ready
+      ? '提示词优化完成'
+      : error
+        ? '提示词优化未完成'
+        : '提示词可能触发内容审核';
+  const description = optimizing
+    ? '正在保持原始创作意图，调整可能触发审核的表达，请稍候。'
+    : ready
+      ? '你可以继续调整优化结果，确认后才会正式发送并创建任务。'
+      : error
+        ? '本次优化请求没有成功，可以重试或返回继续修改原提示词。'
+        : '建议先优化风险歧义，再提交创作，可减少任务被生成服务拒绝的概率。';
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#211d19]/35 p-4 backdrop-blur-[2px]" onMouseDown={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="prompt-risk-title"
+        onMouseDown={(event) => event.stopPropagation()}
+        className="w-full max-w-lg overflow-hidden rounded-2xl border border-[#eadfd4] bg-white shadow-[0_24px_80px_rgba(46,35,25,0.22)]"
+      >
+        <div className={`flex items-start gap-3 border-b border-[#eee7df] px-5 py-4 ${ready ? 'bg-emerald-50/60' : error ? 'bg-rose-50/60' : 'bg-[#fffaf3]'}`}>
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ready ? 'bg-emerald-100 text-emerald-700' : error ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-700'}`}>
+            <span className={`material-symbols-outlined text-xl ${optimizing ? 'animate-spin' : ''}`}>
+              {optimizing ? 'progress_activity' : ready ? 'task_alt' : error ? 'error' : 'shield_with_heart'}
+            </span>
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 id="prompt-risk-title" className="text-sm font-black text-[#4b433c]">{title}</h3>
+            <p className="mt-1 text-[11px] leading-5 text-[#857b72]">{description}</p>
+          </div>
+          <button type="button" aria-label="关闭风险提示" onClick={onClose} className="rounded-lg p-1 text-[#aaa099] hover:bg-white hover:text-[#5d554e]">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+        <div className="space-y-3 px-5 py-4">
+          {review.stage === 'review' && review.result && (
+            <div className="space-y-2">
+            {review.result.warnings.map((warning) => (
+              <div key={warning} className="flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
+                <span className="material-symbols-outlined mt-0.5 text-sm">warning</span>
+                <span>{warning}</span>
+              </div>
+            ))}
+            </div>
+          )}
+          {optimizing ? (
+            <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-primary/10 bg-primary-light/35 px-6 text-center">
+              <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+                <span className="absolute inset-0 animate-ping rounded-2xl bg-primary/10" />
+                <span className="material-symbols-outlined relative animate-spin text-2xl">progress_activity</span>
+              </span>
+              <p className="mt-4 text-xs font-black text-[#554f49]">AI 正在优化表达</p>
+              <p className="mt-1.5 text-[10px] leading-5 text-[#938b84]">分析风险歧义 · 保留创作意图 · 整理生成指令</p>
+            </div>
+          ) : ready ? (
+            <div>
+              <label htmlFor="optimized-prompt" className="mb-2 flex items-center justify-between text-[10px] font-bold text-[#6f675f]">
+                <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-emerald-600">auto_fix_high</span>优化后的提示词</span>
+                <span className="font-medium tabular-nums text-[#aaa39c]">{review.optimizedPrompt?.length ?? 0}/5000</span>
+              </label>
+              <textarea
+                id="optimized-prompt"
+                value={review.optimizedPrompt ?? ''}
+                maxLength={5000}
+                rows={8}
+                onChange={(event) => onOptimizedPromptChange(event.target.value)}
+                className="max-h-72 min-h-44 w-full resize-y rounded-xl border border-emerald-200 bg-emerald-50/25 px-3.5 py-3 text-xs leading-6 text-[#554f49] outline-none transition focus:border-primary/45 focus:bg-white focus:ring-2 focus:ring-primary/10"
+              />
+            </div>
+          ) : error ? (
+            <div className="rounded-xl border border-rose-100 bg-rose-50 px-3.5 py-3 text-[11px] leading-5 text-rose-600">
+              {review.errorMessage || '提示词优化失败，请稍后重试。'}
+            </div>
+          ) : (
+            <>
+              <div className="rounded-xl border border-[#ebe6e0] bg-[#faf9f7] px-3 py-2.5">
+                <div className="mb-1 text-[10px] font-bold text-[#77716b]">本次提示词</div>
+                <p className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words text-[10px] leading-5 text-[#938b84]">{review.prompt}</p>
+              </div>
+              <p className="flex items-start gap-1.5 text-[10px] leading-4 text-[#9a938d]">
+                <span className="material-symbols-outlined text-sm text-primary">auto_fix_high</span>
+                优化会尽量保留主体、商品、构图、风格和商业意图，同时调整可能存在歧义或触发审核的表达。
+              </p>
+            </>
+          )}
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-[#eee7df] bg-[#fcfbf9] px-5 py-3.5">
+          <button type="button" onClick={onClose} className="rounded-xl px-3.5 py-2 text-xs font-semibold text-text-muted hover:bg-[#f1eeea]">{ready ? '返回修改' : '取消'}</button>
+          {review.stage === 'review' && (
+            <>
+              <button type="button" onClick={onSendOriginal} className="rounded-xl border border-[#ddd6cf] bg-white px-3.5 py-2 text-xs font-semibold text-[#6f675f] hover:bg-[#f7f5f2]">仍然发送</button>
+              <button type="button" onClick={onOptimize} className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm shadow-primary/20 hover:bg-primary-hover">
+                <span className="material-symbols-outlined text-base">auto_fix_high</span>优化提示词
+              </button>
+            </>
+          )}
+          {error && (
+            <button type="button" onClick={onRetry} className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary-hover">
+              <span className="material-symbols-outlined text-base">refresh</span>重新优化
+            </button>
+          )}
+          {ready && (
+            <button type="button" disabled={!review.optimizedPrompt?.trim()} onClick={onConfirmSend} className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm shadow-primary/20 hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-35">
+              <span className="material-symbols-outlined text-base">arrow_upward</span>确认发送
+            </button>
+          )}
+          {optimizing && <span className="flex items-center px-2 text-[10px] font-semibold text-primary">优化完成后可确认发送</span>}
+        </div>
+      </div>
+    </div>
   );
 }
 

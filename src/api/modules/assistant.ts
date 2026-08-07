@@ -13,6 +13,11 @@ export type AssistantMessageStatus =
   | 'COMPLETED'
   | 'FAILED'
   | 'CANCELLED';
+export type AssistantSuggestionType =
+  | 'ADD_REQUIREMENT'
+  | 'OPTIMIZE_PROMPT'
+  | 'EXPLAIN_AUDIT'
+  | 'RETRY_SUGGESTION';
 
 export interface AssistantSession {
   id: string;
@@ -57,6 +62,12 @@ export interface AssistantMessage {
   negativePrompt?: string | null;
   schemaParams?: Record<string, unknown> | null;
   status: AssistantMessageStatus;
+  executionChannelId?: string | null;
+  executionChannelType?: string | null;
+  executionModelCode?: string | null;
+  suggestionType?: AssistantSuggestionType | null;
+  appliedAction?: string | null;
+  appliedTime?: number | null;
   errorCode?: string | null;
   errorMessage?: string | null;
   durationMs?: number | null;
@@ -79,6 +90,17 @@ export interface AssistantChatResponse {
   idempotentReplay: boolean;
   userMessage?: AssistantMessage | null;
   assistantMessage: AssistantMessage;
+}
+
+export interface AssistantPromptRiskResult {
+  riskDetected: boolean;
+  severity: 'NONE' | 'MEDIUM' | 'HIGH';
+  riskCodes: string[];
+  warnings: string[];
+}
+
+export interface AssistantPromptOptimizeResult extends AssistantPromptRiskResult {
+  optimizedPrompt: string;
 }
 
 export interface AssistantTaskPrefill {
@@ -137,7 +159,14 @@ export const assistantApi = {
     clientRequestId: string;
     content?: string;
     attachments?: AssistantAttachmentInput[];
+    suggestionType?: AssistantSuggestionType;
   }) => http.post<AssistantChatResponse>('/v1/assistant/chat', request),
+  checkPromptRisk: (prompt: string) =>
+    http.post<AssistantPromptRiskResult>('/v1/assistant/prompt/risk-check', { prompt }),
+  optimizePrompt: (prompt: string) =>
+    http.post<AssistantPromptOptimizeResult>('/v1/assistant/prompt/optimize', { prompt }),
+  applySuggestion: (messageId: string, action: string) =>
+    http.post<void>('/v1/assistant/apply', null, { params: { messageId, action } }),
   cancel: (messageId: string) =>
     http.post<AssistantMessage>('/v1/assistant/message/cancel', { messageId }),
   regenerate: (assistantMessageId: string, clientRequestId: string) =>
