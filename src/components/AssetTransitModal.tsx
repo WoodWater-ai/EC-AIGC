@@ -119,7 +119,11 @@ interface AssetTransitModalProps {
   allowedSources?: ResourceCenterSource[];
   /** 从资源中心成功添加模特后通知上层刷新模特资源库。 */
   onModelImported?: () => void;
-  /** 仅用于业务素材选择，隐藏上传、移动、删除、合并等资源管理能力。 */
+  /**
+   * 仅用于业务素材选择，隐藏移动、删除、合并等资源管理能力。
+   * 注：上传是「产生新资源」而非「管理现有资源」，因此不受 selectionOnly 控制，
+   * 业务 slot 弹出的选择器也允许用户现场上传后立即选用。
+   */
   selectionOnly?: boolean;
 }
 
@@ -175,7 +179,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
   // ============ 真后端数据 ============
   const { user, hasPermission } = useAuth();
-  const canUpload = !selectionOnly && hasPermission('asset:upload');
+  // 上传是产生新资源,不归 selectionOnly(管理动作屏蔽)管;权限完全交给 RBAC
+  const canUpload = hasPermission('asset:upload');
   const canMove = !selectionOnly && hasPermission('asset:move');
   const canDelete = !selectionOnly && hasPermission('asset:delete');
   const canMerge = !selectionOnly && hasPermission('asset:merge');

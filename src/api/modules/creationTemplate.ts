@@ -62,13 +62,21 @@ export interface CreationTemplateReference {
     | 'MODEL_REF'
     | 'FIRST_FRAME'
     | 'SOURCE_VIDEO'
-    | 'REPLACEMENT_REFERENCE';
+    | 'REPLACEMENT_REFERENCE'
+    | 'KEY_FRAME';
   assetId: string;
   name?: string | null;
   url: string;
   thumbnailUrl?: string | null;
   durationSec?: number | null;
   sortOrder?: number;
+}
+
+export interface CreationTemplateMultiFrameSegmentSnapshot {
+  keyFrameAssetId: string;
+  prompt?: string | null;
+  duration?: number | null;
+  sortOrder: number;
 }
 
 export interface CreationTemplateSnapshot {
@@ -87,10 +95,16 @@ export interface CreationTemplateSnapshot {
   modelCode?: string | null;
   schemaParams?: Record<string, unknown>;
   references?: CreationTemplateReference[];
-  videoMode?: 'FIRST_FRAME' | 'TRENDING_REPLICATE' | 'ECOMMERCE_REPLICATE' | null;
+  videoMode?: 'FIRST_FRAME' | 'TRENDING_REPLICATE' | 'ECOMMERCE_REPLICATE' | 'MULTI_FRAME' | null;
   videoDurationSec?: number | null;
   videoResolution?: string | null;
   videoMotion?: string | null;
+  /**
+   * 多帧时间轴段快照(仅 MULTI_FRAME 模式使用)。
+   * - 与 references 中 role='KEY_FRAME' 按 sortOrder 对齐
+   * - 允许同一 keyFrameAssetId 在不同段重复
+   */
+  multiFrameSegments?: CreationTemplateMultiFrameSegmentSnapshot[] | null;
 }
 
 export interface CreationTemplateReuseContext {

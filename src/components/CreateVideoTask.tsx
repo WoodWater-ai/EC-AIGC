@@ -21,9 +21,26 @@ import {
   TRENDING_ROLE_LABELS,
   type TrendingReplacementRole,
 } from '../lib/createVideoTask/buildTrendingReplicatePrompt';
+import { MultiFrameTimeline } from './createVideoTask/MultiFrameTimeline';
+import {
+  buildMultiFrameSubmitData,
+  createMultiFrameSegment,
+  isMultiFrameTimelineReady,
+  isDurationInBounds,
+  moveMultiFrameSegment,
+  MULTI_FRAME_DURATION_MAX,
+  MULTI_FRAME_DURATION_MIN,
+  type MultiFrameSegment,
+  type SelectedMultiFrameAsset,
+} from '../lib/createVideoTask/multiFrame';
 
-type VideoMode = 'FIRST_FRAME' | 'TRENDING_REPLICATE' | 'ECOMMERCE_REPLICATE';
-type InputRole = 'FIRST_FRAME' | 'SOURCE_VIDEO' | 'REPLACEMENT_REFERENCE';
+type VideoMode = 'FIRST_FRAME' | 'TRENDING_REPLICATE' | 'ECOMMERCE_REPLICATE' | 'MULTI_FRAME';
+type InputRole = 'FIRST_FRAME' | 'SOURCE_VIDEO' | 'REPLACEMENT_REFERENCE' | 'KEY_FRAME';
+
+const MULTI_FRAME_DEFAULT_DURATION = 5;
+
+// 智能多帧仅支持 Q2 模型(viduq2-turbo / viduq2-pro),与 useTaskParams.MULTIFRAME_ALLOWED_MODELS 保持一致。
+const MULTI_FRAME_ALLOWED_MODELS: readonly string[] = ['viduq2-turbo', 'viduq2-pro'];
 
 interface SelectedAsset {
   assetId: string;
@@ -84,7 +101,7 @@ const MODE_CONFIG: Record<
   {
     label: string;
     description: string;
-    capability: 'IMG2VIDEO' | 'SOLUTION_TRENDING_REPL' | 'SOLUTION_AD_VIDEO_EDIT';
+    capability: 'IMG2VIDEO' | 'SOLUTION_TRENDING_REPL' | 'SOLUTION_AD_VIDEO_EDIT' | 'MULTIFRAME';
     group: 'VIDEO' | 'SOLUTION';
   }
 > = {
@@ -105,6 +122,12 @@ const MODE_CONFIG: Record<
     description: '参考源视频结构，使用商品和模特等图片复刻电商成片',
     capability: 'SOLUTION_AD_VIDEO_EDIT',
     group: 'SOLUTION',
+  },
+  MULTI_FRAME: {
+    label: '智能多帧',
+    description: '首帧 + 2~9 段关键帧按顺序推进画面，可复用同一素材',
+    capability: 'MULTIFRAME',
+    group: 'VIDEO',
   },
 };
 
@@ -222,6 +245,13 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   const [replacementReferences, setReplacementReferences] = useState<
     SelectedAsset[]
   >([]);
+  /** [2026-08-08 智能多帧] MULTI_FRAME 模式的首帧(同时映射到 FIRST_FRAME 槽位) */
+  const [multiFrameStart, setMultiFrameStart] =
+    useState<SelectedMultiFrameAsset | null>(null);
+  /** [2026-08-08 智能多帧] MULTI_FRAME 模式的多帧段(2..9 段,含关键帧 + 段 Prompt + 时长) */
+  const [multiFrameSegments, setMultiFrameSegments] = useState<MultiFrameSegment[]>(
+    () => [createMultiFrameSegment(), createMultiFrameSegment()],
+  );
   const [prompt, setPrompt] = useState('');
   const [manualTrendingPrompt, setManualTrendingPrompt] = useState<string | null>(null);
   const [negativePrompt, setNegativePrompt] = useState(
@@ -251,6 +281,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     role: InputRole;
     assetKind: 'IMAGE' | 'VIDEO';
     source: ResourceCenterSource;
+    /** [2026-08-08 智能多帧] 多帧模式下 picker 关联的段 id;null 表示作用于首帧 */
+    segmentId?: string | null;
   } | null>(null);
   const appliedCreationTemplateRef = useRef<string | null>(null);
   const appliedAssistantPrefillRef = useRef<string | null>(null);
@@ -291,11 +323,14 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     if (appliedCreationTemplateRef.current === creationPrefill.templateId) return;
     appliedCreationTemplateRef.current = creationPrefill.templateId;
     const snapshot = creationPrefill.snapshot;
-    const nextMode: VideoMode = snapshot.videoMode === 'TRENDING_REPLICATE'
+    const snapshotMode = snapshot.videoMode ?? null;
+    const nextMode: VideoMode = snapshotMode === 'TRENDING_REPLICATE'
       ? 'TRENDING_REPLICATE'
-      : snapshot.videoMode === 'ECOMMERCE_REPLICATE'
+      : snapshotMode === 'ECOMMERCE_REPLICATE'
         ? 'ECOMMERCE_REPLICATE'
-        : 'FIRST_FRAME';
+        : snapshotMode === 'MULTI_FRAME'
+          ? 'MULTI_FRAME'
+          : 'FIRST_FRAME';
     setMode(nextMode);
     setSelectedProductInfo(null);
     setProductFacts({
@@ -333,11 +368,95 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       }))
       .filter((asset) => Boolean(asset.originalUrl))
       .slice(0, nextMode === 'ECOMMERCE_REPLICATE' ? 8 : 6);
+
+    // [2026-08-08 智能多帧] MULTI_FRAME 同款快照:从 references 收集 KEY_FRAME 与 FIRST_FRAME,
+    // multiFrameSegments 按 sortOrder 复原
+    const keyFrameReferences = references
+      .filter((reference) => reference.role === 'KEY_FRAME')
+      .sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
+    const keyFrameAssetMap = new Map<string, SelectedAsset>();
+    for (const ref of keyFrameReferences) {
+      if (!ref.url || keyFrameAssetMap.has(ref.assetId)) continue;
+      keyFrameAssetMap.set(ref.assetId, toTemplateAsset(ref, 'IMAGE'));
+    }
+    const segmentSnapshots = snapshot.multiFrameSegments ?? [];
+    const restoredSegments: MultiFrameSegment[] = segmentSnapshots.length > 0
+      ? segmentSnapshots
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((seg) => {
+          const refAsset = keyFrameAssetMap.get(seg.keyFrameAssetId);
+          const keyFrameRef: SelectedMultiFrameAsset | null = refAsset
+            ? {
+                assetId: refAsset.assetId,
+                originalUrl: refAsset.originalUrl,
+                thumbnailUrl: refAsset.thumbnailUrl,
+                name: refAsset.name,
+              }
+            : null;
+          return {
+            id: `mf-seg-tpl-${seg.sortOrder}-${seg.keyFrameAssetId}`,
+            keyFrame: keyFrameRef,
+            prompt: seg.prompt ?? '',
+            duration:
+              typeof seg.duration === 'number'
+              && isDurationInBounds(seg.duration)
+                ? seg.duration
+                : MULTI_FRAME_DEFAULT_DURATION,
+          };
+        })
+      : (() => {
+          // 没有 segment 快照但有 KEY_FRAME 引用,按引用还原顺序,首段给默认时长
+          const segs = keyFrameReferences
+            .slice()
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+            .map((ref, index) => {
+              const refAsset = keyFrameAssetMap.get(ref.assetId);
+              return {
+                id: `mf-seg-tpl-${index}-${ref.assetId}`,
+                keyFrame: refAsset
+                  ? {
+                      assetId: refAsset.assetId,
+                      originalUrl: refAsset.originalUrl,
+                      thumbnailUrl: refAsset.thumbnailUrl,
+                      name: refAsset.name,
+                    }
+                  : null,
+                prompt: '',
+                duration: MULTI_FRAME_DEFAULT_DURATION,
+              } as MultiFrameSegment;
+            });
+          // 保证至少 2 段(模板应用后允许用户继续删/加)
+          while (segs.length < 2) segs.push(createMultiFrameSegment());
+          return segs;
+        })();
+
     setFirstFrame(
-      firstFrameReference?.url
+      nextMode !== 'MULTI_FRAME' && firstFrameReference?.url
         ? toTemplateAsset(firstFrameReference, 'IMAGE')
         : null,
     );
+    setMultiFrameStart(
+      nextMode === 'MULTI_FRAME' && (firstFrameReference?.url || keyFrameReferences[0]?.url)
+        ? (() => {
+            const source = firstFrameReference?.url
+              ? firstFrameReference
+              : keyFrameReferences[0];
+            if (!source?.url) return null;
+            const asset = toTemplateAsset(source, 'IMAGE');
+            return {
+              assetId: asset.assetId,
+              originalUrl: asset.originalUrl,
+              thumbnailUrl: asset.thumbnailUrl,
+              name: asset.name,
+            };
+          })()
+        : null,
+    );
+    setMultiFrameSegments(nextMode === 'MULTI_FRAME' ? restoredSegments : [
+      createMultiFrameSegment(),
+      createMultiFrameSegment(),
+    ]);
     setSourceVideo(
       sourceVideoReference?.url
         ? toTemplateAsset(sourceVideoReference, 'VIDEO')
@@ -345,19 +464,28 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     );
     setReplacementReferences(replacementReferenceAssets);
     setManualTrendingPrompt(null);
-    setPrompt(nextMode !== 'FIRST_FRAME'
-      ? extractTrendingUserInstruction(snapshot.prompt ?? '')
-      : cleanReusableVideoPrompt(snapshot.prompt ?? ''));
+    setPrompt(nextMode === 'MULTI_FRAME'
+      ? (snapshot.prompt ?? '')
+      : nextMode !== 'FIRST_FRAME'
+        ? extractTrendingUserInstruction(snapshot.prompt ?? '')
+        : cleanReusableVideoPrompt(snapshot.prompt ?? ''));
     setNegativePrompt(snapshot.negativePrompt ?? '');
     setCount(Math.max(1, Math.min(8, snapshot.count ?? 1)));
     setShots(['', '', '']);
     setStoryboardGenerated(false);
-    toast.success(`已应用模板：${creationPrefill.templateName}，已带入视频素材与 Prompt，请选择本次商品`);
+    if (nextMode === 'MULTI_FRAME') {
+      toast.success(`已应用模板：${creationPrefill.templateName}，已带入首帧与 ${restoredSegments.length} 段关键帧，请选择本次商品`);
+    } else {
+      toast.success(`已应用模板：${creationPrefill.templateName}，已带入视频素材与 Prompt，请选择本次商品`);
+    }
   }, [creationPrefill]);
 
   const config = MODE_CONFIG[mode];
-  const isReplicateMode = mode !== 'FIRST_FRAME';
+  // [2026-08-08 智能多帧] isReplicateMode 只覆盖两个复刻模式;MULTI_FRAME / FIRST_FRAME 都是 VIDEO 组
+  const isReplicateMode =
+    mode === 'TRENDING_REPLICATE' || mode === 'ECOMMERCE_REPLICATE';
   const isEcommerceReplicate = mode === 'ECOMMERCE_REPLICATE';
+  const isMultiFrameMode = mode === 'MULTI_FRAME';
   const maxAdditionalReferences = isEcommerceReplicate ? 8 : 6;
   const activeVideoParamsPrefill = videoParamsPrefill?.capability === config.capability
     ? videoParamsPrefill
@@ -372,14 +500,15 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   const effectivePrompt = isReplicateMode
     ? (manualTrendingPrompt ?? trendingPrompt)
     : prompt;
-  const isInputReady =
-    mode === 'FIRST_FRAME'
+  const isInputReady = isMultiFrameMode
+    ? isMultiFrameTimelineReady(multiFrameStart, multiFrameSegments)
+    : mode === 'FIRST_FRAME'
       ? firstFrame !== null
       : sourceVideo !== null && hasProductReference;
   const readiness = [
     selectedProductInfo !== null,
     isInputReady,
-    effectivePrompt.trim().length > 0,
+    isMultiFrameMode ? true : effectivePrompt.trim().length > 0,
     params.channelType === 'VIDU' &&
       params.capability === config.capability &&
       params.channelId !== null &&
@@ -389,6 +518,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   const outputRatio = String(
     params.schemaParams.aspect_ratio ?? '',
   );
+  /** [2026-08-08 智能多帧] 当前选定的供应商模型(优先 modelId,否则用通道默认) */
+  const effectiveModelCode = params.modelId ?? null;
 
   const handleProductPicked = (product: ProductDTO) => {
     const nextFacts = {
@@ -474,6 +605,17 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       setReplacementReferences((previous) => previous.slice(0, 6));
     } else if (nextMode === 'ECOMMERCE_REPLICATE' && sourceVideo) {
       syncEcommerceDurationFromVideo(sourceVideo);
+    } else if (nextMode === 'MULTI_FRAME') {
+      // 进入多帧模式时,如果之前还没有段,补到 2 段
+      setMultiFrameSegments((previous) =>
+        previous.length >= 2 ? previous : [
+          ...previous,
+          ...Array.from(
+            { length: 2 - previous.length },
+            () => createMultiFrameSegment(),
+          ),
+        ],
+      );
     }
     setShots(['', '', '']);
     setStoryboardGenerated(false);
@@ -527,7 +669,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     role: InputRole,
     assetKind: 'IMAGE' | 'VIDEO',
     source: ResourceCenterSource = 'UPLOAD',
-  ) => setPicker({ role, assetKind, source });
+    segmentId?: string | null,
+  ) => setPicker({ role, assetKind, source, segmentId: segmentId ?? null });
 
   const confirmAssets = (items: AssetResourceItem[]) => {
     if (!picker || items.length === 0) return;
@@ -549,12 +692,43 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       return;
     }
     if (picker.role === 'FIRST_FRAME') {
-      setFirstFrame(selected[0]);
-    } else if (picker.role === 'SOURCE_VIDEO') {
-      setSourceVideo(selected[0]);
-      if (mode === 'ECOMMERCE_REPLICATE') {
-        syncEcommerceDurationFromVideo(selected[0]);
+      const head = selected[0];
+      if (mode === 'MULTI_FRAME') {
+        setMultiFrameStart({
+          assetId: head.assetId,
+          originalUrl: head.originalUrl,
+          thumbnailUrl: head.thumbnailUrl,
+          name: head.name,
+        });
+      } else {
+        setFirstFrame(head);
       }
+    } else if (picker.role === 'SOURCE_VIDEO') {
+      const head = selected[0];
+      setSourceVideo(head);
+      if (mode === 'ECOMMERCE_REPLICATE') {
+        syncEcommerceDurationFromVideo(head);
+      }
+    } else if (picker.role === 'KEY_FRAME') {
+      const head = selected[0];
+      const segmentId = picker.segmentId ?? null;
+      if (!segmentId) {
+        setPicker(null);
+        return;
+      }
+      setMultiFrameSegments((previous) => previous.map((segment) =>
+        segment.id === segmentId
+          ? {
+              ...segment,
+              keyFrame: {
+                assetId: head.assetId,
+                originalUrl: head.originalUrl,
+                thumbnailUrl: head.thumbnailUrl,
+                name: head.name,
+              },
+            }
+          : segment,
+      ));
     } else {
       setReplacementReferences((previous) => {
         const merged = [...previous];
@@ -584,6 +758,10 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   };
 
   const buildAssets = (): VideoTaskSubmitPayload['assets'] => {
+    if (isMultiFrameMode && multiFrameStart) {
+      const submitData = buildMultiFrameSubmitData(multiFrameStart, multiFrameSegments);
+      return submitData.assets;
+    }
     if (mode === 'FIRST_FRAME' && firstFrame) {
       return [
         {
@@ -641,18 +819,22 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       return;
     }
     if (!isInputReady) {
-      toast.warning(
-        mode === 'FIRST_FRAME'
-          ? '请先选择视频首帧'
-          : `请先选择${config.label}原视频，并确保已选商品具有商品主图`,
-      );
+      if (isMultiFrameMode) {
+        toast.warning('请先选择视频首帧,并确保 2~9 段关键帧全部已选择且时长在 2~7 秒');
+      } else {
+        toast.warning(
+          mode === 'FIRST_FRAME'
+            ? '请先选择视频首帧'
+            : `请先选择${config.label}原视频，并确保已选商品具有商品主图`,
+        );
+      }
       return;
     }
-    if (!effectivePrompt.trim()) {
+    if (!isMultiFrameMode && !effectivePrompt.trim()) {
       toast.warning('请输入本次视频 Prompt');
       return;
     }
-    if (isReplicateMode && effectivePrompt.length > 2000) {
+    if (!isMultiFrameMode && isReplicateMode && effectivePrompt.length > 2000) {
       toast.warning(`${config.label}最终 Prompt 不能超过 2000 字，请精简素材名称或创意补充`);
       return;
     }
@@ -665,8 +847,18 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       toast.warning('Vidu 通道能力尚未准备完成');
       return;
     }
+    if (isMultiFrameMode) {
+      if (!effectiveModelCode) {
+        toast.warning('请选择智能多帧支持的视频模型');
+        return;
+      }
+      if (!MULTI_FRAME_ALLOWED_MODELS.includes(effectiveModelCode)) {
+        toast.warning('智能多帧仅支持 viduq2-turbo / viduq2-pro 模型');
+        return;
+      }
+    }
 
-    const storyboard = (storyboardGenerated ? shots : [])
+    const storyboard = (storyboardGenerated && !isMultiFrameMode ? shots : [])
       .map((text, index) =>
         text.trim() ? `分镜${index + 1}：${text.trim()}` : '',
       )
@@ -675,18 +867,20 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     const positivePrompt = storyboard
       ? `${effectivePrompt.trim()}\n\n分镜规划：\n${storyboard}`
       : effectivePrompt.trim();
-    if (isReplicateMode && positivePrompt.length > 2000) {
+    if (!isMultiFrameMode && isReplicateMode && positivePrompt.length > 2000) {
       toast.warning(`${config.label}最终 Prompt（含分镜）不能超过 2000 字，请精简创意补充`);
       return;
     }
-    if (isEcommerceReplicate
+    if (!isMultiFrameMode && isEcommerceReplicate
       && params.schemaParams.template === 'ad_video_edit_fast'
       && params.schemaParams.resolution === '1080p') {
       toast.warning('电商复刻快速版仅支持 720P，请调整生成档位或清晰度');
       return;
     }
     // 负面约束使用独立字段提交，由后端统一且幂等地组装进供应商 Prompt。
-    const taskPrompt = positivePrompt;
+    const taskPrompt = isMultiFrameMode
+      ? `【智能多帧】${effectiveModelCode ?? ''} · 共 ${multiFrameSegments.length} 段 · 总时长 ${multiFrameSegments.reduce((sum, seg) => sum + (seg.duration || 0), 0)} 秒`
+      : positivePrompt;
     const numericProductId = /^\d+$/.test(selectedProductInfo.id)
       ? selectedProductInfo.id
       : null;
@@ -713,6 +907,11 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       sourceCreationTemplateId: creationPrefill?.templateId,
       sourceCreationTemplateVersionId: creationPrefill?.versionId,
     };
+
+    if (isMultiFrameMode && multiFrameStart) {
+      const submitData = buildMultiFrameSubmitData(multiFrameStart, multiFrameSegments);
+      payload.multiFrameSegments = submitData.multiFrameSegments;
+    }
 
     setSubmitting(true);
     try {
@@ -850,7 +1049,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                   showLabel={false}
                 />
               </div>
-            ) : (
+            ) : mode !== 'MULTI_FRAME' ? (
               <>
                 <div className="rounded-lg border border-slate-200 bg-white p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -970,7 +1169,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                   </div>
                 </div>
               </>
-            )}
+            ) : null}
 
             <section className="border border-slate-200 bg-white p-4">
               <p className="text-[11px] font-bold text-primary">输入依据</p>
@@ -987,155 +1186,215 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
           </section>
 
           <section className="space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-white p-5">
-              <p className="text-[11px] font-bold text-primary">任务配置</p>
-              <h2 className="mt-1 font-black">{config.label}</h2>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                {config.description}
-              </p>
-              {isReplicateMode && (
-                <div className="mt-5 border-t border-slate-100 pt-5">
-                  <label className="block text-xs font-bold">
-                    用户创意补充
-                    <textarea
-                      value={prompt}
-                      maxLength={500}
-                      onChange={(event) => {
-                        setPrompt(event.target.value);
-                        setStoryboardGenerated(false);
-                      }}
-                      className="mt-1.5 h-20 w-full resize-none rounded-md border border-slate-200 p-2 text-xs font-normal leading-5 outline-none focus:border-primary"
-                      placeholder="补充品牌调性、画面禁忌或其他创意要求；镜头、动作和节奏默认严格跟随源视频"
-                    />
-                  </label>
-                  <p className="mt-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] leading-5 text-blue-700">
-                    {config.label}直接以源视频作为唯一分镜与节奏依据，不额外生成或覆盖分镜。
-                  </p>
+            {isMultiFrameMode ? (
+              <>
+                <div className="rounded-lg border border-slate-200 bg-white px-5 py-4">
+                  <p className="text-[11px] font-bold text-primary">智能多帧</p>
+                  <h2 className="mt-1 text-sm font-black">首帧 + N 段关键帧，按时间轴推进</h2>
                 </div>
-              )}
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-white p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-bold text-primary">内容</p>
-                  <h2 className="mt-1 font-black">本次视频 Prompt</h2>
-                  <p className="mt-2 text-[11px] text-slate-400">
-                    先确认本次视频表达；生成后才按时长拆分为可编辑分镜。
-                  </p>
-                </div>
-                {mode === 'FIRST_FRAME' && (
-                  <span className="flex h-9 items-center rounded border border-slate-200 bg-white px-2 text-xs text-slate-700">
-                    {duration} 秒
-                  </span>
-                )}
-              </div>
-              <label className="mt-4 block text-xs font-bold">
-                最终 Prompt
-                <textarea
-                  value={effectivePrompt}
-                  maxLength={mode === 'FIRST_FRAME' ? 5000 : 2000}
-                  onChange={(event) => {
-                    if (isReplicateMode) {
-                      setManualTrendingPrompt(event.target.value);
+                <MultiFrameTimeline
+                  startFrame={multiFrameStart}
+                  segments={multiFrameSegments}
+                  onChooseAsset={(segmentId) => {
+                    if (!segmentId) {
+                      openPicker('FIRST_FRAME', 'IMAGE');
                     } else {
-                      setPrompt(event.target.value);
+                      openPicker('KEY_FRAME', 'IMAGE', 'UPLOAD', segmentId);
                     }
-                    setStoryboardGenerated(false);
                   }}
-                  className="mt-1.5 h-64 w-full resize-y rounded-md border border-slate-200 p-3 text-xs font-normal leading-5 outline-none focus:border-primary"
-                  placeholder="描述商品、动作、场景和镜头目标"
+                  onUpdateSegment={(id, patch) => {
+                    setMultiFrameSegments((previous) =>
+                      previous.map((segment) =>
+                        segment.id === id
+                          ? {
+                              ...segment,
+                              ...patch,
+                              duration: patch.duration !== undefined
+                                && !isDurationInBounds(patch.duration)
+                                ? segment.duration
+                                : patch.duration ?? segment.duration,
+                            }
+                          : segment,
+                      ),
+                    );
+                  }}
+                  onMoveSegment={(from, to) =>
+                    setMultiFrameSegments((previous) =>
+                      moveMultiFrameSegment(previous, from, to),
+                    )
+                  }
+                  onRemoveSegment={(id) => {
+                    setMultiFrameSegments((previous) =>
+                      previous.length <= 2
+                        ? previous
+                        : previous.filter((segment) => segment.id !== id),
+                    );
+                  }}
+                  onAddSegment={() => {
+                    setMultiFrameSegments((previous) => {
+                      if (previous.length >= 9) return previous;
+                      if (previous.some((seg) => !isDurationInBounds(seg.duration))) {
+                        toast.warning('请先修正时长越界的段，再新增关键帧');
+                        return previous;
+                      }
+                      return [...previous, createMultiFrameSegment()];
+                    });
+                  }}
                 />
-                {isReplicateMode && (
-                  <div className="mt-1 flex items-center justify-between gap-3">
-                    <span className="text-[10px] font-normal text-slate-400">
-                      {manualTrendingPrompt !== null
-                        ? '已手动编辑，素材或槽位变化不会覆盖当前内容'
-                        : '已根据商品主图、素材用途和用户创意补充自动计算'}
-                      （{effectivePrompt.length}/2000）
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setManualTrendingPrompt(null);
-                        setStoryboardGenerated(false);
-                      }}
-                      className="shrink-0 rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-primary hover:text-primary"
-                    >
-                      根据表单计算
-                    </button>
-                  </div>
-                )}
-              </label>
-              {mode === 'FIRST_FRAME' && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[10px] text-slate-400">
-                  {storyboardGenerated
-                    ? `已生成 ${shots.length} 个可编辑分镜`
-                    : '生成提示词后，系统将按时长拆分分镜。'}
-                </p>
-                <button
-                  type="button"
-                  onClick={generateStoryboard}
-                  className="flex h-8 items-center gap-1.5 rounded-md border border-primary bg-white px-3 text-[11px] font-bold text-primary"
-                >
-                  <span className="material-symbols-outlined text-base">
-                    auto_fix_high
-                  </span>
-                  {storyboardGenerated ? '重新生成提示词' : '生成提示词'}
-                </button>
-              </div>
-              )}
-              {storyboardGenerated && (
-                <details open className="mt-4 border border-slate-200">
-                  <summary className="cursor-pointer bg-slate-50 px-3 py-2 text-xs font-black">
-                    分镜提示词 · {shots.length} 镜
-                  </summary>
-                  <div className="space-y-3 p-3">
-                    {shots.map((shot, index) => (
-                      <label key={index} className="block text-xs font-bold">
-                        分镜 {index + 1}
+              </>
+            ) : (
+              <>
+                <div className="rounded-lg border border-slate-200 bg-white p-5">
+                  <p className="text-[11px] font-bold text-primary">任务配置</p>
+                  <h2 className="mt-1 font-black">{config.label}</h2>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    {config.description}
+                  </p>
+                  {isReplicateMode && (
+                    <div className="mt-5 border-t border-slate-100 pt-5">
+                      <label className="block text-xs font-bold">
+                        用户创意补充
                         <textarea
-                          value={shot}
-                          onChange={(event) =>
-                            setShots((previous) =>
-                              previous.map((item, itemIndex) =>
-                                itemIndex === index
-                                  ? event.target.value
-                                  : item,
-                              ),
-                            )
-                          }
+                          value={prompt}
+                          maxLength={500}
+                          onChange={(event) => {
+                            setPrompt(event.target.value);
+                            setStoryboardGenerated(false);
+                          }}
                           className="mt-1.5 h-20 w-full resize-none rounded-md border border-slate-200 p-2 text-xs font-normal leading-5 outline-none focus:border-primary"
+                          placeholder="补充品牌调性、画面禁忌或其他创意要求；镜头、动作和节奏默认严格跟随源视频"
                         />
                       </label>
-                    ))}
+                      <p className="mt-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] leading-5 text-blue-700">
+                        {config.label}直接以源视频作为唯一分镜与节奏依据，不额外生成或覆盖分镜。
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-white p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold text-primary">内容</p>
+                        <h2 className="mt-1 font-black">本次视频 Prompt</h2>
+                        <p className="mt-2 text-[11px] text-slate-400">
+                          先确认本次视频表达；生成后才按时长拆分为可编辑分镜。
+                        </p>
+                      </div>
+                      {mode === 'FIRST_FRAME' && (
+                        <span className="flex h-9 items-center rounded border border-slate-200 bg-white px-2 text-xs text-slate-700">
+                          {duration} 秒
+                        </span>
+                      )}
+                    </div>
+                    <label className="mt-4 block text-xs font-bold">
+                      最终 Prompt
+                      <textarea
+                        value={effectivePrompt}
+                        maxLength={mode === 'FIRST_FRAME' ? 5000 : 2000}
+                        onChange={(event) => {
+                          if (isReplicateMode) {
+                            setManualTrendingPrompt(event.target.value);
+                          } else {
+                            setPrompt(event.target.value);
+                          }
+                          setStoryboardGenerated(false);
+                        }}
+                        className="mt-1.5 h-64 w-full resize-y rounded-md border border-slate-200 p-3 text-xs font-normal leading-5 outline-none focus:border-primary"
+                        placeholder="描述商品、动作、场景和镜头目标"
+                      />
+                      {isReplicateMode && (
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                          <span className="text-[10px] font-normal text-slate-400">
+                            {manualTrendingPrompt !== null
+                              ? '已手动编辑，素材或槽位变化不会覆盖当前内容'
+                              : '已根据商品主图、素材用途和用户创意补充自动计算'}
+                            （{effectivePrompt.length}/2000）
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setManualTrendingPrompt(null);
+                              setStoryboardGenerated(false);
+                            }}
+                            className="shrink-0 rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-primary hover:text-primary"
+                          >
+                            根据表单计算
+                          </button>
+                        </div>
+                      )}
+                    </label>
+                    {mode === 'FIRST_FRAME' && (
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[10px] text-slate-400">
+                        {storyboardGenerated
+                          ? `已生成 ${shots.length} 个可编辑分镜`
+                          : '生成提示词后，系统将按时长拆分分镜。'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={generateStoryboard}
+                        className="flex h-8 items-center gap-1.5 rounded-md border border-primary bg-white px-3 text-[11px] font-bold text-primary"
+                      >
+                        <span className="material-symbols-outlined text-base">
+                          auto_fix_high
+                        </span>
+                        {storyboardGenerated ? '重新生成提示词' : '生成提示词'}
+                      </button>
+                    </div>
+                    )}
+                    {storyboardGenerated && (
+                      <details open className="mt-4 border border-slate-200">
+                        <summary className="cursor-pointer bg-slate-50 px-3 py-2 text-xs font-black">
+                          分镜提示词 · {shots.length} 镜
+                        </summary>
+                        <div className="space-y-3 p-3">
+                          {shots.map((shot, index) => (
+                            <label key={index} className="block text-xs font-bold">
+                              分镜 {index + 1}
+                              <textarea
+                                value={shot}
+                                onChange={(event) =>
+                                  setShots((previous) =>
+                                    previous.map((item, itemIndex) =>
+                                      itemIndex === index
+                                        ? event.target.value
+                                        : item,
+                                    ),
+                                  )
+                                }
+                                className="mt-1.5 h-20 w-full resize-none rounded-md border border-slate-200 p-2 text-xs font-normal leading-5 outline-none focus:border-primary"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    <label className="mt-3 block text-xs font-bold">
+                      负面约束
+                      <input
+                        value={negativePrompt}
+                        onChange={(event) => setNegativePrompt(event.target.value)}
+                        className="mt-1.5 h-9 w-full rounded-md border border-slate-200 px-2 text-xs font-normal outline-none focus:border-primary"
+                      />
+                    </label>
+                    <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                      {/* AI 助手建议按钮暂时隐藏，后续按需解除注释。
+                      <button
+                        type="button"
+                        onClick={applyAiSuggestion}
+                        className="h-8 rounded border border-primary px-3 text-xs font-bold text-primary"
+                      >
+                        AI 助手建议
+                      </button>
+                      */}
+                      <span className="text-[10px] text-slate-400">
+                        内容将在最终提交时统一校验
+                      </span>
+                    </div>
                   </div>
-                </details>
-              )}
-              <label className="mt-3 block text-xs font-bold">
-                负面约束
-                <input
-                  value={negativePrompt}
-                  onChange={(event) => setNegativePrompt(event.target.value)}
-                  className="mt-1.5 h-9 w-full rounded-md border border-slate-200 px-2 text-xs font-normal outline-none focus:border-primary"
-                />
-              </label>
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                {/* AI 助手建议按钮暂时隐藏，后续按需解除注释。
-                <button
-                  type="button"
-                  onClick={applyAiSuggestion}
-                  className="h-8 rounded border border-primary px-3 text-xs font-bold text-primary"
-                >
-                  AI 助手建议
-                </button>
-                */}
-                <span className="text-[10px] text-slate-400">
-                  内容将在最终提交时统一校验
-                </span>
-              </div>
-            </div>
+              </>
+            )}
           </section>
 
           <aside className="space-y-4">
@@ -1169,14 +1428,23 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                   showAspectRatio={false}
                   showPromptEditor={false}
                   showNegativePrompt={false}
-                  showModelSelector={mode === 'FIRST_FRAME'}
+                  showModelSelector={mode === 'FIRST_FRAME' || mode === 'MULTI_FRAME'}
                   showCapabilitySummary={false}
                   showCount={false}
                   presentation="videoDemo"
                 />
               </div>
               <div className="mt-4 rounded bg-slate-50 p-3 text-xs leading-6">
-                {mode === 'FIRST_FRAME' ? (
+                {isMultiFrameMode ? (
+                  <>
+                    <p>首帧 + {MULTI_FRAME_DURATION_MIN}~9 段关键帧，按时间轴顺序推进</p>
+                    <p>单段时长可选 {MULTI_FRAME_DURATION_MIN}~{MULTI_FRAME_DURATION_MAX} 秒，可复用同一素材</p>
+                    <p>仅支持 viduq2-turbo / viduq2-pro 模型</p>
+                    <p className="text-amber-700">
+                      通道默认若为 viduq3-turbo，请手动切换到 Q2 模型
+                    </p>
+                  </>
+                ) : mode === 'FIRST_FRAME' ? (
                   <>
                     <p>输出比例由首帧图片决定</p>
                     <p>时长与分辨率以当前 Vidu 模型能力为准</p>
@@ -1242,7 +1510,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
           assetKind={picker.assetKind}
           initialSource={picker.source}
           multiSelect={picker.role === 'REPLACEMENT_REFERENCE'}
-          targetSlot={picker.role}
+          targetSlot={picker.role === 'KEY_FRAME'
+            ? `key-frame-${picker.segmentId ?? ''}`
+            : picker.role}
           onClose={() => setPicker(null)}
           onConfirmSelection={confirmAssets}
         />

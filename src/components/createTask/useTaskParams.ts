@@ -19,6 +19,8 @@ import type { ModelChannelDTO } from '../../types';
 import { useTemplateRecommend } from '../../api/hooks/useTemplateRecommend';
 import { useCapabilityMatrixStore } from '../../stores/capabilityMatrix';
 
+export const MULTIFRAME_ALLOWED_MODELS = ['viduq2-turbo', 'viduq2-pro'] as const;
+
 export type TaskParamSelectionSource = ExecutionRouteSource | 'NONE';
 
 export interface PrefillState {
@@ -228,12 +230,17 @@ export function useTaskParams(
     [models, group],
   );
   const defaultModelCode = modelsInGroup[0]?.model?.trim() || null;
+  const isMultiframeCapability = capability === 'MULTIFRAME';
   const modelOptionsInGroup = useMemo(() => {
     const catalog = matrix?.channels.find((item) => item.channelType === channelType)
       ?.modelOptions?.[group] ?? [];
-    return [...new Set(catalog.map((value) => value.trim()).filter(Boolean))]
+    const deduped = [...new Set(catalog.map((value) => value.trim()).filter(Boolean))]
       .filter((value) => value !== defaultModelCode);
-  }, [channelType, defaultModelCode, group, matrix]);
+    return isMultiframeCapability
+      ? deduped.filter((value) =>
+        (MULTIFRAME_ALLOWED_MODELS as readonly string[]).includes(value))
+      : deduped;
+  }, [channelType, defaultModelCode, group, matrix, isMultiframeCapability, MULTIFRAME_ALLOWED_MODELS]);
   const effectiveModelCode = modelId ?? defaultModelCode;
 
   const paramsFingerprint = useMemo(

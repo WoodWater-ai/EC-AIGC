@@ -762,7 +762,7 @@ export interface VideoTaskSubmitPayload {
   channelInstanceId: string;
   capability: string;
   channelType: string;
-  videoMode: 'FIRST_FRAME' | 'TRENDING_REPLICATE' | 'ECOMMERCE_REPLICATE';
+  videoMode: 'FIRST_FRAME' | 'TRENDING_REPLICATE' | 'ECOMMERCE_REPLICATE' | 'MULTI_FRAME';
   modelCode?: string | null;
   executionSelectionSource?: string;
   taskParamsJson: string;
@@ -775,11 +775,24 @@ export interface VideoTaskSubmitPayload {
       | 'FIRST_FRAME'
       | 'SOURCE_VIDEO'
       | 'PRODUCT_REFERENCE'
-      | 'REPLACEMENT_REFERENCE';
+      | 'REPLACEMENT_REFERENCE'
+      | 'KEY_FRAME';
     sortOrder: number;
     originalUrl?: string;
     thumbnailUrl?: string;
     name?: string;
+  }>;
+  /**
+   * 多帧时间轴段配置(仅 MULTI_FRAME 模式使用)。
+   * - 与 assets 中 KEY_FRAME 行按 sortOrder 一一对应
+   * - 允许同一 keyFrameAssetId 在不同段重复出现
+   * - sortOrder 与 assets.sortOrder 对齐(0-based)
+   */
+  multiFrameSegments?: Array<{
+    keyFrameAssetId: string;
+    prompt?: string;
+    duration?: number;
+    sortOrder: number;
   }>;
   templateId?: string;
   templateVersionId?: string;
