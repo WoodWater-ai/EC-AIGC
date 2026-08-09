@@ -8,7 +8,6 @@ import { AssetImage } from './AssetImage';
 import { withCosThumbnail } from '../utils/cosImage';
 import { productCategoryApi, type ProductCategoryNode } from '../api/modules/productCategory';
 import { useConfirm } from './common/ConfirmProvider';
-import { OutfitComposePanel, type AppliedCompositeAsset } from './common/OutfitComposePanel';
 
 /**
  * 产品图片选择状态(取自 AssetResourceItem 关键字段,够前端预览 + 提交用)
@@ -84,12 +83,9 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
   // AI 分析相关
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiSnapshot, setAiSnapshot] = useState<{
-    name: string;
-    sellingPoints: string;
     color: string;
     patternMaterial: string;
     silhouetteStructure: string;
-    category: string;
   } | null>(null);
 
   // 初始化 + 打开时回填
@@ -253,16 +249,6 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
     setImageRef(null);
   }
 
-  /** 合成套图上传成功后，直接作为当前产品图片回填。 */
-  function handleCompositeApplied(asset: AppliedCompositeAsset) {
-    setImageRef({
-      id: asset.fileResourceId,
-      thumbnailUrl: asset.thumbnailUrl,
-      originalUrl: asset.originalUrl,
-      name: asset.name,
-    });
-  }
-
   function toggleCategory(id: string, categoryName: string) {
     setSelectedCategories((prev) => {
       const idx = prev.findIndex((c) => c.id === id);
@@ -302,14 +288,11 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
       toast.error('请先选择产品图片');
       return;
     }
-    // 快照当前 6 字段(下一次分析会刷新快照)
+    // 图片理解只更新 SKU 创作参数，不覆盖 SPU 名称、卖点或分类事实。
     setAiSnapshot({
-      name,
-      sellingPoints,
       color,
       patternMaterial,
       silhouetteStructure,
-      category,
     });
     setAiAnalyzing(true);
     try {
@@ -325,23 +308,16 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
   }
 
   function applyAiResult(r: ProductAiAnalyzeResponse) {
-    if (r.name !== undefined) setName(r.name ?? '');
-    if (r.sellingPoints !== undefined) setSellingPoints(r.sellingPoints ?? '');
     if (r.color !== undefined) setColor(r.color ?? '');
     if (r.patternMaterial !== undefined) setPatternMaterial(r.patternMaterial ?? '');
     if (r.silhouetteStructure !== undefined) setSilhouetteStructure(r.silhouetteStructure ?? '');
-    if (r.category !== undefined) setCategory(r.category ?? '');
-    // fabricTexture / keyDetails / unchangeable 暂不消费
   }
 
   function restoreSnapshot() {
     if (!aiSnapshot) return;
-    setName(aiSnapshot.name);
-    setSellingPoints(aiSnapshot.sellingPoints);
     setColor(aiSnapshot.color);
     setPatternMaterial(aiSnapshot.patternMaterial);
     setSilhouetteStructure(aiSnapshot.silhouetteStructure);
-    setCategory(aiSnapshot.category);
     setAiSnapshot(null);
   }
 
@@ -504,13 +480,6 @@ export default function ProductFormDrawer({ open, initial, onClose, onSaved }: P
               从资源库中选择已上传的图片;后端会校验资源并自动转换 URL 存储。
             </p>
           </div>
-
-          {/* 上下装合成套图：合成并上传成功后直接回填为产品图片 */}
-          <OutfitComposePanel
-            productId={initial?.id}
-            onApplied={handleCompositeApplied}
-            defaultCollapsed
-          />
 
           {/* 名称 */}
           <div>

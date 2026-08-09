@@ -20,7 +20,7 @@ export interface ImageContentSectionProps {
   typeSelector: React.ReactNode;
   tagSelector: React.ReactNode;
   templateSelector: React.ReactNode;
-  advancedSettings: React.ReactNode;
+  executionSettings: React.ReactNode;
 }
 
 export const ImageContentSection: React.FC<ImageContentSectionProps> = (props) => {
@@ -28,7 +28,7 @@ export const ImageContentSection: React.FC<ImageContentSectionProps> = (props) =
     isProductBound, assistantState, onAssistantClick,
     selectedTypes, typeCounts, defaultPrompts, promptOverrides, templateName,
     promptsComplete: _promptsComplete, onChangePromptOverride, onRegenerateAll, onAiOptimizeSelected,
-    typeSelector, tagSelector, templateSelector, advancedSettings,
+    typeSelector, tagSelector, templateSelector, executionSettings,
   } = props;
 
   return (
@@ -70,16 +70,6 @@ export const ImageContentSection: React.FC<ImageContentSectionProps> = (props) =
 
       <div className="mt-3">{typeSelector}</div>
 
-      <div className="mt-3 border-y border-slate-100 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {tagSelector}
-          {templateSelector}
-        </div>
-        <p className="mt-2 text-[10px] text-slate-400">
-          风格、场景与姿势来自系统字典，调整后会参与各类型 Prompt 生成。
-        </p>
-      </div>
-
       <PerTypePromptEditor
         selectedTypes={selectedTypes}
         typeCounts={typeCounts}
@@ -92,9 +82,16 @@ export const ImageContentSection: React.FC<ImageContentSectionProps> = (props) =
         onAiOptimizeSelected={onAiOptimizeSelected}
       />
       <p className="mt-2 text-[10px] leading-4 text-slate-400">
-        图片类型支持多选，所有已选类型的 Prompt 会依次显示；点击生成时统一校验 Prompt 与执行参数。
+        参考图标签会自动写入 Prompt，并锁定下方重复枚举。
       </p>
-      <div className="mt-3 border-t border-slate-100 pt-3">{advancedSettings}</div>
+      <div className="mt-3 border-t border-slate-100 pt-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[10px] font-bold text-slate-500">创作标签与输出参数</p>
+          {templateSelector}
+        </div>
+        {tagSelector}
+        <div className="mt-3">{executionSettings}</div>
+      </div>
     </div>
   );
 };

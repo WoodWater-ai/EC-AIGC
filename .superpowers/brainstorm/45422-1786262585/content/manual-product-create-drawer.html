@@ -1,0 +1,64 @@
+<h2>手动新建产品：一次创建 SPU + 至少 1 个 SKU</h2>
+<p class="subtitle">来源自动标记为“手动创建”。SPU 维护共享事实，SKU 维护规格和素材；首个 SKU 图片自动成为 SPU 封面。</p>
+
+<div class="mockup">
+  <div class="mockup-header">产品管理 · 新建产品</div>
+  <div class="mockup-body" style="padding:0;background:#eef2f6;min-height:760px;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0 64% 0 0;background:#f8fafc;opacity:.65"></div>
+    <div style="position:relative;margin-left:auto;width:min(720px,80%);min-width:650px;min-height:760px;background:white;border-left:1px solid #dbe2ea;box-shadow:-14px 0 32px rgba(15,23,42,.12);display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid #e2e8f0">
+        <div style="flex:1"><strong style="font-size:15px">新建产品</strong><span style="margin-left:8px;font-size:9px;padding:3px 6px;border-radius:3px;background:#f5f3ff;color:#7c3aed;font-weight:700">手动创建</span><div style="font-size:9px;color:#64748b;margin-top:4px">保存后生成 1 个 SPU 和对应 SKU，至少需要 1 个有效 SKU</div></div>
+        <button style="width:30px;height:30px;border:0;background:transparent;color:#64748b;font-size:18px">×</button>
+      </div>
+
+      <div style="padding:16px 18px;overflow:auto;flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="width:22px;height:22px;border-radius:4px;background:#111827;color:white;display:grid;place-items:center;font-size:10px;font-weight:800">1</span><strong style="font-size:12px">SPU 共享信息</strong><span style="font-size:9px;color:#94a3b8">所有 SKU 共用</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px 12px;font-size:9px">
+          <label style="grid-column:span 2"><b>商品名称 *</b><input class="mock-input" style="width:100%;margin-top:5px;box-sizing:border-box" value="法式方领连衣裙"></label>
+          <label><b>SPU 编码</b><input class="mock-input" style="width:100%;margin-top:5px;box-sizing:border-box" value="MAN-00032"></label>
+          <label><b>品牌</b><input class="mock-input" style="width:100%;margin-top:5px;box-sizing:border-box" placeholder="选填"></label>
+          <label><b>商品分类 *</b><div style="margin-top:5px;border:1px solid #dbe2ea;border-radius:5px;padding:8px;background:white">女装 / 连衣裙⌄</div></label>
+          <label><b>上下架状态</b><div style="margin-top:5px;border:1px solid #dbe2ea;border-radius:5px;padding:8px;background:white">上架⌄</div></label>
+          <label style="grid-column:span 2"><b>核心卖点</b><div style="height:50px;margin-top:5px;border:1px solid #dbe2ea;border-radius:5px;padding:8px;color:#64748b">方领修饰肩颈，轻盈垂顺，通勤与约会场景均适用</div></label>
+        </div>
+
+        <div style="height:1px;background:#e2e8f0;margin:18px 0"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="width:22px;height:22px;border-radius:4px;background:#111827;color:white;display:grid;place-items:center;font-size:10px;font-weight:800">2</span><strong style="font-size:12px">SKU 与创作素材</strong><span style="font-size:9px;color:#94a3b8">首个 SKU 图片作为 SPU 封面</span><button style="margin-left:auto;border:1px solid #dbe2ea;background:white;border-radius:5px;padding:6px 9px;font-size:9px;font-weight:700">＋ 添加 SKU</button></div>
+
+        <div style="border:1px solid #bfdbfe;border-radius:6px;overflow:hidden;background:#fbfdff">
+          <div style="display:flex;align-items:center;padding:9px 11px;background:#eff6ff;border-bottom:1px solid #dbeafe;font-size:10px"><b>SKU 1 · 酒红 / S</b><span style="margin-left:7px;color:#2563eb;font-size:8px;font-weight:700">SPU 封面</span><span style="margin-left:auto;color:#64748b">收起⌃</span></div>
+          <div style="padding:11px;display:grid;grid-template-columns:145px 1fr;gap:13px">
+            <div>
+              <b style="font-size:9px">SKU 图片 *</b>
+              <div style="height:144px;margin-top:5px;border:1px dashed #fda4af;border-radius:6px;background:#fff1f2;display:flex;align-items:center;justify-content:center"><div style="width:78px;height:116px;background:#fecdd3;border-radius:5px"></div></div>
+              <button style="width:100%;margin-top:6px;border:1px solid #dbe2ea;background:white;border-radius:4px;padding:6px;font-size:9px">AI 图片理解</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px 10px;font-size:9px">
+              <label><b>SKU 名称 *</b><input class="mock-input" style="width:100%;margin-top:4px;box-sizing:border-box" value="酒红 · S"></label>
+              <label><b>SKU 编码 *</b><input class="mock-input" style="width:100%;margin-top:4px;box-sizing:border-box" value="MAN32-WR-S"></label>
+              <label><b>颜色 / 款式</b><input class="mock-input" style="width:100%;margin-top:4px;box-sizing:border-box" value="酒红"></label>
+              <label><b>尺码 / 规格</b><input class="mock-input" style="width:100%;margin-top:4px;box-sizing:border-box" value="S"></label>
+              <label><b>图案 / 材质</b><input class="mock-input" style="width:100%;margin-top:4px;box-sizing:border-box" value="纯色 · 醋酸混纺"></label>
+              <label><b>版型 / 结构</b><input class="mock-input" style="width:100%;margin-top:4px;box-sizing:border-box" value="收腰 A 字裙"></label>
+              <label style="grid-column:span 2"><b>关键细节 / 不可改变项</b><input class="mock-input" style="width:100%;margin-top:4px;box-sizing:border-box" value="方领、腰线、袖口褶皱必须保持"></label>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:9px;border:1px solid #dbe2ea;border-radius:6px;background:white;padding:10px 11px;display:flex;align-items:center;font-size:10px"><span style="width:24px;height:24px;border-radius:4px;background:#fee2e2;margin-right:8px"></span><b>SKU 2 · 米白 / M</b><span style="margin-left:8px;color:#64748b">MAN32-WH-M</span><span style="margin-left:auto;color:#64748b">展开⌄</span></div>
+
+        <div style="margin-top:14px;padding:10px 11px;border-radius:5px;background:#f8fafc;border:1px solid #e2e8f0;font-size:9px;color:#64748b"><b style="color:#334155">规则：</b>不提供上下装或鞋履组合；组合创作统一在资源中心发起。删除 SKU 后仍必须至少保留 1 个。</div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid #e2e8f0;background:white">
+        <span style="font-size:9px;color:#64748b">已填写 2 个 SKU · 必填项完整</span>
+        <div style="display:flex;gap:8px"><button style="height:32px;padding:0 13px;border:1px solid #dbe2ea;background:white;border-radius:5px;font-size:10px">取消</button><button style="height:32px;padding:0 14px;border:0;background:#111827;color:white;border-radius:5px;font-size:10px;font-weight:700">保存产品</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:18px">
+  <div class="option" data-choice="approve-create" onclick="toggleSelect(this)"><div class="letter">✓</div><div class="content"><h3>确认手动新建结构</h3><p>SPU 共享信息 + 可增减 SKU；至少一个 SKU；首个 SKU 图自动作为封面；组合入口移至资源中心。</p></div></div>
+  <div class="option" data-choice="revise-create" onclick="toggleSelect(this)"><div class="letter">↺</div><div class="content"><h3>需要调整</h3><p>点击后请在对话里说明要增加、删除或重新归属的字段。</p></div></div>
+</div>

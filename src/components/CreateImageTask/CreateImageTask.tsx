@@ -17,10 +17,10 @@ import { ReferenceGrid } from './left/ReferenceGrid';
 import { ImageTypeSelector } from './center/ImageTypeSelector';
 import { TemplatePicker } from './center/TemplatePicker';
 import { StyleScenePoseRow } from './center/StyleScenePoseRow';
-import { AdvancedSettings } from './center/AdvancedSettings';
 import { ImageContentSection } from './center/ImageContentSection';
 import { ProductFactsEditor } from './center/ProductFactsEditor';
 import { ImageSettingsSection, type TaskParamsSnapshot } from './right/ImageSettingsSection';
+import { ImageResultPanel } from './right/ImageResultPanel';
 import { ConflictDialog } from './dialogs/ConflictDialog';
 import { TemplateOverwriteDialog } from './dialogs/TemplateOverwriteDialog';
 import { ExecutionConfirmDialog } from './dialogs/ExecutionConfirmDialog';
@@ -34,6 +34,16 @@ import { creationTemplateApi } from '../../api/modules/creationTemplate';
 import { useServiceQuery } from '../../api/hooks/useServiceQuery';
 import type { PrefillState } from '../createTask/useTaskParams';
 import type { AssistantTaskPrefill } from '../../api/modules/assistant';
+import {
+  CANONICAL_STYLES,
+  getCanonicalStyleOptions,
+  getLinkedPoseOptions,
+  getLinkedSceneOptions,
+  groupReferenceSlots,
+  optionCodeFromValue,
+  sameReferenceAsset,
+  type TaggedReference,
+} from '../../lib/createImageTask/imageCreationUi';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
@@ -142,6 +152,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
 
   // ---- local form state ----
   const [productFacts, setProductFacts] = useState<ProductFactsInput>(EMPTY_PRODUCT_FACTS);
+  const [seoName, setSeoName] = useState('');
   const [mainValue, setMainValue] = useState<{
     /** asset_resource.id(后端 aiAnalyze + 提交 assetId 用)—— 雪花 ID 必须 string 避免 JS 精度丢失 */
     id?: string;
@@ -170,9 +181,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   // 之前写死 channel-1 / gpt-image-1 已被替换,父组件不再自己调 useTaskParams(避免两份独立 state)。
 
   // 风格 / 场景 / 姿势 字典(从后端 dict 实时拉取,后端 categoryCode 由 dafenqi-ai 字典管理配置)
-  const { options: styleOptions, loading: loadingStyle } = useDictOptions('STYLE');
-  const { options: sceneOptions, loading: loadingScene } = useDictOptions('SCENE');
-  const { options: poseOptions,  loading: loadingPose  } = useDictOptions('POSTURE');
+  const { options: styleDictOptions, loading: loadingStyle } = useDictOptions('STYLE');
+  const { options: sceneDictOptions, loading: loadingScene } = useDictOptions('SCENE');
+  const { options: poseDictOptions,  loading: loadingPose  } = useDictOptions('POSTURE');
 
   const [paramsSnapshot, setParamsSnapshot] = useState<TaskParamsSnapshot>({
     channelId: null,
@@ -220,6 +231,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     sourceCreationTemplateId: creationPrefill?.templateId ?? null,
     sourceCreationTemplateVersionId: creationPrefill?.versionId ?? null,
     executionParamsReady: paramsSnapshot.executionParamsReady,
+    promptProductName: seoName,
     templateName: creationPrefill?.templateName ?? '默认模板',
     toSubmit: async () => '',
     onAddTask,
@@ -247,6 +259,54 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   } = state;
   const appliedCreationTemplateRef = useRef<string | null>(null);
   const appliedAssistantPrefillRef = useRef<string | null>(null);
+
+  const styleOptions = useMemo(
+    () => getCanonicalStyleOptions(styleDictOptions),
+    [styleDictOptions],
+  );
+  const selectedStyleCode = optionCodeFromValue(styleOptions, style);
+  const sceneOptions = useMemo(
+    () => getLinkedSceneOptions(selectedStyleCode, sceneDictOptions),
+    [sceneDictOptions, selectedStyleCode],
+  );
+  const poseOptions = useMemo(
+    () => getLinkedPoseOptions(selectedStyleCode, poseDictOptions),
+    [poseDictOptions, selectedStyleCode],
+  );
+  const groupedReferences = useMemo(
+    () => groupReferenceSlots(state.orderedRefs),
+    [state.orderedRefs],
+  );
+  const lockedByReference = useMemo(() => {
+    const result: Partial<Record<'style' | 'scene' | 'pose', string>> = {};
+    (['style', 'scene', 'pose'] as const).forEach((role) => {
+      const index = groupedReferences.findIndex((reference) => reference.roles.includes(role));
+      if (index >= 0) result[role] = `参考图 ${index + 1}`;
+    });
+    return result;
+  }, [groupedReferences]);
+
+  const handleStyleChange = useCallback((value: string) => {
+    setStyle(value);
+    const styleCode = optionCodeFromValue(styleOptions, value);
+    const definition = CANONICAL_STYLES.find((item) => item.code === styleCode);
+    if (!definition) return;
+    const nextScenes = getLinkedSceneOptions(styleCode, sceneDictOptions);
+    const nextPoses = getLinkedPoseOptions(styleCode, poseDictOptions);
+    const currentSceneCode = optionCodeFromValue(getLinkedSceneOptions('', sceneDictOptions), scene);
+    const currentPoseCode = optionCodeFromValue(getLinkedPoseOptions('', poseDictOptions), pose);
+    if (!definition.sceneCodes.includes(currentSceneCode)) {
+      setScene(nextScenes.find((item) => item.value === definition.defaultSceneCode)?.label ?? '');
+    }
+    if (!definition.poseCodes.includes(currentPoseCode)) {
+      setPose(nextPoses.find((item) => item.value === definition.defaultPoseCode)?.label ?? '');
+    }
+  }, [pose, poseDictOptions, scene, sceneDictOptions, setPose, setScene, setStyle, styleOptions]);
+
+  useEffect(() => {
+    if (style || lockedByReference.style || styleOptions.length === 0) return;
+    handleStyleChange(styleOptions[0].label);
+  }, [handleStyleChange, lockedByReference.style, style, styleOptions]);
 
   useEffect(() => {
     if (!assistantPrefill || assistantPrefill.targetScreen !== 'CREATE_IMAGE_TASK') return;
@@ -298,6 +358,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     selectedMainResourceIdRef.current = null;
     setTemplate(creationPrefill.templateName);
     setProductFacts(EMPTY_PRODUCT_FACTS);
+    setSeoName('');
     setFormFactsExternal(EMPTY_PRODUCT_FACTS);
     if (snapshot.style) setStyle(snapshot.style);
     if (snapshot.scene) setScene(snapshot.scene);
@@ -364,11 +425,37 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     typeCounts,
   ]);
 
-  // ---- 移除参考图:走 selectReference(slot, undefined) 复用现有重排逻辑 ----
-  const handleRemoveReference = useCallback(
-    (slot: ReferenceSlot) => selectReference(slot, undefined),
-    [selectReference],
-  );
+  const handleReferenceRolesChange = useCallback((
+    reference: TaggedReference,
+    roles: ReferenceSlot[],
+  ) => {
+    REFERENCE_SLOTS_INTERNAL.forEach((slot) => {
+      const current = references[slot];
+      if (sameReferenceAsset(current, reference.ref) && !roles.includes(slot)) {
+        selectReference(slot, undefined);
+      }
+    });
+    roles.forEach((slot) => {
+      selectReference(slot, { ...reference.ref, slot });
+    });
+    if (roles.includes('style')) setStyle('');
+    if (roles.includes('scene')) setScene('');
+    if (roles.includes('pose')) setPose('');
+  }, [references, selectReference, setPose, setScene, setStyle]);
+
+  const handleRemoveReference = useCallback((reference: TaggedReference) => {
+    REFERENCE_SLOTS_INTERNAL.forEach((slot) => {
+      if (sameReferenceAsset(references[slot], reference.ref)) selectReference(slot, undefined);
+    });
+  }, [references, selectReference]);
+
+  const handleProductFactChange = <K extends keyof ProductFactsInput,>(
+    key: K,
+    value: ProductFactsInput[K],
+  ) => {
+    setProductFacts((current) => ({ ...current, [key]: value }));
+    updateProductFact(key, value);
+  };
 
   // ---- AI assistant ----
   const handleAssistantClick = useCallback(() => {
@@ -398,6 +485,11 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         fitStructure: (product.silhouetteStructure ?? '').trim(),
       };
       setProductFacts(nextFacts);
+      setSeoName([
+        product.name,
+        product.color,
+        product.patternMaterial,
+      ].map((value) => value?.trim()).filter(Boolean).join(' '));
       // 关键:也回写到 hook 的 formInput,触发 `prompts` useMemo 重算 → 4 类型 Prompt 自动重写
       setFormFactsExternal(nextFacts);
       const reusablePrompt = creationPrefill?.snapshot.prompt;
@@ -415,6 +507,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const resetProductContext = useCallback(() => {
     setSelectedFromLibrary(null);
     setProductFacts(EMPTY_PRODUCT_FACTS);
+    setSeoName('');
     setFormFactsExternal(EMPTY_PRODUCT_FACTS);
   }, [setFormFactsExternal]);
 
@@ -498,10 +591,22 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
           originalUrl: slotRef.originalUrl,
           name: slotRef.name,
         });
+        if (pendingSlot === 'style') setStyle('');
+        if (pendingSlot === 'scene') setScene('');
+        if (pendingSlot === 'pose') setPose('');
       }
       setPendingSlot(null);
     },
-    [applyMatchedProduct, clearMainSelection, pendingSlot, resetProductContext, selectReference],
+    [
+      applyMatchedProduct,
+      clearMainSelection,
+      pendingSlot,
+      resetProductContext,
+      selectReference,
+      setPose,
+      setScene,
+      setStyle,
+    ],
   );
 
   const handleTransitClose = useCallback(() => {
@@ -529,14 +634,16 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
             />
             <ReferenceGrid
               orderedRefs={state.orderedRefs}
-              onMove={state.moveReference}
               openSlotPicker={openSlotPicker}
+              onRolesChange={handleReferenceRolesChange}
               onRemove={handleRemoveReference}
             />
             <ProductFactsEditor
               value={productFacts}
               isProductBound={isProductBound}
-              onChange={updateProductFact}
+              seoName={seoName}
+              onSeoNameChange={setSeoName}
+              onChange={handleProductFactChange}
             />
           </>
         }
@@ -575,7 +682,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
                   style={style}
                   scene={scene}
                   pose={pose}
-                  onStyleChange={setStyle}
+                  lockedByReference={lockedByReference}
+                  onStyleChange={handleStyleChange}
                   onSceneChange={setScene}
                   onPoseChange={setPose}
                 />
@@ -589,23 +697,22 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
                   />
                 ) : null
               }
-              advancedSettings={
-                <AdvancedSettings
-                  negativePrompt={negativePrompt}
-                  onChange={setNegativePrompt}
+              executionSettings={
+                <ImageSettingsSection
+                  prefill={imageParamsPrefill}
+                  prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
+                  onParamsChange={setParamsSnapshot}
                 />
               }
             />
           </>
         }
         right={
-          <ImageSettingsSection
-            prefill={imageParamsPrefill}
-            prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
-            onParamsChange={setParamsSnapshot}
-            selectedTypesCount={selectedTypes.length}
+          <ImageResultPanel
+            selectedTypes={selectedTypes}
             totalCount={totalCount}
-            onCheckAndGenerate={checkAndGenerate}
+            params={paramsSnapshot}
+            onGenerate={checkAndGenerate}
           />
         }
       />

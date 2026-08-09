@@ -330,7 +330,7 @@ export default function App() {
       case AppScreen.ASYNC_TASKS:
         return <AsyncTaskList />;
       case AppScreen.PRODUCT_MANAGE:
-        return <ProductManagePage />;
+        return <ProductManagePage setScreen={setScreen} />;
       case AppScreen.DICT_CATEGORY:
         return <DictCategoryList />;
       case AppScreen.DICT_ITEM:

@@ -1,200 +1,194 @@
-// src/components/CreateImageTask/left/ReferenceGrid.tsx
-// 左栏-参考图区:5 个固定槽位(细节/风格/场景/姿势/模特)
-// - 徽标 = 槽位视觉序号 1..5
-// - 点击已选 slot → 触发 openSlotPicker 替换图
-// - 点击空槽 → 触发 openSlotPicker 添加新参考图(assignNextOrder 自动分配 slot)
-// - 拖动调整 slot 顺序
-// - 右侧 "+" 卡片点击 = 调 openSlotPicker 添加,但 5 张满了自动隐藏
-import React, { useMemo, useState } from 'react';
-import { REFERENCE_SLOTS_INTERNAL, REFERENCE_SLOT_META } from '../../../lib/createImageTask/referencesConfig';
+import React, { useEffect, useRef, useState } from 'react';
+import { Check, ChevronDown, Plus, X } from 'lucide-react';
 import type { ReferenceSlot } from '../../../lib/createImageTask/extractReferenceInsights';
+import {
+  groupReferenceSlots,
+  type ReferenceAsset,
+  type TaggedReference,
+} from '../../../lib/createImageTask/imageCreationUi';
 
-export interface ReferenceRef {
-  slot: ReferenceSlot;
-  thumbnailUrl?: string;
-  originalUrl?: string;
-  name?: string;
-  analysis?: { promptHint?: string };
+export interface ReferenceRef extends ReferenceAsset {
+  slot?: ReferenceSlot;
 }
 
 export interface ReferenceGridProps {
-  /** 已选参考图的有序数组(按 referenceOrder 升序) */
   orderedRefs: { slot: ReferenceSlot; ref: ReferenceRef }[];
-  /** 拖拽移动 */
-  onMove: (fromSlot: ReferenceSlot, toIndex: number) => void;
-  /** 由父容器注入的 picker 打开回调 */
   openSlotPicker: (slot: ReferenceSlot) => void;
-  /**
-   * 移除已选参考图:卡片底部"移除"按钮触发。
-   * 父容器一般走 selectReference(slot, undefined) 复用现有重排逻辑。
-   * 不传则不渲染移除按钮。
-   */
-  onRemove?: (slot: ReferenceSlot) => void;
+  onRolesChange: (reference: TaggedReference, roles: ReferenceSlot[]) => void;
+  onRemove: (reference: TaggedReference) => void;
 }
 
-export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
-  orderedRefs, onMove, openSlotPicker, onRemove,
-}) => {
-  const [dragSlot, setDragSlot] = useState<ReferenceSlot | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+const ROLE_OPTIONS: Array<{ id: ReferenceSlot; label: string; icon: string }> = [
+  { id: 'model', label: '模特', icon: 'face_3' },
+  { id: 'detail', label: '细节', icon: 'zoom_in' },
+  { id: 'style', label: '风格', icon: 'palette' },
+  { id: 'scene', label: '场景', icon: 'landscape' },
+  { id: 'pose', label: '姿势', icon: 'accessibility_new' },
+];
 
-  /**
-   * 视觉渲染顺序 —— 关键设计:
-   *
-   * 5 个 slot 固定为 detail/style/scene/pose/model(后台标识符永远不变)。
-   * 但视觉上按"已选紧凑 + 空槽尾部"原则渲染:
-   *   - 第 1..N 位 = orderedRefs(已选,按 referenceOrder 升序)
-   *   - 第 N+1..5 位 = REFERENCE_SLOTS 中未选的那些 slot(按原顺序)
-   *
-   * 这样刚选的图自动冒泡到前面空位置。
-   *
-   * 徽标 = 在 orderedRefs 中的 idx + 2(主图固定 1)。
-   */
-  const renderList = useMemo(() => {
-    const used = new Set(orderedRefs.map((r) => r.slot));
-    return [
-      ...orderedRefs.map((r, idx) => ({
-        kind: 'filled' as const,
-        slot: r.slot as ReferenceSlot,
-        ref: r.ref,
-        order: idx + 2,
-      })),
-      ...REFERENCE_SLOTS_INTERNAL
-        .filter((s) => !used.has(s))
-        .map((slot) => ({
-          kind: 'empty' as const,
-          slot,
-          ref: null,
-          order: undefined as number | undefined,
-        })),
-    ];
-  }, [orderedRefs]);
+const roleLabel = (role: ReferenceSlot) =>
+  ROLE_OPTIONS.find((item) => item.id === role)?.label ?? role;
 
-  // 拖到位置 targetIndex(在渲染列表 0..4 中)
-  // hook.onMove 期望"在已选序列中的位置 0..N-1"
-  const handleDrop = (targetIndex: number) => (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const fromSlot = (e.dataTransfer.getData('text/plain') || dragSlot) as ReferenceSlot | null;
-    if (!fromSlot) return;
-    // 计算 targetIndex 在 已选序列 中的目标位置
-    // 先累计"前 N 个渲染项里已选的有几个"
-    let toIndex = 0;
-    for (let i = 0; i < targetIndex; i++) {
-      const cell = renderList[i];
-      if (cell.kind === 'filled') toIndex += 1;
-    }
-    // 若 targetIndex 落在已选卡片上(toIndex = 该卡片位置),或落在空槽
-    // (toIndex = 已选数量,即插入末尾)。两种情况都正确。
-    onMove(fromSlot, toIndex);
-    setDragSlot(null);
-    setDragOverIndex(null);
-  };
+interface RolePickerProps {
+  referenceNumber: number;
+  value: ReferenceSlot[];
+  onChange: (roles: ReferenceSlot[]) => void;
+}
 
-  const handleDragStart = (slot: ReferenceSlot) => (e: React.DragEvent<HTMLDivElement>) => {
-    setDragSlot(slot);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', slot);
-  };
-  const handleDragEnd = () => {
-    setDragSlot(null);
-    setDragOverIndex(null);
-  };
-  const handleDragOver = (targetIndex: number) => (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverIndex !== targetIndex) setDragOverIndex(targetIndex);
+const RolePicker: React.FC<RolePickerProps> = ({ referenceNumber, value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const toggleRole = (role: ReferenceSlot) => {
+    const next = value.includes(role)
+      ? value.filter((item) => item !== role)
+      : [...value, role];
+    if (next.length > 0) onChange(next);
   };
 
   return (
+    <div ref={rootRef} className="relative min-w-0">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={`flex h-7 w-full items-center justify-between gap-1 border px-2 text-[10px] font-bold ${
+          open ? 'border-primary bg-blue-50 text-primary' : 'border-slate-200 bg-white text-slate-600 hover:border-primary/60'
+        }`}
+      >
+        <span className="truncate">{value.map(roleLabel).join('、')}</span>
+        <ChevronDown className={`h-3 w-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          aria-label={`参考图 ${referenceNumber} 标签`}
+          className="absolute left-0 z-40 mt-1 w-36 border border-slate-200 bg-white p-1 shadow-xl"
+        >
+          {ROLE_OPTIONS.map((role) => {
+            const active = value.includes(role.id);
+            return (
+              <button
+                type="button"
+                key={role.id}
+                onClick={() => toggleRole(role.id)}
+                className={`flex h-8 w-full items-center gap-2 px-2 text-left text-[11px] ${
+                  active ? 'bg-orange-50 font-bold text-[#c84d38]' : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span className={`grid h-4 w-4 place-items-center border ${active ? 'border-[#df5b43] bg-[#df5b43] text-white' : 'border-slate-300'}`}>
+                  {active && <Check className="h-3 w-3" strokeWidth={3} />}
+                </span>
+                <span className="material-symbols-outlined text-sm">{role.icon}</span>
+                {role.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
+  orderedRefs,
+  openSlotPicker,
+  onRolesChange,
+  onRemove,
+}) => {
+  const groupedReferences = groupReferenceSlots(orderedRefs);
+  const usedRoles = new Set(groupedReferences.flatMap((reference) => reference.roles));
+  const nextRole = (['model', 'detail', 'style', 'scene', 'pose'] as ReferenceSlot[])
+    .find((role) => !usedRoles.has(role));
+
+  return (
     <div id="reference-grid" className="border border-slate-200 bg-white p-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-xs font-black">参考图</h2>
-        <span className="text-[10px] text-slate-400">自动识别标签 · {orderedRefs.length}/{REFERENCE_SLOTS_INTERNAL.length}</span>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[9px] font-bold text-[#df5b43]">补充依据</p>
+          <h2 className="mt-0.5 text-xs font-black">参考图</h2>
+        </div>
+        <span className="bg-slate-100 px-1.5 py-1 text-[9px] font-bold text-slate-500">
+          {groupedReferences.length} 张
+        </span>
       </div>
 
-      <div className="mt-3 grid grid-cols-5 gap-1.5">
-        {renderList.map((item, index) => {
-          const slotLabel = REFERENCE_SLOT_META[item.slot].label;
-          const showOrder = item.kind === 'filled';
-          return (
-            <div key={item.slot} className="group relative">
-              {dragSlot !== null && dragOverIndex === index && (
-                <div
-                  aria-hidden="true"
-                  className="absolute -left-1 top-0 bottom-0 w-1 rounded-full bg-primary z-10 pointer-events-none"
-                />
-              )}
-
-              {item.kind === 'filled' ? (
-                <div
-                  draggable
-                  onDragStart={handleDragStart(item.slot)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver(index)}
-                  onDrop={handleDrop(index)}
-                  onDragLeave={() => setDragOverIndex(null)}
-                  className={`cursor-grab active:cursor-grabbing ${
-                    dragSlot === item.slot ? 'opacity-50' : ''
-                  }`}
-                  title={`${(item as any).ref?.name ?? ''}(${slotLabel}参考 · 拖动调整)`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => openSlotPicker(item.slot)}
-                    aria-label={`更换${slotLabel}参考`}
-                    className="relative flex aspect-square w-full items-center justify-center overflow-hidden border border-slate-200 bg-white text-left"
-                  >
-                    {(item as any).ref?.thumbnailUrl || (item as any).ref?.originalUrl ? (
-                      <img
-                        src={(item as any).ref.thumbnailUrl ?? (item as any).ref.originalUrl ?? ''}
-                        alt={(item as any).ref.name ?? slotLabel}
-                        className="h-full w-full object-contain"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <span className="material-symbols-outlined text-lg text-slate-400">image</span>
-                    )}
-                    {showOrder && (
-                      <span
-                        aria-hidden="true"
-                        className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white"
-                      >
-                        {(item as any).order}
-                      </span>
-                    )}
-                  </button>
-                </div>
-              ) : (
+      {groupedReferences.length === 0 ? (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {(['model', 'detail'] as ReferenceSlot[]).map((slot) => (
+            <button
+              key={slot}
+              type="button"
+              onClick={() => openSlotPicker(slot)}
+              className="flex aspect-[4/3] flex-col items-center justify-center gap-1 border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-primary hover:text-primary"
+            >
+              <span className="material-symbols-outlined text-xl">
+                {slot === 'model' ? 'face_3' : 'zoom_in'}
+              </span>
+              <span className="text-[10px] font-bold">添加{roleLabel(slot)}参考</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {groupedReferences.map((reference, index) => (
+            <div key={reference.key} className="group min-w-0">
+              <div className="relative aspect-[4/3] overflow-hidden border border-slate-200 bg-slate-50">
+                {reference.ref.thumbnailUrl || reference.ref.originalUrl ? (
+                  <img
+                    src={reference.ref.thumbnailUrl ?? reference.ref.originalUrl}
+                    alt={reference.ref.name ?? `参考图 ${index + 1}`}
+                    className="h-full w-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined grid h-full place-items-center text-slate-400">image</span>
+                )}
+                <span className="absolute left-1 top-1 bg-slate-900/75 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                  参考图 {index + 1}
+                </span>
                 <button
                   type="button"
-                  onClick={() => openSlotPicker(item.slot)}
-                  aria-label={`添加${slotLabel}参考`}
-                  className="flex aspect-square w-full flex-col items-center justify-center border border-dashed border-slate-300 bg-slate-50 text-slate-400 transition-colors hover:border-primary hover:text-primary"
+                  onClick={() => onRemove(reference)}
+                  className="absolute right-1 top-1 grid h-5 w-5 place-items-center bg-slate-900/75 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                  title={`移除参考图 ${index + 1}`}
+                  aria-label={`移除参考图 ${index + 1}`}
                 >
-                  <span className="material-symbols-outlined text-lg">{REFERENCE_SLOT_META[item.slot].icon ?? 'add'}</span>
+                  <X className="h-3 w-3" />
                 </button>
-              )}
-
-              {/* 卡片下方:slot 中文标签(已选/空槽都显示,固定 detail/style/...)。
-                  已选时右侧追加红色「移除」文字按钮,点击走 onRemove 移除该 slot。
-                  stopPropagation 防止冒泡触发卡片本身的换图 picker。 */}
-              <div className="mt-1 flex items-center justify-center text-[10px] font-bold">
-                <span className={`truncate ${item.kind === 'filled' ? 'text-primary' : 'text-slate-500'}`}>{slotLabel}</span>
-                {item.kind === 'filled' && onRemove && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onRemove(item.slot); }}
-                    className="absolute -right-1 -top-1 hidden h-4 w-4 place-items-center rounded-full bg-slate-800 text-[10px] text-white group-hover:grid"
-                    aria-label={`移除${slotLabel}参考`}
-                  >
-                    ×
-                  </button>
-                )}
+              </div>
+              <div className="mt-1.5">
+                <RolePicker
+                  referenceNumber={index + 1}
+                  value={reference.roles}
+                  onChange={(roles) => onRolesChange(reference, roles)}
+                />
               </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+          {nextRole && (
+            <button
+              type="button"
+              onClick={() => openSlotPicker(nextRole)}
+              className="flex aspect-[4/3] min-w-0 flex-col items-center justify-center gap-1 border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-primary hover:text-primary"
+            >
+              <Plus className="h-5 w-5" />
+              <span className="text-[10px] font-bold">添加参考</span>
+            </button>
+          )}
+        </div>
+      )}
+      <p className="mt-2 text-[9px] leading-4 text-slate-400">
+        每张图片可多选模特、细节、风格、场景和姿势标签。
+      </p>
     </div>
   );
 };

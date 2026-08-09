@@ -9,19 +9,22 @@ const TYPE_INSTRUCTIONS: Record<ImageGenerationType, string> = {
   model_triple_view: '相同人物、光线和机位展示正面、侧面、背面；手部不得遮挡商品关键结构。',
 };
 
-const referenceBinding = (slot: ReferenceSlot, imageNo: number): string => {
-  switch (slot) {
-    case 'detail':
-      return `图${imageNo}为细节参考，仅用于锁定重点展示的细节部位和可核验工艺，不得改变图1商品。`;
-    case 'style':
-      return `图${imageNo}为风格参考，仅用于锁定摄影质感、色调和视觉语言，不得改变图1商品。`;
-    case 'scene':
-      return `图${imageNo}为场景参考，仅用于锁定空间、布景和光线，不得改变图1商品。`;
-    case 'pose':
-      return `图${imageNo}为姿势或构图参考，仅用于锁定人物姿态和构图关系，不得改变图1商品。`;
-    case 'model':
-      return `图${imageNo}为模特参考，仅用于锁定人物外貌、体型和发型，不得改变图1商品。`;
-  }
+const referenceBinding = (slots: ReferenceSlot[], imageNo: number): string => {
+  const labels: Record<ReferenceSlot, string> = {
+    detail: '细节',
+    style: '风格',
+    scene: '场景',
+    pose: '姿势或构图',
+    model: '模特',
+  };
+  const scopes: Record<ReferenceSlot, string> = {
+    detail: '重点展示的细节部位和可核验工艺',
+    style: '摄影质感、色调和视觉语言',
+    scene: '空间、布景和光线',
+    pose: '人物姿态和构图关系',
+    model: '人物外貌、体型和发型',
+  };
+  return `图${imageNo}为${slots.map((slot) => labels[slot]).join('、')}参考，仅用于锁定${slots.map((slot) => scopes[slot]).join('、')}，不得改变图1商品。`;
 };
 
 const factsText = (facts: ProductFacts): string => {
@@ -49,11 +52,11 @@ const lockedAttributesText = (facts: ProductFacts): string => {
 
 const visualParam = (
   value: string,
-  referenceSlots: ReferenceSlot[],
+  referenceGroups: ReferenceSlot[][],
   slot: ReferenceSlot,
   fallback: string,
 ): string => {
-  const index = referenceSlots.indexOf(slot);
+  const index = referenceGroups.findIndex((group) => group.includes(slot));
   const reference = index >= 0 ? `图${index + 2}` : '';
   if (value && reference) return `${value}，并以${reference}为参考`;
   return value || (reference ? `以${reference}为参考` : fallback);
@@ -69,14 +72,16 @@ export function buildPromptFromFacts(
   style: string,
   scene: string,
   pose: string,
-  referenceSlots: ReferenceSlot[],
+  referenceBindings: Array<ReferenceSlot | ReferenceSlot[]>,
   userInstruction = '',
 ): string {
   if (!facts.name.trim()) return '';
 
+  const referenceGroups = referenceBindings.map((binding) =>
+    Array.isArray(binding) ? binding : [binding]);
   const bindings = [
     '图1为商品主体，仅用于锁定颜色、图案、材质、版型、结构和可见品牌信息。',
-    ...referenceSlots.map((slot, index) => referenceBinding(slot, index + 2)),
+    ...referenceGroups.map((slots, index) => referenceBinding(slots, index + 2)),
   ];
   const detailFocus = facts.sellingPoints
     || facts.patternAndMaterial
@@ -92,9 +97,9 @@ export function buildPromptFromFacts(
 ${bindings.join('\n')}
 
 【视觉参数】
-摄影风格：${visualParam(style, referenceSlots, 'style', '真实、清晰的电商摄影风格')}。
-场景：${visualParam(scene, referenceSlots, 'scene', type === 'scene_detail' ? '符合商品使用逻辑的低干扰场景' : '简洁低干扰背景')}。
-姿势或构图：${visualParam(pose, referenceSlots, 'pose', type === 'model_triple_view' ? '同一模特正面、侧面、背面三视图' : '商品主体稳定、结构完整')}。
+摄影风格：${visualParam(style, referenceGroups, 'style', '真实、清晰的电商摄影风格')}。
+场景：${visualParam(scene, referenceGroups, 'scene', type === 'scene_detail' ? '符合商品使用逻辑的低干扰场景' : '简洁低干扰背景')}。
+姿势或构图：${visualParam(pose, referenceGroups, 'pose', type === 'model_triple_view' ? '同一模特正面、侧面、背面三视图' : '商品主体稳定、结构完整')}。
 
 【商品事实与保真】
 商品事实：${factsText(facts)}。

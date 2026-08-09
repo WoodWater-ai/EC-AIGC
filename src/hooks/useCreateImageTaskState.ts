@@ -22,6 +22,7 @@ import { buildGenerationTask } from '../lib/createImageTask/buildGenerationTask'
 import { compactReferenceOrder, moveReferenceInOrder, assignNextOrder, REFERENCE_SLOTS } from '../lib/createImageTask/referenceOrder';
 import { taskApi } from '../api/modules/task';
 import { messages } from '../labels/createImageTask';
+import { groupReferenceSlots } from '../lib/createImageTask/imageCreationUi';
 
 // 与 referencesConfig 保持同步的 5 个参考图 slot 名。
 // 重新声明一份以避免 export-re-export 在 Vite HMR 下偶发的 TDZ
@@ -124,6 +125,8 @@ export interface UseCreateImageTaskStateOpts {
   sourceCreationTemplateVersionId?: string | null;
   /** 通道、能力、模型以及能力 Schema 必填参数是否已完成选择。 */
   executionParamsReady: boolean;
+  /** 仅用于 Prompt 展示的 SEO 商品名称，不覆盖 ERP 商品主数据。 */
+  promptProductName?: string;
 }
 
 export interface UseCreateImageTaskStateReturn {
@@ -277,19 +280,24 @@ export function useCreateImageTaskState(
     return filled.map(({ slot, ref }) => ({ slot, ref }));
   }, [references, referenceOrder]);
 
-  const orderedReferenceSlots = useMemo<ReferenceSlot[]>(
-    () => orderedRefs.map(({ slot }) => slot),
+  const promptReferenceGroups = useMemo<ReferenceSlot[][]>(
+    () => groupReferenceSlots(orderedRefs).map((reference) => reference.roles),
     [orderedRefs],
   );
 
+  const withPromptProductName = useCallback((facts: ProductFacts): ProductFacts => ({
+    ...facts,
+    name: opts.promptProductName?.trim() || facts.name,
+  }), [opts.promptProductName]);
+
   const prompts = useMemo<AllTypePrompts>(() => {
-    const facts = productFacts ?? extractProductFacts(formInput);
+    const facts = withPromptProductName(productFacts ?? extractProductFacts(formInput));
     const result: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_triple_view: '' };
     (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[]).forEach((t) => {
-      result[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceSlots);
+      result[t] = buildPromptFromFacts(t, facts, style, scene, pose, promptReferenceGroups);
     });
     return result;
-  }, [productFacts, formInput, style, scene, pose, orderedReferenceSlots]);
+  }, [productFacts, formInput, style, scene, pose, promptReferenceGroups, withPromptProductName]);
 
   const promptsComplete = useMemo(() => {
     if (selectedTypes.length === 0) return false;
@@ -403,7 +411,7 @@ export function useCreateImageTaskState(
   const fallbackToLocalPrompts = (facts: ProductFacts) => {
     const nextOverrides: Partial<Record<ImageGenerationType, string>> = {};
     selectedTypes.forEach((t) => {
-      nextOverrides[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceSlots);
+      nextOverrides[t] = buildPromptFromFacts(t, withPromptProductName(facts), style, scene, pose, promptReferenceGroups);
     });
     setPromptOverrides(nextOverrides);
     setPromptHasEdits(true);
@@ -473,7 +481,7 @@ export function useCreateImageTaskState(
       (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[])
         .forEach((t) => {
           nextOverrides[t] = buildPromptFromFacts(
-            t, extractedFacts, style, scene, pose, orderedReferenceSlots,
+            t, withPromptProductName(extractedFacts), style, scene, pose, promptReferenceGroups,
           );
         });
       setPromptOverrides(nextOverrides);
@@ -497,7 +505,8 @@ export function useCreateImageTaskState(
     }
   }, [
     opts.isProductBound, opts.mainAssetId, opts.mainImage, opts.onAiComplete,
-    assistantState, formInput, selectedTypes, style, scene, pose, orderedReferenceSlots,
+    assistantState, formInput, selectedTypes, style, scene, pose, orderedRefs,
+    promptReferenceGroups, withPromptProductName,
   ]);
 
   const regeneratePrompts = useCallback(() => {
@@ -509,10 +518,10 @@ export function useCreateImageTaskState(
   }, [opts.isProductBound, formInput]);
 
   const applyAiOptimizeToSelected = useCallback((selected: ImageGenerationType[]) => {
-    const facts = productFacts ?? extractProductFacts(formInput);
+    const facts = withPromptProductName(productFacts ?? extractProductFacts(formInput));
     const basePrompts: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_triple_view: '' };
     (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[]).forEach((t) => {
-      basePrompts[t] = buildPromptFromFacts(t, facts, style, scene, pose, orderedReferenceSlots);
+      basePrompts[t] = buildPromptFromFacts(t, facts, style, scene, pose, promptReferenceGroups);
     });
     const optimized = applyAiOptimizePerType(basePrompts, selected);
     setPromptOverrides((prev) => {
@@ -521,7 +530,7 @@ export function useCreateImageTaskState(
       return next;
     });
     setPromptHasEdits(true);
-  }, [productFacts, formInput, style, scene, pose, orderedReferenceSlots]);
+  }, [productFacts, formInput, style, scene, pose, promptReferenceGroups, withPromptProductName]);
 
   const checkAndGenerate = useCallback(() => {
     const issue = readinessChecks.find((c) => !c.complete);

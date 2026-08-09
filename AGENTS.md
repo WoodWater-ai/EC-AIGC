@@ -4,23 +4,27 @@
 
 ## 状态
 
-**全 mock 阶段**。`src/App.tsx` 用 `useState` + `src/mockData.ts` 维护所有数据,尚未接入后端 API。开发目标是逐步把 mock 替换为 `../dafenqi-ai/` 后端真实接口。
+**真实接口接入阶段**。核心业务已通过 `src/api/client.ts` 和 `src/api/modules/` 对接 `../dafenqi-ai/` 后端；`src/mockData.ts` 仅保留给尚未接入的展示数据或视觉开发，不能作为已接入页面的业务数据源。
+
+前端请求统一走 `http` 封装：浏览器请求 `/api/v1/...`，Vite 开发代理去除 `/api` 后转发到后端。组件不得直接创建 axios 实例或硬编码后端地址。
+
+接口契约以以下顺序为准：后端 Controller / DTO 与 OpenAPI -> `src/api/modules/` 类型和方法 -> 组件。接口字段、枚举、权限或状态变化时，必须先更新 API 模块和类型，再修改界面；所有 Long ID、时间戳在前端按 `string` 处理。
 
 ## 业务模块
 
 | 模块 | 组件 | 当前状态 | 后端对接点 |
 |---|---|---|---|
-| 仪表盘 | `Dashboard.tsx` | mock | `GET /v1/dashboard/summary` (TBD) |
-| 任务列表 | `TaskList.tsx` + `TaskDetailsDrawer.tsx` | mock | `GET/POST /v1/tasks` (TBD) |
-| 创建图片任务 | `CreateImageTask.tsx` | mock | `POST /v1/tasks/image` (TBD) |
-| 创建视频任务 | `CreateVideoTask.tsx` | mock | `POST /v1/tasks/video` (TBD) |
-| 模板中心 | `TemplateCenter.tsx` | mock | `GET/POST /v1/templates` (TBD) |
-| 素材库 | `ProductAssetLibrary.tsx` | mock | `GET /v1/assets` (TBD) |
-| 数据分析 | `DataAnalytics.tsx` | mock | `GET /v1/analytics/...` (TBD) |
-| 系统配置 | `SystemConfig.tsx` | mock | `GET /v1/admin/...` (TBD) |
-| 素材中转 | `AssetTransitModal.tsx` | mock | 全局 Modal |
+| 仪表盘 | `Dashboard.tsx` | 混合 | 创作作品/模板：`/v1/creation-template/*`；其余看各子模块 |
+| 任务列表 | `TaskList.tsx` + `TaskDetailsDrawer.tsx` | 已接入 | `/v1/task/my-page`、`/v1/task/group-*`、`/v1/task/detail` |
+| 创建图片任务 | `components/CreateImageTask/` + `useCreateImageTaskState.ts` | 已接入 | `/v1/task/submit`、`/v1/task/generated-images*`、`/v1/task/image-revision/*` |
+| 创建视频任务 | `CreateVideoTask.tsx` | 已接入 | `/v1/video-task/submit` |
+| 模板中心 | `TemplateCenter.tsx` | 已接入，但存在两套模板模型 | 管理模板：`/v1/admin/prompt-template/*`；创作模板：`/v1/creation-template/*` |
+| 商品素材库 | `ProductAssetLibrary.tsx` | 已接入 | `/v1/admin/product-library/*` |
+| 数据分析 | `DataAnalytics.tsx` | 混合 | 以对应 `src/api/modules/` 为准 |
+| 系统配置 | `SystemConfig.tsx` | 已接入 | `/v1/admin/*` |
+| 素材中转 | `AssetTransitModal.tsx` | 已接入 | 资源、分类、文件等 API 模块 |
 
-(后端接口路径待与 `dafenqi-ai/` 团队对齐,以 `dafenqi-ai/docs/单体项目开发规范.md` 为准)
+后端接口路径以 `dafenqi-ai` 的 Controller、DTO 和 OpenAPI 为准；`docs/单体项目开发规范.md` 规定接口风格，但不替代具体实现。
 
 ## 协作入口
 

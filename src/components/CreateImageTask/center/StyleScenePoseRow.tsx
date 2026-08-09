@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Image as ImageIcon } from 'lucide-react';
+import { Check, ChevronDown, Image as ImageIcon, LockKeyhole } from 'lucide-react';
 import type { DictOption } from '../../../api/modules/dict';
 import { withCosThumbnail } from '../../../utils/cosImage';
 
@@ -16,6 +16,7 @@ export interface StyleScenePoseRowProps {
   onStyleChange: (value: string) => void;
   onSceneChange: (value: string) => void;
   onPoseChange: (value: string) => void;
+  lockedByReference?: Partial<Record<PickerKind, string>>;
 }
 
 type PickerKind = 'style' | 'scene' | 'pose';
@@ -95,6 +96,7 @@ interface VisualTagPickerProps {
   options: DictOption[];
   loading?: boolean;
   onChange: (value: string) => void;
+  lockedLabel?: string;
 }
 
 function VisualTagPicker({
@@ -104,6 +106,7 @@ function VisualTagPicker({
   options,
   loading,
   onChange,
+  lockedLabel,
 }: VisualTagPickerProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -116,7 +119,7 @@ function VisualTagPicker({
   );
   const selected = decoratedOptions.find((option) => option.label === value);
   const isEmpty = !loading && decoratedOptions.length === 0;
-  const disabled = Boolean(loading || isEmpty);
+  const disabled = Boolean(loading || isEmpty || lockedLabel);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -139,7 +142,8 @@ function VisualTagPicker({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
-        className={`flex h-9 max-w-[220px] items-center gap-2 rounded-full border bg-white py-1 pl-1 pr-2 text-left transition ${
+        title={lockedLabel ? `${label}已由${lockedLabel}接管` : undefined}
+        className={`flex h-9 max-w-[220px] items-center gap-2 rounded-md border bg-white py-1 pl-1 pr-2 text-left transition ${
           open
             ? 'border-primary ring-2 ring-primary/10'
             : 'border-slate-200 hover:border-primary/50 hover:bg-primary/5'
@@ -161,10 +165,12 @@ function VisualTagPicker({
         <span className="min-w-0 flex-1">
           <span className="mr-1 text-[10px] font-bold text-slate-400">{label}</span>
           <span className="text-[11px] font-bold text-slate-700">
-            {loading ? '加载中…' : isEmpty ? '暂无可用字典项' : selected?.label ?? value ?? '请选择'}
+            {lockedLabel || (loading ? '加载中…' : isEmpty ? '暂无可用字典项' : selected?.label ?? value ?? '请选择')}
           </span>
         </span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} />
+        {lockedLabel
+          ? <LockKeyhole className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          : <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} />}
       </button>
 
       {open && !disabled && (
@@ -242,6 +248,7 @@ export const StyleScenePoseRow: React.FC<StyleScenePoseRowProps> = ({
   onStyleChange,
   onSceneChange,
   onPoseChange,
+  lockedByReference,
 }) => (
   <div className="flex flex-wrap items-center gap-2">
     <VisualTagPicker
@@ -251,6 +258,7 @@ export const StyleScenePoseRow: React.FC<StyleScenePoseRowProps> = ({
       options={styleOptions}
       loading={loadingStyle}
       onChange={onStyleChange}
+      lockedLabel={lockedByReference?.style}
     />
     <VisualTagPicker
       kind="scene"
@@ -259,6 +267,7 @@ export const StyleScenePoseRow: React.FC<StyleScenePoseRowProps> = ({
       options={sceneOptions}
       loading={loadingScene}
       onChange={onSceneChange}
+      lockedLabel={lockedByReference?.scene}
     />
     <VisualTagPicker
       kind="pose"
@@ -267,6 +276,7 @@ export const StyleScenePoseRow: React.FC<StyleScenePoseRowProps> = ({
       options={poseOptions}
       loading={loadingPose}
       onChange={onPoseChange}
+      lockedLabel={lockedByReference?.pose}
     />
   </div>
 );

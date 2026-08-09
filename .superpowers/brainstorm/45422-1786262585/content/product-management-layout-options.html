@@ -1,0 +1,95 @@
+<h2>产品管理：SPU / SKU 列表结构</h2>
+<p class="subtitle">三种方案都保留手动新建、来源标识和单规格快捷创作。请选择更适合日常素材创作的一种。</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#f8fafc;min-height:380px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div><strong style="font-size:15px">产品管理</strong><div style="font-size:10px;color:#64748b;margin-top:3px">SPU 128 · SKU 486</div></div>
+        <button class="mock-button">＋ 新建产品</button>
+      </div>
+      <div style="display:flex;gap:7px;margin-bottom:10px">
+        <input class="mock-input" style="flex:1" placeholder="搜索名称 / SPU / SKU 编码">
+        <div style="border:1px solid #dbe2ea;background:white;border-radius:5px;padding:7px 10px;font-size:10px">全部来源⌄</div>
+        <div style="border:1px solid #dbe2ea;background:white;border-radius:5px;padding:7px 10px;font-size:10px">全部分类⌄</div>
+      </div>
+      <div style="border:1px solid #dbe2ea;border-radius:6px;overflow:hidden;background:white;font-size:9px">
+        <div style="display:grid;grid-template-columns:28px 48px 1.8fr 1fr 1fr .7fr .8fr 76px;gap:6px;padding:8px;background:#f1f5f9;color:#64748b;font-weight:700">
+          <span></span><span>图片</span><span>商品 / 编码</span><span>分类</span><span>核心参数</span><span>来源</span><span>状态</span><span>操作</span>
+        </div>
+        <div style="display:grid;grid-template-columns:28px 48px 1.8fr 1fr 1fr .7fr .8fr 76px;gap:6px;align-items:center;padding:9px;border-top:1px solid #eef2f7">
+          <b style="font-size:14px">⌄</b><div style="height:38px;background:#e2e8f0;border-radius:4px"></div><div><b>轻户外防晒衬衫</b><br><span style="color:#94a3b8">SPU · FS-2026-018</span></div><span>女装 / 防晒衣</span><span>锦纶 · 宽松</span><span style="color:#2563eb">ERP同步</span><span style="color:#059669">在售 · 3 SKU</span><span>查看</span>
+        </div>
+        <div style="display:grid;grid-template-columns:28px 48px 1.8fr 1fr 1fr .7fr .8fr 76px;gap:6px;align-items:center;padding:8px 9px 8px 36px;background:#fafcff;border-top:1px solid #eef2f7">
+          <span style="color:#cbd5e1">└</span><div style="height:32px;background:#dbeafe;border-radius:4px"></div><div><b>雾霾蓝 · M</b><br><span style="color:#94a3b8">SKU · FS018-BL-M</span></div><span>规格：蓝 / M</span><span>轻薄 · 防晒</span><span>继承 ERP</span><span style="color:#059669">可创作</span><button style="border:0;background:#111827;color:white;border-radius:4px;padding:6px;font-size:9px">去创作</button>
+        </div>
+        <div style="display:grid;grid-template-columns:28px 48px 1.8fr 1fr 1fr .7fr .8fr 76px;gap:6px;align-items:center;padding:8px 9px 8px 36px;background:#fafcff;border-top:1px solid #eef2f7">
+          <span style="color:#cbd5e1">└</span><div style="height:32px;background:#e0f2fe;border-radius:4px"></div><div><b>米白 · L</b><br><span style="color:#94a3b8">SKU · FS018-WH-L</span></div><span>规格：白 / L</span><span>轻薄 · 防晒</span><span>继承 ERP</span><span style="color:#059669">可创作</span><button style="border:0;background:#111827;color:white;border-radius:4px;padding:6px;font-size:9px">去创作</button>
+        </div>
+        <div style="display:grid;grid-template-columns:28px 48px 1.8fr 1fr 1fr .7fr .8fr 76px;gap:6px;align-items:center;padding:9px;border-top:1px solid #eef2f7">
+          <b style="font-size:14px">›</b><div style="height:38px;background:#fee2e2;border-radius:4px"></div><div><b>法式方领连衣裙</b><br><span style="color:#94a3b8">SPU · MAN-00032</span></div><span>女装 / 连衣裙</span><span>棉 · 收腰</span><span style="color:#7c3aed">手动创建</span><span style="color:#059669">在售 · 1 SKU</span><button style="border:0;background:#111827;color:white;border-radius:4px;padding:6px;font-size:9px">去创作</button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 树形表格（推荐）</h3>
+      <p>SPU 是父行，SKU 原位展开。单规格父行直接创作，多规格展开后按 SKU 创作。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#f8fafc;min-height:380px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><strong style="font-size:15px">产品管理</strong><button class="mock-button">＋ 新建产品</button></div>
+      <div style="display:grid;grid-template-columns:1.05fr 1.45fr;border:1px solid #dbe2ea;border-radius:6px;overflow:hidden;background:white;min-height:312px">
+        <div style="border-right:1px solid #dbe2ea">
+          <div style="padding:9px;background:#f1f5f9;font-size:10px;font-weight:700">SPU 商品</div>
+          <div style="padding:10px;background:#eff6ff;border-left:3px solid #2563eb;font-size:10px"><b>轻户外防晒衬衫</b><br><span style="color:#64748b">FS-2026-018 · ERP同步</span><br><span style="color:#059669">3 个 SKU</span></div>
+          <div style="padding:10px;border-top:1px solid #eef2f7;font-size:10px"><b>法式方领连衣裙</b><br><span style="color:#64748b">MAN-00032 · 手动创建</span><br><span style="color:#059669">1 个 SKU</span></div>
+          <div style="padding:10px;border-top:1px solid #eef2f7;font-size:10px"><b>针织居家套装</b><br><span style="color:#64748b">HOME-2609 · ERP同步</span><br><span style="color:#059669">4 个 SKU</span></div>
+        </div>
+        <div>
+          <div style="padding:9px;background:#f1f5f9;font-size:10px;font-weight:700">轻户外防晒衬衫 · SKU</div>
+          <div style="padding:11px;border-bottom:1px solid #eef2f7;font-size:10px;display:flex;justify-content:space-between"><span><b>雾霾蓝 · M</b><br><small>FS018-BL-M · 可创作</small></span><button class="mock-button">去创作</button></div>
+          <div style="padding:11px;border-bottom:1px solid #eef2f7;font-size:10px;display:flex;justify-content:space-between"><span><b>米白 · L</b><br><small>FS018-WH-L · 可创作</small></span><button class="mock-button">去创作</button></div>
+          <div style="padding:11px;font-size:10px;display:flex;justify-content:space-between"><span><b>雾霾蓝 · L</b><br><small>FS018-BL-L · 图片待同步</small></span><button style="border:1px solid #dbe2ea;background:#f8fafc;color:#94a3b8;border-radius:4px;font-size:9px">暂不可创作</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 主从双栏</h3>
+      <p>左侧选 SPU，右侧浏览 SKU。SKU 很多时操作集中，但会改变当前整页表格习惯。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#f8fafc;min-height:380px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><strong style="font-size:15px">产品管理</strong><button class="mock-button">＋ 新建产品</button></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:white;border:1px solid #dbe2ea;border-radius:6px;padding:11px">
+          <div style="display:flex;gap:9px"><div style="width:44px;height:44px;background:#e2e8f0;border-radius:4px"></div><div><b style="font-size:11px">轻户外防晒衬衫</b><br><small>FS-2026-018</small><br><small style="color:#2563eb">ERP同步 · 3 SKU</small></div></div>
+          <div style="display:flex;gap:5px;margin-top:10px;flex-wrap:wrap"><span style="padding:5px 7px;background:#eff6ff;border-radius:4px;font-size:9px">雾霾蓝 M</span><span style="padding:5px 7px;background:#eff6ff;border-radius:4px;font-size:9px">米白 L</span><span style="padding:5px 7px;background:#f1f5f9;border-radius:4px;font-size:9px">+1</span></div>
+          <button style="width:100%;margin-top:10px;border:1px solid #dbe2ea;background:white;border-radius:4px;padding:7px;font-size:9px">查看与选择 SKU</button>
+        </div>
+        <div style="background:white;border:1px solid #dbe2ea;border-radius:6px;padding:11px">
+          <div style="display:flex;gap:9px"><div style="width:44px;height:44px;background:#fee2e2;border-radius:4px"></div><div><b style="font-size:11px">法式方领连衣裙</b><br><small>MAN-00032</small><br><small style="color:#7c3aed">手动创建 · 1 SKU</small></div></div>
+          <div style="display:flex;gap:5px;margin-top:10px"><span style="padding:5px 7px;background:#f5f3ff;border-radius:4px;font-size:9px">酒红 S</span></div>
+          <button style="width:100%;margin-top:10px;border:0;background:#111827;color:white;border-radius:4px;padding:7px;font-size:9px">直接创作</button>
+        </div>
+        <div style="background:white;border:1px solid #dbe2ea;border-radius:6px;padding:11px">
+          <div style="display:flex;gap:9px"><div style="width:44px;height:44px;background:#dcfce7;border-radius:4px"></div><div><b style="font-size:11px">针织居家套装</b><br><small>HOME-2609</small><br><small style="color:#2563eb">ERP同步 · 4 SKU</small></div></div>
+          <div style="display:flex;gap:5px;margin-top:10px;flex-wrap:wrap"><span style="padding:5px 7px;background:#f0fdf4;border-radius:4px;font-size:9px">灰 M</span><span style="padding:5px 7px;background:#f0fdf4;border-radius:4px;font-size:9px">灰 L</span><span style="padding:5px 7px;background:#f1f5f9;border-radius:4px;font-size:9px">+2</span></div>
+          <button style="width:100%;margin-top:10px;border:1px solid #dbe2ea;background:white;border-radius:4px;padding:7px;font-size:9px">查看与选择 SKU</button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. SPU 卡片 + SKU 标签</h3>
+      <p>更直观，但同屏信息少，不适合高频检索和批量运营。</p>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons" style="margin-top:18px">
+  <div class="pros"><h4>推荐 A 的原因</h4><ul><li>最大程度复用当前表格结构</li><li>父子归属最直观</li><li>单规格和多规格都有快捷路径</li><li>适合后续接入 ERP 大量商品</li></ul></div>
+  <div class="cons"><h4>需要控制</h4><ul><li>默认折叠，避免长列表过高</li><li>主表只放创作相关字段</li><li>完整 ERP 字段放详情抽屉</li></ul></div>
+</div>

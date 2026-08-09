@@ -1,11 +1,9 @@
-// src/components/CreateImageTask/right/ImageSettingsSection.tsx
-// 右栏"任务参数"卡片(对齐 demo 主版):通道实例/能力/模型 3 级选择器 + 能力参数 schema 动态表单
 import React, { useEffect } from 'react';
+import { Cpu, Route } from 'lucide-react';
 import { useTaskParams } from '../../createTask/useTaskParams';
 import { ParamSchemaForm } from '../../common/ParamSchemaForm';
 import { localValidate } from '../../common/ParamSchemaForm/utils/validate';
 import { UnsupportedNotice } from './UnsupportedNotice';
-import { messages } from '../../../labels/createImageTask';
 import type { PrefillState } from '../../createTask/useTaskParams';
 
 export interface TaskParamsSnapshot {
@@ -14,60 +12,33 @@ export interface TaskParamsSnapshot {
   capability: string | null;
   /** 历史字段名；值是供应商 modelCode，不是数据库 ID。 */
   modelId: string | null;
-  /**
-   * 能力参数(ParamSchemaForm 渲染 Vidu 能力 schema 收集),例如
-   * { aspect_ratio: '9:16', resolution: '1080p' }。
-   * 父组件把它透传给 useCreateImageTaskState,提交时合并到 taskParamsJson;
-   * 不传则 hook 用 Vidu 能力 schema 的默认/推荐值兜底。
-   */
   schemaParams?: Record<string, any>;
   executionParamsReady: boolean;
   selectionSource: string;
   fallbackReason: string | null;
 }
 
-/** ratio 由 useCreateImageTaskState 内部维护;本节不再展示。
- *  在 ImageTypeSelector 顶部 banner 加一句话提示"比例由图片类型决定 + 上方头部显示",
- *  让用户感知到 ratio 实际由 schema 与 image-set 联动,而不是孤立选择。
- */
 export interface ImageSettingsSectionProps {
-  /** 已废弃:由 useTaskParams.isSupported 真实判定(基于 Vidu 能力 schema);
-   *  保留仅为不破坏调用方,实际不再使用。 */
-  isSupported?: boolean;
-  /** 选中状态变化时通知父组件,父组件用于 submit payload 的 channelInstanceId/modelId */
   onParamsChange?: (snapshot: TaskParamsSnapshot) => void;
   prefill?: PrefillState | null;
   prefillPending?: boolean;
-  selectedTypesCount: number;
-  totalCount: number;
-  onCheckAndGenerate: () => void;
 }
 
 export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
   onParamsChange,
   prefill,
   prefillPending = false,
-  selectedTypesCount,
-  totalCount,
-  onCheckAndGenerate,
 }) => {
-  // 通道实例 / 能力 / 模型 三级联动 — 与 demo 创建图片任务 "任务参数"一致
   const tp = useTaskParams('IMAGE', prefill, 'REF_IMG_EDIT', prefillPending);
 
-  // 选中状态变化时通知父组件
   useEffect(() => {
     const schemaValid = !!tp.schema
       && localValidate(tp.schemaParams, tp.schema.fields ?? []).length === 0;
-    const modelSelected = !!tp.effectiveModelCode;
     onParamsChange?.({
       channelId: tp.channelId,
       channelType: tp.channelType,
       capability: tp.capability,
-      // modelId 是历史内部命名，值实际为供应商 modelCode。
       modelId: tp.effectiveModelCode,
-      // [2026-07-25 P0 修复] schemaParams 必须冒泡,否则 ParamSchemaForm 改的
-      // aspect_ratio / resolution 等参数不会进提交 payload;
-      // 之前 useCreateImageTaskState 写死 ratio='16:9' 正是因为收不到这个值。
       schemaParams: tp.schemaParams,
       selectionSource: tp.selectionSource,
       fallbackReason: tp.fallbackReason,
@@ -75,7 +46,7 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
         && !tp.unavailableReason
         && !!tp.channelId
         && !!tp.capability
-        && modelSelected
+        && !!tp.effectiveModelCode
         && schemaValid,
     });
   }, [
@@ -92,131 +63,64 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
     onParamsChange,
   ]);
 
-  return (
-    <div
-      id="image-settings-section"
-      className="bg-white border border-slate-200 rounded-lg p-5"
-    >
-      <p className="text-[11px] font-bold text-primary">执行参数</p>
-      <h2 className="text-base font-black mt-1">
-        {messages.header.title.replace('新建多类型图片任务', '任务参数与输出规格')}
-      </h2>
+  const viduInstances = tp.instances.filter((instance) => instance.channelType === 'VIDU');
 
+  return (
+    <div id="image-settings-section">
       {tp.initializing && (
-        <div className="mt-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-          正在解析默认通道和模型…
-        </div>
+        <p className="mb-2 text-[10px] text-primary">正在解析默认模型与输出规格...</p>
       )}
       {tp.fallbackReason && (
-        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          模板原执行参数已失效,将使用默认配置,你可手动调整。
-        </div>
+        <p className="mb-2 border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] text-amber-800">
+          原执行参数已失效，已使用默认配置。
+        </p>
       )}
       {tp.unavailableReason && (
-        <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <p className="mb-2 border border-red-200 bg-red-50 px-2 py-1.5 text-[10px] text-red-700">
           {tp.unavailableReason}
-        </div>
+        </p>
       )}
 
-      {/* ① 通道实例 chips(对齐 demo) */}
-      <div className="mt-4">
-        <label className="block text-xs font-bold text-slate-700 mb-1.5">
-          通道实例{tp.locked && ' 🔒'}
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {tp.instances.filter((inst) => inst.channelType === 'VIDU').map((inst) => (
-            <button
-              key={inst.id}
-              type="button"
-              disabled={tp.locked}
-              onClick={() => tp.setChannelId(inst.id)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1.5 ${
-                tp.channelId === inst.id
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : tp.locked
-                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                    : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400'
-              }`}
-            >
-              {inst.channelName}
-              <span className="text-[9px] px-1 rounded bg-slate-200 text-slate-700">{inst.channelType}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ② 能力 chips */}
-      {tp.channelType && (
-        <div className="mt-3">
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">
-            能力{tp.locked && ' 🔒'}
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {tp.capabilitiesInChannel.filter((cap) => cap.code === 'REF_IMG_EDIT').map((cap) => (
-              <button
-                key={cap.code}
-                type="button"
-                disabled={tp.locked}
-                onClick={() => tp.setCapability(cap.code)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1 ${
-                  tp.capability === cap.code
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : tp.locked
-                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                      : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400'
-                }`}
-              >
-                {cap.label}
-                {cap.isAsync && (
-                  <span className="text-[9px] px-1 rounded bg-purple-100 text-purple-700">async</span>
-                )}
-              </button>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="min-w-[150px] flex-1">
+          <span className="mb-1 flex items-center gap-1 text-[9px] font-bold text-slate-400">
+            <Route className="h-3 w-3" />执行通道
+          </span>
+          <select
+            value={tp.channelId ?? ''}
+            disabled={tp.locked || viduInstances.length === 0}
+            onChange={(event) => tp.setChannelId(event.target.value || null)}
+            className="h-9 w-full border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700 outline-none focus:border-primary disabled:bg-slate-50 disabled:text-slate-400"
+          >
+            {viduInstances.length === 0 && <option value="">暂无可用通道</option>}
+            {viduInstances.map((instance) => (
+              <option key={instance.id} value={instance.id}>{instance.channelName}</option>
             ))}
-            {tp.capabilitiesInChannel.length === 0 && (
-              <div className="text-xs text-slate-400 py-1">
-                该实例未开通该类型能力,请在系统配置 → 模型通道统管开通,或换其他实例
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          </select>
+        </label>
 
-      {/* ③ 模型 select */}
-      {tp.capability && (
-        <div className="mt-3">
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">模型</label>
+        <label className="min-w-[180px] flex-[1.2]">
+          <span className="mb-1 flex items-center gap-1 text-[9px] font-bold text-slate-400">
+            <Cpu className="h-3 w-3" />模型
+          </span>
           <select
             value={tp.modelId === tp.defaultModelCode ? '' : (tp.modelId ?? '')}
-            disabled={tp.locked}
-            onChange={(e) => tp.setModelId(e.target.value || null)}
-            className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md bg-white"
+            disabled={tp.locked || !tp.capability}
+            onChange={(event) => tp.setModelId(event.target.value || null)}
+            className="h-9 w-full border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700 outline-none focus:border-primary disabled:bg-slate-50 disabled:text-slate-400"
           >
             <option value="">
-              {tp.defaultModelCode
-                ? `默认模型 (${tp.defaultModelCode})`
-                : '未配置默认模型，请选择'}
+              {tp.defaultModelCode ? `默认模型 (${tp.defaultModelCode})` : '未配置默认模型'}
             </option>
             {tp.modelOptionsInGroup.map((modelCode) => (
               <option key={modelCode} value={modelCode}>{modelCode}</option>
             ))}
           </select>
-          {tp.modelOptionsInGroup.length > 0 && (
-            <p className="mt-1 text-[10px] text-slate-400">
-              默认值来自系统配置，也可切换为该能力目录中的其他模型。
-            </p>
-          )}
-        </div>
-      )}
+        </label>
+      </div>
 
-      {/* ④ 比例/分辨率在下方"能力参数"里改(ParamSchemaForm 根据 Vidu 能力 schema 动态渲染) */}
-      <p className="mt-3 text-[10px] text-slate-400">
-        输出比例与分辨率由下方"能力参数"区域控制,选择会同步到提交参数。
-      </p>
-
-      {/* ⑤ 能力参数 schema 动态表单(对齐 demo 的 `ParamSchemaForm`) */}
       {tp.schema && (
-        <div className="mt-4">
-          <label className="block text-xs font-bold text-slate-700 mb-2">能力参数</label>
+        <div className="mt-2 [&_.param-schema-form]:grid [&_.param-schema-form]:grid-cols-2 [&_.param-schema-form]:gap-2 [&_.param-field]:min-w-0 [&_.param-field_label]:mb-1 [&_.param-field_label]:block [&_.param-field_label]:text-[9px] [&_.param-field_label]:font-bold [&_.param-field_label]:text-slate-400 [&_.param-field_select]:h-9 [&_.param-field_select]:text-[10px]">
           <ParamSchemaForm
             schema={tp.schema}
             value={tp.schemaParams}
@@ -226,22 +130,7 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
         </div>
       )}
 
-      {/* 由 useTaskParams.isSupported 真实判定(基于 Vidu 能力 schema + 当前 schemaParams),
-          取代之前用写死 model.capability 的旧判定 */}
       <UnsupportedNotice show={!tp.initializing && !tp.unavailableReason && !tp.isSupported} />
-
-      <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-        <span className="text-xs text-slate-500">
-          {selectedTypesCount} 个类型 · 共 {totalCount} 张
-        </span>
-        <button
-          type="button"
-          onClick={onCheckAndGenerate}
-          className="h-9 shrink-0 rounded-md bg-primary px-4 text-xs font-bold text-white shadow-sm hover:opacity-90"
-        >
-          生成
-        </button>
-      </div>
     </div>
   );
 };

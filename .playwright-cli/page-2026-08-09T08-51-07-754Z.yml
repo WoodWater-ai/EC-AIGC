@@ -1,0 +1,456 @@
+- generic [ref=e2]:
+  - generic [ref=e55]:
+    - complementary [ref=e56]:
+      - generic [ref=e57]:
+        - generic [ref=e59]:
+          - generic [ref=e60]: blur_on
+          - generic [ref=e62]:
+            - heading "达芬奇密码 AI" [level=1] [ref=e63]
+            - text: WORKBENCH
+        - button "add_circle 新建创作 keyboard_arrow_down" [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: add_circle
+          - text: 新建创作
+          - generic [ref=e67]: keyboard_arrow_down
+        - navigation [ref=e68]:
+          - generic [ref=e69]: 主模块
+          - button "dashboard 工作台首页" [ref=e70] [cursor=pointer]:
+            - generic [ref=e71]:
+              - generic [ref=e72]: dashboard
+              - generic [ref=e73]: 工作台首页
+          - button "auto_awesome 创作助手" [ref=e75] [cursor=pointer]:
+            - generic [ref=e76]:
+              - generic [ref=e77]: auto_awesome
+              - generic [ref=e78]: 创作助手
+          - button "auto_schedule 任务列表" [ref=e79] [cursor=pointer]:
+            - generic [ref=e80]:
+              - generic [ref=e81]: auto_schedule
+              - generic [ref=e82]: 任务列表
+          - button "dashboard_customize 智能模板中心" [ref=e83] [cursor=pointer]:
+            - generic [ref=e84]:
+              - generic [ref=e85]: dashboard_customize
+              - generic [ref=e86]: 智能模板中心
+          - button "inventory_2 商品素材库" [ref=e87] [cursor=pointer]:
+            - generic [ref=e88]:
+              - generic [ref=e89]: inventory_2
+              - generic [ref=e90]: 商品素材库
+          - button "insights 数据效能复盘" [ref=e91] [cursor=pointer]:
+            - generic [ref=e92]:
+              - generic [ref=e93]: insights
+              - generic [ref=e94]: 数据效能复盘
+          - button "settings_applications 系统配置模块" [ref=e95] [cursor=pointer]:
+            - generic [ref=e96]:
+              - generic [ref=e97]: settings_applications
+              - generic [ref=e98]: 系统配置模块
+          - button "sync_alt 通道异步任务" [ref=e99] [cursor=pointer]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: sync_alt
+              - generic [ref=e102]: 通道异步任务
+          - button "account_tree 资源分类" [ref=e103] [cursor=pointer]:
+            - generic [ref=e104]:
+              - generic [ref=e105]: account_tree
+              - generic [ref=e106]: 资源分类
+          - button "category 商品分类" [ref=e107] [cursor=pointer]:
+            - generic [ref=e108]:
+              - generic [ref=e109]: category
+              - generic [ref=e110]: 商品分类
+          - button "inventory_2 产品管理" [ref=e111] [cursor=pointer]:
+            - generic [ref=e112]:
+              - generic [ref=e113]: inventory_2
+              - generic [ref=e114]: 产品管理
+          - button "dataset 字典分类管理" [ref=e115] [cursor=pointer]:
+            - generic [ref=e116]:
+              - generic [ref=e117]: dataset
+              - generic [ref=e118]: 字典分类管理
+          - button "menu_book 字典管理" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]:
+              - generic [ref=e121]: menu_book
+              - generic [ref=e122]: 字典管理
+        - generic [ref=e123]:
+          - generic [ref=e124]: 快捷工具
+          - button "grid_view 资源中心" [ref=e125] [cursor=pointer]:
+            - generic [ref=e126]: grid_view
+            - text: 资源中心
+          - button "face_3 模特资源库" [ref=e127] [cursor=pointer]:
+            - generic [ref=e128]:
+              - generic [ref=e129]: face_3
+              - text: 模特资源库
+      - generic [ref=e131]:
+        - img "管理员" [ref=e133]
+        - generic [ref=e135]:
+          - paragraph [ref=e136]: 管理员
+          - paragraph [ref=e137]: 管理员
+    - generic [ref=e138]:
+      - banner [ref=e139]:
+        - generic [ref=e140]:
+          - generic [ref=e141] [cursor=pointer]: 达芬奇密码 AI
+          - generic [ref=e142]: chevron_right
+          - generic [ref=e143]: 控制台
+        - generic [ref=e145]:
+          - button "add 新建任务 keyboard_arrow_down" [ref=e147] [cursor=pointer]:
+            - generic [ref=e148]: add
+            - generic [ref=e149]: 新建任务
+            - generic [ref=e150]: keyboard_arrow_down
+          - button "notifications 2" [ref=e153] [cursor=pointer]:
+            - generic [ref=e154]: notifications
+            - generic [ref=e155]: "2"
+          - button "help" [ref=e156] [cursor=pointer]
+          - button "logout 退出" [ref=e158] [cursor=pointer]:
+            - generic [ref=e159]: logout
+            - generic [ref=e160]: 退出
+      - main [ref=e161]:
+        - generic [ref=e502]:
+          - generic [ref=e503]:
+            - generic [ref=e504]: inventory_2
+            - generic [ref=e506]:
+              - heading "产品管理" [level=1] [ref=e507]
+              - paragraph [ref=e508]: 共 36 个 SPU·当前页 10 个 SKU
+            - button "新建产品" [active] [ref=e509]
+          - generic [ref=e511]:
+            - generic [ref=e512]:
+              - textbox "搜索商品名称 / SPU / SKU 编码" [ref=e514]
+              - combobox "按来源筛选" [ref=e515]:
+                - option "全部来源" [selected]
+                - option "手动创建"
+                - option "ERP 同步"
+              - combobox "按状态筛选" [ref=e516]:
+                - option "全部状态" [selected]
+                - option "上架"
+                - option "下架"
+              - combobox "按商品分类筛选" [ref=e517]:
+                - option "全部分类" [selected]
+                - option "电子产品"
+                - option "电子手表"
+                - option "男装"
+                - option "上衣"
+                - option "下装"
+                - option "女装"
+                - option "睡衣"
+              - button "查询" [ref=e518]
+              - button "重置筛选" [disabled] [ref=e522]
+            - table [ref=e529]:
+              - rowgroup [ref=e530]:
+                - row [ref=e531]:
+                  - columnheader [ref=e532]
+                  - columnheader "图片" [ref=e533]
+                  - columnheader "商品 / 编码" [ref=e534]
+                  - columnheader "分类 / 规格" [ref=e535]
+                  - columnheader "创作参数" [ref=e536]
+                  - columnheader "来源" [ref=e537]
+                  - columnheader "状态" [ref=e538]
+                  - columnheader "更新时间" [ref=e539]
+                  - columnheader "操作" [ref=e540]
+              - rowgroup [ref=e541]:
+                - row [ref=e944]:
+                  - cell [ref=e945]:
+                    - button "收起 SKU" [ref=e946]
+                  - cell [ref=e547]:
+                    - img "无袖连衣裙" [ref=e549]
+                  - cell [ref=e550]:
+                    - button "无袖连衣裙 SPU-2085998127607390210" [ref=e551]:
+                      - strong [ref=e552]: 无袖连衣裙
+                      - generic "SPU-2085998127607390210" [ref=e553]
+                  - cell "女装/家居睡裙" [ref=e554]
+                  - cell "满印竖排植物花卉图案，面料有缎面光泽感 · 宽松A字版型，无袖直筒裙摆结构" [ref=e556]
+                  - cell "手动创建" [ref=e558]
+                  - cell "上架 · 1 SKU" [ref=e560]
+                  - cell "2026/08/08 15:54" [ref=e562]
+                  - cell [ref=e563]:
+                    - generic [ref=e564]:
+                      - button "查看详情" [ref=e565]
+                      - button "编辑" [ref=e569]
+                      - button "删除" [ref=e573]
+                      - button "使用 浅蓝底色，搭配粉色、橙色、绿色植物花卉图案 进入图片创作" [ref=e577]
+                - row [ref=e949]:
+                  - cell "└" [ref=e950]
+                  - cell [ref=e951]:
+                    - img "浅蓝底色，搭配粉色、橙色、绿色植物花卉图案" [ref=e953]
+                  - cell "浅蓝底色，搭配粉色、橙色、绿色植物花卉图案 SKU-2085998127607390210" [ref=e954]:
+                    - strong [ref=e955]: 浅蓝底色，搭配粉色、橙色、绿色植物花卉图案
+                    - generic [ref=e956]: SKU-2085998127607390210
+                  - cell "浅蓝底色，搭配粉色、橙色、绿色植物花卉图案" [ref=e957]
+                  - cell "满印竖排植物花卉图案，面料有缎面光泽感 · 宽松A字版型，无袖直筒裙摆结构" [ref=e958]
+                  - cell "继承 手动创建" [ref=e959]
+                  - cell "1 张素材 · 可创作" [ref=e960]
+                  - cell "2026/08/08 15:54" [ref=e961]
+                  - cell [ref=e962]:
+                    - button "使用 浅蓝底色，搭配粉色、橙色、绿色植物花卉图案 进入图片创作" [ref=e963]: 去创作
+                - row [ref=e581]:
+                  - cell [ref=e582]:
+                    - button "展开 SKU" [ref=e583]
+                  - cell [ref=e586]:
+                    - img "女童睡裙" [ref=e588]
+                  - cell [ref=e589]:
+                    - button "女童睡裙 SPU-2085980576957538305" [ref=e590]:
+                      - strong [ref=e591]: 女童睡裙
+                      - generic "SPU-2085980576957538305" [ref=e592]
+                  - cell "童装/睡裙" [ref=e593]
+                  - cell "满印卡通动植物图案，包含兔子、鹿、鸟类、花卉、蝴蝶、蘑菇、浆果元素；面料表面光滑有光泽感，成分未明确可见 · A字直筒版型，无袖短款裙装，领口处有抽褶设计" [ref=e595]
+                  - cell "手动创建" [ref=e597]
+                  - cell "上架 · 1 SKU" [ref=e599]
+                  - cell "2026/08/08 14:45" [ref=e601]
+                  - cell [ref=e602]:
+                    - generic [ref=e603]:
+                      - button "查看详情" [ref=e604]
+                      - button "编辑" [ref=e608]
+                      - button "删除" [ref=e612]
+                      - button "使用 粉色底，搭配多色动植物图案 进入图片创作" [ref=e616]
+                - row [ref=e620]:
+                  - cell [ref=e621]:
+                    - button "展开 SKU" [ref=e622]
+                  - cell [ref=e625]:
+                    - img "短袖长裤睡衣套装" [ref=e627]
+                  - cell [ref=e628]:
+                    - button "短袖长裤睡衣套装 SPU-2085612097774481410" [ref=e629]:
+                      - strong [ref=e630]: 短袖长裤睡衣套装
+                      - generic "SPU-2085612097774481410" [ref=e631]
+                  - cell "女装/睡衣" [ref=e632]
+                  - cell "满印粉色字母图案、粉色草莓小图案；面料成分未明确可见 · 上衣为开襟直身版型，长裤为直筒版型，整套为上下装套装结构" [ref=e634]
+                  - cell "手动创建" [ref=e636]
+                  - cell "上架 · 1 SKU" [ref=e638]
+                  - cell "2026/08/07 14:20" [ref=e640]
+                  - cell [ref=e641]:
+                    - generic [ref=e642]:
+                      - button "查看详情" [ref=e643]
+                      - button "编辑" [ref=e647]
+                      - button "删除" [ref=e651]
+                      - button "使用 黑色底，粉色图案 进入图片创作" [ref=e655]
+                - row [ref=e659]:
+                  - cell [ref=e660]:
+                    - button "展开 SKU" [ref=e661]
+                  - cell [ref=e664]:
+                    - img "镂空装饰贝雷帽" [ref=e666]
+                  - cell [ref=e667]:
+                    - button "镂空装饰贝雷帽 SPU-2085406750786908162" [ref=e668]:
+                      - strong [ref=e669]: 镂空装饰贝雷帽
+                      - generic "SPU-2085406750786908162" [ref=e670]
+                  - cell "配饰/帽子" [ref=e671]
+                  - cell "通体镂空钩织纹样，帽身装饰金色花形饰件（中心嵌圆珠） · 无檐贝雷帽版型，整体呈圆润扁帽型" [ref=e673]
+                  - cell "手动创建" [ref=e675]
+                  - cell "上架 · 1 SKU" [ref=e677]
+                  - cell "2026/08/07 00:44" [ref=e679]
+                  - cell [ref=e680]:
+                    - generic [ref=e681]:
+                      - button "查看详情" [ref=e682]
+                      - button "编辑" [ref=e686]
+                      - button "删除" [ref=e690]
+                      - button "使用 米杏色 进入图片创作" [ref=e694]
+                - row [ref=e698]:
+                  - cell [ref=e699]:
+                    - button "展开 SKU" [ref=e700]
+                  - cell [ref=e703]:
+                    - img "格纹流苏围巾" [ref=e705]
+                  - cell [ref=e706]:
+                    - button "格纹流苏围巾 SPU-2085018834038734850" [ref=e707]:
+                      - strong [ref=e708]: 格纹流苏围巾
+                      - generic "SPU-2085018834038734850" [ref=e709]
+                  - cell "服饰配件/围巾" [ref=e710]
+                  - cell "大格纹图案，面料成分未明确可见 · 长条形披肩版型，两端垂坠" [ref=e712]
+                  - cell "手动创建" [ref=e714]
+                  - cell "上架 · 1 SKU" [ref=e716]
+                  - cell "2026/08/05 23:03" [ref=e718]
+                  - cell [ref=e719]:
+                    - generic [ref=e720]:
+                      - button "查看详情" [ref=e721]
+                      - button "编辑" [ref=e725]
+                      - button "删除" [ref=e729]
+                      - button "使用 灰蓝色、红棕色、深棕色 进入图片创作" [ref=e733]
+                - row [ref=e737]:
+                  - cell [ref=e738]:
+                    - button "展开 SKU" [ref=e739]
+                  - cell [ref=e742]:
+                    - img "格子流苏围巾" [ref=e744]
+                  - cell [ref=e745]:
+                    - button "格子流苏围巾 SPU-2085018328964841473" [ref=e746]:
+                      - strong [ref=e747]: 格子流苏围巾
+                      - generic "SPU-2085018328964841473" [ref=e748]
+                  - cell "服饰配件/围巾" [ref=e749]
+                  - cell "格纹图案，材质未明确可见 · 长条形围巾版型" [ref=e751]
+                  - cell "手动创建" [ref=e753]
+                  - cell "上架 · 1 SKU" [ref=e755]
+                  - cell "2026/08/05 23:01" [ref=e757]
+                  - cell [ref=e758]:
+                    - generic [ref=e759]:
+                      - button "查看详情" [ref=e760]
+                      - button "编辑" [ref=e764]
+                      - button "删除" [ref=e768]
+                      - button "使用 深棕色、蓝色、浅棕色 进入图片创作" [ref=e772]
+                - row [ref=e968]:
+                  - cell [ref=e969]:
+                    - button "收起 SKU" [ref=e970]
+                  - cell [ref=e781]:
+                    - img "格纹流苏围巾" [ref=e783]
+                  - cell [ref=e784]:
+                    - button "格纹流苏围巾 SPU-2085005964480671746" [ref=e785]:
+                      - strong [ref=e786]: 格纹流苏围巾
+                      - generic "SPU-2085005964480671746" [ref=e787]
+                  - cell "服饰配件/围巾" [ref=e788]
+                  - cell "格纹图案，材质未明确可见 · 长条形长围巾版型" [ref=e790]
+                  - cell "手动创建" [ref=e792]
+                  - cell "上架 · 1 SKU" [ref=e794]
+                  - cell "2026/08/05 22:12" [ref=e796]
+                  - cell [ref=e797]:
+                    - generic [ref=e798]:
+                      - button "查看详情" [ref=e799]
+                      - button "编辑" [ref=e803]
+                      - button "删除" [ref=e807]
+                      - button "使用 深棕色、中灰色、浅灰色、黑色 进入图片创作" [ref=e811]
+                - row [ref=e973]:
+                  - cell "└" [ref=e974]
+                  - cell [ref=e975]:
+                    - img "深棕色、中灰色、浅灰色、黑色" [ref=e977]
+                  - cell "深棕色、中灰色、浅灰色、黑色 SKU-2085005964480671746" [ref=e978]:
+                    - strong [ref=e979]: 深棕色、中灰色、浅灰色、黑色
+                    - generic [ref=e980]: SKU-2085005964480671746
+                  - cell "深棕色、中灰色、浅灰色、黑色" [ref=e981]
+                  - cell "格纹图案，材质未明确可见 · 长条形长围巾版型" [ref=e982]
+                  - cell "继承 手动创建" [ref=e983]
+                  - cell "1 张素材 · 可创作" [ref=e984]
+                  - cell "2026/08/05 22:12" [ref=e985]
+                  - cell [ref=e986]:
+                    - button "使用 深棕色、中灰色、浅灰色、黑色 进入图片创作" [ref=e987]: 去创作
+                - row [ref=e815]:
+                  - cell [ref=e816]:
+                    - button "展开 SKU" [ref=e817]
+                  - cell [ref=e820]:
+                    - img "条纹围巾" [ref=e822]
+                  - cell [ref=e823]:
+                    - button "条纹围巾 SPU-2085004540963254274" [ref=e824]:
+                      - strong [ref=e825]: 条纹围巾
+                      - generic "SPU-2085004540963254274" [ref=e826]
+                  - cell "服饰配件/围巾" [ref=e827]
+                  - cell "横竖拼接格纹图案；材质未明确可见 · 长条形围巾版型，两端带流苏" [ref=e829]
+                  - cell "手动创建" [ref=e831]
+                  - cell "上架 · 1 SKU" [ref=e833]
+                  - cell "2026/08/05 22:06" [ref=e835]
+                  - cell [ref=e836]:
+                    - generic [ref=e837]:
+                      - button "查看详情" [ref=e838]
+                      - button "编辑" [ref=e842]
+                      - button "删除" [ref=e846]
+                      - button "使用 蓝色系、灰色系、黑色 进入图片创作" [ref=e850]
+                - row [ref=e854]:
+                  - cell [ref=e855]:
+                    - button "展开 SKU" [ref=e856]
+                  - cell [ref=e859]:
+                    - img "山羊绒围巾" [ref=e861]
+                  - cell [ref=e862]:
+                    - button "山羊绒围巾 SPU-2084945418418974721" [ref=e863]:
+                      - strong [ref=e864]: 山羊绒围巾
+                      - generic "SPU-2084945418418974721" [ref=e865]
+                  - cell "服饰配件/围巾" [ref=e866]
+                  - cell "格纹图案，材质未明确可见 · 长条形围巾，两端带流苏" [ref=e868]
+                  - cell "手动创建" [ref=e870]
+                  - cell "上架 · 1 SKU" [ref=e872]
+                  - cell "2026/08/05 18:11" [ref=e874]
+                  - cell [ref=e875]:
+                    - generic [ref=e876]:
+                      - button "查看详情" [ref=e877]
+                      - button "编辑" [ref=e881]
+                      - button "删除" [ref=e885]
+                      - button "使用 棕色系，包含浅棕、深棕、橙红、米白 进入图片创作" [ref=e889]
+                - row [ref=e893]:
+                  - cell [ref=e894]:
+                    - button "展开 SKU" [ref=e895]
+                  - cell [ref=e898]:
+                    - img "山羊绒格纹流苏围巾" [ref=e900]
+                  - cell [ref=e901]:
+                    - button "山羊绒格纹流苏围巾 SPU-2084941503090716674" [ref=e902]:
+                      - strong [ref=e903]: 山羊绒格纹流苏围巾
+                      - generic "SPU-2084941503090716674" [ref=e904]
+                  - cell "服饰配件/围巾" [ref=e905]
+                  - cell "格纹图案，材质未明确可见 · 长条形披肩式围巾版型" [ref=e907]
+                  - cell "手动创建" [ref=e909]
+                  - cell "上架 · 1 SKU" [ref=e911]
+                  - cell "2026/08/05 17:56" [ref=e913]
+                  - cell [ref=e914]:
+                    - generic [ref=e915]:
+                      - button "查看详情" [ref=e916]
+                      - button "编辑" [ref=e920]
+                      - button "删除" [ref=e924]
+                      - button "使用 以棕色调为主，搭配红棕、浅棕、深棕色块 进入图片创作" [ref=e928]
+            - generic [ref=e932]:
+              - generic [ref=e933]:
+                - generic [ref=e934]: 共 36 个 SPU
+                - combobox "每页数量" [ref=e935]:
+                  - option "10 / 页" [selected]
+                  - option "20 / 页"
+                  - option "50 / 页"
+              - generic [ref=e936]:
+                - button "上一页" [disabled] [ref=e937]
+                - generic [ref=e940]: 第 1 / 4 页
+                - button "下一页" [ref=e941]
+          - generic [ref=e1075]:
+            - button "关闭产品表单" [ref=e1076]
+            - complementary [ref=e1077]:
+              - generic [ref=e1078]:
+                - generic [ref=e1079]:
+                  - generic [ref=e1080]:
+                    - heading "新建产品" [level=2] [ref=e1081]
+                    - generic [ref=e1082]: 手动创建
+                  - paragraph [ref=e1083]: 保存后生成 SPU · 当前接口保存 1 个默认 SKU
+                - button "关闭" [ref=e1084]
+              - main [ref=e1088]:
+                - generic [ref=e1089]:
+                  - generic [ref=e1090]:
+                    - generic [ref=e1091]: "1"
+                    - heading "SPU 共享信息" [level=3] [ref=e1092]
+                    - generic [ref=e1093]: 商品公共事实
+                  - generic [ref=e1094]:
+                    - generic [ref=e1095]:
+                      - generic [ref=e1096]: 商品名称 *
+                      - textbox "商品名称 *" [ref=e1097]:
+                        - /placeholder: 例如：法式方领连衣裙
+                    - generic [ref=e1098]:
+                      - generic [ref=e1099]: 商品分类
+                      - button "商品分类" [ref=e1101]: 选择商品分类
+                    - generic [ref=e1104]:
+                      - generic [ref=e1105]: 品类标签
+                      - textbox "品类标签" [ref=e1106]:
+                        - /placeholder: 例如：连衣裙
+                    - generic [ref=e1107]:
+                      - generic [ref=e1108]: 上下架状态
+                      - combobox "上下架状态" [ref=e1109]:
+                        - option "上架" [selected]
+                        - option "下架"
+                    - generic [ref=e1110]:
+                      - generic [ref=e1111]: 核心卖点
+                      - textbox "核心卖点" [ref=e1112]:
+                        - /placeholder: 用于商品事实和创作提示词
+                - generic [ref=e1113]:
+                  - generic [ref=e1114]:
+                    - generic [ref=e1115]:
+                      - generic [ref=e1116]: "2"
+                      - heading "SKU 与创作素材" [level=3] [ref=e1117]
+                      - generic [ref=e1118]: 至少保留 1 个 SKU
+                    - button "添加 SKU（等待接口接入）" [disabled] [ref=e1119]
+                  - generic [ref=e1121]:
+                    - generic [ref=e1122]:
+                      - strong [ref=e1123]: SKU 1 · 默认规格
+                      - generic [ref=e1124]: SPU 封面
+                      - generic [ref=e1125]: 保存后生成
+                    - generic [ref=e1126]:
+                      - generic [ref=e1127]:
+                        - generic [ref=e1128]: SKU 图片 *
+                        - button "选择 SKU 图片" [ref=e1129]
+                        - button "图片理解" [disabled] [ref=e1137]
+                      - generic [ref=e1141]:
+                        - generic [ref=e1142]:
+                          - generic [ref=e1143]: 颜色 / 款式
+                          - textbox "颜色 / 款式" [ref=e1144]:
+                            - /placeholder: 例如：酒红
+                        - generic [ref=e1145]:
+                          - generic [ref=e1146]: 规格
+                          - textbox "规格" [ref=e1147]: 默认规格
+                        - generic [ref=e1148]:
+                          - generic [ref=e1149]: 图案 / 材质
+                          - textbox "图案 / 材质" [ref=e1150]:
+                            - /placeholder: 例如：纯色 · 醋酸混纺
+                        - generic [ref=e1151]:
+                          - generic [ref=e1152]: 版型 / 结构
+                          - textbox "版型 / 结构" [ref=e1153]:
+                            - /placeholder: 例如：收腰 A 字裙
+              - generic [ref=e1154]:
+                - paragraph [ref=e1155]: 1 个 SKU · 首个 SKU 图片自动作为 SPU 封面
+                - button "取消" [ref=e1156]
+                - button "保存产品" [ref=e1157]
+  - region "Notifications alt+T"
