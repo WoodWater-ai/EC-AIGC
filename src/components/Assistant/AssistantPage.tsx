@@ -61,6 +61,9 @@ const CAPABILITY_LABELS: Record<string, string> = {
 const INTENT_LABELS: Record<string, string> = {
   IMAGE_GENERATION: '图片创作需求',
   VIDEO_GENERATION: '视频创作需求',
+  IMAGE_UNDERSTANDING: '图片理解需求',
+  PROMPT_CREATION: '提示词编写需求',
+  IMAGE_PROMPT_REVERSE: '提示词反推需求',
   CHITCHAT: '对话咨询',
 };
 
@@ -74,8 +77,17 @@ const buildProcessSteps = (message: AssistantMessage): ProcessStep[] => {
 
   if (!capability) {
     const promptOptimization = message.suggestionType === 'OPTIMIZE_PROMPT';
+    const promptCreation = message.intent === 'PROMPT_CREATION'
+      || message.intent === 'IMAGE_PROMPT_REVERSE';
+    const imageUnderstanding = message.intent === 'IMAGE_UNDERSTANDING';
     return [{
-      title: promptOptimization ? '优化提示词' : isCompleted ? '理解并回复' : '理解需求',
+      title: promptOptimization
+        ? '优化提示词'
+        : promptCreation
+          ? (message.targetMedia === 'VIDEO' ? '编写视频提示词' : '编写图片提示词')
+          : imageUnderstanding
+            ? '理解图片'
+          : isCompleted ? '理解并回复' : '理解需求',
       description: isPending
         ? (promptOptimization ? '正在保持原意并优化提示词表达' : '正在结合当前会话和已选资源分析你的需求')
         : isFailed
@@ -84,7 +96,11 @@ const buildProcessSteps = (message: AssistantMessage): ProcessStep[] => {
             ? '本次处理已停止'
             : promptOptimization
               ? '已完成表达增强与风险歧义优化，可回填后继续创作'
-              : `已识别为${INTENT_LABELS[message.intent ?? ''] ?? '普通对话需求'}`,
+              : promptCreation
+                ? `已整理${message.targetMedia === 'VIDEO' ? '视频' : '图片'}提示词，本次未提交生成任务`
+                : imageUnderstanding
+                  ? '已结合图片内容完成分析，本次未提交生成任务'
+                : `已识别为${INTENT_LABELS[message.intent ?? ''] ?? '普通对话需求'}`,
       state: isPending ? 'active' : isFailed ? 'failed' : isCancelled ? 'pending' : 'done',
     }];
   }
@@ -1151,7 +1167,11 @@ function AssistantProcessPanel({ message }: { message: AssistantMessage }) {
         </div>
         {message.prompt && (
           <div className="mt-3 rounded-lg border border-[#ebe6e0] bg-white px-2.5 py-2">
-            <div className="mb-1 text-[9px] font-bold text-[#77716b]">整理后的生成指令</div>
+            <div className="mb-1 text-[9px] font-bold text-[#77716b]">
+              {message.intent === 'PROMPT_CREATION' || message.intent === 'IMAGE_PROMPT_REVERSE'
+                ? '整理得到的提示词'
+                : '整理后的生成指令'}
+            </div>
             <p className="max-h-28 overflow-y-auto whitespace-pre-wrap break-words text-[9px] leading-4 text-[#99928b]">{message.prompt}</p>
           </div>
         )}

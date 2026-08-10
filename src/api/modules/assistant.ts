@@ -2,6 +2,15 @@ import http from '../client';
 import type { PageInfo } from '../service-result';
 
 export type AssistantMediaType = 'IMAGE' | 'VIDEO';
+export type AssistantTargetMedia = 'NONE' | AssistantMediaType;
+export type AssistantIntent =
+  | 'CHITCHAT'
+  | 'IMAGE_UNDERSTANDING'
+  | 'PROMPT_CREATION'
+  | 'IMAGE_GENERATION'
+  | 'VIDEO_GENERATION'
+  | 'PROMPT_OPTIMIZATION'
+  | 'IMAGE_PROMPT_REVERSE';
 export type AssistantTaskTargetCapability =
   | 'REF_IMG_EDIT'
   | 'IMG2VIDEO'
@@ -56,7 +65,9 @@ export interface AssistantMessage {
   parentMessageId?: string | null;
   role: 'USER' | 'ASSISTANT' | 'SYSTEM' | 'TOOL';
   content: string;
-  intent?: string | null;
+  intent?: AssistantIntent | null;
+  targetMedia?: AssistantTargetMedia | null;
+  executeGeneration?: boolean | null;
   capability?: string | null;
   prompt?: string | null;
   negativePrompt?: string | null;
