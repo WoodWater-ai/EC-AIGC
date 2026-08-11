@@ -15,10 +15,10 @@ import {
 import { toast } from 'sonner';
 import type { ProductDTO, ProductQueryReq, ProductStatus } from '../api/modules/productInfo';
 import { productInfoApi } from '../api/modules/productInfo';
+import { productLibraryApi } from '../api/modules/productLibrary';
 import type { PageInfo } from '../api/service-result';
 import { productCategoryApi, type ProductCategoryNode } from '../api/modules/productCategory';
 import { useAuth } from '../auth/AuthContext';
-import { AppScreen } from '../types';
 import { withCosThumbnail } from '../utils/cosImage';
 import { useConfirm } from './common/ConfirmProvider';
 import { ProductDetailDrawer } from './productManagement/ProductDetailDrawer';
@@ -35,7 +35,7 @@ import {
 } from './productManagement/productManagementModel';
 
 interface ProductManagePageProps {
-  setScreen: (screen: AppScreen) => void;
+  onCreateSku: (sku: ProductSkuView) => Promise<void>;
 }
 
 interface ProductLoadOverrides {
@@ -46,7 +46,7 @@ interface ProductLoadOverrides {
   categoryId?: string | null;
 }
 
-export default function ProductManagePage({ setScreen }: ProductManagePageProps) {
+export default function ProductManagePage({ onCreateSku }: ProductManagePageProps) {
   const { hasPermission } = useAuth();
   const canCreate = hasPermission('product:create');
   const canEdit = hasPermission('product:edit');
@@ -148,7 +148,28 @@ export default function ProductManagePage({ setScreen }: ProductManagePageProps)
     setDetailProduct(product);
     try {
       const detail = await productInfoApi.detail({ id: product.id });
-      setDetailProduct(toProductSpu(detail as ProductManagementRecord));
+      const nextProduct = toProductSpu(detail as ProductManagementRecord);
+      setDetailProduct(nextProduct);
+      // 产品库记录的是输入素材和全部生成产物；详情抽屉在此补真实数量，
+      // 不改变列表分页接口，也避免为每一行发 N+1 请求。
+      void productLibraryApi.productDetail(product.id).then((libraryDetail) => {
+        const materialCount = libraryDetail.inputAssets.length
+          + libraryDetail.generatedImages.length
+          + libraryDetail.generatedVideos.length;
+        const baseImage = libraryDetail.inputAssets.find((item) => item.mediaType === 'IMAGE');
+        setDetailProduct((current) => {
+          if (!current || current.id !== product.id) return current;
+          return {
+            ...current,
+            imageUrl: current.imageUrl ?? baseImage?.thumbnailUrl ?? baseImage?.url,
+            skus: current.skus.map((sku) => ({
+              ...sku,
+              materialCount,
+              imageUrl: sku.imageUrl ?? baseImage?.thumbnailUrl ?? baseImage?.url,
+            })),
+          };
+        });
+      }).catch(() => undefined);
     } catch {
       // 列表已有完整兜底数据，详情请求失败时仍可浏览当前快照。
     }
@@ -177,13 +198,13 @@ export default function ProductManagePage({ setScreen }: ProductManagePageProps)
     }
   }
 
-  function handleCreate(sku: ProductSkuView) {
+  async function handleCreate(sku: ProductSkuView) {
     if (!sku.canCreate) {
       toast.warning(sku.unavailableReason || '当前 SKU 暂不可用于创作');
       return;
     }
     setDetailProduct(null);
-    setScreen(AppScreen.CREATE_IMAGE_TASK);
+    await onCreateSku(sku);
   }
 
   async function handleReset() {

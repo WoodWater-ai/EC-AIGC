@@ -13,6 +13,7 @@ export interface ProductPickerModalProps {
   open: boolean;
   onClose: () => void;
   onPick: (product: ProductDTO) => void;
+  onCreate?: () => void;
 }
 
 const PAGE_SIZE = 20;
@@ -26,7 +27,7 @@ const PAGE_SIZE = 20;
  * - 单页 20 条,翻页器用 button 简单 prev/next
  * - 选中行后调 onPick(product) 并自动 onClose
  */
-export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({ open, onClose, onPick }) => {
+export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({ open, onClose, onPick, onCreate }) => {
   // 搜索栏:输入态(draftKeyword)与触发态(appliedKeyword)分离,只有点"搜索"
   // 或回车 Enter 才提交到 appliedKeyword 触发 fetch;重置按钮清空两个 + 触发 fetch。
   const [draftKeyword, setDraftKeyword] = useState('');
@@ -163,6 +164,15 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({ open, on
               >
                 重置
               </button>
+              {onCreate && (
+                <button
+                  type="button"
+                  onClick={onCreate}
+                  className="h-9 px-3 text-xs font-bold text-primary hover:bg-[#fff5f1] rounded-md border border-primary/30"
+                >
+                  新建商品
+                </button>
+              )}
               <span className="text-xs text-slate-500">
                 共 {pageInfo?.total ?? 0} 个
               </span>

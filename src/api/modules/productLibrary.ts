@@ -81,6 +81,12 @@ export interface ProductLibraryInputAsset {
   name: string;
   mediaType: 'IMAGE' | 'VIDEO';
   assetType?: string;
+  /** 产品输入素材保留的业务标签，例如“合并套图”。 */
+  tags?: string;
+  /** ERP 或手动产品设置的主图，允许选择但不允许从素材库删除。 */
+  productMainImage?: boolean;
+  /** 资源中心显式指定的产品封面，不影响 ERP 商品主图。 */
+  productCover?: boolean;
   url: string;
   thumbnailUrl?: string;
   fileSize?: number;
@@ -168,4 +174,13 @@ export const productLibraryApi = {
 
   archiveBatch: (assets: Array<{ id: string; mediaType: 'IMAGE' | 'VIDEO' }>) =>
     http.post<number>('/v1/admin/product-library/asset/archive-batch', { assets }),
+
+  deleteInputAssets: (productId: string, assetIds: string[]) =>
+    http.post<number>('/v1/admin/product-library/input-asset/delete-batch', {
+      productId,
+      assetIds,
+    }),
+
+  setInputAssetCover: (productId: string, assetId: string) =>
+    http.post('/v1/admin/product-library/input-asset/set-cover', { productId, assetId }),
 };

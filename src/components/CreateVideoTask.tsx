@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AppScreen, type ProductAsset, type VideoTaskSubmitPayload } from '../types';
-import type { ProductDTO } from '../api/modules/productInfo';
+import { productInfoApi, type ProductDTO } from '../api/modules/productInfo';
 import {
   AssetTransitModal,
   type ResourceCenterSource,
@@ -78,6 +78,8 @@ interface CreateVideoTaskProps {
   setSelectedProduct: (product: ProductAsset) => void;
   creationTemplateId?: string | null;
   assistantPrefill?: AssistantTaskPrefill | null;
+  /** 从任务结果继续创作时带入的、已保存的业务素材。 */
+  resultAssetPrefill?: AssetResourceItem | null;
   /** 返回按钮回调;不传则 fallback 到跳工作台首页(原行为) */
   goBack?: () => void;
 }
@@ -200,6 +202,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   setScreen,
   creationTemplateId,
   assistantPrefill,
+  resultAssetPrefill,
   goBack,
 }) => {
   const creationPrefillQuery = useServiceQuery(
@@ -292,6 +295,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   } | null>(null);
   const appliedCreationTemplateRef = useRef<string | null>(null);
   const appliedAssistantPrefillRef = useRef<string | null>(null);
+  const appliedResultAssetRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!assistantPrefill || assistantPrefill.targetScreen !== 'CREATE_VIDEO_TASK') return;
@@ -528,7 +532,10 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   /** [2026-08-08 智能多帧] 当前选定的供应商模型(优先 modelId,否则用通道默认) */
   const effectiveModelCode = params.modelId ?? null;
 
-  const handleProductPicked = (product: ProductDTO) => {
+  const handleProductPicked = (
+    product: ProductDTO,
+    successMessage = `已选择产品：${product.name}`,
+  ) => {
     const nextFacts = {
       name: (product.name ?? '').trim(),
       sellingPoints: (product.sellingPoints ?? '').trim(),
@@ -567,8 +574,37 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       setPrompt(reusablePrompt.replace(/\{\{([^}]+)}}/g, (match, key: string) =>
         values[key] || match));
     }
-    toast.success(`已选择产品：${product.name}`);
+    toast.success(successMessage);
   };
+
+  useEffect(() => {
+    if (!resultAssetPrefill || appliedResultAssetRef.current === resultAssetPrefill.id) return;
+    appliedResultAssetRef.current = resultAssetPrefill.id;
+    const asset: SelectedAsset = {
+      assetId: resultAssetPrefill.id,
+      name: resultAssetPrefill.name,
+      assetKind: resultAssetPrefill.assetKind,
+      originalUrl: resultAssetPrefill.originalUrl ?? resultAssetPrefill.thumbnailUrl ?? '',
+      thumbnailUrl: resultAssetPrefill.thumbnailUrl ?? resultAssetPrefill.originalUrl,
+      durationSec: resultAssetPrefill.durationSec,
+    };
+    if (resultAssetPrefill.assetKind === 'VIDEO') {
+      setMode('TRENDING_REPLICATE');
+      setSourceVideo(asset);
+      setFirstFrame(null);
+    } else {
+      setMode('FIRST_FRAME');
+      setFirstFrame(asset);
+      setSourceVideo(null);
+    }
+    if (!resultAssetPrefill.productId) {
+      toast.warning('已带入生成结果，请补充关联产品后再生成');
+      return;
+    }
+    void productInfoApi.detail({ id: resultAssetPrefill.productId })
+      .then(handleProductPicked)
+      .catch(() => toast.warning('已带入生成结果，但产品信息读取失败'));
+  }, [handleProductPicked, resultAssetPrefill]);
 
   const handleClearProduct = () => {
     setSelectedProductInfo(null);
@@ -679,6 +715,13 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     segmentId?: string | null,
   ) => setPicker({ role, assetKind, source, segmentId: segmentId ?? null });
 
+  const syncProductFromFirstFrame = (asset: AssetResourceItem) => {
+    if (!asset.productId || asset.productId === selectedProductInfo?.id) return;
+    void productInfoApi.detail({ id: asset.productId })
+      .then((product) => handleProductPicked(product, `已根据首帧素材带入产品：${product.name}`))
+      .catch(() => toast.warning('首帧素材已选择，但关联产品读取失败，请手动选择产品'));
+  };
+
   const confirmAssets = (items: AssetResourceItem[]) => {
     if (!picker || items.length === 0) return;
     const selected = items
@@ -700,6 +743,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     }
     if (picker.role === 'FIRST_FRAME') {
       const head = selected[0];
+      const sourceAsset = items.find((item) => item.id === head.assetId);
       if (mode === 'MULTI_FRAME') {
         setMultiFrameStart({
           assetId: head.assetId,
@@ -710,6 +754,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       } else {
         setFirstFrame(head);
       }
+      if (sourceAsset) syncProductFromFirstFrame(sourceAsset);
     } else if (picker.role === 'SOURCE_VIDEO') {
       const head = selected[0];
       setSourceVideo(head);

@@ -49,6 +49,10 @@ export interface AssetResourceItem {
   inModelLibrary?: boolean;
   uploadUserId: string;
   productId?: string;
+  /** 产品详情中的当前产品主图，受保护不可删除。 */
+  isProductMainImage?: boolean;
+  /** 资源中心显式指定的产品封面。 */
+  isProductCover?: boolean;
   recognitionId?: string;
   /** 关联 file_resource.id(Spec-B 主路径;长 string 防 JS 精度丢失) */
   fileResourceId?: string;
@@ -100,4 +104,7 @@ export const assetApi = {
     items: Array<{ mediaType: 'IMAGE' | 'VIDEO'; sourceId: string }>,
   ) =>
     http.post<AssetResourceItem[]>('/v1/admin/asset/resolve-generated', { items }),
+
+  bindToProduct: (resourceId: string, productId: string) =>
+    http.post('/v1/admin/asset/bind-product', { resourceId, productId }),
 };

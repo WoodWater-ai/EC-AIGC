@@ -8,6 +8,8 @@ import {
   type ProductDTO,
 } from '../../../api/modules/productInfo';
 import { DialogFrame } from './DialogFrame';
+import { ProductPickerModal } from '../ProductPickerModal';
+import { assetApi } from '../../../api/modules/asset';
 
 interface ProductDraft {
   name: string;
@@ -51,6 +53,7 @@ export const CreateProductFromAssetDialog: React.FC<Props> = ({
   const [draft, setDraft] = useState<ProductDraft>(EMPTY_DRAFT);
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!asset) return;
@@ -58,6 +61,7 @@ export const CreateProductFromAssetDialog: React.FC<Props> = ({
     setDraft(EMPTY_DRAFT);
     setAnalyzing(false);
     setSaving(false);
+    setProductPickerOpen(false);
   }, [asset]);
 
   const updateDraft = (field: keyof ProductDraft, value: string) => {
@@ -107,6 +111,21 @@ export const CreateProductFromAssetDialog: React.FC<Props> = ({
     }
   };
 
+  const handleBindExistingProduct = async (product: ProductDTO) => {
+    if (!asset) return;
+    setSaving(true);
+    try {
+      await assetApi.bindToProduct(asset.id, product.id);
+      toast.success(`已关联商品“${product.name}”`);
+      setProductPickerOpen(false);
+      onCreated(product);
+    } catch {
+      // 业务错误由请求拦截器统一提示，保留当前弹窗供用户重试或新建。
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const cancelButton = (
     <div className="group relative">
       <button
@@ -138,6 +157,14 @@ export const CreateProductFromAssetDialog: React.FC<Props> = ({
           {cancelButton}
           <button
             type="button"
+            onClick={() => setProductPickerOpen(true)}
+            disabled={analyzing || saving}
+            className="rounded border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary hover:bg-[#fff5f1] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            关联现有商品
+          </button>
+          <button
+            type="button"
             onClick={handleAnalyze}
             disabled={analyzing}
             className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -164,9 +191,9 @@ export const CreateProductFromAssetDialog: React.FC<Props> = ({
           <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">
             <span className="material-symbols-outlined text-xl">info</span>
             <div>
-              <p className="font-bold">当前资源没有创建商品，必须创建商品后才能使用。</p>
+              <p className="font-bold">当前资源尚未关联商品，请先关联现有商品或新建商品。</p>
               <p className="mt-1 text-[11px] text-amber-700">
-                确认后将自动分析素材并展示商品信息，您确认信息后系统会创建商品并完成关联。
+                选择新建后将自动分析素材并展示商品信息，确认后完成创建与关联。
               </p>
             </div>
           </div>
@@ -197,6 +224,11 @@ export const CreateProductFromAssetDialog: React.FC<Props> = ({
           </label>
         </div>
       )}
+      <ProductPickerModal
+        open={productPickerOpen}
+        onClose={() => setProductPickerOpen(false)}
+        onPick={handleBindExistingProduct}
+      />
     </DialogFrame>
   );
 };

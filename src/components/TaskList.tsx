@@ -13,11 +13,13 @@ import { ImagePreviewModal, type PreviewImage } from './ImagePreviewModal';
 import { VideoPreviewModal, type PreviewVideo } from './VideoPreviewModal';
 import { TaskDetailsDrawer } from './TaskDetailsDrawer';
 import { useAuth } from '../auth/AuthContext';
+import type { AssetResourceItem } from '../api/modules/asset';
 
 interface TaskListProps {
   highlightGroupId: string | null;
   highlightTaskKind: MediaKind;
   setScreen: (screen: AppScreen, payload?: { highlightGroupId?: string }) => void;
+  onContinueWithResult: (asset: AssetResourceItem) => void;
 }
 
 type MediaKind = 'IMAGE' | 'VIDEO';
@@ -79,7 +81,12 @@ const resultImageUrl = (result: TaskResultPreviewResponse) =>
     ? result.url
     : result.thumbnailUrl || result.url;
 
-export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightTaskKind, setScreen }) => {
+export const TaskList: React.FC<TaskListProps> = ({
+  highlightGroupId,
+  highlightTaskKind,
+  setScreen,
+  onContinueWithResult,
+}) => {
   const { hasPermission } = useAuth();
   const canCreateTask = hasPermission('task:create');
   const [kind, setKind] = useState<MediaKind>(highlightTaskKind);
@@ -410,10 +417,11 @@ export const TaskList: React.FC<TaskListProps> = ({ highlightGroupId, highlightT
       {selectedGroup && (
         <TaskDetailsDrawer
           group={selectedGroup}
-          initialTaskId={selectedTaskId}
-          onClose={() => setSelectedGroup(null)}
-          onChanged={() => groupsQuery.refetch()}
-        />
+        initialTaskId={selectedTaskId}
+        onClose={() => setSelectedGroup(null)}
+        onChanged={() => groupsQuery.refetch()}
+        onContinueWithResult={onContinueWithResult}
+      />
       )}
       {imagePreview && (
         <ImagePreviewModal

@@ -16,6 +16,8 @@ interface CompositePreview {
 interface ResourceMergeDrawerProps {
   items: AssetResourceItem[];
   categoryId?: number;
+  /** 合成素材只归属一个目标 SKU，避免一条资源被多头关联。 */
+  productId?: string;
   onClose: () => void;
   onUploaded: () => void | Promise<void>;
 }
@@ -29,18 +31,20 @@ const defaultResourceName = () => {
 export function ResourceMergeDrawer({
   items,
   categoryId,
+  productId,
   onClose,
   onUploaded,
 }: ResourceMergeDrawerProps) {
   const [orderedItems, setOrderedItems] = useState(items);
-  const [direction, setDirection] = useState<MergeDirection>('VERTICAL');
+  const [direction, setDirection] = useState<MergeDirection>('HORIZONTAL');
   const [resourceName, setResourceName] = useState(defaultResourceName);
   const [preview, setPreview] = useState<CompositePreview | null>(null);
   const [isComposing, setIsComposing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { upload, progress, error: uploadError, reset: resetUpload } = useFileUpload({
-    purpose: 'UP_DOWN_MERGE',
+    purpose: productId ? 'PRODUCT' : 'UP_DOWN_MERGE',
+    productId,
   });
 
   const usableUrls = useMemo(
@@ -126,6 +130,7 @@ export function ResourceMergeDrawer({
         assetType: 'PRODUCT_ORIGINAL',
         description: `${orderedItems.length} 张图片${direction === 'VERTICAL' ? '上下' : '左右'}合成`,
         tags: `合并套图,${direction === 'VERTICAL' ? '上下合成' : '左右合成'}`,
+        productId,
         categoryIds: categoryId == null ? undefined : [String(categoryId)],
       });
       toast.success('合并套图已上传到资源中心');

@@ -17,15 +17,18 @@ import { creationTemplateApi } from '../api/modules/creationTemplate';
 import { PublishTemplateDialog } from './common/PublishTemplateDialog';
 import { ImageRevisionDialog } from './task/ImageRevisionDialog';
 import { useAuth } from '../auth/AuthContext';
+import { assetApi, type AssetResourceItem } from '../api/modules/asset';
 
 interface TaskDetailsDrawerProps {
   group: TaskGroupResponse;
   initialTaskId?: string;
   onClose: () => void;
   onChanged?: () => void;
+  /** 将某个已生成结果转换为产品素材后，带入对应创作页。 */
+  onContinueWithResult?: (asset: AssetResourceItem) => void;
 }
 
-type DetailTab = 'overview' | 'results' | 'inputs' | 'diagnostics';
+type DetailTab = 'details' | 'results' | 'diagnostics';
 
 interface ReviewTarget {
   result: TaskResultPreviewResponse;
@@ -107,6 +110,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   initialTaskId,
   onClose,
   onChanged,
+  onContinueWithResult,
 }) => {
   const { hasPermission } = useAuth();
   const canAudit = hasPermission('task:audit');
@@ -117,13 +121,15 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   const [selectedTaskId, setSelectedTaskId] = useState(
     initialTaskId ?? initialGroup.tasks[0]?.id,
   );
-  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+  const [activeTab, setActiveTab] = useState<DetailTab>('results');
   const [imagePreview, setImagePreview] = useState<{ results: TaskResultPreviewResponse[]; index: number } | null>(null);
   const [videoPreview, setVideoPreview] = useState<TaskResultPreviewResponse | null>(null);
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
   const [templatePublishTarget, setTemplatePublishTarget] = useState<TemplatePublishTarget | null>(null);
   const [revisionTarget, setRevisionTarget] = useState<TaskResultPreviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savedResultIds, setSavedResultIds] = useState<Set<string>>(new Set());
+  const [savingResultId, setSavingResultId] = useState<string | null>(null);
 
   const selectedTask = group.tasks.find((task) => task.id === selectedTaskId)
     ?? group.tasks[0];
@@ -138,6 +144,21 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
       onChanged?.();
     } finally {
       if (!silent) setLoading(false);
+    }
+  };
+
+  const resolveProductAsset = async (result: TaskResultPreviewResponse) => {
+    setSavingResultId(result.id);
+    try {
+      const [asset] = await assetApi.resolveGenerated([{
+        mediaType: result.mediaType,
+        sourceId: result.id,
+      }]);
+      if (!asset) throw new Error('未返回可用素材');
+      setSavedResultIds((current) => new Set(current).add(result.id));
+      return asset;
+    } finally {
+      setSavingResultId(null);
     }
   };
 
@@ -217,9 +238,8 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
           <main className="flex min-h-0 flex-col">
             <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-5 pt-3">
               {([
-                ['overview', '概览'],
+                ['details', '详情'],
                 ['results', `生成结果 (${selectedTask.resultPreviews.length})`],
-                ['inputs', '输入与 Prompt'],
                 ['diagnostics', '执行诊断'],
               ] as Array<[DetailTab, string]>).map(([id, label]) => (
                 <button
@@ -237,8 +257,11 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5 lg:p-6">
-              {activeTab === 'overview' && (
-                <OverviewTab group={group} task={selectedTask} meta={meta} />
+              {activeTab === 'details' && (
+                <div className="space-y-5">
+                  <OverviewTab group={group} task={selectedTask} meta={meta} />
+                  <InputsTab group={group} task={selectedTask} />
+                </div>
               )}
               {activeTab === 'results' && (
                 <ResultsTab
@@ -269,13 +292,23 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                       // 统一请求层展示具体错误。
                     }
                   }}
+                  onSaveToProduct={async (result) => {
+                    await resolveProductAsset(result);
+                    toast.success('已保存到产品素材');
+                  }}
+                  onContinueWithResult={async (result) => {
+                    const asset = await resolveProductAsset(result);
+                    onContinueWithResult?.(asset);
+                  }}
+                  canSaveToProduct={Boolean(group.productId)}
+                  savedResultIds={savedResultIds}
+                  savingResultId={savingResultId}
                   canAudit={canAudit}
                   canRetry={canRetryTask}
                   canRevise={canReviseTask}
                   canManageTemplate={canManageTemplate}
                 />
               )}
-              {activeTab === 'inputs' && <InputsTab group={group} task={selectedTask} />}
               {activeTab === 'diagnostics' && (
                 <DiagnosticsTab task={selectedTask} onTaskChanged={() => void refreshGroup()} />
               )}
@@ -423,6 +456,11 @@ const ResultsTab: React.FC<{
   onRevisionRetry: (taskId: string) => Promise<void>;
   onPublishTemplate: (result: TaskResultPreviewResponse) => void;
   onOfflineTemplate: (result: TaskResultPreviewResponse) => Promise<void>;
+  onSaveToProduct: (result: TaskResultPreviewResponse) => Promise<void>;
+  onContinueWithResult: (result: TaskResultPreviewResponse) => Promise<void>;
+  canSaveToProduct: boolean;
+  savedResultIds: Set<string>;
+  savingResultId: string | null;
   canAudit: boolean;
   canRetry: boolean;
   canRevise: boolean;
@@ -436,6 +474,11 @@ const ResultsTab: React.FC<{
   onRevisionRetry,
   onPublishTemplate,
   onOfflineTemplate,
+  onSaveToProduct,
+  onContinueWithResult,
+  canSaveToProduct,
+  savedResultIds,
+  savingResultId,
   canAudit,
   canRetry,
   canRevise,
@@ -503,7 +546,27 @@ const ResultsTab: React.FC<{
                   {resultStatusLabel(result.status)}
                 </span>
               </div>
-              <div className="mt-3 flex min-h-7 flex-nowrap items-center justify-between gap-1 border-t border-slate-100 pt-3">
+              <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-3">
+                {canSaveToProduct && (
+                  <>
+                    <button
+                      onClick={() => void onSaveToProduct(result)}
+                      disabled={savingResultId === result.id || savedResultIds.has(result.id)}
+                      className="inline-flex h-7 shrink-0 items-center gap-0.5 whitespace-nowrap rounded border border-emerald-200 bg-emerald-50 px-2 text-[10px] font-bold text-emerald-700 hover:border-emerald-400 disabled:cursor-default disabled:opacity-70"
+                    >
+                      <span className="material-symbols-outlined text-xs">{savedResultIds.has(result.id) ? 'check' : 'add_to_photos'}</span>
+                      {savedResultIds.has(result.id) ? '已入产品素材' : savingResultId === result.id ? '保存中…' : '保存到产品素材'}
+                    </button>
+                    <button
+                      onClick={() => void onContinueWithResult(result)}
+                      disabled={savingResultId === result.id}
+                      className="inline-flex h-7 shrink-0 items-center gap-0.5 whitespace-nowrap rounded border border-slate-200 px-2 text-[10px] font-bold text-slate-700 hover:border-primary hover:text-primary disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-xs">auto_awesome</span>
+                      继续创作
+                    </button>
+                  </>
+                )}
                 {canRevise && result.mediaType === 'IMAGE' && (
                   <button
                     onClick={() => onRevise(result)}

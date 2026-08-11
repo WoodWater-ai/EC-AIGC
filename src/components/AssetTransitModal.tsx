@@ -21,6 +21,8 @@ import { useFileUpload } from '../hooks/useFileUpload';
 import { useConfirm } from './common/ConfirmProvider';
 import { AssetImage } from './AssetImage';
 import { ResourceMergeDrawer } from './common/ResourceMergeDrawer';
+import { ProductPickerModal } from './CreateImageTask/ProductPickerModal';
+import { CreateProductFromAssetDialog } from './CreateImageTask/dialogs/CreateProductFromAssetDialog';
 
 /**
  * 左侧仅"分类导航"(调用真实分类树接口),无快捷视图。
@@ -156,7 +158,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
         : 'UPLOAD',
   );
   const [mediaFilter, setMediaFilter] = useState<ResourceMediaFilter>(
-    assetKind,
+    assetKind === 'AUDIO' ? 'AUDIO' : 'ALL',
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [productSpus, setProductSpus] = useState<ProductSpuView[]>([]);
@@ -198,6 +200,9 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   /** 合并抽屉使用打开瞬间的选择快照，避免合成过程中素材顺序被列表操作改变。 */
   const [mergeDrawerItems, setMergeDrawerItems] = useState<AssetResourceItem[] | null>(null);
   const [isSettingAsModel, setIsSettingAsModel] = useState(false);
+  const [associationAsset, setAssociationAsset] = useState<AssetResourceItem | null>(null);
+  const [productAssociationPickerOpen, setProductAssociationPickerOpen] = useState(false);
+  const [productCreationAsset, setProductCreationAsset] = useState<AssetResourceItem | null>(null);
 
   // ============ 真后端数据 ============
   const { user, hasPermission } = useAuth();
@@ -330,7 +335,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setFocusedProduct(null);
     setPrimaryFilter('all');
     setOpenTagDimension(null);
-    if (source === 'MODEL') setMediaFilter('IMAGE');
+    setMediaFilter(source === 'MODEL' ? 'IMAGE' : assetKind === 'AUDIO' ? 'AUDIO' : 'ALL');
   };
 
   /**
@@ -409,11 +414,23 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     && selectedAssetIds
       .map((id) => assets.find((asset) => asset.id === id))
       .every((asset) => asset != null
-        && String(asset.uploadUserId) === currentUserId
-        && !asset.productId);
+        && (activeSource === 'PRODUCT' && focusedProduct
+          ? !asset.isProductMainImage
+          : String(asset.uploadUserId) === currentUserId && !asset.productId));
   const selectedItems = selectedAssetIds
     .map((id) => assets.find((asset) => asset.id === id))
     .filter((item): item is AssetResourceItem => item !== undefined);
+  const canSetProductCover = canMove
+    && activeSource === 'PRODUCT'
+    && focusedProduct !== null
+    && selectedItems.length === 1
+    && selectedItems[0].sourceType === 'UPLOAD'
+    && selectedItems[0].assetKind === 'IMAGE'
+    && !selectedItems[0].isProductMainImage;
+  const canAssociateSelectedAsset = canMove
+    && activeSource === 'UPLOAD'
+    && selectedItems.length === 1
+    && selectedItems[0].assetKind !== 'AUDIO';
   const canMergeSelected = canMerge
     && mode === 'manager'
     && activeSource === 'UPLOAD'
@@ -442,7 +459,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const effectiveMultiSelect = mode === 'manager' ? true : multiSelect;
 
   const handleCardClick = (id: string) => {
-    if (mode === 'manager' && activeSource !== 'UPLOAD') return;
+    if (mode === 'manager' && activeSource !== 'UPLOAD' && !(activeSource === 'PRODUCT' && focusedProduct)) return;
     if (effectiveMultiSelect) {
       // 多选:toggle 累加
       setSelectedAssetIds(prev =>
@@ -468,9 +485,26 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
   const productComposeDisabledReason = selectedProductSkus.length < 2
     ? '至少选择两个 SKU'
-    : selectedProductSkus.some(({ sku }) => !sku.imageId)
-      ? '所选 SKU 需要有当前白底图'
-      : '多 SKU 素材引用接口接入后可用';
+    : undefined;
+
+  const handleProductCompose = async () => {
+    if (!canMerge || productComposeDisabledReason) return;
+    const productIds = Array.from(new Set<string>(
+      selectedProductSkus.map(({ sku }) => sku.productId),
+    ));
+    try {
+      const details = await Promise.all(productIds.map((id) => productLibraryApi.productDetail(id)));
+      const whiteBaseAssets = details.map((detail) => buildProductDetailAssets(detail, 'IMAGE')
+        .find((asset) => ['PRODUCT_ORIGINAL', 'WHITE_BACKGROUND'].includes(asset.assetType ?? '')));
+      if (whiteBaseAssets.some((asset) => !asset)) {
+        toast.warning('所选 SKU 中存在缺少白底图的产品，无法搭配合成');
+        return;
+      }
+      setMergeDrawerItems(whiteBaseAssets.filter((asset): asset is AssetResourceItem => Boolean(asset)));
+    } catch {
+      toast.error('读取产品白底图失败，请稍后重试');
+    }
+  };
 
   const handleSetAsModel = async () => {
     if (!canSetSelectedAsModel) return;
@@ -612,31 +646,87 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
       };
     });
 
-  /**
-   * 批量删除选中的资源
-   * - useConfirm 弹窗确认(避免误删)
-   * - 调 assetApi.deleteBatch(ids)
-   * - 后端:删除 asset_resource,若 file_resource 引用归 0,自动物理删除 COS 文件
-   * - 成功后清空选中 + 刷新列表
-   */
+  /** 删除通用资源或当前 SKU 下选中的产品素材。 */
   const handleDeleteSelected = async () => {
     if (!canDelete || selectedAssetIds.length === 0) return;
     const count = selectedAssetIds.length;
     const ok = await confirm({
-      title: '删除资源',
-      message: `确认要删除选择的 ${count} 个资源吗?`,
+      title: activeSource === 'PRODUCT' ? '删除产品素材' : '删除资源',
+      message: `确认要删除选择的 ${count} 个${activeSource === 'PRODUCT' ? '产品素材' : '资源'}吗?`,
       confirmText: '删除',
       danger: true,
     });
     if (!ok) return;
 
     try {
-      const successCount = await assetApi.deleteBatch([...selectedAssetIds]);
-      toast.success(`${successCount} 个资源已删除`);
+      let successCount: number;
+      if (activeSource === 'PRODUCT' && focusedProduct) {
+        const inputs = selectedItems.filter((item) => item.sourceType === 'UPLOAD');
+        const generated = selectedItems.filter((item) => item.sourceType !== 'UPLOAD');
+        const results = await Promise.all([
+          inputs.length > 0
+            ? productLibraryApi.deleteInputAssets(focusedProduct.productId, inputs.map((item) => item.id))
+            : Promise.resolve(0),
+          generated.length > 0
+            ? productLibraryApi.archiveBatch(generated.map((item) => ({
+                id: item.id,
+                mediaType: item.assetKind as 'IMAGE' | 'VIDEO',
+              })))
+            : Promise.resolve(0),
+        ]);
+        successCount = results[0] + results[1];
+      } else {
+        successCount = await assetApi.deleteBatch([...selectedAssetIds]);
+      }
+      toast.success(`${successCount} 个${activeSource === 'PRODUCT' ? '产品素材' : '资源'}已删除`);
       setSelectedAssetIds([]);
       await refetch();
     } catch (err) {
       toast.error(`删除失败: ${(err as Error).message}`);
+    }
+  };
+
+  const handleSetProductCover = async () => {
+    if (!canSetProductCover || !focusedProduct) return;
+    try {
+      await productLibraryApi.setInputAssetCover(focusedProduct.productId, selectedItems[0].id);
+      toast.success('已设为产品素材封面');
+      setSelectedAssetIds([]);
+      await refetch();
+    } catch (err) {
+      toast.error(`设置封面失败: ${(err as Error).message}`);
+    }
+  };
+
+  const handleAssociateSelectedAsset = async () => {
+    if (!canAssociateSelectedAsset) return;
+    const asset = selectedItems[0];
+    if (productId != null) {
+      try {
+        await assetApi.bindToProduct(asset.id, String(productId));
+        toast.success('素材已关联到当前产品');
+        setSelectedAssetIds([]);
+        await refetch();
+      } catch (err) {
+        toast.error(`关联产品失败: ${(err as Error).message}`);
+      }
+      return;
+    }
+    setAssociationAsset(asset);
+    setProductAssociationPickerOpen(true);
+  };
+
+  const handleAssociateExistingProduct = async (product: { id: string; name: string }) => {
+    if (!associationAsset) return;
+    try {
+      await assetApi.bindToProduct(associationAsset.id, product.id);
+      toast.success(`素材已关联商品“${product.name}”`);
+      setProductAssociationPickerOpen(false);
+      setAssociationAsset(null);
+      setSelectedAssetIds([]);
+      await refetch();
+    } catch (err) {
+      toast.error(`关联产品失败: ${(err as Error).message}`);
     }
   };
 
@@ -656,14 +746,41 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
       return;
     }
 
+    const compatibleItems = selectedItems.filter((item) => item.assetKind === assetKind);
+    if (compatibleItems.length !== selectedItems.length) {
+      toast.warning(`当前任务仅支持选择${assetKind === 'VIDEO' ? '视频' : assetKind === 'AUDIO' ? '音频' : '图片'}素材`);
+      return;
+    }
+
     setConfirmingSelection(true);
     try {
-      const resolvedItems = activeSource === 'PRODUCT'
-        ? await assetApi.resolveGenerated(selectedItems.map((item) => ({
+      let resolvedItems = selectedItems;
+      if (activeSource === 'PRODUCT') {
+        // 产品详情同时展示上传素材和 AI 生成素材：只有后者需要转换成业务资源。
+        // 上传素材本身已经是 asset_resource，直接带入任务，避免被误判为生成结果。
+        const generatedItems = selectedItems.filter((item) =>
+          item.sourceType === 'GENERATED_IMAGE' || item.sourceType === 'GENERATED_VIDEO');
+        if (generatedItems.length > 0) {
+          const convertedItems = await assetApi.resolveGenerated(generatedItems.map((item) => ({
             mediaType: item.assetKind as 'IMAGE' | 'VIDEO',
-            sourceId: item.id,
-          })))
-        : selectedItems;
+            sourceId: item.sourceId ?? item.id,
+          })));
+          const convertedBySource = new Map(convertedItems.map((item) => [
+            `${item.assetKind}:${item.sourceId ?? item.id}`,
+            item,
+          ]));
+          resolvedItems = selectedItems.map((item) => {
+            if (item.sourceType !== 'GENERATED_IMAGE' && item.sourceType !== 'GENERATED_VIDEO') {
+              return item;
+            }
+            const converted = convertedBySource.get(
+              `${item.assetKind}:${item.sourceId ?? item.id}`,
+            );
+            if (!converted) throw new Error('生成素材转换失败，请重试');
+            return converted;
+          });
+        }
+      }
 
       if (onConfirmSelection) {
         onConfirmSelection(resolvedItems);
@@ -1114,7 +1231,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                       key={kind}
                       type="button"
                       onClick={() => {
-                        setMediaFilter(kind);
+                        setMediaFilter((current) => current === kind ? 'ALL' : kind);
                         setSelectedAssetIds([]);
                       }}
                       className={`flex h-8 items-center justify-center gap-1 rounded-md text-[11px] font-bold ${
@@ -1357,8 +1474,9 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                     <span title={productComposeDisabledReason}>
                       <button
                         type="button"
-                        disabled
-                        className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white opacity-40"
+                        onClick={() => void handleProductCompose()}
+                        disabled={Boolean(productComposeDisabledReason)}
+                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <span className="material-symbols-outlined text-sm">view_quilt</span>
                         搭配合成
@@ -1538,7 +1656,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                             selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'
                           }`}
                         >
-                          <div className="relative aspect-[9/16] overflow-hidden bg-white">
+                          <div className="relative aspect-square overflow-hidden bg-white">
                             <AssetImage
                               urls={[sku.imageUrl, spu.imageUrl]}
                               alt={`${spu.name} ${sku.name}`}
@@ -1546,30 +1664,29 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                               objectFit="contain"
                               className="h-full w-full"
                             />
-                            <span className="absolute bottom-2 left-2 rounded border border-slate-200 bg-white/95 px-2 py-1 text-[9px] font-bold text-slate-600">当前白底图</span>
                             <span className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md border text-[11px] ${
                               selected
                                 ? 'border-blue-600 bg-blue-600 text-white'
                                 : 'border-slate-300 bg-white/95 text-transparent'
                             }`}>✓</span>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setFocusedProduct({ spuName: spu.name, productId: sku.productId, sku });
+                                setSelectedAssetIds([]);
+                              }}
+                              className="absolute bottom-2 right-2 flex h-8 items-center gap-1 rounded-md border border-blue-200 bg-white/95 px-2 text-[10px] font-bold text-blue-700 shadow-sm hover:bg-blue-50"
+                            >
+                              <span className="material-symbols-outlined text-sm">photo_library</span>
+                              查看素材
+                            </button>
                           </div>
                           <div className="p-3">
                             <h4 className="truncate text-xs font-extrabold text-slate-800">{spu.name}</h4>
                             <p className="mt-1 truncate text-[10px] text-slate-500">{sku.name} · {sku.code}</p>
-                            <div className="mt-3 flex min-h-8 items-end justify-between gap-2">
+                            <div className="mt-3 flex min-h-5 items-end justify-between gap-2">
                               <span className="text-[9px] text-slate-400">{sku.materialCount} 张素材</span>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setFocusedProduct({ spuName: spu.name, productId: sku.productId, sku });
-                                  setSelectedAssetIds([]);
-                                }}
-                                className="flex h-8 items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 text-[10px] font-bold text-blue-700 hover:bg-blue-100"
-                              >
-                                <span className="material-symbols-outlined text-sm">photo_library</span>
-                                查看素材
-                              </button>
                             </div>
                           </div>
                         </article>
@@ -1702,6 +1819,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                             </div>
                           )}
                           <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          {asset.isProductMainImage && (
+                            <span className="absolute bottom-2 left-2 rounded border border-slate-200 bg-white/95 px-2 py-1 text-[9px] font-bold text-slate-600">商品主图</span>
+                          )}
+                          {activeSource === 'PRODUCT' && focusedProduct && asset.isProductCover && (
+                            <span className="absolute bottom-2 left-2 rounded border border-blue-200 bg-blue-50/95 px-2 py-1 text-[9px] font-bold text-blue-700">封面图</span>
+                          )}
                         </div>
                         <div className="p-3">
                           <div className="mb-1 flex items-center gap-1">
@@ -1780,16 +1903,34 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                         )}
                       </>
                     )}
+                    {canSetProductCover && (
+                      <button
+                        type="button"
+                        onClick={handleSetProductCover}
+                        className="text-xs font-bold text-blue-600 hover:underline"
+                      >
+                        设为封面
+                      </button>
+                    )}
+                    {canAssociateSelectedAsset && (
+                      <button
+                        type="button"
+                        onClick={handleAssociateSelectedAsset}
+                        className="text-xs font-bold text-blue-600 hover:underline"
+                      >
+                        关联产品
+                      </button>
+                    )}
                   </>
                 )}
               </div>
               <div className="flex items-center gap-3">
-                {activeSource === 'UPLOAD' && canDeleteSelected && (
+                {canDeleteSelected && (activeSource === 'UPLOAD' || (activeSource === 'PRODUCT' && focusedProduct)) && (
                   <button
                     onClick={handleDeleteSelected}
                     className="text-xs font-bold text-red-600 hover:text-red-700 hover:underline bg-transparent border-none cursor-pointer"
                   >
-                    删除资源
+                    {activeSource === 'PRODUCT' ? '删除素材' : '删除资源'}
                   </button>
                 )}
                 <button
@@ -1824,6 +1965,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
               <ResourceMergeDrawer
                 items={mergeDrawerItems}
                 categoryId={selectedCategoryId ?? undefined}
+                productId={selectedProductSkus[0]?.sku.productId}
                 onClose={() => setMergeDrawerItems(null)}
                 onUploaded={async () => {
                   setMergeDrawerItems(null);
@@ -1832,6 +1974,31 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                 }}
               />
             )}
+
+            <ProductPickerModal
+              open={productAssociationPickerOpen}
+              onClose={() => {
+                setProductAssociationPickerOpen(false);
+                setAssociationAsset(null);
+              }}
+              onPick={handleAssociateExistingProduct}
+              onCreate={associationAsset?.assetKind === 'IMAGE'
+                ? () => {
+                    setProductAssociationPickerOpen(false);
+                    setProductCreationAsset(associationAsset);
+                  }
+                : undefined}
+            />
+            <CreateProductFromAssetDialog
+              asset={productCreationAsset}
+              onCancel={() => setProductCreationAsset(null)}
+              onCreated={() => {
+                setProductCreationAsset(null);
+                setAssociationAsset(null);
+                setSelectedAssetIds([]);
+                void refetch();
+              }}
+            />
 
             {/* MOVE TO CATEGORY OVERLAY */}
             {isMoveModalOpen && (

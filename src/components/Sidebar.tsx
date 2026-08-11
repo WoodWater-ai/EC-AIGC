@@ -11,6 +11,15 @@ interface SidebarProps {
   openTransit: () => void;
 }
 
+type SidebarGroup = '主控' | '创作' | '业务' | '管理';
+
+interface SidebarItem {
+  screen: AppScreen;
+  label: string;
+  icon: string;
+  group: SidebarGroup;
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentScreen,
   setScreen,
@@ -20,28 +29,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { canAccessScreen, hasPermission } = useAuth();
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
 
-  const menuItems = [
-    { screen: AppScreen.DASHBOARD, label: '工作台首页', icon: 'dashboard' },
-    { screen: AppScreen.ASSISTANT, label: '创作助手', icon: 'auto_awesome' },
-    { screen: AppScreen.TASKS, label: '任务列表', icon: 'auto_schedule' },
-    { screen: AppScreen.TEMPLATES, label: '智能模板中心', icon: 'dashboard_customize' },
-    { screen: AppScreen.ASSETS, label: '商品素材库', icon: 'inventory_2' },
-    { screen: AppScreen.ANALYTICS, label: '数据效能复盘', icon: 'insights' },
-    { screen: AppScreen.SYSTEM_CONFIG, label: '系统配置模块', icon: 'settings_applications' },
-    { screen: AppScreen.ASYNC_TASKS, label: '通道异步任务', icon: 'sync_alt' },
-    { screen: AppScreen.ASSET_CATEGORY, label: '资源分类', icon: 'account_tree' },
-    { screen: AppScreen.PRODUCT_CATEGORY, label: '商品分类', icon: 'category' },
-    { screen: AppScreen.PRODUCT_MANAGE, label: '产品管理', icon: 'inventory_2' },
-    { screen: AppScreen.DICT_CATEGORY, label: '字典分类管理', icon: 'dataset' },
-    { screen: AppScreen.DICT_ITEM, label: '字典管理', icon: 'menu_book' },
+  // 日常创作只保留主链路；基础数据与运维能力收进管理员“管理”分组。
+  const menuItems: SidebarItem[] = [
+    { screen: AppScreen.DASHBOARD, label: '首页', icon: 'dashboard', group: '主控' },
+    { screen: AppScreen.ASSISTANT, label: '创作', icon: 'auto_awesome', group: '创作' },
+    { screen: AppScreen.TASKS, label: '任务', icon: 'auto_schedule', group: '创作' },
+    { screen: AppScreen.TEMPLATES, label: '模板', icon: 'dashboard_customize', group: '创作' },
+    { screen: AppScreen.PRODUCT_MANAGE, label: '产品', icon: 'inventory_2', group: '业务' },
+    { screen: AppScreen.ANALYTICS, label: '复盘', icon: 'insights', group: '业务' },
+    { screen: AppScreen.DICT_ITEM, label: '字典', icon: 'menu_book', group: '管理' },
+    { screen: AppScreen.DICT_CATEGORY, label: '字典类', icon: 'dataset', group: '管理' },
+    { screen: AppScreen.ASSET_CATEGORY, label: '素材类', icon: 'account_tree', group: '管理' },
+    { screen: AppScreen.PRODUCT_CATEGORY, label: '商品类', icon: 'category', group: '管理' },
+    { screen: AppScreen.ASYNC_TASKS, label: '异步', icon: 'sync_alt', group: '管理' },
+    { screen: AppScreen.SYSTEM_CONFIG, label: '系统', icon: 'settings_applications', group: '管理' },
   ];
 
   const visibleMenuItems = menuItems.filter((item) => canAccessScreen(item.screen));
   const mobileMenuItems = visibleMenuItems.filter((item) =>
-    [AppScreen.DASHBOARD, AppScreen.ASSISTANT, AppScreen.TASKS, AppScreen.ASSETS].includes(item.screen)
+    [AppScreen.DASHBOARD, AppScreen.ASSISTANT, AppScreen.TASKS].includes(item.screen)
   );
   const canCreateTask = hasPermission('task:create');
-  const canOpenResourceCenter = hasPermission('asset-center:view');
+  // 新旧权限并存期间，具备旧“资源页”权限的账号也应能打开统一素材中心。
+  const canOpenResourceCenter = hasPermission('asset-center:view') || canAccessScreen(AppScreen.ASSETS);
+
+  const renderMenuItem = (item: SidebarItem) => {
+    const isActive = currentScreen === item.screen;
+    return (
+      <button
+        key={item.screen}
+        type="button"
+        onClick={() => setScreen(item.screen)}
+        className={`group flex h-9 w-full cursor-pointer items-center justify-between rounded-md px-2.5 text-left text-xs font-medium transition-all duration-150 ${
+          isActive
+            ? 'bg-[#37322e] text-white'
+            : 'text-stone-400 hover:bg-[#2a2724] hover:text-stone-100'
+        }`}
+        id={`menu-item-${item.screen.toLowerCase()}`}
+      >
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className={`material-symbols-outlined text-[17px] transition-colors ${
+            isActive ? 'text-primary' : 'text-stone-500 group-hover:text-stone-300'
+          }`}>{item.icon}</span>
+          <span className="truncate">{item.label}</span>
+        </span>
+        {isActive && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />}
+      </button>
+    );
+  };
 
   return (
     <>
@@ -107,72 +142,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>}
 
-        {/* Menu Items List */}
-        <nav className="space-y-0.5 px-2">
-          <span className="mb-1.5 block px-2.5 text-[9px] font-bold uppercase tracking-[0.12em] text-stone-500">主模块</span>
-          {visibleMenuItems.map((item) => {
-            const isActive = currentScreen === item.screen;
-            return (
-              <button
-                key={item.screen}
-                onClick={() => setScreen(item.screen)}
-                className={`group flex h-9 w-full cursor-pointer items-center justify-between rounded-md px-2.5 text-left text-xs font-medium transition-all duration-150 ${
-                  isActive
-                    ? 'bg-[#37322e] text-white'
-                    : 'text-stone-400 hover:bg-[#2a2724] hover:text-stone-100'
-                }`}
-                id={`menu-item-${item.screen.toLowerCase()}`}
-              >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span className={`material-symbols-outlined text-[17px] transition-colors ${
-                    isActive ? 'text-primary' : 'text-stone-500 group-hover:text-stone-300'
-                  }`}>
-                    {item.icon}
-                  </span>
-                  <span className="truncate">{item.label}</span>
+        {/* 侧栏按创作主线分组；素材仅保留统一资源中心入口。 */}
+        <nav className="space-y-4 px-2">
+          {(['主控', '创作', '业务', '管理'] as SidebarGroup[]).map((group) => {
+            const items = visibleMenuItems.filter((item) => item.group === group);
+            if (group === '创作' && canOpenResourceCenter) {
+              return (
+                <div key={group}>
+                  <span className="mb-1.5 block px-2.5 text-[9px] font-bold uppercase tracking-[0.12em] text-stone-500">{group}</span>
+                  {items.map((item) => renderMenuItem(item))}
+                  <button
+                    type="button"
+                    onClick={openTransit}
+                    className="group flex h-9 w-full cursor-pointer items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-stone-400 transition-all duration-150 hover:bg-[#2a2724] hover:text-stone-100"
+                    id="menu-item-assets"
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5"><span className="material-symbols-outlined text-[17px] text-stone-500 transition-colors group-hover:text-stone-300">inventory_2</span><span>素材</span></span>
+                  </button>
+                  {canAccessScreen(AppScreen.MODEL_LIBRARY) && renderMenuItem({ screen: AppScreen.MODEL_LIBRARY, label: '模特', icon: 'face_3', group: '创作' })}
                 </div>
-                {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                )}
-              </button>
-            );
+              );
+            }
+            return items.length > 0 ? (
+              <div key={group}>
+                <span className="mb-1.5 block px-2.5 text-[9px] font-bold uppercase tracking-[0.12em] text-stone-500">{group}</span>
+                {items.map((item) => renderMenuItem(item))}
+              </div>
+            ) : null;
           })}
         </nav>
 
-        {/* Shortcuts / Utilities */}
-        <div className="mt-5 px-2">
-          <span className="mb-1.5 block px-2.5 text-[9px] font-bold uppercase tracking-[0.12em] text-stone-500">快捷工具</span>
-          {canOpenResourceCenter && <button
-            onClick={openTransit}
-            className="flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-xs font-medium text-stone-400 transition-all duration-150 hover:bg-[#2a2724] hover:text-stone-100"
-          >
-            <span className="material-symbols-outlined text-lg text-stone-500">grid_view</span>
-            资源中心
-          </button>}
-          {canAccessScreen(AppScreen.MODEL_LIBRARY) && <button
-            onClick={() => setScreen(AppScreen.MODEL_LIBRARY)}
-            className={`group flex h-8 w-full cursor-pointer items-center justify-between rounded-md px-2.5 text-xs font-medium transition-all duration-150 ${
-              currentScreen === AppScreen.MODEL_LIBRARY
-                ? 'bg-[#37322e] text-white'
-                : 'text-stone-400 hover:bg-[#2a2724] hover:text-stone-100'
-            }`}
-            id={`menu-item-${AppScreen.MODEL_LIBRARY.toLowerCase()}`}
-          >
-            <div className="flex items-center gap-2.5">
-              <span className={`material-symbols-outlined text-lg ${
-                currentScreen === AppScreen.MODEL_LIBRARY
-                  ? 'text-primary'
-                  : 'text-stone-500 group-hover:text-stone-300'
-              }`}>
-                face_3
-              </span>
-              模特资源库
-            </div>
-            {currentScreen === AppScreen.MODEL_LIBRARY && (
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-            )}
-          </button>}
-        </div>
       </div>
 
       {/* 当前登录账号只读展示；真实 RBAC 不允许在前端切换成其他账号。 */}
@@ -208,10 +207,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className={`material-symbols-outlined text-[21px] ${isActive ? 'text-primary' : 'text-stone-500'}`}>
               {item.icon}
             </span>
-            {item.label.replace('工作台首页', '首页').replace('智能模板中心', '模板').replace('商品素材库', '素材')}
+            {item.label}
           </button>
         );
       })}
+      {canOpenResourceCenter && (
+        <button
+          type="button"
+          onClick={openTransit}
+          className="flex min-w-14 flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] font-bold text-stone-400 transition-colors"
+        >
+          <span className="material-symbols-outlined text-[21px] text-stone-500">inventory_2</span>
+          素材
+        </button>
+      )}
     </nav>
     </>
   );

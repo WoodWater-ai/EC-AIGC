@@ -58,6 +58,8 @@ interface CreateImageTaskProps {
   setSelectedProduct: (product: ProductAsset) => void;
   creationTemplateId?: string | null;
   assistantPrefill?: AssistantTaskPrefill | null;
+  /** 从任务结果继续创作时带入的、已保存的业务素材。 */
+  resultAssetPrefill?: AssetResourceItem | null;
   /** 返回按钮回调;不传则 fallback 到跳工作台首页(原行为) */
   onBack?: () => void;
 }
@@ -108,7 +110,14 @@ const renderReusablePrompt = (prompt: string, facts: ProductFactsInput) => {
 };
 
 export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
-  const { setScreen, onAddTask, creationTemplateId, assistantPrefill, onBack } = props;
+  const {
+    setScreen,
+    onAddTask,
+    creationTemplateId,
+    assistantPrefill,
+    resultAssetPrefill,
+    onBack,
+  } = props;
   const creationPrefillQuery = useServiceQuery(
     () => creationTemplateId
       ? creationTemplateApi.reuseContext(creationTemplateId)
@@ -168,6 +177,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const [unboundMainAsset, setUnboundMainAsset] = useState<AssetResourceItem | null>(null);
   const [matchingProduct, setMatchingProduct] = useState(false);
   const selectedMainResourceIdRef = useRef<string | null>(null);
+  const appliedResultAssetRef = useRef<string | null>(null);
 
   // ---- 本页自己的资源中心 picker(替代 App.tsx 全局 manager modal)----
   // 由 pendingSlot 路由:点击主图 → 'main';点击参考图 slot → 该 slot id
@@ -607,6 +617,48 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const handleTransitClose = useCallback(() => {
     setPendingSlot(null);
   }, []);
+
+  useEffect(() => {
+    if (!resultAssetPrefill || appliedResultAssetRef.current === resultAssetPrefill.id) return;
+    appliedResultAssetRef.current = resultAssetPrefill.id;
+    selectedMainResourceIdRef.current = resultAssetPrefill.id;
+    resetProductContext();
+    setUnboundMainAsset(null);
+    setMainValue({
+      id: resultAssetPrefill.id,
+      fileResourceId: resultAssetPrefill.id,
+      originalUrl: resultAssetPrefill.originalUrl ?? resultAssetPrefill.thumbnailUrl,
+      thumbnailUrl: withCosThumbnail(
+        resultAssetPrefill.thumbnailUrl ?? resultAssetPrefill.originalUrl,
+        256,
+      ) ?? resultAssetPrefill.thumbnailUrl ?? resultAssetPrefill.originalUrl,
+      name: resultAssetPrefill.name,
+    });
+
+    if (!resultAssetPrefill.productId) {
+      setUnboundMainAsset(resultAssetPrefill);
+      toast.warning('该结果未关联产品，请先选择或新建产品');
+      return;
+    }
+
+    setMatchingProduct(true);
+    void productInfoApi.detail({ id: resultAssetPrefill.productId })
+      .then((product) => {
+        if (selectedMainResourceIdRef.current === resultAssetPrefill.id) {
+          applyMatchedProduct(product);
+          toast.success(`已带入产品与生成结果：${product.name}`);
+        }
+      })
+      .catch(() => {
+        if (selectedMainResourceIdRef.current === resultAssetPrefill.id) {
+          setUnboundMainAsset(resultAssetPrefill);
+          toast.warning('已带入结果，但产品信息读取失败');
+        }
+      })
+      .finally(() => {
+        if (selectedMainResourceIdRef.current === resultAssetPrefill.id) setMatchingProduct(false);
+      });
+  }, [applyMatchedProduct, resetProductContext, resultAssetPrefill]);
 
   const isProductBound = !!mainValue && !!selectedFromLibrary && !matchingProduct;
 

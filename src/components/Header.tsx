@@ -63,10 +63,20 @@ export const Header: React.FC<HeaderProps> = ({
         return { parent: '模板中心', child: '智能排版模板库' };
       case AppScreen.ASSETS:
         return { parent: '资产仓库', child: '商品素材库' };
+      case AppScreen.MODEL_LIBRARY:
+        return { parent: '创作资源', child: '模特库' };
       case AppScreen.ANALYTICS:
         return { parent: '成效数据复盘', child: 'AI 生成效能分析' };
       case AppScreen.SYSTEM_CONFIG:
         return { parent: '运维与渠道', child: '系统通道配置' };
+      case AppScreen.ASSET_CATEGORY:
+        return { parent: '基础数据', child: '素材分类' };
+      case AppScreen.PRODUCT_CATEGORY:
+        return { parent: '基础数据', child: '商品分类' };
+      case AppScreen.ASYNC_TASKS:
+        return { parent: '系统运维', child: '异步任务' };
+      case AppScreen.PRODUCT_MANAGE:
+        return { parent: '产品中心', child: '产品管理' };
       case AppScreen.DICT_CATEGORY:
         return { parent: '基础数据', child: '字典分类管理' };
       case AppScreen.DICT_ITEM:

@@ -7,7 +7,6 @@ import { TaskList } from './components/TaskList';
 import { CreateImageTask } from './components/CreateImageTask';
 import { CreateVideoTask } from './components/CreateVideoTask';
 import TemplateCenter from './components/TemplateCenter';
-import { ProductAssetLibrary } from './components/ProductAssetLibrary';
 import { DataAnalytics } from './components/DataAnalytics';
 import { SystemConfig } from './components/SystemConfig';
 import { AssetTransitModal } from './components/AssetTransitModal';
@@ -33,6 +32,8 @@ import { useServiceQuery } from './api/hooks/useServiceQuery';
 import { userApi, type UserDTO } from './api/modules/user';
 import { taskApi } from './api/modules/task';
 import { modelProfileApi } from './api/modules/modelProfile';
+import { assetApi, type AssetResourceItem } from './api/modules/asset';
+import type { ProductSkuView } from './components/productManagement/productManagementModel';
 import { toUIGenerationTask } from './components/createTask/taskAdapter';
 
 import {
@@ -107,13 +108,21 @@ export default function App() {
   const [creationTemplateId, setCreationTemplateId] = useState<string | null>(null);
   // 仅在“助手 → 创建任务”的这次跳转中使用；离开创建页即清空，不做草稿恢复。
   const [assistantTaskPrefill, setAssistantTaskPrefill] = useState<AssistantTaskPrefill | null>(null);
+  // 从任务结果或产品 SKU 进入创作时，只保留本次临时上下文，不写入草稿。
+  const [creationAssetPrefill, setCreationAssetPrefill] = useState<AssetResourceItem | null>(null);
 
   const setScreen = (
     screen: AppScreen,
     payload?: { highlightGroupId?: string; creationTemplateId?: string },
   ) => {
     if (!canAccessScreen(screen)) return;
+    // 兼容旧资源中心导航调用，统一落到新的素材中心弹窗。
+    if (screen === AppScreen.ASSETS) {
+      setIsTransitOpen(true);
+      return;
+    }
     setAssistantTaskPrefill(null);
+    setCreationAssetPrefill(null);
     setCurrentScreen(screen);
     if (payload?.highlightGroupId) {
       setHighlightGroupId(payload.highlightGroupId);
@@ -143,7 +152,34 @@ export default function App() {
 
   const handleBack = () => {
     setAssistantTaskPrefill(null);
+    setCreationAssetPrefill(null);
     setCurrentScreen(previousScreenRef.current);
+  };
+
+  const continueWithResult = (asset: AssetResourceItem) => {
+    const screen = asset.assetKind === 'VIDEO'
+      ? AppScreen.CREATE_VIDEO_TASK
+      : AppScreen.CREATE_IMAGE_TASK;
+    if (!canAccessScreen(screen)) return;
+    setAssistantTaskPrefill(null);
+    setCreationTemplateId(null);
+    setCreationAssetPrefill(asset);
+    setCurrentScreen(screen);
+  };
+
+  const createFromProductSku = async (sku: ProductSkuView) => {
+    if (!canAccessScreen(AppScreen.CREATE_IMAGE_TASK)) return;
+    setAssistantTaskPrefill(null);
+    setCreationTemplateId(null);
+    setCreationAssetPrefill(null);
+    if (sku.imageId) {
+      try {
+        setCreationAssetPrefill(await assetApi.get(sku.imageId));
+      } catch {
+        // 商品主图仍会在创建页显示为待选择状态，避免因历史主图无业务资源记录阻断创作。
+      }
+    }
+    setCurrentScreen(AppScreen.CREATE_IMAGE_TASK);
   };
 
   // Core local states
@@ -284,6 +320,7 @@ export default function App() {
             highlightGroupId={highlightGroupId}
             highlightTaskKind={highlightTaskKind}
             setScreen={setScreen}
+            onContinueWithResult={continueWithResult}
           />
         );
       case AppScreen.CREATE_IMAGE_TASK:
@@ -295,16 +332,6 @@ export default function App() {
       case AppScreen.TEMPLATES:
         return (
           <TemplateCenter setScreen={setScreen} />
-        );
-      case AppScreen.ASSETS:
-        return (
-          <ProductAssetLibrary
-            selectedProduct={selectedProduct}
-            setSelectedProduct={setSelectedProduct}
-            isDrawerOpen={isProductDrawerOpen}
-            setIsDrawerOpen={setIsProductDrawerOpen}
-            setScreen={setScreen}
-          />
         );
       case AppScreen.MODEL_LIBRARY:
         return (
@@ -334,7 +361,7 @@ export default function App() {
       case AppScreen.ASYNC_TASKS:
         return <AsyncTaskList />;
       case AppScreen.PRODUCT_MANAGE:
-        return <ProductManagePage setScreen={setScreen} />;
+        return <ProductManagePage onCreateSku={createFromProductSku} />;
       case AppScreen.DICT_CATEGORY:
         return <DictCategoryList />;
       case AppScreen.DICT_ITEM:
@@ -382,6 +409,7 @@ export default function App() {
           setSelectedProduct={setSelectedProduct}
           creationTemplateId={creationTemplateId}
           assistantPrefill={assistantTaskPrefill}
+          resultAssetPrefill={creationAssetPrefill}
           onBack={handleBack}
         />
         {isTransitOpen && (
@@ -432,6 +460,7 @@ export default function App() {
           setSelectedProduct={setSelectedProduct}
           creationTemplateId={creationTemplateId}
           assistantPrefill={assistantTaskPrefill}
+          resultAssetPrefill={creationAssetPrefill}
           goBack={handleBack}
         />
         {isTransitOpen && (
