@@ -768,6 +768,8 @@ export interface VideoTaskSubmitPayload {
   taskParamsJson: string;
   taskPrompt: string;
   negativePrompt?: string;
+  /** 智能多帧的可选全片补充要求；默认连续性规则由服务端组装。 */
+  globalInstruction?: string;
   inputImageUrls?: string;
   assets: Array<{
     assetId: string;

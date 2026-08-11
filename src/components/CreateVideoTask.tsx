@@ -131,6 +131,11 @@ const MODE_CONFIG: Record<
   },
 };
 
+const MODE_GROUPS: Array<{ label: string; modes: VideoMode[] }> = [
+  { label: '图生视频', modes: ['FIRST_FRAME', 'MULTI_FRAME'] },
+  { label: '视频复刻', modes: ['TRENDING_REPLICATE', 'ECOMMERCE_REPLICATE'] },
+];
+
 const inferReplacementRole = (asset: AssetResourceItem): TrendingReplacementRole => {
   const hint = `${asset.tags ?? ''},${asset.assetType ?? ''},${asset.name}`;
   if (/模特|人物|人像/.test(hint)) return 'model';
@@ -257,6 +262,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   const [negativePrompt, setNegativePrompt] = useState(
     '商品漂移、材质闪烁、人物畸形、镜头突变、文字变化',
   );
+  const [multiFrameGlobalInstruction, setMultiFrameGlobalInstruction] = useState('');
   const [shots, setShots] = useState(['', '', '']);
   const [storyboardGenerated, setStoryboardGenerated] = useState(false);
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
@@ -470,6 +476,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
         ? extractTrendingUserInstruction(snapshot.prompt ?? '')
         : cleanReusableVideoPrompt(snapshot.prompt ?? ''));
     setNegativePrompt(snapshot.negativePrompt ?? '');
+    setMultiFrameGlobalInstruction('');
     setCount(Math.max(1, Math.min(8, snapshot.count ?? 1)));
     setShots(['', '', '']);
     setStoryboardGenerated(false);
@@ -878,8 +885,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       return;
     }
     // 负面约束使用独立字段提交，由后端统一且幂等地组装进供应商 Prompt。
+    // 多帧的默认规则和最终有效 Prompt 必须由服务端生成；这里仅保留 DTO 必填的任务摘要。
     const taskPrompt = isMultiFrameMode
-      ? `【智能多帧】${effectiveModelCode ?? ''} · 共 ${multiFrameSegments.length} 段 · 总时长 ${multiFrameSegments.reduce((sum, seg) => sum + (seg.duration || 0), 0)} 秒`
+      ? '智能多帧任务'
       : positivePrompt;
     const numericProductId = /^\d+$/.test(selectedProductInfo.id)
       ? selectedProductInfo.id
@@ -902,6 +910,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       taskParamsJson: JSON.stringify(schemaParams),
       taskPrompt,
       negativePrompt: negativePrompt.trim() || undefined,
+      globalInstruction: isMultiFrameMode
+        ? multiFrameGlobalInstruction.trim() || undefined
+        : undefined,
       assets: buildAssets(),
       count,
       sourceCreationTemplateId: creationPrefill?.templateId,
@@ -922,6 +933,77 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const renderVideoModelConfig = (showModelSelector: boolean) => {
+    const schemaValue = (key: string, fallback: string) => {
+      const value = params.schemaParams[key];
+      if (value === undefined || value === null || value === '') return fallback;
+      if (typeof value === 'boolean') return value ? '开启' : '关闭';
+      return String(value);
+    };
+    const chips = [
+      ['deployed_code', '模型', params.modelId ?? '默认模型'],
+      ['timer', '时长', schemaValue('duration', '自动')],
+      ['monitor', '分辨率', schemaValue('resolution', '自动')],
+      ['crop_portrait', '比例', schemaValue('aspect_ratio', outputRatio || '跟随首帧')],
+      ['volume_up', '音频', schemaValue('audio', '按模型')],
+    ];
+    return (
+      <details className="group mt-4 border-t border-slate-100 pt-4">
+        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+          <div>
+            <p className="text-[11px] font-bold text-slate-600">模型配置</p>
+            <p className="mt-1 text-[10px] text-slate-400">点击标签可展开并调整当前模型能力参数</p>
+          </div>
+          <span className="flex items-center gap-1 text-[11px] font-bold text-primary">
+            配置
+            <span className="material-symbols-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
+          </span>
+        </summary>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {chips.map(([icon, label, value]) => (
+            <span
+              key={label}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-600"
+            >
+              <span className="material-symbols-outlined text-[15px] text-slate-400">{icon}</span>
+              {label}
+              <strong className="font-bold text-slate-800">{value}</strong>
+              <span className="material-symbols-outlined text-[14px] text-slate-400">expand_more</span>
+            </span>
+          ))}
+        </div>
+        <div className="mt-4 border-t border-slate-100 pt-4">
+        <TaskParamsPanel
+          key={mode}
+          group={config.group}
+          prefill={activeVideoParamsPrefill}
+          prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
+          unified={{ productName: productFacts.name ?? '', sellingPoints: productFacts.sellingPoints }}
+          aspectRatio=""
+          count={count}
+          onAspectRatioChange={() => undefined}
+          onCountChange={setCount}
+          prompt={effectivePrompt}
+          onPromptChange={setPrompt}
+          negativePrompt={negativePrompt}
+          onNegativePromptChange={setNegativePrompt}
+          onParamsChange={setParams}
+          fixedChannelType="VIDU"
+          fixedCapability={config.capability}
+          schemaParamsPatch={isEcommerceReplicate ? sourceDurationPatch : null}
+          showAspectRatio={false}
+          showPromptEditor={false}
+          showNegativePrompt={false}
+          showModelSelector={showModelSelector}
+          showCapabilitySummary={false}
+          showCount={false}
+          presentation="videoDemo"
+        />
+        </div>
+      </details>
+    );
   };
 
   return (
@@ -997,25 +1079,6 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
           */}
         </div>
       </header>
-
-      <nav className="shrink-0 border-b border-slate-200 bg-white px-6">
-        <div className="mx-auto flex max-w-[1440px] gap-6 overflow-x-auto">
-          {(Object.keys(MODE_CONFIG) as VideoMode[]).map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => switchMode(item)}
-              className={`h-12 shrink-0 border-b-2 text-xs font-bold ${
-                mode === item
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              {MODE_CONFIG[item].label}
-            </button>
-          ))}
-        </div>
-      </nav>
 
       <main className="flex-1 overflow-y-auto p-5">
         <div className="mx-auto grid w-full max-w-[1440px] grid-cols-1 items-start gap-5 xl:grid-cols-[300px_minmax(0,1fr)_380px]">
@@ -1169,6 +1232,59 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                   </div>
                 </div>
               </>
+            ) : isMultiFrameMode ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-bold text-primary">输入素材</p>
+                    <h2 className="mt-1 text-sm font-black">首帧与关键帧</h2>
+                    <p className="mt-1 text-[11px] leading-4 text-slate-400">
+                      首帧确定起点，关键帧按时间顺序推进画面。
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                    {multiFrameSegments.length} 段
+                  </span>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openPicker('FIRST_FRAME', 'IMAGE')}
+                    className="min-w-0 text-left"
+                    title="选择或更换视频首帧"
+                  >
+                    <MultiFrameAssetPreview
+                      asset={multiFrameStart}
+                      label="首帧 · 起始画面"
+                      accent="emerald"
+                    />
+                  </button>
+                  {multiFrameSegments.slice(0, 2).map((segment, index) => (
+                    <button
+                      key={segment.id}
+                      type="button"
+                      onClick={() => openPicker('KEY_FRAME', 'IMAGE', 'UPLOAD', segment.id)}
+                      className="min-w-0 text-left"
+                      title={`选择或更换第 ${index + 1} 段关键帧`}
+                    >
+                      <MultiFrameAssetPreview
+                        asset={segment.keyFrame}
+                        label={`关键帧 ${index + 1}`}
+                        accent="primary"
+                      />
+                    </button>
+                  ))}
+                </div>
+                {multiFrameSegments.length > 2 && (
+                  <p className="mt-2 text-[10px] text-slate-400">
+                    还有 {multiFrameSegments.length - 2} 段关键帧，请在时间轴中编辑。
+                  </p>
+                )}
+                <div className="mt-3 flex gap-2 rounded-md border border-blue-100 bg-blue-50 p-2 text-[10px] leading-4 text-blue-700">
+                  <span className="material-symbols-outlined text-sm">route</span>
+                  每段只描述与上一帧的变化；画面事实由已选图片决定。
+                </div>
+              </div>
             ) : null}
 
             <section className="border border-slate-200 bg-white p-4">
@@ -1186,11 +1302,82 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
           </section>
 
           <section className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold text-primary">视频模式</p>
+                  <h2 className="mt-1 text-sm font-black">选择创作方式</h2>
+                </div>
+                <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                  {config.label}
+                </span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {MODE_GROUPS.map((group) => (
+                  <div key={group.label}>
+                    <p className="mb-1.5 text-[10px] font-bold text-slate-400">{group.label}</p>
+                    <div className="grid grid-cols-2 rounded-md bg-slate-100 p-1">
+                      {group.modes.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => switchMode(item)}
+                          className={`h-8 rounded text-[11px] font-bold transition-colors ${
+                            mode === item
+                              ? 'bg-white text-primary shadow-sm'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          {MODE_CONFIG[item].label.replace('视频', '')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex gap-2 rounded-md border border-blue-100 bg-blue-50 p-2 text-[11px] leading-4 text-blue-700">
+                <span className="material-symbols-outlined text-sm">route</span>
+                {config.description}
+              </div>
+            </div>
             {isMultiFrameMode ? (
               <>
-                <div className="rounded-lg border border-slate-200 bg-white px-5 py-4">
-                  <p className="text-[11px] font-bold text-primary">智能多帧</p>
-                  <h2 className="mt-1 text-sm font-black">首帧 + N 段关键帧，按时间轴推进</h2>
+                <div className="rounded-lg border border-slate-200 bg-white p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold text-primary">内容表达</p>
+                      <h2 className="mt-1 text-sm font-black">全局规则</h2>
+                      <p className="mt-2 text-[11px] leading-5 text-slate-400">
+                        图片定义画面事实；每段只描述从上一帧到当前关键帧的动作与变化。
+                      </p>
+                    </div>
+                    <span className="material-symbols-outlined text-lg text-primary">auto_awesome</span>
+                  </div>
+                  <div className="mt-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11px] leading-5 text-blue-700">
+                    <p className="font-bold">全局规则已自动应用</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      <li>选中商品的事实、首帧和关键帧约束</li>
+                      <li>全片商品一致性、镜头连续性与安全约束</li>
+                    </ul>
+                  </div>
+                  <details className="mt-3 border-t border-slate-100 pt-3">
+                    <summary className="cursor-pointer text-[11px] font-bold text-primary">
+                      补充全局要求（可选）
+                    </summary>
+                    <div className="pt-3">
+                      <textarea
+                        value={multiFrameGlobalInstruction}
+                        maxLength={500}
+                        onChange={(event) => setMultiFrameGlobalInstruction(event.target.value)}
+                        className="h-20 w-full resize-y rounded-md border border-slate-200 p-3 text-xs leading-5 outline-none focus:border-primary"
+                        placeholder="例如：全片不快速切镜、保持自然连贯、无字幕。"
+                      />
+                      <p className="mt-2 text-[10px] text-slate-400">
+                        {multiFrameGlobalInstruction.length}/500；最终规则由服务端与每段变化描述一起保存。
+                      </p>
+                    </div>
+                  </details>
+                  {renderVideoModelConfig(true)}
                 </div>
                 <MultiFrameTimeline
                   startFrame={multiFrameStart}
@@ -1245,40 +1432,14 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
             ) : (
               <>
                 <div className="rounded-lg border border-slate-200 bg-white p-5">
-                  <p className="text-[11px] font-bold text-primary">任务配置</p>
-                  <h2 className="mt-1 font-black">{config.label}</h2>
-                  <p className="mt-2 text-xs leading-5 text-slate-500">
-                    {config.description}
-                  </p>
-                  {isReplicateMode && (
-                    <div className="mt-5 border-t border-slate-100 pt-5">
-                      <label className="block text-xs font-bold">
-                        用户创意补充
-                        <textarea
-                          value={prompt}
-                          maxLength={500}
-                          onChange={(event) => {
-                            setPrompt(event.target.value);
-                            setStoryboardGenerated(false);
-                          }}
-                          className="mt-1.5 h-20 w-full resize-none rounded-md border border-slate-200 p-2 text-xs font-normal leading-5 outline-none focus:border-primary"
-                          placeholder="补充品牌调性、画面禁忌或其他创意要求；镜头、动作和节奏默认严格跟随源视频"
-                        />
-                      </label>
-                      <p className="mt-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] leading-5 text-blue-700">
-                        {config.label}直接以源视频作为唯一分镜与节奏依据，不额外生成或覆盖分镜。
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-lg border border-slate-200 bg-white p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-[11px] font-bold text-primary">内容</p>
+                        <p className="text-[11px] font-bold text-primary">内容表达</p>
                         <h2 className="mt-1 font-black">本次视频 Prompt</h2>
                         <p className="mt-2 text-[11px] text-slate-400">
-                          先确认本次视频表达；生成后才按时长拆分为可编辑分镜。
+                          {mode === 'FIRST_FRAME'
+                            ? '首帧已定义画面，请补充动作、镜头、时序和商品保持要求。'
+                            : '源视频已定义分镜和节奏，可补充本次商品的创意要求。'}
                         </p>
                       </div>
                       {mode === 'FIRST_FRAME' && (
@@ -1301,7 +1462,9 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                           setStoryboardGenerated(false);
                         }}
                         className="mt-1.5 h-64 w-full resize-y rounded-md border border-slate-200 p-3 text-xs font-normal leading-5 outline-none focus:border-primary"
-                        placeholder="描述商品、动作、场景和镜头目标"
+                        placeholder={mode === 'FIRST_FRAME'
+                          ? '例如：模特缓慢转身，镜头平稳推进至面料细节，保持商品颜色、材质和版型稳定。'
+                          : '补充品牌调性、商品展示重点或其他创意要求。'}
                       />
                       {isReplicateMode && (
                         <div className="mt-1 flex items-center justify-between gap-3">
@@ -1393,6 +1556,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                       </span>
                     </div>
                   </div>
+                {renderVideoModelConfig(mode === 'FIRST_FRAME')}
               </>
             )}
           </section>
@@ -1400,49 +1564,15 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
           <aside className="space-y-4">
             <div className="rounded-lg border border-slate-200 bg-white p-5">
               <p className="text-[11px] font-bold text-primary">
-                模型通道与模型能力
+                生成任务
               </p>
-              <h2 className="mt-1 font-black">可用视频规格</h2>
-              <div className="mt-4">
-                <TaskParamsPanel
-                  key={mode}
-                  group={config.group}
-                  prefill={activeVideoParamsPrefill}
-                  prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
-                  unified={{
-                    productName: productFacts.name ?? '',
-                    sellingPoints: productFacts.sellingPoints,
-                  }}
-                  aspectRatio=""
-                  count={count}
-                  onAspectRatioChange={() => undefined}
-                  onCountChange={setCount}
-                  prompt={effectivePrompt}
-                  onPromptChange={setPrompt}
-                  negativePrompt={negativePrompt}
-                  onNegativePromptChange={setNegativePrompt}
-                  onParamsChange={setParams}
-                  fixedChannelType="VIDU"
-                  fixedCapability={config.capability}
-                  schemaParamsPatch={isEcommerceReplicate ? sourceDurationPatch : null}
-                  showAspectRatio={false}
-                  showPromptEditor={false}
-                  showNegativePrompt={false}
-                  showModelSelector={mode === 'FIRST_FRAME' || mode === 'MULTI_FRAME'}
-                  showCapabilitySummary={false}
-                  showCount={false}
-                  presentation="videoDemo"
-                />
-              </div>
+              <h2 className="mt-1 font-black">提交前检查</h2>
               <div className="mt-4 rounded bg-slate-50 p-3 text-xs leading-6">
                 {isMultiFrameMode ? (
                   <>
                     <p>首帧 + {MULTI_FRAME_DURATION_MIN}~9 段关键帧，按时间轴顺序推进</p>
                     <p>单段时长可选 {MULTI_FRAME_DURATION_MIN}~{MULTI_FRAME_DURATION_MAX} 秒，可复用同一素材</p>
-                    <p>仅支持 viduq2-turbo / viduq2-pro 模型</p>
-                    <p className="text-amber-700">
-                      通道默认若为 viduq3-turbo，请手动切换到 Q2 模型
-                    </p>
+                    <p>商品事实、连续性和安全约束由服务端写入每段 Prompt 快照</p>
                   </>
                 ) : mode === 'FIRST_FRAME' ? (
                   <>
@@ -1620,6 +1750,32 @@ const AssetThumb: React.FC<{
     <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 pb-2 pt-8">
       <p className="truncate text-[11px] font-bold text-white">{asset.name}</p>
     </div>
+  </div>
+);
+
+const MultiFrameAssetPreview: React.FC<{
+  asset: SelectedMultiFrameAsset | null;
+  label: string;
+  accent: 'emerald' | 'primary';
+}> = ({ asset, label, accent }) => (
+  <div className="min-w-0">
+    <div
+      className={`grid aspect-[3/4] place-items-center overflow-hidden rounded-md border bg-slate-50 ${
+        accent === 'emerald' ? 'border-emerald-200' : 'border-slate-200'
+      }`}
+    >
+      {asset ? (
+        <img
+          src={asset.thumbnailUrl ?? asset.originalUrl}
+          alt={asset.name ?? label}
+          className="h-full w-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span className="material-symbols-outlined text-xl text-slate-300">add_photo_alternate</span>
+      )}
+    </div>
+    <p className="mt-1 truncate text-[9px] font-medium text-slate-500" title={label}>{label}</p>
   </div>
 );
 
