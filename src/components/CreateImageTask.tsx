@@ -9,7 +9,7 @@ import {
   ResultTemplate,
   VisualPromptTagOption,
 } from '../types';
-import { mockImagePromptVisualTags, mockModelChannels, mockReferenceAnalysisByFileId } from '../mockData';
+import { mockImagePromptVisualTags, mockModelChannels } from '../mockData';
 import type { AssetResourceItem } from '../api/modules/asset';
 import { ExecutionConfirmDialog } from './ExecutionConfirmDialog';
 import { TemplatePickerDrawer } from './TemplatePickerDrawer';
@@ -26,19 +26,20 @@ interface CreateImageTaskProps {
   onTemplateApplied: () => void;
 }
 
-type ReferenceSlot = 'detail' | 'style' | 'scene' | 'pose' | 'model';
+type ReferenceRole = 'model' | 'style' | 'scene' | 'pose' | 'detail';
 type AssistantState = 'idle' | 'processing' | 'ready' | 'failed';
 
 interface TaskReference {
   id: string;
-  role: string;
   name: string;
   thumbnailUrl?: string;
   productAssetId?: string;
+  roles: ReferenceRole[];
 }
 
 interface ProductFacts {
   name: string;
+  seoName: string;
   sellingPoints: string;
   category: string;
   color: string;
@@ -56,19 +57,39 @@ interface VisualTagPickerProps {
   value: string;
   options: VisualPromptTagOption[];
   onChange: (value: string) => void;
+  disabled?: boolean;
+  disabledLabel?: string;
+}
+
+interface ReferenceRolePickerProps {
+  referenceNumber: number;
+  value: ReferenceRole[];
+  onChange: (roles: ReferenceRole[]) => void;
 }
 
 const TYPE_ORDER: ImageGenerationType[] = ['product_main', 'scene_detail', 'detail_closeup', 'on_model'];
 const MIN_TYPE_COUNT = 1;
 const MAX_TYPE_COUNT = 5;
 
-const REFERENCE_SLOTS: Array<{ id: ReferenceSlot; label: string; role: string; transitSlot: string; icon: string }> = [
-  { id: 'model', label: '模特', role: '模特参考', transitSlot: 'reference-model', icon: 'face_3' },
-  { id: 'scene', label: '场景', role: '场景参考', transitSlot: 'reference-scene', icon: 'landscape' },
-  { id: 'style', label: '风格', role: '风格参考', transitSlot: 'reference-style', icon: 'palette' },
-  { id: 'pose', label: '姿势', role: '姿势参考', transitSlot: 'reference-pose', icon: 'accessibility_new' },
-  { id: 'detail', label: '细节', role: '细节参考', transitSlot: 'reference-detail', icon: 'zoom_in' },
+const REFERENCE_ROLES: Array<{ id: ReferenceRole; label: string; icon: string }> = [
+  { id: 'model', label: '模特', icon: 'face_3' },
+  { id: 'style', label: '风格', icon: 'palette' },
+  { id: 'scene', label: '场景', icon: 'landscape' },
+  { id: 'pose', label: '姿势', icon: 'accessibility_new' },
+  { id: 'detail', label: '细节', icon: 'zoom_in' },
 ];
+
+const REFERENCE_ROLE_LABELS: Record<ReferenceRole, string> = {
+  model: '模特',
+  style: '风格',
+  scene: '场景',
+  pose: '姿势',
+  detail: '细节',
+};
+
+const orderReferenceRoles = (roles: ReferenceRole[]) => REFERENCE_ROLES
+  .map((role) => role.id)
+  .filter((role) => roles.includes(role));
 
 const typeIcon: Record<ImageGenerationType, string> = {
   product_main: 'inventory_2',
@@ -93,6 +114,7 @@ const taskProfileByType: Record<ImageGenerationType, string> = {
 
 const EMPTY_PRODUCT_FACTS: ProductFacts = {
   name: '',
+  seoName: '',
   sellingPoints: '',
   category: '',
   color: '',
@@ -102,6 +124,7 @@ const EMPTY_PRODUCT_FACTS: ProductFacts = {
 
 const createProductFacts = (asset: AssetResourceItem, product: ProductAsset | null): ProductFacts => ({
   name: product?.name ?? asset.name.replace(/\.[^.]+$/, ''),
+  seoName: product ? `${product.name} ${product.specs.color.join(' ')} ${product.fabric}`.trim() : asset.name.replace(/\.[^.]+$/, ''),
   sellingPoints: product?.specs.sellingPoints.join('、') ?? asset.tags ?? '待补充',
   category: product?.category ?? '待 AI 识别',
   color: product?.specs.color.join('、') ?? '待 AI 识别',
@@ -111,6 +134,27 @@ const createProductFacts = (asset: AssetResourceItem, product: ProductAsset | nu
     : '以主体素材可见结构为准',
 });
 
+const joinChineseList = (items: string[]) => {
+  if (items.length <= 1) return items[0] ?? '';
+  return `${items.slice(0, -1).join('、')}与${items.at(-1)}`;
+};
+
+const getReferenceSources = (references: Array<TaskReference & { position: number }>) => Object.fromEntries(
+  REFERENCE_ROLES.map(({ id }) => [
+    id,
+    references.filter((reference) => reference.roles.includes(id)).map((reference) => `参考图 ${reference.position}`),
+  ]),
+) as Record<ReferenceRole, string[]>;
+
+const getReferencePromptLine = (references: Array<TaskReference & { position: number }>) => {
+  if (!references.length) return '仅以主体素材为商品依据。';
+  const assignedReferences = references
+    .filter((reference) => reference.roles.length > 0)
+    .map((reference) => `${joinChineseList(orderReferenceRoles(reference.roles).map((role) => REFERENCE_ROLE_LABELS[role]))}参考图 ${reference.position}`)
+    .join('；');
+  return assignedReferences ? `${assignedReferences}。` : '已添加参考图，尚未指定参考标签。';
+};
+
 const buildPrompt = (
   type: ImageGenerationType,
   facts: ProductFacts,
@@ -119,22 +163,23 @@ const buildPrompt = (
   pose: string,
   references: Array<TaskReference & { position: number }>,
 ) => {
-  const referenceLine = references.length
-    ? `参考图按顺序使用：${references.map((reference) => `${reference.position}.${reference.role}`).join('、')}。`
-    : '仅以主体素材为商品依据。';
+  const referenceSources = getReferenceSources(references);
+  const styleDirection = referenceSources.style.length ? '风格按指定参考图保持一致' : style;
+  const sceneDirection = referenceSources.scene.length ? '场景按指定参考图保持一致' : scene;
+  const poseDirection = referenceSources.pose.length ? '姿势按指定参考图保持一致' : pose;
   const directions: Record<ImageGenerationType, string> = {
-    product_main: `为「${facts.name}」生成干净的电商主图。商品完整居中，轮廓和可见材质清晰，${scene}环境保持低干扰；${style}，柔和商业光线与克制阴影。`,
-    scene_detail: `为「${facts.name}」生成有使用感的场景图。商品始终是画面中心，${scene}只承担氛围和尺度参照；${style}，自然层次与真实景深。`,
-    detail_closeup: `为「${facts.name}」生成可核验的细节图。微距聚焦主体素材可见的材质、纹理或工艺，单一焦点锐利，背景干净虚化；${style}。`,
-    on_model: `为「${facts.name}」生成三视图。相同人物、相同光线和机位依次呈现正面、侧面与背面，采用${pose}，不得遮挡商品关键结构；${style}。`,
+    product_main: `为「${facts.seoName || facts.name}」生成干净的电商主图。商品完整居中，轮廓和可见材质清晰，${sceneDirection}且保持低干扰；${styleDirection}，柔和商业光线与克制阴影。`,
+    scene_detail: `为「${facts.seoName || facts.name}」生成有使用感的场景图。商品始终是画面中心，${sceneDirection}只承担氛围和尺度参照；${styleDirection}，自然层次与真实景深。`,
+    detail_closeup: `为「${facts.seoName || facts.name}」生成可核验的细节图。微距聚焦主体素材可见的材质、纹理或工艺，单一焦点锐利，背景干净虚化；${styleDirection}。`,
+    on_model: `为「${facts.seoName || facts.name}」生成三视图。相同人物、相同光线和机位依次呈现正面、侧面与背面，${poseDirection}，不得遮挡商品关键结构；${styleDirection}。`,
   };
   const factLine = [facts.category, facts.color, facts.materialAndPattern, facts.structure, facts.sellingPoints]
     .filter((value) => value && value !== '待 AI 识别' && value !== '待补充')
     .join('；');
-  return `${directions[type]}\n\n商品事实：${factLine || '以主体素材可见信息为准。'}\n\n${referenceLine}\n\n保持主体素材中可见的颜色、图案、结构和品牌信息，不新增未提供的商品、文字或配饰。避免模糊、商品漂移、错误文字和材质失真。`;
+  return `${getReferencePromptLine(references)}\n\n${directions[type]}\n\n商品事实：${factLine || '以主体素材可见信息为准。'}\n\n保持主体素材中可见的颜色、图案、结构和品牌信息，不新增未提供的商品、文字或配饰。避免模糊、商品漂移、错误文字和材质失真。`;
 };
 
-const VisualTagPicker: React.FC<VisualTagPickerProps> = ({ label, value, options, onChange }) => {
+const VisualTagPicker: React.FC<VisualTagPickerProps> = ({ label, value, options, onChange, disabled = false, disabledLabel }) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const selected = options.find((option) => option.id === value) ?? options[0];
@@ -160,17 +205,19 @@ const VisualTagPicker: React.FC<VisualTagPickerProps> = ({ label, value, options
     <div className="relative" ref={containerRef}>
       <button
         type="button"
+        disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`flex h-9 items-center gap-2 rounded-full border bg-white py-1 pl-1 pr-2 text-left transition-colors ${open ? 'border-primary ring-2 ring-primary/10' : 'border-slate-200 hover:border-slate-300'}`}
+        title={disabled ? `${label}已由${disabledLabel}接管` : undefined}
+        className={`flex h-9 items-center gap-2 rounded-md border py-1 pl-1 pr-2 text-left transition-colors ${disabled ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400' : open ? 'border-primary bg-white ring-2 ring-primary/10' : 'border-slate-200 bg-white hover:border-slate-300'}`}
       >
         <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-slate-100">
           <img src={selected.previewImage} alt="" className="h-full w-full object-cover" />
         </span>
         <span className="min-w-0">
           <span className="mr-1 text-[10px] font-bold text-slate-400">{label}</span>
-          <span className="text-[11px] font-bold text-slate-700">{selected.label}</span>
+          <span className={`text-[11px] font-bold ${disabled ? 'text-slate-400' : 'text-slate-700'}`}>{disabled ? disabledLabel : selected.label}</span>
         </span>
         <ChevronDown size={14} strokeWidth={2.2} className={`shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -208,6 +255,52 @@ const VisualTagPicker: React.FC<VisualTagPickerProps> = ({ label, value, options
   );
 };
 
+const ReferenceRolePicker: React.FC<ReferenceRolePickerProps> = ({ referenceNumber, value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const closeOnOutsidePress = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsidePress);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsidePress);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, []);
+
+  const toggleRole = (role: ReferenceRole) => {
+    const nextValue = value.includes(role) ? value.filter((item) => item !== role) : [...value, role];
+    onChange(orderReferenceRoles(nextValue));
+  };
+
+  return (
+    <div ref={containerRef} className="relative min-w-0">
+      <button type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open} className={`flex h-7 w-full items-center justify-between gap-1 rounded border px-1.5 text-[10px] font-bold ${open ? 'border-primary bg-blue-50 text-primary' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+        <span className="truncate">{value.length ? orderReferenceRoles(value).map((role) => REFERENCE_ROLE_LABELS[role]).join('、') : '选择标签'}</span>
+        <ChevronDown size={12} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute left-0 z-40 mt-1 w-36 rounded-md border border-slate-200 bg-white p-1 shadow-xl" role="listbox" aria-label={`参考图 ${referenceNumber} 标签`}>
+          {REFERENCE_ROLES.map((role) => {
+            const active = value.includes(role.id);
+            return <button type="button" key={role.id} onClick={() => toggleRole(role.id)} className={`flex h-8 w-full items-center gap-2 rounded px-2 text-left text-[11px] ${active ? 'bg-orange-50 font-bold text-[#df5b43]' : 'text-slate-600 hover:bg-slate-50'}`}>
+              <span className={`grid h-4 w-4 place-items-center rounded border ${active ? 'border-[#df5b43] bg-[#df5b43] text-white' : 'border-slate-300'}`}>{active && <Check size={11} strokeWidth={3} />}</span>
+              <span className="material-symbols-outlined text-sm">{role.icon}</span>
+              {role.label}
+            </button>;
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   products,
   onAddTask,
@@ -227,8 +320,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     on_model: 1,
   });
   const [mainAsset, setMainAsset] = useState<TaskReference | null>(null);
-  const [references, setReferences] = useState<Partial<Record<ReferenceSlot, TaskReference>>>({});
-  const [referenceOrder, setReferenceOrder] = useState<Partial<Record<ReferenceSlot, number>>>({});
+  const [references, setReferences] = useState<TaskReference[]>([]);
   const [productFacts, setProductFacts] = useState<ProductFacts>(EMPTY_PRODUCT_FACTS);
   const [style, setStyle] = useState(mockImagePromptVisualTags.styles[0].id);
   const [scene, setScene] = useState(mockImagePromptVisualTags.styles[0].defaultSceneId);
@@ -242,7 +334,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   const [modelId, setModelId] = useState('gpt-image-2');
   const [ratio, setRatio] = useState('1:1');
   const [resolution, setResolution] = useState('2048px');
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [executionConfirmOpen, setExecutionConfirmOpen] = useState(false);
   const [readinessIssue, setReadinessIssue] = useState('');
   const [factsCopyState, setFactsCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -266,10 +357,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     .flatMap((item) => item.models
       .filter((itemModel) => itemModel.mediaTypes.includes('image'))
       .map((itemModel) => ({ channel: item, model: itemModel }))), []);
-  const orderedReferences = useMemo(() => Object.entries(references)
-    .filter((entry): entry is [ReferenceSlot, TaskReference] => Boolean(entry[1]))
-    .sort(([left], [right]) => (referenceOrder[left] ?? 99) - (referenceOrder[right] ?? 99))
-    .map(([, reference], index) => ({ ...reference, position: index + 1 })), [referenceOrder, references]);
+  const orderedReferences = useMemo(() => references.map((reference, index) => ({ ...reference, position: index + 1 })), [references]);
+  const referenceSources = useMemo(() => getReferenceSources(orderedReferences), [orderedReferences]);
   const generatedPrompts = useMemo(() => Object.fromEntries(TYPE_ORDER.map((type) => [
     type,
     buildPrompt(type, productFacts, selectedStyle.label, selectedScene.label, selectedPose.label, orderedReferences),
@@ -277,6 +366,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   const promptsComplete = selectedTypes.every((type) => (promptOverrides[type] ?? (assistantState === 'ready' ? generatedPrompts[type] : '')).trim().length > 0);
   const isSupported = model.capability.ratios.includes(ratio)
     && model.capability.resolutions.includes(resolution)
+    && references.length <= model.capability.maxReferenceImages
     && selectedTypes.every((type) => typeCounts[type] <= model.capability.maxCount);
 
   const clearPromptState = () => {
@@ -288,18 +378,18 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     setReadinessIssue('');
   };
 
-  const toTaskReference = (asset: AssetResourceItem, role: string): TaskReference => ({
+  const toTaskReference = (asset: AssetResourceItem, roles: ReferenceRole[] = []): TaskReference => ({
     id: `asset-${asset.id}`,
-    role,
     name: asset.name,
     thumbnailUrl: asset.thumbnailUrl ?? asset.originalUrl,
     productAssetId: asset.productAssetId,
+    roles,
   });
 
   const selectMainAsset = (assets: AssetResourceItem[]) => {
     const asset = assets[0];
     if (!asset) return;
-    const reference = toTaskReference(asset, '主体素材');
+    const reference = toTaskReference(asset);
     const linkedProduct = reference.productAssetId
       ? products.find((item) => item.id === reference.productAssetId) ?? null
       : null;
@@ -312,17 +402,22 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   const applyTemplate = (template: ResultTemplate) => {
     const snapshot = template.snapshot;
     const imageType = snapshot.imageType ?? 'product_main';
-    const allowedReferences = snapshot.references.filter((reference): reference is typeof reference & { role: ReferenceSlot } => REFERENCE_SLOTS.some((slot) => slot.id === reference.role));
-    const nextReferences = Object.fromEntries(allowedReferences.map((reference) => [reference.role, {
-      id: reference.id, role: REFERENCE_SLOTS.find((slot) => slot.id === reference.role)?.role ?? '参考图', name: reference.name, thumbnailUrl: reference.url,
-    }])) as Partial<Record<ReferenceSlot, TaskReference>>;
-    const nextOrder = Object.fromEntries(allowedReferences.map((reference, index) => [reference.role, index + 1])) as Partial<Record<ReferenceSlot, number>>;
+    const nextReferences: TaskReference[] = [];
+    snapshot.references.forEach((reference) => {
+      if (!REFERENCE_ROLES.some((role) => role.id === reference.role)) return;
+      const role = reference.role as ReferenceRole;
+      const existing = nextReferences.find((item) => item.thumbnailUrl === reference.url);
+      if (existing) {
+        if (!existing.roles.includes(role)) existing.roles.push(role);
+        return;
+      }
+      nextReferences.push({ id: reference.id, name: reference.name, thumbnailUrl: reference.url, roles: [role] });
+    });
     setSelectedTypes([imageType]);
     setTypeCounts((current) => ({ ...current, [imageType]: Math.max(MIN_TYPE_COUNT, Math.min(MAX_TYPE_COUNT, snapshot.count ?? 1)) }));
     setRatio(snapshot.ratio);
     setResolution(snapshot.resolution);
     setReferences(nextReferences);
-    setReferenceOrder(nextOrder);
     setPromptOverrides({ [imageType]: snapshot.prompt });
     setManualPromptTypes({ [imageType]: false });
     setAiSuggestions({});
@@ -339,13 +434,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     onTemplateApplied();
   }, [selectedTemplate?.id]);
 
-  const toOrderedReferences = (
-    nextReferences: Partial<Record<ReferenceSlot, TaskReference>>,
-    nextOrder: Partial<Record<ReferenceSlot, number>>,
-  ) => Object.entries(nextReferences)
-    .filter((entry): entry is [ReferenceSlot, TaskReference] => Boolean(entry[1]))
-    .sort(([left], [right]) => (nextOrder[left] ?? 99) - (nextOrder[right] ?? 99))
-    .map(([, reference], index) => ({ ...reference, position: index + 1 }));
+  const toOrderedReferences = (nextReferences: TaskReference[]) => nextReferences
+    .map((reference, index) => ({ ...reference, position: index + 1 }));
 
   const applyAiPromptUpdate = (candidates: Record<ImageGenerationType, string>, reason: string) => {
     setPromptOverrides((current) => {
@@ -403,22 +493,28 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     }, 500);
   };
 
-  const selectReferenceAsset = (slot: ReferenceSlot) => (assets: AssetResourceItem[]) => {
+  const selectReferenceAsset = (assets: AssetResourceItem[]) => {
     const asset = assets[0];
     if (!asset) return;
-    const definition = REFERENCE_SLOTS.find((item) => item.id === slot);
-    const nextReference = toTaskReference(asset, definition?.role ?? '参考图');
-    const analysis = asset.fileResourceId ? mockReferenceAnalysisByFileId[asset.fileResourceId] : undefined;
-    const nextReferences = { ...references, [slot]: nextReference };
-    const nextOrder = { ...referenceOrder, [slot]: referenceOrder[slot] ?? Object.keys(referenceOrder).length + 1 };
-    const nextTags = normalizeTagSelection(analysis?.style ?? style, analysis?.scene ?? scene, analysis?.pose ?? pose);
+    if (references.some((reference) => reference.id === `asset-${asset.id}`)) return;
+    if (references.length >= model.capability.maxReferenceImages) {
+      setReadinessIssue(`当前模型最多支持 ${model.capability.maxReferenceImages} 张参考图。`);
+      return;
+    }
+    const defaultRoles: ReferenceRole[] = references.length === 0 ? ['model'] : references.length === 1 ? ['detail'] : [];
+    const nextReferences = [...references, toTaskReference(asset, defaultRoles)];
     setReferences(nextReferences);
-    setReferenceOrder(nextOrder);
-    setStyle(nextTags.styleId);
-    setScene(nextTags.sceneId);
-    setPose(nextTags.poseId);
+    setReadinessIssue('');
     if (mainAsset) {
-      applyAiPromptUpdate(getPromptCandidates(productFacts, nextTags.styleId, nextTags.sceneId, nextTags.poseId, toOrderedReferences(nextReferences, nextOrder)), `${definition?.label ?? '参考'}参考图`);
+      applyAiPromptUpdate(getPromptCandidates(productFacts, style, scene, pose, toOrderedReferences(nextReferences)), '参考图');
+    }
+  };
+
+  const updateReferenceRoles = (referenceId: string, roles: ReferenceRole[]) => {
+    const nextReferences = references.map((reference) => reference.id === referenceId ? { ...reference, roles } : reference);
+    setReferences(nextReferences);
+    if (mainAsset) {
+      applyAiPromptUpdate(getPromptCandidates(productFacts, style, scene, pose, toOrderedReferences(nextReferences)), '参考图标签');
     }
   };
 
@@ -431,16 +527,11 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
     applyAiPromptUpdate(getPromptCandidates(productFacts, nextTags.styleId, nextTags.sceneId, nextTags.poseId, orderedReferences), `${kind === 'style' ? '风格' : kind === 'scene' ? '场景' : '姿势'}标签`);
   };
 
-  const removeReference = (slot: ReferenceSlot) => {
-    const nextReferences = { ...references };
-    delete nextReferences[slot];
-    const nextOrder = Object.fromEntries(Object.entries(referenceOrder)
-      .filter(([key]) => key !== slot)
-      .map(([key], index) => [key, index + 1])) as Partial<Record<ReferenceSlot, number>>;
+  const removeReference = (referenceId: string) => {
+    const nextReferences = references.filter((reference) => reference.id !== referenceId);
     setReferences(nextReferences);
-    setReferenceOrder(nextOrder);
     if (mainAsset) {
-      applyAiPromptUpdate(getPromptCandidates(productFacts, style, scene, pose, toOrderedReferences(nextReferences, nextOrder)), `${slot === 'model' ? '模特' : REFERENCE_SLOTS.find((item) => item.id === slot)?.label ?? '参考'}参考图`);
+      applyAiPromptUpdate(getPromptCandidates(productFacts, style, scene, pose, toOrderedReferences(nextReferences)), '参考图');
     }
   };
 
@@ -503,7 +594,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
   };
 
   const copyProductFacts = async () => {
-    const text = `商品名称：${productFacts.name}\n品类：${productFacts.category}\n颜色：${productFacts.color}\n图案/材质：${productFacts.materialAndPattern}\n版型/结构：${productFacts.structure}\n核心卖点：${productFacts.sellingPoints}`;
+    const text = `ERP 商品名称：${productFacts.name}\nERP 分类：${productFacts.category}\nSEO 优化商品名称：${productFacts.seoName}\n颜色：${productFacts.color}\n图案/材质：${productFacts.materialAndPattern}\n版型/结构：${productFacts.structure}\n核心卖点：${productFacts.sellingPoints}`;
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard API is unavailable');
       await navigator.clipboard.writeText(text);
@@ -544,7 +635,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
       return;
     }
     if (!isSupported) {
-      setReadinessIssue('当前模型不支持所选输出规格或张数，请在高级设置中调整。');
+      setReadinessIssue('当前模型不支持所选输出规格或张数，请调整 Prompt 下方的模型、比例或分辨率。');
       document.getElementById('image-settings-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
@@ -603,110 +694,119 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = ({
         : '生成提示词';
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[#f5f7fb] text-slate-800">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setScreen(AppScreen.TASKS)} className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100" title="返回任务列表"><span className="material-symbols-outlined">arrow_back</span></button>
-          <div><p className="text-[11px] font-bold text-primary">图片任务</p><h1 className="text-base font-black">新建图片任务</h1></div>
+    <div className="flex h-screen flex-col overflow-hidden bg-[#f4f6f9] text-slate-800">
+      <header className="flex h-[58px] shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <button onClick={() => setScreen(AppScreen.TASKS)} className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" title="返回任务列表"><span className="material-symbols-outlined text-lg">arrow_back</span></button>
+          <div className="min-w-0"><h1 className="truncate text-base font-black">新建图片任务</h1><p className="mt-0.5 text-[10px] text-slate-400">配置、生成与结果在同一页面完成</p></div>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-xs text-slate-500">{selectedTypes.length} 个类型 · 共 {totalCount} 张</span>
-          <button onClick={() => setTemplatePickerOpen(true)} className="h-9 rounded-md border border-primary px-3 text-xs font-bold text-primary">模板</button>
-          <button onClick={checkAndGenerate} className="h-9 rounded-md bg-primary px-4 text-xs font-bold text-white shadow-sm">生成</button>
+        <div className="flex shrink-0 items-center gap-3">
+          {selectedMainProduct && <div className="hidden max-w-64 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 lg:flex"><img src={selectedMainProduct.thumbnail} alt="" className="h-7 w-7 rounded object-cover" /><div className="min-w-0"><p className="truncate text-[10px] font-bold text-emerald-800">{selectedMainProduct.name}</p><p className="truncate text-[9px] text-emerald-600">ERP 商品 · {selectedMainProduct.sku}</p></div></div>}
+          <button onClick={() => setTemplatePickerOpen(true)} className="h-8 rounded-md border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-600 hover:border-primary hover:text-primary">模板</button>
+          <button onClick={checkAndGenerate} className="h-8 rounded-md bg-[#df5b43] px-4 text-[11px] font-bold text-white shadow-sm hover:bg-[#cb4d37]">生成 {totalCount} 张</button>
         </div>
       </header>
 
-      {readinessIssue && <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-6 py-2 text-[11px] font-bold text-amber-700"><span className="material-symbols-outlined mr-1 align-middle text-sm">error</span>{readinessIssue}</div>}
-      {appliedTemplateName && <div className="shrink-0 border-b border-blue-100 bg-blue-50 px-6 py-2 text-[11px] font-bold text-primary">已应用模板「{appliedTemplateName}」，请替换主体素材后生成。</div>}
+      {readinessIssue && <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-[11px] font-bold text-amber-700"><span className="material-symbols-outlined mr-1 align-middle text-sm">error</span>{readinessIssue}</div>}
+      {appliedTemplateName && <div className="shrink-0 border-b border-blue-100 bg-blue-50 px-4 py-2 text-[11px] font-bold text-primary">已应用模板「{appliedTemplateName}」，请确认主体素材与参考图标签。</div>}
 
-      <main className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[260px_minmax(480px,1fr)_300px]">
-        <section id="image-source-section" className="min-w-0 space-y-3">
-          <div className="border border-slate-200 bg-white p-3">
-            <div className="flex items-center justify-between"><h2 className="text-xs font-black">主体素材</h2><button onClick={() => openTransit(selectMainAsset, 'main')} className="text-[11px] font-bold text-primary">资源中心</button></div>
+      <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-3 lg:grid-cols-[288px_minmax(0,1fr)_310px] lg:overflow-hidden">
+        <section id="image-source-section" className="min-w-0 space-y-3 lg:overflow-y-auto lg:pr-1">
+          <div className="rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between"><div><p className="text-[9px] font-bold text-[#df5b43]">创作商品</p><h2 className="mt-0.5 text-xs font-black">主体素材</h2></div><button onClick={() => openTransit(selectMainAsset, 'main')} className="h-7 rounded border border-slate-200 px-2 text-[10px] font-bold text-slate-600 hover:border-primary hover:text-primary">资源中心</button></div>
             {mainAsset?.thumbnailUrl ? (
-              <button onClick={() => openTransit(selectMainAsset, 'main')} className="mt-3 block w-full text-left"><img src={mainAsset.thumbnailUrl} alt={mainAsset.name} className="h-36 w-full object-cover" referrerPolicy="no-referrer" /><p className="mt-2 truncate text-xs font-bold text-slate-700">{mainAsset.name}</p></button>
+              <button onClick={() => openTransit(selectMainAsset, 'main')} className="relative mt-3 block w-full overflow-hidden rounded border border-slate-200 bg-slate-50 text-left"><img src={mainAsset.thumbnailUrl} alt={mainAsset.name} className="h-40 w-full object-cover" referrerPolicy="no-referrer" /><span className="absolute bottom-2 right-2 rounded bg-slate-900/75 px-2 py-1 text-[9px] font-bold text-white">更换</span></button>
             ) : (
-              <button onClick={() => openTransit(selectMainAsset, 'main')} className="mt-3 flex h-36 w-full flex-col items-center justify-center gap-2 border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-primary hover:bg-blue-50 hover:text-primary"><span className="material-symbols-outlined text-3xl">add_photo_alternate</span><span className="text-xs font-bold">选择主体素材</span></button>
+              <button onClick={() => openTransit(selectMainAsset, 'main')} className="mt-3 flex h-40 w-full flex-col items-center justify-center gap-2 rounded border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-primary hover:bg-blue-50 hover:text-primary"><span className="material-symbols-outlined text-3xl">add_photo_alternate</span><span className="text-xs font-bold">选择主体素材</span></button>
             )}
-            {mainAsset && <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500"><span className="material-symbols-outlined text-sm">inventory_2</span>{selectedMainProduct ? <span className="truncate">{selectedMainProduct.name} · {selectedMainProduct.sku}</span> : <span>未关联商品，可后续归档</span>}</div>}
+            {mainAsset && <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500"><span className="material-symbols-outlined text-sm text-emerald-600">verified</span>{selectedMainProduct ? <span className="truncate">已匹配 ERP · {selectedMainProduct.sku}</span> : <span>未匹配 ERP 商品</span>}</div>}
           </div>
 
-          <div className="border border-slate-200 bg-white p-3">
-            <div className="flex items-baseline justify-between"><h2 className="text-xs font-black">参考图</h2><span className="text-[10px] text-slate-400">自动识别标签</span></div>
-            <div className="mt-3 grid grid-cols-5 gap-1.5">
-              {REFERENCE_SLOTS.map((slot) => {
-                const reference = references[slot.id];
-                return <div key={slot.id} className="group relative min-w-0">
-                  <button onClick={() => openTransit(selectReferenceAsset(slot.id), slot.transitSlot)} className={`flex aspect-square w-full flex-col items-center justify-center overflow-hidden border text-slate-400 transition-colors ${reference ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-slate-50 hover:border-primary hover:text-primary'}`} title={`添加${slot.label}参考图`}>
-                    {reference?.thumbnailUrl ? <img src={reference.thumbnailUrl} alt={slot.label} className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <span className="material-symbols-outlined text-lg">{slot.icon}</span>}
-                  </button>
-                  {reference && <button onClick={() => removeReference(slot.id)} className="absolute -right-1 -top-1 hidden h-4 w-4 place-items-center rounded-full bg-slate-800 text-[10px] text-white group-hover:grid" title={`移除${slot.label}参考图`}>×</button>}
-                  <p className="mt-1 truncate text-center text-[10px] font-bold text-slate-500">{slot.label}</p>
+          <div className="rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between"><div><p className="text-[9px] font-bold text-[#df5b43]">补充依据</p><h2 className="mt-0.5 text-xs font-black">参考图</h2></div><span className="rounded bg-slate-100 px-1.5 py-1 text-[9px] font-bold text-slate-500">{references.length} / {model.capability.maxReferenceImages}</span></div>
+            <p className="mt-1 text-[9px] leading-4 text-slate-400">每张图可同时选择模特、风格、场景、姿势、细节。</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {references.map((reference, index) => <div key={reference.id} className="group relative min-w-0">
+                <div className="relative aspect-[4/5] overflow-hidden rounded border border-slate-200 bg-slate-50"><img src={reference.thumbnailUrl} alt={reference.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /><button onClick={() => removeReference(reference.id)} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded bg-slate-900/75 text-white opacity-0 transition-opacity group-hover:opacity-100" title={`移除参考图 ${index + 1}`}><span className="material-symbols-outlined text-xs">close</span></button></div>
+                <p className="my-1 truncate text-[9px] font-bold text-slate-500">参考图 {index + 1}</p>
+                <ReferenceRolePicker referenceNumber={index + 1} value={reference.roles} onChange={(roles) => updateReferenceRoles(reference.id, roles)} />
+              </div>)}
+              {references.length < model.capability.maxReferenceImages && <button onClick={() => openTransit(selectReferenceAsset, 'reference')} className="flex aspect-[4/5] min-w-0 flex-col items-center justify-center gap-1 rounded border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-primary hover:text-primary"><span className="material-symbols-outlined text-xl">add</span><span className="text-[9px] font-bold">添加参考</span></button>}
+            </div>
+          </div>
+
+          {mainAsset && <div className="rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-[9px] font-bold text-[#df5b43]">ERP 商品事实</p><h2 className="mt-1 truncate text-sm font-black" title={productFacts.name}>{productFacts.name}</h2><p className="mt-1 truncate text-[10px] text-slate-500" title={productFacts.category}>{productFacts.category}</p></div><button onClick={copyProductFacts} className={`grid h-7 w-7 shrink-0 place-items-center rounded border ${factsCopyState === 'failed' ? 'border-red-200 text-red-600' : 'border-slate-200 text-slate-500 hover:border-primary hover:text-primary'}`} title={factsCopyState === 'failed' ? '复制失败，请检查浏览器权限' : '复制商品信息'}><span className="material-symbols-outlined text-sm">{factsCopyState === 'copied' ? 'check' : factsCopyState === 'failed' ? 'error' : 'content_copy'}</span></button></div>
+            <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+              <label className="block"><span className="text-[9px] text-slate-400">SEO 优化商品名称</span><input value={productFacts.seoName} onChange={(event) => updateProductFact('seoName', event.target.value)} className="mt-0.5 h-7 w-full border-b border-slate-200 bg-transparent text-[10px] font-bold text-[#df5b43] outline-none focus:border-primary" /></label>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">{([['color', '颜色'], ['materialAndPattern', '图案 / 材质'], ['structure', '版型 / 结构']] as Array<[keyof ProductFacts, string]>).map(([key, label]) => <label key={key} className="min-w-0"><span className="block text-[9px] text-slate-400">{label}</span><input value={productFacts[key]} onChange={(event) => updateProductFact(key, event.target.value)} className="mt-0.5 h-7 w-full truncate border-b border-slate-200 bg-transparent text-[10px] font-bold text-[#df5b43] outline-none focus:border-primary" /></label>)}</div>
+              <label className="block"><span className="text-[9px] text-slate-400">核心卖点</span><textarea value={productFacts.sellingPoints} onChange={(event) => updateProductFact('sellingPoints', event.target.value)} className="mt-0.5 h-12 w-full resize-none border-b border-slate-200 bg-transparent text-[10px] font-bold leading-4 text-[#df5b43] outline-none focus:border-primary" /></label>
+            </div>
+          </div>}
+        </section>
+
+        <section id="image-prompt-section" className="flex min-h-[640px] min-w-0 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+          <div className="rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between"><div><p className="text-[9px] font-bold text-[#df5b43]">输出内容</p><h2 className="mt-0.5 text-xs font-black">选择图片类型</h2></div><span className="rounded bg-slate-100 px-2 py-1 text-[9px] font-bold text-slate-500">共生成 {totalCount} 张</span></div>
+            <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
+              {TYPE_ORDER.map((type) => {
+                const active = selectedTypes.includes(type);
+                return <div key={type} className={`flex h-16 min-w-0 items-center gap-2 rounded border px-2 ${active ? 'border-[#ef8b77] bg-[#fff3ef]' : 'border-slate-200 bg-white'}`}>
+                  <button onClick={() => toggleType(type)} aria-pressed={active} className="flex min-w-0 flex-1 items-center gap-1.5 text-left"><span className={`material-symbols-outlined text-base ${active ? 'text-[#df5b43]' : 'text-slate-400'}`}>{active ? 'check_box' : typeIcon[type]}</span><span className={`truncate text-[10px] font-bold ${active ? 'text-[#c84d38]' : 'text-slate-600'}`}>{typeCompactLabel[type]}</span></button>
+                  {active ? <div className="flex shrink-0 items-center rounded border border-slate-200 bg-white text-[11px]"><button onClick={() => changeTypeCount(type, -1)} disabled={typeCounts[type] <= MIN_TYPE_COUNT} className="grid h-6 w-5 place-items-center text-slate-500 disabled:text-slate-300" title="减少张数">−</button><span className="w-4 text-center font-bold">{typeCounts[type]}</span><button onClick={() => changeTypeCount(type, 1)} disabled={typeCounts[type] >= Math.min(MAX_TYPE_COUNT, model.capability.maxCount)} className="grid h-6 w-5 place-items-center text-slate-500 disabled:text-slate-300" title="增加张数">+</button></div> : <button onClick={() => toggleType(type)} className="grid h-6 w-6 shrink-0 place-items-center text-slate-400 hover:text-primary" title={`添加${typeCompactLabel[type]}`}><span className="material-symbols-outlined text-base">add</span></button>}
                 </div>;
               })}
             </div>
           </div>
 
-          {mainAsset && <div className="border border-slate-200 bg-white p-3">
-            <div className="flex items-center justify-between gap-2"><div><h2 className="text-xs font-black">商品事实</h2><p className="mt-0.5 text-[10px] text-slate-400">AI 基于主体素材识别，可直接修改</p></div><button onClick={copyProductFacts} className={`grid h-6 w-6 place-items-center rounded border ${factsCopyState === 'failed' ? 'border-red-200 text-red-600' : 'border-slate-200 text-slate-500 hover:border-primary hover:text-primary'}`} title={factsCopyState === 'failed' ? '复制失败，请检查浏览器权限' : '复制商品信息'} aria-label={factsCopyState === 'failed' ? '复制失败' : '复制商品信息'}><span className="material-symbols-outlined text-sm">{factsCopyState === 'copied' ? 'check' : factsCopyState === 'failed' ? 'error' : 'content_copy'}</span></button></div>
-            <div className="mt-3 space-y-2"><label className="block"><span className="text-[10px] text-slate-400">商品名称</span><input value={productFacts.name} onChange={(event) => updateProductFact('name', event.target.value)} className="mt-0.5 h-7 w-full border-b border-slate-200 bg-transparent text-[11px] font-bold outline-none focus:border-primary" /></label><div className="grid grid-cols-2 gap-x-2 gap-y-2">{([['category', '品类'], ['color', '颜色'], ['materialAndPattern', '图案/材质'], ['structure', '版型/结构']] as Array<[keyof ProductFacts, string]>).map(([key, label]) => <label key={key} className="min-w-0"><span className="block text-[10px] text-slate-400">{label}</span><input value={productFacts[key]} onChange={(event) => updateProductFact(key, event.target.value)} className="mt-0.5 h-7 w-full truncate border-b border-slate-200 bg-transparent text-[11px] outline-none focus:border-primary" /></label>)}</div><label className="block"><span className="text-[10px] text-slate-400">核心卖点</span><textarea value={productFacts.sellingPoints} onChange={(event) => updateProductFact('sellingPoints', event.target.value)} className="mt-0.5 h-12 w-full resize-none border-b border-slate-200 bg-transparent text-[11px] leading-4 outline-none focus:border-primary" /></label></div>
-          </div>}
-        </section>
-
-        <section id="image-prompt-section" className="min-w-0 border border-slate-200 bg-white p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div><p className="text-[11px] font-bold text-primary">内容</p><h2 className="mt-0.5 text-sm font-black">最终 Prompt</h2></div>
-            <button onClick={refreshPrompts} disabled={assistantState === 'processing'} className="flex h-8 items-center gap-1.5 rounded-md border border-primary bg-white px-3 text-[11px] font-bold text-primary disabled:border-slate-200 disabled:text-slate-400"><span className={`material-symbols-outlined text-base ${assistantState === 'processing' ? 'animate-spin' : ''}`}>{assistantState === 'ready' ? 'auto_awesome' : 'auto_fix_high'}</span>{assistantLabel}</button>
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {TYPE_ORDER.map((type) => {
-              const active = selectedTypes.includes(type);
-              return <div key={type} className={`flex h-16 min-w-0 items-center gap-2 border px-2 ${active ? 'border-primary bg-blue-50' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
-                <button onClick={() => toggleType(type)} aria-pressed={active} className="flex min-w-0 flex-1 items-center gap-1.5 text-left"><span className={`material-symbols-outlined text-base ${active ? 'text-primary' : 'text-slate-400'}`}>{active ? 'check_circle' : typeIcon[type]}</span><span className="truncate text-[11px] font-bold text-slate-700">{typeCompactLabel[type]}</span></button>
-                {active ? <div className="flex items-center border border-slate-200 bg-white text-[11px]"><button onClick={() => changeTypeCount(type, -1)} disabled={typeCounts[type] <= MIN_TYPE_COUNT} className="grid h-6 w-5 place-items-center text-slate-500 disabled:text-slate-300" title="减少张数">−</button><span className="w-4 text-center font-bold">{typeCounts[type]}</span><button onClick={() => changeTypeCount(type, 1)} disabled={typeCounts[type] >= Math.min(MAX_TYPE_COUNT, model.capability.maxCount)} className="grid h-6 w-5 place-items-center text-slate-500 disabled:text-slate-300" title="增加张数">+</button></div> : <button onClick={() => toggleType(type)} className="grid h-6 w-6 place-items-center text-slate-400 hover:text-primary" title={`添加${typeCompactLabel[type]}`}><span className="material-symbols-outlined text-base">add</span></button>}
-              </div>;
-            })}
-          </div>
-
-          <div className="mt-3 border-y border-slate-100 py-3">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <VisualTagPicker label="风格" value={style} options={mockImagePromptVisualTags.styles} onChange={(value) => updateTag('style', value)} />
-              <VisualTagPicker label="场景" value={scene} options={availableScenes} onChange={(value) => updateTag('scene', value)} />
-              <VisualTagPicker label="姿势" value={pose} options={availablePoses} onChange={(value) => updateTag('pose', value)} />
+          <div className="flex min-h-[480px] flex-1 flex-col rounded-md border border-slate-200 bg-white">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-3 py-3"><div><p className="text-[9px] font-bold text-[#df5b43]">内容表达</p><h2 className="mt-0.5 text-xs font-black">本次图片 Prompt</h2><p className="mt-1 text-[9px] text-slate-400">参考图标签会自动写入 Prompt，并锁定重复枚举。</p></div><button onClick={refreshPrompts} disabled={assistantState === 'processing'} className="flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600 hover:border-primary hover:text-primary disabled:text-slate-300"><span className={`material-symbols-outlined text-sm ${assistantState === 'processing' ? 'animate-spin' : ''}`}>auto_fix_high</span>{assistantLabel}</button></div>
+            <div className="flex-1 space-y-3 p-3">
+              {selectedTypes.map((type) => {
+                const prompt = promptOverrides[type] ?? (assistantState === 'ready' ? generatedPrompts[type] : '');
+                const suggestion = aiSuggestions[type];
+                const suggestionOpen = openSuggestions[type];
+                return <div key={type} className="overflow-hidden rounded border border-slate-200">
+                  <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-3 py-2"><div className="flex min-w-0 items-center gap-2"><span className="material-symbols-outlined text-sm text-[#df5b43]">{typeIcon[type]}</span><span className="text-[10px] font-black">{IMAGE_GENERATION_TYPE_LABELS[type]}</span><span className="truncate text-[9px] text-slate-400">{taskProfileByType[type]} · {typeCounts[type]} 张</span></div><span className={`text-[9px] font-bold ${manualPromptTypes[type] ? 'text-amber-700' : 'text-emerald-700'}`}>{manualPromptTypes[type] ? '已手动编辑' : 'AI 生成'}</span></div>
+                  {suggestion && <div className="border-y border-amber-200 bg-amber-50 px-3 py-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-[9px] font-bold text-amber-800">AI 有新建议：{suggestion.reason}</p><div className="flex gap-2"><button onClick={() => setOpenSuggestions((current) => ({ ...current, [type]: !suggestionOpen }))} className="text-[9px] font-bold text-primary">{suggestionOpen ? '收起' : '查看'}</button><button onClick={() => applySuggestion(type)} className="text-[9px] font-bold text-primary">采用</button><button onClick={() => dismissSuggestion(type)} className="text-[9px] font-bold text-slate-500">保留当前</button></div></div>{suggestionOpen && <p className="mt-2 whitespace-pre-wrap border-t border-amber-200 pt-2 text-[9px] leading-4 text-slate-700">{suggestion.prompt}</p>}</div>}
+                  <textarea value={prompt} disabled={!mainAsset} onChange={(event) => updatePrompt(type, event.target.value)} placeholder="选择主体素材后，点击 AI 优化生成 Prompt" className="h-40 w-full resize-y p-3 text-[11px] leading-5 text-slate-700 outline-none placeholder:text-slate-300 disabled:bg-slate-50" />
+                </div>;
+              })}
             </div>
-            <p className="mt-2 text-[10px] text-slate-400">切换风格会自动保留兼容的场景与姿势；不兼容时回到该风格的推荐组合。</p>
+            <div className="border-t border-slate-100 px-3 py-3">
+              <div className="mb-2 flex items-center justify-between"><p className="text-[9px] font-bold text-slate-500">创作标签</p>{(referenceSources.style.length > 0 || referenceSources.scene.length > 0 || referenceSources.pose.length > 0) && <p className="text-[9px] text-slate-400">已引用参考图的标签自动锁定</p>}</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <VisualTagPicker label="风格" value={style} options={mockImagePromptVisualTags.styles} onChange={(value) => updateTag('style', value)} disabled={referenceSources.style.length > 0} disabledLabel={referenceSources.style.join('、')} />
+                <VisualTagPicker label="场景" value={scene} options={availableScenes} onChange={(value) => updateTag('scene', value)} disabled={referenceSources.scene.length > 0} disabledLabel={referenceSources.scene.join('、')} />
+                <VisualTagPicker label="姿势" value={pose} options={availablePoses} onChange={(value) => updateTag('pose', value)} disabled={referenceSources.pose.length > 0} disabledLabel={referenceSources.pose.join('、')} />
+                <label className="flex h-9 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-500"><span className="material-symbols-outlined text-sm">deployed_code</span><select value={`${channel.id}:${model.id}`} onChange={(event) => chooseModel(event.target.value)} className="max-w-36 bg-transparent text-[10px] font-bold text-slate-700 outline-none">{availableModels.map((item) => <option key={`${item.channel.id}:${item.model.id}`} value={`${item.channel.id}:${item.model.id}`}>{item.model.name}</option>)}</select></label>
+                <label className="flex h-9 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-500"><span className="material-symbols-outlined text-sm">aspect_ratio</span><select value={ratio} onChange={(event) => setRatio(event.target.value)} className="bg-transparent text-[10px] font-bold text-slate-700 outline-none">{model.capability.ratios.map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label className="flex h-9 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-500"><span className="material-symbols-outlined text-sm">high_quality</span><select value={resolution} onChange={(event) => setResolution(event.target.value)} className="bg-transparent text-[10px] font-bold text-slate-700 outline-none">{model.capability.resolutions.map((item) => <option key={item}>{item}</option>)}</select></label>
+              </div>
+              <div className="mt-2 flex flex-wrap justify-between gap-2 text-[9px] text-slate-400"><span>{totalCount} 张 · {resolution} · {channel.health === 'healthy' ? '服务健康' : '服务受限'}</span><span>商品结构与事实约束已启用</span></div>
+              {!isSupported && <p className="mt-2 rounded bg-red-50 px-2 py-2 text-[9px] font-bold text-red-700">当前参考图数量、图片张数或输出规格不受所选模型支持，请调整。</p>}
+            </div>
           </div>
-
-          <div className="mt-4 space-y-3">
-            {selectedTypes.map((type) => {
-              const prompt = promptOverrides[type] ?? (assistantState === 'ready' ? generatedPrompts[type] : '');
-              const suggestion = aiSuggestions[type];
-              const suggestionOpen = openSuggestions[type];
-              return <div key={type} className="overflow-hidden border border-slate-200">
-                <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-3 py-2"><div className="flex items-center gap-2"><span className="material-symbols-outlined text-base text-primary">{typeIcon[type]}</span><span className="text-xs font-black">{IMAGE_GENERATION_TYPE_LABELS[type]}</span><span className="text-[10px] text-slate-400">{taskProfileByType[type]} · {typeCounts[type]} 张</span></div><span className={`text-[10px] font-bold ${manualPromptTypes[type] ? 'text-amber-700' : 'text-emerald-700'}`}>{manualPromptTypes[type] ? '已手动编辑' : 'AI 生成'}</span></div>
-                {suggestion && <div className="border-y border-amber-200 bg-amber-50 px-3 py-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-[10px] font-bold text-amber-800">AI 有新的建议，来自：{suggestion.reason}</p><div className="flex gap-2"><button onClick={() => setOpenSuggestions((current) => ({ ...current, [type]: !suggestionOpen }))} className="text-[10px] font-bold text-primary">{suggestionOpen ? '收起建议' : '查看差异'}</button><button onClick={() => applySuggestion(type)} className="text-[10px] font-bold text-primary">覆盖为 AI 建议</button><button onClick={() => dismissSuggestion(type)} className="text-[10px] font-bold text-slate-500">保留当前</button></div></div>{suggestionOpen && <div className="mt-2 grid gap-2 border-t border-amber-200 pt-2 md:grid-cols-2"><div><p className="text-[10px] text-slate-500">当前人工版本</p><p className="mt-1 whitespace-pre-wrap text-[10px] leading-4 text-slate-700">{prompt}</p></div><div><p className="text-[10px] text-slate-500">AI 新建议</p><p className="mt-1 whitespace-pre-wrap text-[10px] leading-4 text-slate-700">{suggestion.prompt}</p></div></div>}</div>}
-                <textarea value={prompt} disabled={!mainAsset} onChange={(event) => updatePrompt(type, event.target.value)} placeholder="选择主体素材后，点击 AI 助手生成 Prompt" className="h-48 w-full resize-y p-3 text-xs leading-6 text-slate-700 outline-none placeholder:text-slate-300 disabled:bg-slate-50" />
-              </div>;
-            })}
-          </div>
-          <p className="mt-2 text-[10px] leading-4 text-slate-400">图片类型支持多选，所有已选类型的 Prompt 会依次显示。点击“生成”即接受当前 Prompt，并进入预检与费用确认。</p>
         </section>
 
-        <section id="image-settings-section" className="min-w-0 space-y-3">
-          <div className="border border-slate-200 bg-white p-4">
-            <p className="text-[11px] font-bold text-primary">执行</p><h2 className="mt-0.5 text-sm font-black">模型与输出</h2>
-            <label className="mt-4 block text-[11px] font-bold text-slate-600">模型<select value={`${channel.id}:${model.id}`} onChange={(event) => chooseModel(event.target.value)} className="mt-1.5 h-9 w-full border border-slate-200 bg-white px-2 text-xs text-slate-700">{availableModels.map((item) => <option key={`${item.channel.id}:${item.model.id}`} value={`${item.channel.id}:${item.model.id}`}>{item.model.name}</option>)}</select></label><p className="mt-1 text-[10px] leading-4 text-slate-400">{model.description}</p>
-            <div className="mt-4 border-y border-slate-100 py-3"><p className="text-[10px] font-bold text-slate-400">本次任务总生成图片数</p><p className="mt-1 text-2xl font-black text-slate-800">{totalCount}<span className="ml-1 text-xs font-bold text-slate-400">张</span></p><p className="mt-1 text-[10px] text-slate-400">按图片类型分别生成</p></div>
-            <button onClick={() => setAdvancedOpen((current) => !current)} className="mt-3 flex w-full items-center justify-between text-left text-[11px] font-bold text-slate-600"><span>高级设置</span><span className="text-[10px] font-normal text-slate-400">{ratio} · {resolution}</span><span className="material-symbols-outlined text-base">{advancedOpen ? 'expand_less' : 'expand_more'}</span></button>
-            {advancedOpen && <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3"><label className="text-[11px] font-bold text-slate-600">比例<select value={ratio} onChange={(event) => setRatio(event.target.value)} className="mt-1 h-8 w-full border border-slate-200 bg-white px-2 text-xs">{model.capability.ratios.map((item) => <option key={item}>{item}</option>)}</select></label><label className="text-[11px] font-bold text-slate-600">分辨率<select value={resolution} onChange={(event) => setResolution(event.target.value)} className="mt-1 h-8 w-full border border-slate-200 bg-white px-2 text-xs">{model.capability.resolutions.map((item) => <option key={item}>{item}</option>)}</select></label></div>}
-            {!isSupported && <p className="mt-3 bg-red-50 px-2 py-2 text-[10px] leading-4 text-red-700">当前张数或输出规格不受所选模型支持，请调整设置。</p>}
+        <section id="image-settings-section" className="flex min-h-[520px] min-w-0 flex-col rounded-md border border-slate-200 bg-white lg:min-h-0">
+          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-3"><h2 className="text-xs font-black">本次生成结果</h2><span className="rounded bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700">待生成 · {totalCount} 张</span></div>
+          <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+            <span className="material-symbols-outlined grid h-14 w-14 place-items-center rounded-full bg-slate-100 text-2xl text-slate-400">imagesmode</span>
+            <p className="mt-4 text-xs font-black text-slate-700">结果将在这里显示</p>
+            <p className="mt-2 max-w-52 text-[10px] leading-5 text-slate-400">生成任务提交后将进入任务列表，可继续查看进度与结果。</p>
+            <div className="mt-5 w-full border-y border-slate-100 py-3 text-left">
+              <div className="flex justify-between text-[10px]"><span className="text-slate-400">图片类型</span><span className="font-bold text-slate-700">{selectedTypes.length} 类</span></div>
+              <div className="mt-2 flex justify-between text-[10px]"><span className="text-slate-400">生成数量</span><span className="font-bold text-slate-700">{totalCount} 张</span></div>
+              <div className="mt-2 flex justify-between text-[10px]"><span className="text-slate-400">预计费用</span><span className="font-bold text-slate-700">¥ {(model.cost * totalCount).toFixed(2)}</span></div>
+              <div className="mt-2 flex justify-between text-[10px]"><span className="text-slate-400">输出规格</span><span className="font-bold text-slate-700">{ratio} · {resolution}</span></div>
+            </div>
           </div>
-          <p className="px-1 text-[10px] leading-4 text-slate-400">费用、耗时、通道健康度和失败兜底策略将在预检通过后的费用确认中展示。</p>
+          <div className="border-t border-slate-100 p-3"><button onClick={checkAndGenerate} className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#df5b43] text-xs font-bold text-white hover:bg-[#cb4d37]"><span className="material-symbols-outlined text-base">auto_awesome</span>检查并生成 {totalCount} 张</button><p className="mt-2 text-center text-[9px] leading-4 text-slate-400">提交前会展示费用、耗时与失败兜底策略。</p></div>
         </section>
       </main>
 
-      {executionConfirmOpen && <ExecutionConfirmDialog title={`确认生成 ${selectedTypes.length} 个图片类型`} description="已按当前 Prompt、模型能力与结构化输出参数完成预检。确认费用后，任务将进入排队。" estimatedCost={`¥ ${(model.cost * totalCount).toFixed(2)}`} estimatedDuration={`${Math.max(1, Math.ceil(totalCount / 2))}–${Math.max(2, Math.ceil(totalCount * 0.8))} 分钟`} healthLabel={channel.health === 'healthy' ? '服务健康' : '额度偏低'} healthDetail={channel.quotaText} fallbackPolicy="同配置最多自动重试 1 次；仍失败则停止并通知，不自动切换其他付费通道。" summary={[{ label: '图片类型', value: selectedTypes.map((type) => IMAGE_GENERATION_TYPE_LABELS[type]).join('、') }, { label: '主体素材', value: subjectName }, { label: '模型', value: model.name }, { label: '输出规格', value: `${ratio} · ${resolution} · ${totalCount} 张` }]} requestLines={[`参考图：${orderedReferences.length ? orderedReferences.map((item) => `${item.position}.${item.role}`).join('、') : '未使用参考图'}`, `参数：ratio=${ratio}，resolution=${resolution}，count=${totalCount}`]} onCancel={() => setExecutionConfirmOpen(false)} onConfirm={submitTasks} />}
+      {executionConfirmOpen && <ExecutionConfirmDialog title={`确认生成 ${selectedTypes.length} 个图片类型`} description="已按当前 Prompt、模型能力与结构化输出参数完成预检。确认费用后，任务将进入排队。" estimatedCost={`¥ ${(model.cost * totalCount).toFixed(2)}`} estimatedDuration={`${Math.max(1, Math.ceil(totalCount / 2))}–${Math.max(2, Math.ceil(totalCount * 0.8))} 分钟`} healthLabel={channel.health === 'healthy' ? '服务健康' : '额度偏低'} healthDetail={channel.quotaText} fallbackPolicy="同配置最多自动重试 1 次；仍失败则停止并通知，不自动切换其他付费通道。" summary={[{ label: '图片类型', value: selectedTypes.map((type) => IMAGE_GENERATION_TYPE_LABELS[type]).join('、') }, { label: '主体素材', value: subjectName }, { label: '模型', value: model.name }, { label: '输出规格', value: `${ratio} · ${resolution} · ${totalCount} 张` }]} requestLines={[`参考图：${orderedReferences.length ? orderedReferences.map((item) => `参考图 ${item.position}（${orderReferenceRoles(item.roles).map((role) => REFERENCE_ROLE_LABELS[role]).join('、') || '未设标签'}）`).join('、') : '未使用参考图'}`, `参数：ratio=${ratio}，resolution=${resolution}，count=${totalCount}`]} onCancel={() => setExecutionConfirmOpen(false)} onConfirm={submitTasks} />}
       <TemplatePickerDrawer open={templatePickerOpen} templates={templates} mediaType="image" onClose={() => setTemplatePickerOpen(false)} onSelect={applyTemplate} />
     </div>
   );

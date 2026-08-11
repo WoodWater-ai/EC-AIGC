@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ERP 商品创作闭环 V2.5 - 全状态设计参考</title>
+  <style>
+    :root { --p:#d85c42; --pl:#fff0ea; --ok:#10b981; --warn:#e59a21; --bad:#ef4444; --info:#6c79b8; --bg:#faf9f7; --card:#fff; --line:#e8e4df; --text:#201f1d; --muted:#79736d; --dark:#201f1d; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin:0; background:var(--bg); color:var(--text); font:13px/1.6 "PingFang SC","Microsoft YaHei",system-ui,sans-serif; letter-spacing:0; }
+    .top { position:sticky; top:0; z-index:10; background:rgba(32,31,29,.97); color:white; border-bottom:3px solid var(--p); }
+    .top-inner { max-width:1320px; margin:auto; padding:15px 20px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    h1 { margin:0; font-size:18px; }
+    .meta { color:#aaa39c; font-size:10px; }
+    nav { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+    nav a { color:#c8c2bc; text-decoration:none; padding:5px 8px; border-radius:4px; font-size:10px; }
+    nav a:hover { background:#37322e; color:white; }
+    main { max-width:1320px; margin:auto; padding:24px 20px 80px; }
+    section { margin-top:28px; scroll-margin-top:92px; }
+    h2 { margin:0 0 5px; font-size:18px; }
+    h3 { margin:0 0 10px; font-size:13px; }
+    .desc { margin:0 0 14px; color:var(--muted); font-size:11px; }
+    .principles { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .principle { border-left:3px solid var(--p); padding:12px; background:white; border-top:1px solid var(--line); border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .principle strong { display:block; font-size:11px; }
+    .principle span { display:block; margin-top:4px; color:var(--muted); font-size:9px; }
+    .state-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    .state { min-width:0; border:1px solid var(--line); background:white; border-radius:7px; overflow:hidden; box-shadow:0 7px 22px rgba(53,44,37,.045); }
+    .state-head { min-height:52px; padding:10px 12px; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; border-bottom:1px solid var(--line); background:#fbfaf8; }
+    .state-head strong { display:block; font-size:11px; }
+    .state-head small { display:block; color:var(--muted); font-size:8px; margin-top:2px; }
+    .state-body { min-height:132px; padding:12px; }
+    .tag { flex:0 0 auto; display:inline-flex; align-items:center; padding:3px 6px; border-radius:4px; font-size:8px; font-weight:800; }
+    .green { color:#047857; background:#ecfdf5; } .amber { color:#a16207; background:#fffbeb; } .rose { color:#be123c; background:#fff1f2; } .gray { color:#69635e; background:#f0eeeb; } .blue { color:#515f9f; background:#f0f1f9; }
+    .mini-toolbar { display:grid; grid-template-columns:1.3fr .8fr .8fr; gap:6px; }
+    .skeleton { height:27px; background:linear-gradient(90deg,#f0eeeb 20%,#faf9f7 50%,#f0eeeb 80%); background-size:200% 100%; border-radius:4px; animation:shimmer 1.6s infinite; }
+    @keyframes shimmer { to { background-position:-200% 0; } }
+    .mini-table { margin-top:8px; border:1px solid var(--line); }
+    .mini-row { height:29px; display:grid; grid-template-columns:1.5fr 1fr .7fr; align-items:center; gap:8px; padding:0 8px; border-top:1px solid #f0ede9; font-size:8px; color:var(--muted); }
+    .mini-row:first-child { border-top:0; background:#f7f5f2; font-weight:800; }
+    .empty { min-height:104px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; border:1px dashed #d9d4ce; border-radius:6px; background:#fbfaf8; }
+    .empty .icon { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; background:#f1eeea; color:var(--muted); font-size:17px; }
+    .empty strong { margin-top:7px; font-size:10px; }
+    .empty span { color:var(--muted); font-size:8px; max-width:240px; }
+    .mini-btn { display:inline-flex; height:25px; align-items:center; justify-content:center; border:1px solid var(--line); background:white; border-radius:4px; padding:0 7px; margin-top:7px; color:var(--text); font-size:8px; font-weight:700; }
+    .mini-btn.primary { color:white; background:var(--p); border-color:var(--p); }
+    .alert { display:flex; align-items:flex-start; gap:7px; padding:8px; border-radius:5px; font-size:8px; line-height:1.5; }
+    .alert.warning { color:#8a5b10; border:1px solid #f4dcae; background:#fffbeb; }
+    .alert.error { color:#a3333d; border:1px solid #f6c9ce; background:#fff1f2; }
+    .alert.info { color:#536b91; border:1px solid #d8e3f5; background:#f3f7fd; }
+    .progress { height:5px; margin:10px 0 5px; border-radius:5px; background:#e9e5e0; overflow:hidden; }
+    .progress span { display:block; height:100%; background:var(--p); }
+    .result-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; }
+    .result { aspect-ratio:1; background:#f1efec; border:1px solid var(--line); border-radius:5px; display:grid; place-items:center; color:var(--muted); font-size:8px; overflow:hidden; position:relative; }
+    .result img { width:100%; height:100%; object-fit:cover; }
+    .result.fail { border-color:#f3b7bd; background:#fff6f7; color:#b44b55; text-align:center; padding:5px; }
+    .result .check { position:absolute; top:4px; right:4px; background:#087b55; color:white; border-radius:3px; padding:1px 4px; font-size:7px; }
+    .disabled { opacity:.52; filter:grayscale(.2); }
+    .toast-stage { position:relative; min-height:235px; background:#f3f1ee; border:1px solid var(--line); border-radius:7px; padding:14px; overflow:hidden; }
+    .toast-rules { color:var(--muted); font-size:9px; max-width:620px; }
+    .toast-stack { position:absolute; right:14px; top:14px; width:330px; display:flex; flex-direction:column; gap:7px; }
+    .toast { display:grid; grid-template-columns:24px 1fr auto; gap:8px; align-items:start; padding:10px; background:white; border:1px solid var(--line); border-left:3px solid var(--info); border-radius:6px; box-shadow:0 12px 30px rgba(53,44,37,.12); }
+    .toast.success { border-left-color:var(--ok); } .toast.warn { border-left-color:var(--warn); } .toast.error { border-left-color:var(--bad); }
+    .toast i { width:24px; height:24px; border-radius:50%; display:grid; place-items:center; background:#f0f1f9; font-style:normal; }
+    .toast strong { display:block; font-size:10px; }
+    .toast span { display:block; color:var(--muted); font-size:8px; }
+    .toast b { color:var(--muted); font-size:11px; }
+    .edge-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+    .edge { border:1px solid var(--line); background:white; padding:12px; border-radius:7px; }
+    .truncate-demo { display:grid; grid-template-columns:130px minmax(0,1fr) 92px; gap:8px; padding:8px; border:1px solid var(--line); background:#fbfaf8; }
+    .ellipsis { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .mapping { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; }
+    .mapping .box { border:1px solid var(--line); background:#fbfaf8; border-radius:5px; padding:9px; font-size:9px; }
+    .mapping .arrow { color:var(--p); font-weight:800; }
+    table { width:100%; border-collapse:collapse; background:white; border:1px solid var(--line); table-layout:fixed; }
+    th, td { padding:9px 10px; border-bottom:1px solid var(--line); border-right:1px solid var(--line); vertical-align:top; text-align:left; font-size:9px; line-height:1.55; word-break:break-word; }
+    th { background:#f4f1ed; color:#5f5954; font-size:8px; }
+    tr:last-child td { border-bottom:0; }
+    .foot { margin-top:26px; padding:14px; border-left:3px solid var(--p); background:white; color:var(--muted); font-size:9px; }
+    @media(max-width:1000px){ .principles{grid-template-columns:repeat(2,1fr)} .state-grid{grid-template-columns:repeat(2,1fr)} .toast-stack{position:static;width:100%;margin-top:14px}.toast-stage{min-height:0}.edge-grid{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <header class="top"><div class="top-inner"><div><h1>ERP 商品创作闭环 · 全状态设计参考</h1><div class="meta">V2.5 · 2026-08-10 · 已补充资源中心与组合素材规则</div></div><nav><a href="#principles">规则</a><a href="#sync">ERP 同步</a><a href="#catalog">商品目录</a><a href="#combination">组合项目</a><a href="#library">素材库</a><a href="#resource-center">资源中心</a><a href="#creation">创作结果</a><a href="#toasts">Toast</a><a href="#edges">边界</a><a href="#rules">交互规则</a></nav></div></header>
+  <main>
+    <section id="principles"><h2>状态设计原则</h2><p class="desc">异常不得清空最后一次成功数据；创作结果优先展示；ERP 状态与本地创作状态分别表达。</p><div class="principles"><div class="principle"><strong>ERP 只读</strong><span>商品、规格、分类和条码不可在工作台改写。</span></div><div class="principle"><strong>创作字段可编辑</strong><span>卖点、材质、版型、备注和业务标签不被同步覆盖。</span></div><div class="principle"><strong>历史不删除</strong><span>ERP 停用只改变提醒和默认可选范围。</span></div><div class="principle"><strong>局部失败可继续</strong><span>图片失败不阻断主数据，单项生成失败不隐藏成功结果。</span></div></div></section>
+
+    <section id="sync"><h2>ERP 同步状态</h2><p class="desc">产品管理顶部显示全局健康度；每个规格行显示自身主数据与图片状态。</p><div class="state-grid">
+      <article class="state"><div class="state-head"><div><strong>正常</strong><small>主数据和图片均已完成</small></div><span class="tag green">已同步</span></div><div class="state-body"><div class="alert info">最近增量同步：8 分钟前 · 分类校准：今天 02:10</div><div class="mini-table"><div class="mini-row"><b>规格</b><b>图片</b><b>状态</b></div><div class="mini-row"><span>绿色 / M</span><span>3 张</span><span class="tag green">可创作</span></div><div class="mini-row"><span>绿色 / L</span><span>2 张</span><span class="tag green">可创作</span></div></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>同步中</strong><small>异步任务已创建，不锁页面</small></div><span class="tag blue">进行中</span></div><div class="state-body"><div class="mini-toolbar"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div><div class="progress"><span style="width:62%"></span></div><div style="display:flex;justify-content:space-between;color:var(--muted);font-size:8px"><span>正在同步第 8 / 13 页</span><span>62%</span></div><div class="alert info" style="margin-top:10px">可以继续浏览最后一次成功数据；重复点击“立即同步”提示已有任务执行中。</div></div></article>
+      <article class="state"><div class="state-head"><div><strong>部分图片失败</strong><small>主数据可用，图片局部异常</small></div><span class="tag amber">16 项待处理</span></div><div class="state-body"><div class="alert warning">1 张图片因源站超时未转存；已成功图片继续可用。</div><div class="result-grid"><div class="result"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><span class="check">已就绪</span></div><div class="result"><img src="../../dist/mock-assets/source/green-pajama-pants.jpg"><span class="check">已就绪</span></div><div class="result fail">源图片超时<br><button class="mini-btn">重试</button></div></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>同步失败</strong><small>保留最后成功数据</small></div><span class="tag rose">需管理员处理</span></div><div class="state-body"><div class="alert error">旺店通接口签名校验失败。用户仍看到 22 分钟前的数据，管理员可查看错误编号 WDGJ-AUTH-02。</div><button class="mini-btn primary">重新触发同步</button><button class="mini-btn">查看同步记录</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>长期未同步</strong><small>数据可能已过期</small></div><span class="tag amber">3 小时前</span></div><div class="state-body"><div class="alert warning">商品增量同步已超过 30 分钟未成功。普通用户看到数据时间，不看到密钥或技术错误详情。</div><div class="mini-table"><div class="mini-row"><b>数据</b><b>最后成功</b><b>处理</b></div><div class="mini-row"><span>商品/规格</span><span>3 小时前</span><span>管理员</span></div><div class="mini-row"><span>分类</span><span>今天 02:10</span><span>仍可用</span></div></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>分类局部异常</strong><small>孤儿节点不拖垮整棵树</small></div><span class="tag amber">2 个节点</span></div><div class="state-body"><div class="mapping"><div class="box">父分类缺失<br><b>classid 9012</b></div><div class="arrow">→</div><div class="box">临时归入“未识别分类”<br><b>管理员查看原因</b></div></div><div class="alert info" style="margin-top:10px">正常分类仍可浏览和筛选。</div></div></article>
+    </div></section>
+
+    <section id="catalog"><h2>产品管理与商品状态</h2><p class="desc">全量规格目录覆盖加载、空态、无结果、停用与旧商品兼容。</p><div class="state-grid">
+      <article class="state"><div class="state-head"><div><strong>加载态</strong><small>保留筛选框，禁用提交操作</small></div><span class="tag gray">加载中</span></div><div class="state-body"><div class="mini-toolbar"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div><div class="mini-table"><div class="mini-row"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div><div class="mini-row"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div><div class="mini-row"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>ERP 尚无数据</strong><small>首次接入空态</small></div><span class="tag gray">0 个规格</span></div><div class="state-body"><div class="empty"><div class="icon">□</div><strong>还没有同步到 ERP 商品</strong><span>管理员先检查接口配置并触发首次同步。</span><button class="mini-btn primary">立即同步</button></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>搜索无结果</strong><small>有数据，但当前条件不匹配</small></div><span class="tag gray">0 个结果</span></div><div class="state-body"><div class="empty"><div class="icon">⌕</div><strong>没有符合条件的规格</strong><span>当前筛选：家居服 · 部分图片失败 · 货品编号 TEST88</span><button class="mini-btn">清除筛选</button></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>ERP 已停用</strong><small>默认筛选隐藏，历史仍可用</small></div><span class="tag amber">历史商品</span></div><div class="state-body"><div class="alert warning">该规格已在 ERP 停用。可查看历史素材、任务和结果，也可继续创作；新建选择器默认不展示。</div><div class="mini-table"><div class="mini-row"><b>历史数据</b><b>数量</b><b>状态</b></div><div class="mini-row"><span>输入素材</span><span>5</span><span>保留</span></div><div class="mini-row"><span>生成结果</span><span>21</span><span>保留</span></div></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>本地来源</strong><small>旧商品继续创作，管理员可匹配</small></div><span class="tag blue">待匹配 ERP</span></div><div class="state-body"><div class="mapping"><div class="box">本地商品 LOCAL-018<br>8 素材 · 12 任务</div><div class="arrow">→</div><div class="box">候选 ERP 规格<br>SLP-208 / 香槟 M</div></div><button class="mini-btn primary">预览匹配影响</button><button class="mini-btn">继续本地创作</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>无有效规格</strong><small>全部为占位或停用规格</small></div><span class="tag rose">不可直接创作</span></div><div class="state-body"><div class="alert error">商品“测试一11”没有可用规格：`specid=0` 1 条，`bblockup=True` 2 条。</div><button class="mini-btn">查看 ERP 原始信息</button></div></article>
+    </div></section>
+
+    <section id="combination"><h2>商品组合创作项目</h2><p class="desc">组合至少包含上装和下装，可增加鞋履；一份合成素材、任务和结果只保存一次，可按任一参与 SKU 检索。</p><div class="state-grid">
+      <article class="state"><div class="state-head"><div><strong>可带入组合</strong><small>上装、下装和源图均已就绪</small></div><span class="tag green">可创作</span></div><div class="state-body"><div class="mapping"><div class="box">上装<br><b>TEST1 / 绿色 M</b></div><div class="arrow">+</div><div class="box">下装<br><b>PANTS-L / 绿色 L</b></div></div><div class="alert info" style="margin-top:10px">当前主体图预填对应角色；鞋履可选。确认后带回图片任务，不在资源中心直接生成。</div><button class="mini-btn primary">带入图片任务</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>缺少有效来源图</strong><small>不创建半成品组合</small></div><span class="tag rose">需修复</span></div><div class="state-body"><div class="mapping"><div class="box">上衣<br><b>首图已就绪</b></div><div class="arrow">+</div><div class="box">下装<br><b>源图转存失败</b></div></div><div class="alert warning" style="margin-top:10px">禁止提交合成；保留已选规格和角色，可只重试失败图片。</div><button class="mini-btn">重试下装图片</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>历史组合</strong><small>任一来源 SKU 已停用或不再同步</small></div><span class="tag amber">历史可用</span></div><div class="state-body"><div class="alert warning">组合、源图和商品事实以创建时快照为准。历史素材、任务和结果不删除；新建组合选择器默认隐藏该来源。</div><button class="mini-btn primary">继续创作</button><button class="mini-btn">更换有效来源</button></div></article>
+    </div></section>
+
+    <section id="library"><h2>商品素材库准入状态</h2><p class="desc">仅同步 ERP 图片不进入素材库；人的本地上传或首次任务提交才建立创作活动。组合项目显示为一张卡片，可按任一关联 SKU 检索。</p><div class="state-grid">
+      <article class="state"><div class="state-head"><div><strong>未准入</strong><small>只有 ERP 主数据与同步图片</small></div><span class="tag gray">产品管理可见</span></div><div class="state-body"><div class="empty"><div class="icon">◫</div><strong>尚未发生创作活动</strong><span>不会出现在商品素材库。可从产品管理上传素材或发起创作。</span></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>本地上传后准入</strong><small>首次活动来源：UPLOAD</small></div><span class="tag green">已进入素材库</span></div><div class="state-body"><div class="mini-table"><div class="mini-row"><b>活动</b><b>时间</b><b>结果</b></div><div class="mini-row"><span>上传主体图</span><span>10:32</span><span>准入</span></div><div class="mini-row"><span>ERP 图片</span><span>10:21</span><span>不计准入</span></div></div><button class="mini-btn primary">进入商品工作区</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>首次任务提交后准入</strong><small>草稿不计入，Submit 成功才准入</small></div><span class="tag green">已进入素材库</span></div><div class="state-body"><div class="alert info">任务组 IMG-1042 已提交。商品加入素材库，右侧结果区继续跟踪生成进度。</div><div class="progress"><span style="width:42%"></span></div><div style="font-size:8px;color:var(--muted)">生成中 · 42%</div></div></article>
+      <article class="state"><div class="state-head"><div><strong>组合项目首次准入</strong><small>两个 SKU 共用同一项目和资产</small></div><span class="tag green">组合套装</span></div><div class="state-body"><div class="mapping"><div class="box">上衣<br><b>TEST1 / 1170</b></div><div class="arrow">+</div><div class="box">下装<br><b>PANTS-L / 23792</b></div></div><div class="alert info" style="margin-top:10px">全局素材库只出现一张组合卡；从任一 SKU 搜索可找到同一素材、任务和结果。</div></div></article>
+      <article class="state"><div class="state-head"><div><strong>筛选无结果</strong><small>当前 Tab 或筛选没有匹配素材</small></div><span class="tag gray">0 个素材</span></div><div class="state-body"><div class="empty"><div class="icon">⌕</div><strong>“已通过视频”暂无内容</strong><span>商品已有其他素材，切换类型或清除审核筛选。</span><button class="mini-btn">查看全部素材</button></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>审核积压</strong><small>不再用过多指标挤占首屏</small></div><span class="tag amber">待审核 183</span></div><div class="state-body"><div class="alert warning">该商品有 6 个结果等待审美评分，其中 2 个已等待超过 24 小时。</div><button class="mini-btn primary">查看待审核结果</button><button class="mini-btn">继续创作</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>全部归档</strong><small>历史商品不自动移出素材库</small></div><span class="tag gray">历史活动</span></div><div class="state-body"><div class="alert info">当前没有活跃素材，但该商品曾发生创作。保留商品工作区和活动记录，可随时再次创作。</div><button class="mini-btn">查看归档</button><button class="mini-btn primary">再次创作</button></div></article>
+    </div></section>
+
+    <section id="resource-center"><h2>图片任务资源中心</h2><p class="desc">产品素材、公共素材和我的素材是同一宽版选择弹窗的三个数据范围；分类和标签只用于筛选，不在弹窗内维护。</p><div class="state-grid">
+      <article class="state"><div class="state-head"><div><strong>当前主体图</strong><small>复用现有图片任务选择</small></div><span class="tag green">已选 1 项</span></div><div class="state-body"><div class="mapping"><div class="box">ERP 同步图或<br><b>用户最近更换图</b></div><div class="arrow">→</div><div class="box">资源列表高亮<br><b>不制造新默认值</b></div></div><button class="mini-btn primary">确认使用</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>空参考图入口</strong><small>正常展示素材列表</small></div><span class="tag gray">未选择</span></div><div class="state-body"><div class="empty"><div class="icon">□</div><strong>请选择参考素材</strong><span>分类、标签和素材网格保持可用；确认按钮在选择前禁用。</span><button class="mini-btn">浏览产品素材</button></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>大量产品筛选</strong><small>ERP 分类是唯一产品分类源</small></div><span class="tag blue">248 个 SKU</span></div><div class="state-body"><div class="mini-table"><div class="mini-row"><b>分类</b><b>结果</b><b>规则</b></div><div class="mini-row"><span>睡衣 / 家居服</span><span>86</span><span>ERP</span></div><div class="mini-row"><span>围巾 / 帽子 / 鞋履</span><span>105</span><span>ERP</span></div></div><div class="alert info" style="margin-top:9px">同一 SPU 下的 SKU 连续排列，可继续按名称、SPU 和 SKU 搜索。</div></div></article>
+      <article class="state"><div class="state-head"><div><strong>公共与我的素材</strong><small>独立查询范围和权限</small></div><span class="tag blue">完整列表</span></div><div class="state-body"><div class="mapping"><div class="box">公共素材<br><b>资源分类 + 热门标签</b></div><div class="arrow">≠</div><div class="box">我的素材<br><b>上传 + 生成 + 收藏</b></div></div><div class="alert info" style="margin-top:9px">不复制文件，不把公共结果混入个人范围。</div></div></article>
+      <article class="state"><div class="state-head"><div><strong>筛选无结果</strong><small>保留当前入口和条件</small></div><span class="tag gray">0 项素材</span></div><div class="state-body"><div class="empty"><div class="icon">⌕</div><strong>没有符合条件的素材</strong><span>显示当前分类和标签，可清除筛选；不自动切换到其他素材范围。</span><button class="mini-btn">清除筛选</button></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>公共/个人查询失败</strong><small>权限或网络异常</small></div><span class="tag rose">加载失败</span></div><div class="state-body"><div class="alert error">当前素材范围加载失败。保留产品和任务上下文，不回退到另一权限范围。</div><button class="mini-btn primary">重试当前范围</button><button class="mini-btn">返回产品素材</button></div></article>
+    </div></section>
+
+    <section id="creation"><h2>创作页右侧结果区</h2><p class="desc">图片和视频共用状态语义；提交不跳页，成功结果始终优先于错误信息。</p><div class="state-grid">
+      <article class="state"><div class="state-head"><div><strong>未开始</strong><small>配置摘要代替空白大区域</small></div><span class="tag gray">待生成</span></div><div class="state-body"><div class="empty"><div class="icon">✦</div><strong>准备生成 3 张图片</strong><span>商品主图 2 · 场景图 1 · Qwen Image Pro · 预计 ¥0.42</span><button class="mini-btn primary">检查并生成</button></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>Preflight</strong><small>付费生成前的确认</small></div><span class="tag blue">等待确认</span></div><div class="state-body"><div class="mini-table"><div class="mini-row"><b>检查项</b><b>结果</b><b>说明</b></div><div class="mini-row"><span>主体素材</span><span>通过</span><span>2048px</span></div><div class="mini-row"><span>预计费用</span><span>¥0.42</span><span>3 张</span></div></div><button class="mini-btn">返回修改</button><button class="mini-btn primary">确认费用并生成</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>排队中</strong><small>已取得 groupId/taskIds</small></div><span class="tag amber">队列第 3 位</span></div><div class="state-body"><div class="result-grid"><div class="result">等待生成</div><div class="result">等待生成</div><div class="result">等待生成</div></div><div class="alert info" style="margin-top:9px">离开页面不取消任务；顶部任务中心持续显示进度。</div></div></article>
+      <article class="state"><div class="state-head"><div><strong>生成中</strong><small>结果逐个到达</small></div><span class="tag amber">2 / 3</span></div><div class="state-body"><div class="progress"><span style="width:72%"></span></div><div class="result-grid"><div class="result"><img src="../../dist/mock-assets/results/sleepdress-bedroom.png"><span class="check">完成</span></div><div class="result"><img src="../../dist/mock-assets/results/sleepdress-lace-detail.png"><span class="check">完成</span></div><div class="result">生成中 72%</div></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>部分成功</strong><small>保留成功项，仅重试失败项</small></div><span class="tag amber">2 成功 · 1 失败</span></div><div class="state-body"><div class="result-grid"><div class="result"><img src="../../dist/mock-assets/results/sleepdress-bedroom.png"></div><div class="result"><img src="../../dist/mock-assets/results/sleepdress-lace-detail.png"></div><div class="result fail">模型响应超时<br><button class="mini-btn">重试此项</button></div></div></div></article>
+      <article class="state"><div class="state-head"><div><strong>全部成功</strong><small>显示可继续的业务动作</small></div><span class="tag green">已完成</span></div><div class="state-body"><div class="result-grid"><div class="result"><img src="../../dist/mock-assets/results/sleepdress-bedroom.png"></div><div class="result"><img src="../../dist/mock-assets/results/sleepdress-lace-detail.png"></div><div class="result"><img src="../../dist/mock-assets/results/sleepdress-three-view.png"></div></div><button class="mini-btn">继续修改</button><button class="mini-btn">生成视频</button><button class="mini-btn primary">保存为资产</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>全部失败 / 超时</strong><small>给出可理解原因与下一步</small></div><span class="tag rose">生成失败</span></div><div class="state-body"><div class="alert error">模型服务在 180 秒内未返回结果，本次未产生可用素材。费用以服务端最终账单为准。</div><button class="mini-btn">调整参数</button><button class="mini-btn primary">重新生成</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>内容审核拦截</strong><small>不得用“服务端异常”代替业务原因</small></div><span class="tag rose">需要修改</span></div><div class="state-body"><div class="alert error">Prompt 中包含不允许的真人身份指向。请改为描述服装、动作和场景，不指定真实人物。</div><button class="mini-btn primary">返回修改 Prompt</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>额度不足</strong><small>保留当前草稿和所有选择</small></div><span class="tag rose">无法提交</span></div><div class="state-body"><div class="alert warning">预计需要 ¥2.80，当前团队可用额度 ¥1.25。参数和素材已保存，不清空页面。</div><button class="mini-btn">降低生成数量</button><button class="mini-btn">联系管理员</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>刷新后恢复</strong><small>按当前任务组恢复状态</small></div><span class="tag blue">已恢复</span></div><div class="state-body"><div class="alert info">已恢复任务组 IMG-20260808-1042：2 个结果完成，1 个仍在生成。</div><div class="progress"><span style="width:75%"></span></div><div style="font-size:8px;color:var(--muted)">恢复时不重复 Submit，不创建新费用。</div></div></article>
+      <article class="state"><div class="state-head"><div><strong>组合素材带入</strong><small>组合关联不是商品冲突</small></div><span class="tag blue">完整上下文</span></div><div class="state-body"><div class="mapping"><div class="box">上装<br><b>TEST1 / 1170</b></div><div class="arrow">+</div><div class="box">下装 + 可选鞋履<br><b>PANTS-L / SHOES-01</b></div></div><button class="mini-btn primary">使用组合素材</button><button class="mini-btn">返回资源中心</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>商品关联冲突</strong><small>仅适用于两个互斥的单规格商品</small></div><span class="tag amber">需要选择</span></div><div class="state-body"><div class="mapping"><div class="box">当前商品<br><b>青柠格纹上衣</b></div><div class="arrow">≠</div><div class="box">素材关联商品<br><b>蕾丝吊带睡裙</b></div></div><button class="mini-btn primary">使用素材关联商品</button><button class="mini-btn">保留当前商品</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>ERP 已停用但继续创作</strong><small>历史上下文保持完整</small></div><span class="tag amber">ERP 已停用</span></div><div class="state-body"><div class="alert warning">商品规格已停用，当前创作基于历史商品事实和素材。继续操作不会写回 ERP。</div><button class="mini-btn primary">继续创作</button><button class="mini-btn">更换有效商品</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>参考图角色多选</strong><small>每张图片从五类角色中下拉多选</small></div><span class="tag blue">模特 / 风格 / 场景 / 姿势 / 细节</span></div><div class="state-body"><div class="mini-table"><div class="mini-row"><b>参考图</b><b>已选角色</b><b>Prompt 处理</b></div><div class="mini-row"><span>参考图 1</span><span>模特、风格、场景</span><span>锁定风格、场景标签</span></div><div class="mini-row"><span>参考图 2</span><span>细节</span><span>写明细节参考图 2</span></div></div><button class="mini-btn primary">+ 添加参考图</button><button class="mini-btn">编辑角色</button></div></article>
+      <article class="state"><div class="state-head"><div><strong>九大风格字典与联动</strong><small>名称、图片与允许组合来自同一字典</small></div><span class="tag blue">严格 9 项</span></div><div class="state-body"><div class="mapping"><div class="box">切换到<br><b>静奢深睡品质感</b></div><div class="arrow">→</div><div class="box">场景 3 项 · 姿势 3 项<br><b>兼容保留，否则回落默认</b></div></div><div class="alert info" style="margin-top:10px">旧别名和实验风格不进入新建任务；历史任务仅兼容显示。高级设置与负面约束不再单独展示。</div></div></article>
+    </div></section>
+
+    <section id="toasts"><h2>Toast 汇总</h2><p class="desc">右上角显示；成功 3 秒，警告 5 秒，错误 8 秒且支持手动关闭；同时最多 3 条，更多合并为“还有 N 条消息”。</p><div class="toast-stage"><div class="toast-rules"><h3>信息原则</h3><p>标题说明结果，正文说明对象和下一步。普通用户不展示 Provider、堆栈、接口签名或能力编码；错误编号仅在管理员详情中展示。</p><p><b>成功：</b>同步任务已创建、素材上传成功、任务已提交、ERP 匹配完成。</p><p><b>警告：</b>已有同步任务、部分图片失败、ERP 已停用、商品关联冲突。</p><p><b>错误：</b>同步触发失败、图片重试失败、Preflight 阻断、任务提交失败。</p></div><div class="toast-stack"><div class="toast success"><i>✓</i><div><strong>任务已提交</strong><span>正在右侧结果区生成 3 张图片。</span></div><b>×</b></div><div class="toast warn"><i>!</i><div><strong>部分图片未就绪</strong><span>2 张可用，1 张转存失败；可以继续创作或稍后重试。</span></div><b>×</b></div><div class="toast error"><i>×</i><div><strong>同步触发失败</strong><span>未创建新任务，最后成功数据不受影响。请稍后重试。</span></div><b>×</b></div></div></div></section>
+
+    <section id="edges"><h2>边界与可用性</h2><p class="desc">长文本、大数据、图片失败和权限差异不能破坏布局。</p><div class="edge-grid"><div class="edge"><h3>长名称与编码</h3><div class="truncate-demo"><b class="ellipsis" title="2026 春夏超长商品名称示例">2026 春夏超长商品名称示例：轻薄透气绿色格纹宽松家居服上衣</b><span class="ellipsis">规格：薄荷绿色 / 超大码 / 限定批次</span><span class="tag blue">ERP 同步</span></div><p class="desc" style="margin:7px 0 0">列表单行截断并提供浏览器提示；详情完整换行。按钮宽度固定，不被名称挤压。</p></div><div class="edge"><h3>图片加载失败</h3><div class="mapping"><div class="box">缩略图请求失败</div><div class="arrow">→</div><div class="box">展示媒体类型占位图<br>名称、状态和操作仍可用</div></div><p class="desc" style="margin:7px 0 0">不使用破图图标，不因单张图片失败改变行高。</p></div><div class="edge"><h3>大量数据</h3><div class="mini-table"><div class="mini-row"><b>数据</b><b>处理</b><b>限制</b></div><div class="mini-row"><span>1,248 个规格</span><span>服务端分页</span><span>50/页</span></div><div class="mini-row"><span>86 个分类</span><span>树懒加载</span><span>保留展开</span></div><div class="mini-row"><span>188 个素材</span><span>分页/虚拟列表</span><span>筛选服务端执行</span></div></div></div><div class="edge"><h3>权限差异</h3><div class="mini-table"><div class="mini-row"><b>操作</b><b>普通用户</b><b>管理员</b></div><div class="mini-row"><span>查看 ERP 字段</span><span>允许</span><span>允许</span></div><div class="mini-row"><span>手动同步/重试</span><span>隐藏</span><span>允许</span></div><div class="mini-row"><span>修改 ERP 分类</span><span>不提供</span><span>不提供</span></div></div></div></div></section>
+
+    <section id="rules"><h2>交互行为规则表</h2><p class="desc">前端、后端和测试可直接据此核对行为。</p><table><colgroup><col style="width:11%"><col style="width:19%"><col style="width:48%"><col style="width:22%"></colgroup><thead><tr><th>触发</th><th>用户操作</th><th>系统行为</th><th>反馈</th></tr></thead><tbody>
+      <tr><td>管理员</td><td>点击“立即同步”</td><td>创建异步增量任务；若已有同类任务则不重复创建；页面继续展示最后成功数据。</td><td>成功 Toast 或“已有任务执行中”；顶部状态更新。</td></tr>
+      <tr><td>管理员</td><td>重试失败图片</td><td>只重试失败项；成功资源幂等复用；保留源 URL 和规格归属。</td><td>行状态变为“图片处理中”，完成后刷新图片数。</td></tr>
+      <tr><td>系统</td><td>每日分类校准</td><td>从 ERP 全量校准分类树；异常节点进入“未识别分类”；不清空最后成功树。</td><td>管理员看到异常数量，普通用户看到更新时间。</td></tr>
+      <tr><td>用户</td><td>在产品管理按分类筛选</td><td>使用 ERP 分类 ID 服务端查询有效规格，不读取本地新分类。</td><td>更新结果数；无结果时展示条件和“清除筛选”。</td></tr>
+      <tr><td>用户</td><td>从规格行新建图片</td><td>带入单规格上下文；第一张有效 ERP 图作为主体；其余图片作为可选参考。</td><td>进入图片创作，顶部显示“由产品管理带入”。</td></tr>
+      <tr><td>用户</td><td>打开资源中心</td><td>主体图入口映射 ERP 同步图或用户更换图；空参考图入口保持零选择。产品、公共和我的素材分别按真实范围加载。</td><td>已有值高亮；零选择时确认按钮禁用，素材列表仍完整展示。</td></tr>
+      <tr><td>用户</td><td>筛选产品与素材</td><td>SKU 使用 ERP 分类、名称、SPU 和 SKU 查询；素材使用来源、参考角色、九大风格和联动场景筛选。筛选只读取现有元数据。</td><td>显示结果数和筛选条件；无结果可一键清除，不进入标签维护。</td></tr>
+      <tr><td>用户</td><td>在资源中心选择组合素材</td><td>当前主体图预填为上装或下装；用户补齐另一必选角色并可添加鞋履。点击“带入图片任务”只回填源图、SKU 和角色，继续复用现有 Submit。</td><td>缺少上装或下装时按钮禁用；补齐后返回图片任务，结果资源只归属当前 SKU。</td></tr>
+      <tr><td>用户</td><td>打开新建图片任务</td><td>进入无应用侧栏的全屏三栏工作台；左侧以 ERP 商品名称和分类为标题上下文，下方展示 SEO 名称与图片理解参数；中间为图片类型与 Prompt，右侧为任务和结果。</td><td>素材、内容与结果在一屏可见。</td></tr>
+      <tr><td>用户</td><td>设置参考图角色</td><td>每张图可从模特、风格、场景、姿势、细节中多选。风格、场景或姿势被图片接管后，禁用 Prompt 底部对应标签并在文本中写明来源图片。</td><td>角色显示在图片下方；冲突标签变为“参考图 N”并锁定。</td></tr>
+      <tr><td>用户</td><td>调整 Prompt 底部标签</td><td>未被参考图接管时，风格严格使用九大正式项，场景和姿势按风格过滤；已被参考图接管的对应标签保持禁用。更改后重新编译各图片类型 Prompt。</td><td>名称、预览图和允许组合即时更新；不显示高级设置与负面约束入口。</td></tr>
+      <tr><td>用户</td><td>从规格行新建视频</td><td>带入商品规格和事实；仍要求选择合格首帧或源视频。</td><td>进入视频创作，商品字段不再显示“未填写”。</td></tr>
+      <tr><td>用户</td><td>选择已关联素材</td><td>单规格素材仅一个关联时自动带入；组合素材自动识别为完整组合上下文。若当前为单规格，要求选择切换为组合上下文或仅作参考图；只有互斥单规格关联才显示冲突。</td><td>显示“由素材带入”“组合上下文”或单规格关联冲突选择框。</td></tr>
+      <tr><td>用户</td><td>上传首个本地素材</td><td>保存素材并记录首次活动来源 `UPLOAD`；商品规格进入素材库。</td><td>上传成功 Toast，素材库可立即检索。</td></tr>
+      <tr><td>用户</td><td>只浏览 ERP 图片</td><td>不记录创作准入，不将商品放入素材库。</td><td>无额外提示，产品管理仍可见。</td></tr>
+      <tr><td>用户</td><td>确认费用并 Submit</td><td>调用现有事务 Submit；保存 `groupId/taskIds` 和创作项目快照；单规格或组合项目首次准入；当前页开始刷新任务。</td><td>不跳转；右侧从排队到生成中。</td></tr>
+      <tr><td>系统</td><td>单个结果完成</td><td>立即追加到右侧结果区，不等待全组完成。</td><td>缩略图可选，大预览更新，完成数增加。</td></tr>
+      <tr><td>系统</td><td>部分任务失败</td><td>保留成功结果，失败项显示归一化原因，允许仅重试失败项。</td><td>“部分成功”状态和重试入口。</td></tr>
+      <tr><td>用户</td><td>刷新或返回创作页</td><td>根据当前任务组恢复状态和已有结果，不重复 Submit。</td><td>信息 Toast“已恢复任务进度”。</td></tr>
+      <tr><td>用户</td><td>从图片结果生成视频</td><td>带入单规格或组合项目、结果图、来源任务和比例；创建视频草稿，不立即付费。</td><td>视频页显示完整商品或上下装组合上下文。</td></tr>
+      <tr><td>系统</td><td>ERP 停用商品/规格</td><td>默认选择器隐藏；历史商品、素材、任务、结果不删除；允许继续创作。组合项目任一来源停用时标记为历史组合，保留双 SKU 快照。</td><td>商品和创作页显示“ERP 已停用”或“历史组合”。</td></tr>
+      <tr><td>管理员</td><td>匹配旧本地商品到 ERP 规格</td><td>先校验唯一性并展示影响；确认后只补 ERP 归属，不覆盖本地字段，不复制历史记录。</td><td>成功后来源变为 ERP；失败时说明冲突对象。</td></tr>
+      <tr><td>异常</td><td>ERP 接口或图片源失败</td><td>保留最后成功主数据，记录错误、对象和重试次数；不向普通用户暴露密钥或堆栈。</td><td>管理员错误详情；普通用户看到可理解状态。</td></tr>
+      <tr><td>异常</td><td>Preflight 审核拦截或额度不足</td><td>不 Submit，不清空素材、Prompt 和参数。</td><td>右侧解释原因并提供返回修改或联系管理员。</td></tr>
+    </tbody></table></section>
+    <div class="foot">本参考与 `PRD-V2.5.md`、`需求总结.md` 共同使用。冲突时以 PRD 的业务规则为准；视觉和交互实现以本文件的状态覆盖为最低要求。</div>
+  </main>
+</body>
+</html>

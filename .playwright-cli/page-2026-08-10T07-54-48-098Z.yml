@@ -1,0 +1,113 @@
+- main [ref=e4]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - button [ref=e8] [cursor=pointer]
+      - generic [ref=e11]:
+        - heading "新建图片任务" [level=1] [ref=e12]
+        - paragraph [ref=e13]: 配置、生成与结果在同一页面完成
+    - generic [ref=e16]:
+      - strong [ref=e17]: 青柠格纹家居服上衣 · 绿色 / M
+      - generic [ref=e18]: ERP SKU TEST1-GRN-M
+  - dialog "资源中心" [ref=e24]:
+    - generic [ref=e25]:
+      - generic [ref=e30]:
+        - heading "资源中心" [level=2] [ref=e31]
+        - generic [ref=e32]: 媒体类型优先，素材统一归集
+      - tablist "媒体类型" [ref=e33]:
+        - tab "图片素材 286" [selected] [ref=e34] [cursor=pointer]:
+          - text: 图片素材
+          - generic [ref=e39]: "286"
+        - tab "视频素材 42" [ref=e40] [cursor=pointer]:
+          - text: 视频素材
+          - generic [ref=e44]: "42"
+      - generic [ref=e45]:
+        - textbox "搜索名称、SKU 或标签" [ref=e50]
+        - button "上传" [ref=e51] [cursor=pointer]
+        - button "关闭资源中心" [ref=e55] [cursor=pointer]
+    - generic [ref=e60]:
+      - complementary [ref=e61]:
+        - generic [ref=e62]: 素材范围
+        - navigation "素材范围" [ref=e63]:
+          - button "产品素材 248 SKU" [ref=e64] [cursor=pointer]:
+            - text: 产品素材
+            - generic [ref=e69]: 248 SKU
+          - button "公共素材 326" [ref=e70] [cursor=pointer]:
+            - text: 公共素材
+            - generic [ref=e76]: "326"
+          - button "我的素材 128" [ref=e77] [cursor=pointer]:
+            - text: 我的素材
+            - generic [ref=e81]: "128"
+        - generic [ref=e85]:
+          - generic [ref=e86]:
+            - text: 图片分类
+            - generic [ref=e87]: 公共
+          - generic [ref=e88]:
+            - button "全部图片 326" [ref=e89] [cursor=pointer]:
+              - text: 全部图片
+              - generic [ref=e90]: "326"
+            - button "场景 112" [ref=e91] [cursor=pointer]:
+              - text: 场景
+              - generic [ref=e92]: "112"
+            - button "风格参考 74" [ref=e93] [cursor=pointer]:
+              - text: 风格参考
+              - generic [ref=e94]: "74"
+            - button "姿势参考 58" [ref=e95] [cursor=pointer]:
+              - text: 姿势参考
+              - generic [ref=e96]: "58"
+            - button "商品细节 49" [ref=e97] [cursor=pointer]:
+              - text: 商品细节
+              - generic [ref=e98]: "49"
+        - generic [ref=e99]:
+          - generic [ref=e100]:
+            - text: 存储空间
+            - generic [ref=e101]: 82%
+          - text: 已使用 4.1GB / 5.0GB
+      - generic [ref=e105]:
+        - generic [ref=e106]:
+          - generic [ref=e107]:
+            - heading "公共图片素材" [level=3] [ref=e108]
+            - paragraph [ref=e109]: 团队共享资源；分类和标签只用于查找，不在此处重复维护
+          - generic [ref=e110]: 团队可用
+        - generic [ref=e116]:
+          - generic [ref=e117]:
+            - generic [ref=e118]:
+              - button "全部" [ref=e119] [cursor=pointer]
+              - button "最近使用" [ref=e120] [cursor=pointer]
+              - button "场景" [ref=e121] [cursor=pointer]
+              - button "风格" [ref=e122] [cursor=pointer]
+              - button "细节" [ref=e123] [cursor=pointer]
+            - button "使用最多" [ref=e124] [cursor=pointer]
+          - generic [ref=e128]:
+            - generic [ref=e129]: 热门标签
+            - button "全部" [ref=e130] [cursor=pointer]
+            - button "静奢老钱" [ref=e131] [cursor=pointer]
+            - button "奶油甜美" [ref=e132] [cursor=pointer]
+            - button "新中式极简" [ref=e133] [cursor=pointer]
+            - button "自然站姿" [ref=e134] [cursor=pointer]
+          - generic [ref=e135]:
+            - article [ref=e136]:
+              - generic [ref=e139]:
+                - strong [ref=e140]: 静奢缎面晨光
+                - generic [ref=e141]: 公共场景 · 238 次使用
+                - generic [ref=e142]:
+                  - generic [ref=e143]: 静奢老钱
+                  - generic [ref=e144]: 窗边
+            - article [ref=e145]:
+              - generic [ref=e148]:
+                - strong [ref=e149]: 奶油卧室布景
+                - generic [ref=e150]: 公共场景 · 184 次使用
+                - generic [ref=e151]:
+                  - generic [ref=e152]: 奶油甜美
+                  - generic [ref=e153]: 卧室
+            - article [ref=e154]:
+              - generic [ref=e157]:
+                - strong [ref=e158]: 新中式园林
+                - generic [ref=e159]: 公共场景 · 126 次使用
+                - generic [ref=e160]:
+                  - generic [ref=e161]: 新中式极简
+                  - generic [ref=e162]: 庭院
+    - generic [ref=e163]:
+      - generic [ref=e164]: 未选择图片素材
+      - generic [ref=e165]:
+        - button "取消" [ref=e166] [cursor=pointer]
+        - button "确认使用" [disabled] [ref=e167]

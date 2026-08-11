@@ -1,0 +1,137 @@
+{
+  "typography": [
+    {
+      "role": "display",
+      "fontFamily": "PingFang SC",
+      "fontSize": "36px",
+      "fontWeight": "700",
+      "lineHeight": "45px",
+      "letterSpacing": "-0.9px",
+      "color": "#FFFFFF",
+      "sampleText": "让 AI 解锁商业创意的密码"
+    },
+    {
+      "role": "heading",
+      "fontFamily": "PingFang SC",
+      "fontSize": "24px",
+      "fontWeight": "700",
+      "lineHeight": "32px",
+      "letterSpacing": "-0.6px",
+      "color": "#201F1D",
+      "sampleText": "欢迎登录"
+    },
+    {
+      "role": "body",
+      "fontFamily": "PingFang SC",
+      "fontSize": "16px",
+      "fontWeight": "700",
+      "lineHeight": "24px",
+      "letterSpacing": "-0.4px",
+      "color": "#FFFFFF",
+      "sampleText": "达芬奇密码 AI"
+    },
+    {
+      "role": "label",
+      "fontFamily": "PingFang SC",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "lineHeight": "16px",
+      "letterSpacing": "normal",
+      "color": "oklch(0.446 0.043 257.281)",
+      "sampleText": "用户名"
+    }
+  ],
+  "spacing": {
+    "observed": [
+      4,
+      8,
+      10,
+      12,
+      16,
+      20,
+      32,
+      40,
+      64
+    ],
+    "baseUnit": 4
+  },
+  "radius": [
+    "8px"
+  ],
+  "shadows": [
+    {
+      "value": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px",
+      "count": 1
+    },
+    {
+      "value": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.627456 0.134952 0.0892375 / 0.2) 0px 1px 3px 0px, oklab(0.627456 0.134952 0.0892375 / 0.2) 0px 1px 2px -1px",
+      "count": 1
+    }
+  ],
+  "buttons": [
+    {
+      "label": "visibility",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "oklch(0.704 0.04 256.788)",
+      "padding": "0px",
+      "borderRadius": "6px",
+      "border": "0px solid oklch(0.704 0.04 256.788)",
+      "boxShadow": "none",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "28px"
+    },
+    {
+      "label": "忘记密码？",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#D85C42",
+      "padding": "0px",
+      "borderRadius": "0px",
+      "border": "0px solid rgb(216, 92, 66)",
+      "boxShadow": "none",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "height": "16px"
+    },
+    {
+      "label": "登录arrow_forward",
+      "background": "#D85C42",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#FFFFFF",
+      "padding": "10px 16px",
+      "borderRadius": "8px",
+      "border": "0px solid rgb(255, 255, 255)",
+      "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.627456 0.134952 0.0892375 / 0.2) 0px 1px 3px 0px, oklab(0.627456 0.134952 0.0892375 / 0.2) 0px 1px 2px -1px",
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "height": "48px"
+    }
+  ],
+  "cards": [
+    {
+      "label": "card",
+      "background": "#FFFFFF",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#201F1D",
+      "padding": "32px",
+      "borderRadius": "16px",
+      "border": "1px solid rgb(232, 228, 223)",
+      "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "392px"
+    }
+  ],
+  "nav": null,
+  "chips": [],
+  "statCells": [],
+  "tabs": [],
+  "backgrounds": [],
+  "glass": []
+}

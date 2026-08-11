@@ -1,0 +1,75 @@
+- main [ref=e4]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - button [ref=e8] [cursor=pointer]
+      - generic [ref=e11]:
+        - heading "新建图片任务" [level=1] [ref=e12]
+        - paragraph [ref=e13]: 配置、生成与结果在同一页面完成
+    - generic [ref=e16]:
+      - strong [ref=e17]: 青柠格纹家居服上衣 · 绿色 / M
+      - generic [ref=e18]: ERP SKU TEST1-GRN-M
+  - dialog "资源中心" [ref=e24]:
+    - generic [ref=e25]:
+      - generic [ref=e33]:
+        - heading "资源中心" [level=2] [ref=e34]
+        - generic [ref=e35]: 为当前图片任务选择素材
+      - tablist [ref=e36]:
+        - tab "产品素材" [selected] [ref=e37] [cursor=pointer]
+        - tab "公共素材" [ref=e38] [cursor=pointer]
+        - tab "我的素材" [ref=e39] [cursor=pointer]
+      - button "关闭资源中心" [ref=e40] [cursor=pointer]
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - generic [ref=e47]:
+          - generic [ref=e49]:
+            - strong [ref=e50]: 青柠格纹家居服上衣
+            - generic [ref=e51]: SKU TEST1-GRN-M · SPU TEST1 · 绿色 / M · 家居服 / 夏季
+          - generic [ref=e52]: 当前任务商品
+        - generic [ref=e53]:
+          - button "切换产品" [ref=e54] [cursor=pointer]
+          - button "上传素材" [ref=e60] [cursor=pointer]
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - button "全部 13" [ref=e66] [cursor=pointer]
+          - button "上传素材 3" [ref=e67] [cursor=pointer]
+          - button "生成结果 9" [ref=e68] [cursor=pointer]
+          - button "组合结果 1" [ref=e69] [cursor=pointer]
+        - textbox "搜索当前 SKU 素材" [ref=e74]
+      - generic [ref=e75]:
+        - article [ref=e76]:
+          - generic [ref=e82]:
+            - strong [ref=e83]: 静奢三视图 · V3
+            - generic [ref=e84]: 生成结果 · 8 分钟前
+        - article [ref=e85]:
+          - generic [ref=e88]:
+            - strong [ref=e89]: 窗边居家展示图
+            - generic [ref=e90]: 生成结果 · 26 分钟前
+        - article [ref=e91]:
+          - generic [ref=e94]:
+            - strong [ref=e95]: 上装 + 长裤 + 鞋履
+            - generic [ref=e96]: 组合结果 · 关联 3 个 SKU
+        - article [ref=e97]:
+          - generic [ref=e100]:
+            - strong [ref=e101]: ERP 商品正面图
+            - generic [ref=e102]: 上传素材 · 昨天
+        - article [ref=e103]:
+          - generic [ref=e106]:
+            - strong [ref=e107]: 翻领排扣细节
+            - generic [ref=e108]: 生成结果 · 昨天
+        - article [ref=e109]:
+          - generic [ref=e112]:
+            - strong [ref=e113]: 奶油卧室场景图
+            - generic [ref=e114]: 生成结果 · 2 天前
+        - article [ref=e115]:
+          - generic [ref=e118]:
+            - strong [ref=e119]: 模特试穿参考
+            - generic [ref=e120]: 上传素材 · 3 天前
+        - article [ref=e121]:
+          - generic [ref=e124]:
+            - strong [ref=e125]: 东方雅致展示图
+            - generic [ref=e126]: 生成结果 · 4 天前
+    - generic [ref=e127]:
+      - generic [ref=e128]: 已选择 1 项 · 主体图单选
+      - generic [ref=e129]:
+        - button "取消" [ref=e130] [cursor=pointer]
+        - button "确认使用" [ref=e131] [cursor=pointer]

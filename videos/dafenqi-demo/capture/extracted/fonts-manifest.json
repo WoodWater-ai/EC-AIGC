@@ -1,0 +1,324 @@
+{
+  "files": [
+    {
+      "file": "hanken-grotesk-latin-400-normal-BG6hkEXj.woff2",
+      "family": "Hanken Grotesk",
+      "rawFamily": "Hanken Grotesk",
+      "subfamily": "Regular",
+      "postscript": "HankenGrotesk-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "hanken-grotesk-latin-400-normal-CjyVwvJV.woff",
+      "family": "Hanken Grotesk",
+      "rawFamily": "Hanken Grotesk",
+      "subfamily": "Regular",
+      "postscript": "HankenGrotesk-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "hanken-grotesk-latin-ext-400-normal-DI-aIsWt.woff",
+      "family": "Hanken Grotesk",
+      "rawFamily": "Hanken Grotesk",
+      "subfamily": "Regular",
+      "postscript": "HankenGrotesk-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "hanken-grotesk-latin-ext-400-normal-DR7lHpW4.woff2",
+      "family": "Hanken Grotesk",
+      "rawFamily": "Hanken Grotesk",
+      "subfamily": "Regular",
+      "postscript": "HankenGrotesk-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "hanken-grotesk-latin-ext-600-normal-DHIm05DD.woff",
+      "family": "Hanken Grotesk",
+      "rawFamily": "Hanken Grotesk SemiBold",
+      "subfamily": "Regular",
+      "postscript": "HankenGrotesk-SemiBold",
+      "weight": 600,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "hanken-grotesk-latin-ext-600-normal-FY8kSObK.woff2",
+      "family": "Hanken Grotesk",
+      "rawFamily": "Hanken Grotesk SemiBold",
+      "subfamily": "Regular",
+      "postscript": "HankenGrotesk-SemiBold",
+      "weight": 600,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-latin-400-normal-C38fXH4l.woff2",
+      "family": "Inter",
+      "rawFamily": "Inter",
+      "subfamily": "Regular",
+      "postscript": "Inter-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-latin-400-normal-CyCys3Eg.woff",
+      "family": "Inter",
+      "rawFamily": "Inter",
+      "subfamily": "Regular",
+      "postscript": "Inter-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-latin-ext-400-normal-77YHD8bZ.woff",
+      "family": "Inter",
+      "rawFamily": "Inter",
+      "subfamily": "Regular",
+      "postscript": "Inter-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-latin-ext-400-normal-C1nco2VV.woff2",
+      "family": "Inter",
+      "rawFamily": "Inter",
+      "subfamily": "Regular",
+      "postscript": "Inter-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-latin-ext-500-normal-BxGbmqWO.woff",
+      "family": "Inter",
+      "rawFamily": "Inter Medium",
+      "subfamily": "Regular",
+      "postscript": "Inter-Medium",
+      "weight": 500,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "inter-latin-ext-500-normal-CV4jyFjo.woff2",
+      "family": "Inter",
+      "rawFamily": "Inter Medium",
+      "subfamily": "Regular",
+      "postscript": "Inter-Medium",
+      "weight": 500,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "material-symbols-latin-400-normal-DjHu2BxN.woff",
+      "family": "Material Symbols",
+      "rawFamily": "Material Symbols",
+      "subfamily": "Regular",
+      "postscript": "MaterialSymbols-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "material-symbols-latin-400-normal-Dz1YaqmA.woff2",
+      "family": "Material Symbols",
+      "rawFamily": "Material Symbols",
+      "subfamily": "Regular",
+      "postscript": "MaterialSymbols-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "noto-sans-tc-latin-400-normal-BoKxAR0y.woff",
+      "family": "Noto Sans TC",
+      "rawFamily": "Noto Sans TC",
+      "subfamily": "Regular",
+      "postscript": "NotoSansTC-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "noto-sans-tc-latin-400-normal-DiJT3MpU.woff2",
+      "family": "Noto Sans TC",
+      "rawFamily": "Noto Sans TC Thin",
+      "subfamily": "Regular",
+      "postscript": "NotoSansTCThin-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "noto-sans-tc-latin-ext-400-normal-BV2sQBLl.woff",
+      "family": "Noto Sans TC",
+      "rawFamily": "Noto Sans TC",
+      "subfamily": "Regular",
+      "postscript": "NotoSansTC-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "noto-sans-tc-latin-ext-400-normal-CYHlOUO_.woff2",
+      "family": "Noto Sans TC",
+      "rawFamily": "Noto Sans TC Thin",
+      "subfamily": "Regular",
+      "postscript": "NotoSansTCThin-Regular",
+      "weight": 400,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "noto-sans-tc-latin-ext-500-normal-Cy8sG8_X.woff2",
+      "family": "Noto Sans TC Thin",
+      "rawFamily": "Noto Sans TC Thin Medium",
+      "subfamily": "Regular",
+      "postscript": "NotoSansTCThin-Medium",
+      "weight": 500,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    },
+    {
+      "file": "noto-sans-tc-latin-ext-500-normal-DAFTTezw.woff",
+      "family": "Noto Sans TC",
+      "rawFamily": "Noto Sans TC Medium",
+      "subfamily": "Regular",
+      "postscript": "NotoSansTC-Medium",
+      "weight": 500,
+      "style": "normal",
+      "variationAxes": [],
+      "identified": true,
+      "isIcon": false
+    }
+  ],
+  "families": [
+    {
+      "family": "Hanken Grotesk",
+      "weights": [
+        400,
+        600
+      ],
+      "variable": false,
+      "fileCount": 6,
+      "files": [
+        "hanken-grotesk-latin-400-normal-BG6hkEXj.woff2",
+        "hanken-grotesk-latin-400-normal-CjyVwvJV.woff",
+        "hanken-grotesk-latin-ext-400-normal-DI-aIsWt.woff",
+        "hanken-grotesk-latin-ext-400-normal-DR7lHpW4.woff2",
+        "hanken-grotesk-latin-ext-600-normal-DHIm05DD.woff",
+        "hanken-grotesk-latin-ext-600-normal-FY8kSObK.woff2"
+      ]
+    },
+    {
+      "family": "Inter",
+      "weights": [
+        400,
+        500
+      ],
+      "variable": false,
+      "fileCount": 6,
+      "files": [
+        "inter-latin-400-normal-C38fXH4l.woff2",
+        "inter-latin-400-normal-CyCys3Eg.woff",
+        "inter-latin-ext-400-normal-77YHD8bZ.woff",
+        "inter-latin-ext-400-normal-C1nco2VV.woff2",
+        "inter-latin-ext-500-normal-BxGbmqWO.woff",
+        "inter-latin-ext-500-normal-CV4jyFjo.woff2"
+      ]
+    },
+    {
+      "family": "Material Symbols",
+      "weights": [
+        400
+      ],
+      "variable": false,
+      "fileCount": 2,
+      "files": [
+        "material-symbols-latin-400-normal-DjHu2BxN.woff",
+        "material-symbols-latin-400-normal-Dz1YaqmA.woff2"
+      ]
+    },
+    {
+      "family": "Noto Sans TC",
+      "weights": [
+        400,
+        500
+      ],
+      "variable": false,
+      "fileCount": 5,
+      "files": [
+        "noto-sans-tc-latin-400-normal-BoKxAR0y.woff",
+        "noto-sans-tc-latin-400-normal-DiJT3MpU.woff2",
+        "noto-sans-tc-latin-ext-400-normal-BV2sQBLl.woff",
+        "noto-sans-tc-latin-ext-400-normal-CYHlOUO_.woff2",
+        "noto-sans-tc-latin-ext-500-normal-DAFTTezw.woff"
+      ]
+    },
+    {
+      "family": "Noto Sans TC Thin",
+      "weights": [
+        500
+      ],
+      "variable": false,
+      "fileCount": 1,
+      "files": [
+        "noto-sans-tc-latin-ext-500-normal-Cy8sG8_X.woff2"
+      ]
+    }
+  ],
+  "unidentified": [],
+  "meta": {
+    "generatedAt": "2026-08-04T16:30:31.280Z",
+    "tool": "fontkit"
+  }
+}

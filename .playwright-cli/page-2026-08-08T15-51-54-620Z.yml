@@ -1,0 +1,158 @@
+- generic [ref=f4e2]:
+  - complementary [ref=f4e3]:
+    - generic [ref=f4e12]:
+      - strong [ref=f4e13]: 达芬奇密码 AI
+      - text: WORKBENCH
+    - button "新建创作" [ref=f4e15] [cursor=pointer]
+    - navigation [ref=f4e20]:
+      - generic [ref=f4e21]: 主模块
+      - button "工作台首页" [ref=f4e22] [cursor=pointer]
+      - button "创作助手" [ref=f4e28] [cursor=pointer]
+      - button "任务列表" [ref=f4e31] [cursor=pointer]
+      - button "智能模板中心" [ref=f4e35] [cursor=pointer]
+      - button "商品素材库" [ref=f4e38] [cursor=pointer]
+      - button "数据效能复盘" [ref=f4e43] [cursor=pointer]
+      - generic [ref=f4e46]: 系统与主数据
+      - button "系统配置模块" [ref=f4e47] [cursor=pointer]
+      - button "通道异步任务" [ref=f4e51] [cursor=pointer]
+      - button "资源分类" [ref=f4e59] [cursor=pointer]
+      - button "商品分类" [ref=f4e65] [cursor=pointer]
+      - button "产品管理" [ref=f4e71] [cursor=pointer]
+      - button "字典管理" [ref=f4e79] [cursor=pointer]
+    - generic [ref=f4e82]:
+      - generic [ref=f4e83]: 潘
+      - generic [ref=f4e84]:
+        - strong [ref=f4e85]: 潘俊杰
+        - text: 产品管理员 · 在线
+  - generic [ref=f4e86]:
+    - generic [ref=f4e87]:
+      - generic [ref=f4e88]:
+        - generic [ref=f4e89]: 达芬奇密码 AI
+        - strong [ref=f4e92]: 视频创作
+      - generic [ref=f4e93]:
+        - generic "效果稿页面切换" [ref=f4e94]:
+          - button "产品管理" [ref=f4e95] [cursor=pointer]
+          - button "商品素材库" [ref=f4e96] [cursor=pointer]
+          - button "图片创作" [ref=f4e97] [cursor=pointer]
+          - button "视频创作" [ref=f4e98] [cursor=pointer]
+        - button "通知" [ref=f4e99] [cursor=pointer]
+        - button "帮助" [ref=f4e103] [cursor=pointer]
+    - main [ref=f4e107]:
+      - generic [ref=f4e108]:
+        - generic [ref=f4e109]:
+          - generic [ref=f4e110]:
+            - button "返回商品素材库" [ref=f4e111] [cursor=pointer]
+            - generic [ref=f4e114]:
+              - heading "新建视频任务" [level=1] [ref=f4e115]
+              - paragraph [ref=f4e116]: 商品、首帧与来源任务已自动关联
+          - generic [ref=f4e117]:
+            - generic [ref=f4e119]:
+              - strong [ref=f4e120]: 轻奢蕾丝吊带睡裙 · 香槟色 / M
+              - generic [ref=f4e121]: 由图片结果带入 · 来源任务 IMG-1042
+            - generic [ref=f4e122]: 已匹配
+        - generic [ref=f4e123]:
+          - generic [ref=f4e124]:
+            - generic [ref=f4e125]:
+              - generic [ref=f4e126]:
+                - generic [ref=f4e127]:
+                  - text: 输入素材
+                  - heading "视频首帧" [level=2] [ref=f4e128]
+                - button "更换" [ref=f4e129] [cursor=pointer]
+              - generic [ref=f4e130]: 来源图片结果 · 图 1
+            - generic [ref=f4e133]:
+              - generic [ref=f4e134]:
+                - generic [ref=f4e135]:
+                  - text: 补充依据
+                  - heading "参考素材" [level=2] [ref=f4e136]
+                - generic [ref=f4e137]: 2 / 4
+              - generic [ref=f4e138]:
+                - generic [ref=f4e139]: 模特动作
+                - generic [ref=f4e142]: 场景光线
+                - generic [ref=f4e145]: 添加参考
+            - generic [ref=f4e149]:
+              - generic [ref=f4e150]:
+                - generic [ref=f4e151]:
+                  - text: 商品事实
+                  - heading "商品与来源" [level=2] [ref=f4e152]
+                - generic [ref=f4e153]: 自动带入
+              - generic [ref=f4e154]:
+                - term [ref=f4e155]: 商品
+                - definition [ref=f4e156]: 轻奢蕾丝吊带睡裙
+                - term [ref=f4e157]: 规格
+                - definition [ref=f4e158]: 香槟色 / M
+                - term [ref=f4e159]: ERP 分类
+                - definition [ref=f4e160]: 睡衣 / 吊带裙
+                - term [ref=f4e161]: 来源结果
+                - definition [ref=f4e162]: IMG-1042 / V1
+                - term [ref=f4e163]: 卖点
+                - definition [ref=f4e164]: 缎面光泽、精致蕾丝
+                - term [ref=f4e165]: 材质
+                - definition [ref=f4e166]: 轻薄缎面
+          - generic [ref=f4e167]:
+            - generic [ref=f4e168]:
+              - generic [ref=f4e170]:
+                - text: 视频模式
+                - heading "选择创作方式" [level=2] [ref=f4e171]
+              - generic [ref=f4e172]:
+                - button "首帧生成视频" [ref=f4e173] [cursor=pointer]
+                - button "电商视频复刻" [ref=f4e174] [cursor=pointer]
+                - button "爆款视频复刻" [ref=f4e175] [cursor=pointer]
+            - generic [ref=f4e176]:
+              - generic [ref=f4e177]:
+                - generic [ref=f4e178]:
+                  - text: 内容表达
+                  - heading "本次视频 Prompt" [level=2] [ref=f4e179]
+                  - paragraph [ref=f4e180]: 保持商品结构稳定，描述动作、镜头与节奏
+                - generic [ref=f4e181]: 8 秒
+              - textbox [ref=f4e182]: 成年女性模特穿着香槟色蕾丝吊带睡裙站在柔和晨光的卧室中，先轻微转身展示缎面光泽，再自然走向窗边。镜头从中景平稳推进到半身近景，动作克制自然，面料和蕾丝结构保持准确。
+            - generic [ref=f4e183]:
+              - generic [ref=f4e184]:
+                - generic [ref=f4e185]:
+                  - text: 分镜
+                  - heading "3 个镜头" [level=2] [ref=f4e186]
+                - button "重新生成" [ref=f4e187] [cursor=pointer]
+              - generic [ref=f4e191]:
+                - generic [ref=f4e194]:
+                  - strong [ref=f4e195]: 镜头 1 · 0-2s
+                  - text: 中景，模特自然站立
+                - generic [ref=f4e198]:
+                  - strong [ref=f4e199]: 镜头 2 · 2-5s
+                  - text: 轻转身展示面料
+                - generic [ref=f4e202]:
+                  - strong [ref=f4e203]: 镜头 3 · 5-8s
+                  - text: 推进至蕾丝细节
+            - generic [ref=f4e204]:
+              - generic [ref=f4e205]:
+                - generic [ref=f4e206]:
+                  - text: 创作控制
+                  - heading "最终模型与动态参数" [level=2] [ref=f4e207]
+                - generic [ref=f4e208]: 预检通过
+              - generic [ref=f4e209]:
+                - generic [ref=f4e210]:
+                  - generic [ref=f4e211]: 最终模型
+                  - strong [ref=f4e212]: Vidu Q2 Pro
+                - generic [ref=f4e213]:
+                  - generic [ref=f4e214]: 时长
+                  - strong [ref=f4e215]: 8 秒
+                - generic [ref=f4e216]:
+                  - generic [ref=f4e217]: 比例
+                  - strong [ref=f4e218]: 9:16
+                - generic [ref=f4e219]:
+                  - generic [ref=f4e220]: 运动幅度
+                  - strong [ref=f4e221]: 轻微
+          - complementary [ref=f4e222]:
+            - generic [ref=f4e223]:
+              - generic [ref=f4e224]:
+                - heading "视频结果" [level=2] [ref=f4e225]
+                - generic [ref=f4e226]: 已完成
+              - generic [ref=f4e227]:
+                - button "播放视频" [ref=f4e231] [cursor=pointer]
+                - generic [ref=f4e234]:
+                  - generic [ref=f4e235]: VID-20260808-0526 · V1
+                  - generic [ref=f4e236]: 8 秒 · 9:16 · 1080P
+                - generic [ref=f4e237]: 生成完成。商品、首帧、Prompt、分镜和模型参数已随任务快照保存。
+              - generic [ref=f4e242]:
+                - button "下载" [ref=f4e243] [cursor=pointer]
+                - button "继续修改" [ref=f4e247] [cursor=pointer]
+                - button "提交审核" [ref=f4e251] [cursor=pointer]
+                - button "保存为资产" [ref=f4e254] [cursor=pointer]

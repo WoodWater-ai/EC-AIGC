@@ -1,0 +1,1048 @@
+{
+  "tts_provider": "heygen",
+  "voice_id": "05f19352e8f74b0392a8f411eba40de1",
+  "bgm": {
+    "path": "assets/bgm/track.mp3",
+    "volume": 0.12,
+    "query": "uplifting corporate tech, clean electronic pulse, restrained, 108 BPM",
+    "mode": "retrieve",
+    "duration_s": 50
+  },
+  "bgm_pending": false,
+  "bgm_provider": "heygen",
+  "bgm_pid": null,
+  "bgm_log": null,
+  "bgm_mode": "retrieve",
+  "bgm_target_duration_s": null,
+  "bgm_seed_duration_s": null,
+  "bgm_loop_count": null,
+  "voices": [
+    {
+      "id": "01",
+      "path": "assets/voice/01.wav",
+      "duration_s": 3.422,
+      "words": [
+        {
+          "id": "w0",
+          "text": "首",
+          "start": 0.34,
+          "end": 0.519
+        },
+        {
+          "id": "w1",
+          "text": "页",
+          "start": 0.519,
+          "end": 0.68
+        },
+        {
+          "id": "w2",
+          "text": "进",
+          "start": 0.68,
+          "end": 0.799
+        },
+        {
+          "id": "w3",
+          "text": "入",
+          "start": 0.799,
+          "end": 0.979
+        },
+        {
+          "id": "w4",
+          "text": "模",
+          "start": 0.979,
+          "end": 1.12
+        },
+        {
+          "id": "w5",
+          "text": "特",
+          "start": 1.12,
+          "end": 1.299
+        },
+        {
+          "id": "w6",
+          "text": "创",
+          "start": 1.299,
+          "end": 1.579
+        },
+        {
+          "id": "w7",
+          "text": "作",
+          "start": 1.579,
+          "end": 1.679
+        },
+        {
+          "id": "w8",
+          "text": "，",
+          "start": 1.679,
+          "end": 1.679
+        },
+        {
+          "id": "w9",
+          "text": "先",
+          "start": 2,
+          "end": 2.22
+        },
+        {
+          "id": "w10",
+          "text": "确",
+          "start": 2.22,
+          "end": 2.44
+        },
+        {
+          "id": "w11",
+          "text": "定",
+          "start": 2.44,
+          "end": 2.599
+        },
+        {
+          "id": "w12",
+          "text": "人",
+          "start": 2.599,
+          "end": 2.679
+        },
+        {
+          "id": "w13",
+          "text": "物",
+          "start": 2.679,
+          "end": 2.859
+        },
+        {
+          "id": "w14",
+          "text": "主",
+          "start": 2.859,
+          "end": 3.139
+        },
+        {
+          "id": "w15",
+          "text": "角",
+          "start": 3.139,
+          "end": 3.199
+        },
+        {
+          "id": "w16",
+          "text": "。",
+          "start": 3.199,
+          "end": 3.199
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "path": "assets/voice/02.wav",
+      "duration_s": 2.691,
+      "words": [
+        {
+          "id": "w0",
+          "text": "打",
+          "start": 0.219,
+          "end": 0.319
+        },
+        {
+          "id": "w1",
+          "text": "开",
+          "start": 0.319,
+          "end": 0.539
+        },
+        {
+          "id": "w2",
+          "text": "模",
+          "start": 0.539,
+          "end": 0.68
+        },
+        {
+          "id": "w3",
+          "text": "特",
+          "start": 0.68,
+          "end": 0.779
+        },
+        {
+          "id": "w4",
+          "text": "列",
+          "start": 0.779,
+          "end": 1.059
+        },
+        {
+          "id": "w5",
+          "text": "表",
+          "start": 1.059,
+          "end": 1.12
+        },
+        {
+          "id": "w6",
+          "text": "，",
+          "start": 1.12,
+          "end": 1.12
+        },
+        {
+          "id": "w7",
+          "text": "新",
+          "start": 1.539,
+          "end": 1.659
+        },
+        {
+          "id": "w8",
+          "text": "增",
+          "start": 1.659,
+          "end": 1.839
+        },
+        {
+          "id": "w9",
+          "text": "专",
+          "start": 1.839,
+          "end": 2.039
+        },
+        {
+          "id": "w10",
+          "text": "属",
+          "start": 2.039,
+          "end": 2.2
+        },
+        {
+          "id": "w11",
+          "text": "模",
+          "start": 2.2,
+          "end": 2.299
+        },
+        {
+          "id": "w12",
+          "text": "特",
+          "start": 2.299,
+          "end": 2.46
+        },
+        {
+          "id": "w13",
+          "text": "。",
+          "start": 2.46,
+          "end": 2.46
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "path": "assets/voice/03.wav",
+      "duration_s": 3.187,
+      "words": [
+        {
+          "id": "w0",
+          "text": "上",
+          "start": 0.239,
+          "end": 0.419
+        },
+        {
+          "id": "w1",
+          "text": "传",
+          "start": 0.419,
+          "end": 0.659
+        },
+        {
+          "id": "w2",
+          "text": "照",
+          "start": 0.659,
+          "end": 0.759
+        },
+        {
+          "id": "w3",
+          "text": "片",
+          "start": 0.759,
+          "end": 0.879
+        },
+        {
+          "id": "w4",
+          "text": "后",
+          "start": 0.879,
+          "end": 1.019
+        },
+        {
+          "id": "w5",
+          "text": "，",
+          "start": 1.019,
+          "end": 1.019
+        },
+        {
+          "id": "w6",
+          "text": "可",
+          "start": 1.36,
+          "end": 1.48
+        },
+        {
+          "id": "w7",
+          "text": "选",
+          "start": 1.48,
+          "end": 1.74
+        },
+        {
+          "id": "w8",
+          "text": "择",
+          "start": 1.74,
+          "end": 1.919
+        },
+        {
+          "id": "w9",
+          "text": "四",
+          "start": 1.919,
+          "end": 2.059
+        },
+        {
+          "id": "w10",
+          "text": "种",
+          "start": 2.059,
+          "end": 2.339
+        },
+        {
+          "id": "w11",
+          "text": "创",
+          "start": 2.339,
+          "end": 2.5
+        },
+        {
+          "id": "w12",
+          "text": "作",
+          "start": 2.5,
+          "end": 2.7
+        },
+        {
+          "id": "w13",
+          "text": "方",
+          "start": 2.7,
+          "end": 2.859
+        },
+        {
+          "id": "w14",
+          "text": "式",
+          "start": 2.859,
+          "end": 2.939
+        },
+        {
+          "id": "w15",
+          "text": "。",
+          "start": 2.939,
+          "end": 2.939
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "path": "assets/voice/04.wav",
+      "duration_s": 2.743,
+      "words": [
+        {
+          "id": "w0",
+          "text": "完",
+          "start": 0.219,
+          "end": 0.399
+        },
+        {
+          "id": "w1",
+          "text": "成",
+          "start": 0.399,
+          "end": 0.499
+        },
+        {
+          "id": "w2",
+          "text": "创",
+          "start": 0.5,
+          "end": 0.839
+        },
+        {
+          "id": "w3",
+          "text": "作",
+          "start": 0.839,
+          "end": 0.859
+        },
+        {
+          "id": "w4",
+          "text": "，",
+          "start": 0.859,
+          "end": 0.859
+        },
+        {
+          "id": "w5",
+          "text": "得",
+          "start": 1.199,
+          "end": 1.319
+        },
+        {
+          "id": "w6",
+          "text": "到",
+          "start": 1.319,
+          "end": 1.599
+        },
+        {
+          "id": "w7",
+          "text": "可",
+          "start": 1.599,
+          "end": 1.739
+        },
+        {
+          "id": "w8",
+          "text": "用",
+          "start": 1.74,
+          "end": 1.799
+        },
+        {
+          "id": "w9",
+          "text": "的",
+          "start": 1.799,
+          "end": 1.939
+        },
+        {
+          "id": "w10",
+          "text": "模",
+          "start": 1.939,
+          "end": 2.019
+        },
+        {
+          "id": "w11",
+          "text": "特",
+          "start": 2.019,
+          "end": 2.2
+        },
+        {
+          "id": "w12",
+          "text": "资",
+          "start": 2.2,
+          "end": 2.319
+        },
+        {
+          "id": "w13",
+          "text": "产",
+          "start": 2.319,
+          "end": 2.519
+        },
+        {
+          "id": "w14",
+          "text": "。",
+          "start": 2.519,
+          "end": 2.519
+        }
+      ]
+    },
+    {
+      "id": "05",
+      "path": "assets/voice/05.wav",
+      "duration_s": 2.22,
+      "words": [
+        {
+          "id": "w0",
+          "text": "资",
+          "start": 0.179,
+          "end": 0.34
+        },
+        {
+          "id": "w1",
+          "text": "源",
+          "start": 0.34,
+          "end": 0.479
+        },
+        {
+          "id": "w2",
+          "text": "中",
+          "start": 0.479,
+          "end": 0.719
+        },
+        {
+          "id": "w3",
+          "text": "心",
+          "start": 0.719,
+          "end": 0.879
+        },
+        {
+          "id": "w4",
+          "text": "统",
+          "start": 0.879,
+          "end": 1.139
+        },
+        {
+          "id": "w5",
+          "text": "一",
+          "start": 1.139,
+          "end": 1.319
+        },
+        {
+          "id": "w6",
+          "text": "管",
+          "start": 1.319,
+          "end": 1.439
+        },
+        {
+          "id": "w7",
+          "text": "理",
+          "start": 1.439,
+          "end": 1.579
+        },
+        {
+          "id": "w8",
+          "text": "模",
+          "start": 1.579,
+          "end": 1.659
+        },
+        {
+          "id": "w9",
+          "text": "特",
+          "start": 1.659,
+          "end": 1.879
+        },
+        {
+          "id": "w10",
+          "text": "库",
+          "start": 1.879,
+          "end": 1.939
+        },
+        {
+          "id": "w11",
+          "text": "。",
+          "start": 1.939,
+          "end": 1.939
+        }
+      ]
+    },
+    {
+      "id": "06",
+      "path": "assets/voice/06.wav",
+      "duration_s": 3.109,
+      "words": [
+        {
+          "id": "w0",
+          "text": "带",
+          "start": 0.179,
+          "end": 0.339
+        },
+        {
+          "id": "w1",
+          "text": "着",
+          "start": 0.34,
+          "end": 0.439
+        },
+        {
+          "id": "w2",
+          "text": "模",
+          "start": 0.439,
+          "end": 0.62
+        },
+        {
+          "id": "w3",
+          "text": "特",
+          "start": 0.62,
+          "end": 0.839
+        },
+        {
+          "id": "w4",
+          "text": "和",
+          "start": 0.839,
+          "end": 1.019
+        },
+        {
+          "id": "w5",
+          "text": "商",
+          "start": 1.019,
+          "end": 1.259
+        },
+        {
+          "id": "w6",
+          "text": "品",
+          "start": 1.259,
+          "end": 1.36
+        },
+        {
+          "id": "w7",
+          "text": "，",
+          "start": 1.36,
+          "end": 1.36
+        },
+        {
+          "id": "w8",
+          "text": "新",
+          "start": 1.899,
+          "end": 2.079
+        },
+        {
+          "id": "w9",
+          "text": "建",
+          "start": 2.079,
+          "end": 2.339
+        },
+        {
+          "id": "w10",
+          "text": "图",
+          "start": 2.339,
+          "end": 2.459
+        },
+        {
+          "id": "w11",
+          "text": "片",
+          "start": 2.46,
+          "end": 2.619
+        },
+        {
+          "id": "w12",
+          "text": "任",
+          "start": 2.619,
+          "end": 2.799
+        },
+        {
+          "id": "w13",
+          "text": "务",
+          "start": 2.799,
+          "end": 2.839
+        },
+        {
+          "id": "w14",
+          "text": "。",
+          "start": 2.839,
+          "end": 2.839
+        }
+      ]
+    },
+    {
+      "id": "07",
+      "path": "assets/voice/07.wav",
+      "duration_s": 2.978,
+      "words": [
+        {
+          "id": "w0",
+          "text": "任",
+          "start": 0.239,
+          "end": 0.299
+        },
+        {
+          "id": "w1",
+          "text": "务",
+          "start": 0.299,
+          "end": 0.499
+        },
+        {
+          "id": "w2",
+          "text": "列",
+          "start": 0.5,
+          "end": 0.719
+        },
+        {
+          "id": "w3",
+          "text": "表",
+          "start": 0.719,
+          "end": 0.819
+        },
+        {
+          "id": "w4",
+          "text": "，",
+          "start": 0.819,
+          "end": 0.819
+        },
+        {
+          "id": "w5",
+          "text": "集",
+          "start": 1.399,
+          "end": 1.539
+        },
+        {
+          "id": "w6",
+          "text": "中",
+          "start": 1.539,
+          "end": 1.719
+        },
+        {
+          "id": "w7",
+          "text": "追",
+          "start": 1.719,
+          "end": 1.939
+        },
+        {
+          "id": "w8",
+          "text": "踪",
+          "start": 1.939,
+          "end": 2.139
+        },
+        {
+          "id": "w9",
+          "text": "生",
+          "start": 2.139,
+          "end": 2.22
+        },
+        {
+          "id": "w10",
+          "text": "成",
+          "start": 2.22,
+          "end": 2.599
+        },
+        {
+          "id": "w11",
+          "text": "进",
+          "start": 2.599,
+          "end": 2.719
+        },
+        {
+          "id": "w12",
+          "text": "度",
+          "start": 2.72,
+          "end": 2.759
+        },
+        {
+          "id": "w13",
+          "text": "。",
+          "start": 2.759,
+          "end": 2.759
+        }
+      ]
+    },
+    {
+      "id": "08",
+      "path": "assets/voice/08.wav",
+      "duration_s": 2.795,
+      "words": [
+        {
+          "id": "w0",
+          "text": "打",
+          "start": 0.159,
+          "end": 0.299
+        },
+        {
+          "id": "w1",
+          "text": "开",
+          "start": 0.299,
+          "end": 0.459
+        },
+        {
+          "id": "w2",
+          "text": "结",
+          "start": 0.459,
+          "end": 0.719
+        },
+        {
+          "id": "w3",
+          "text": "果",
+          "start": 0.719,
+          "end": 1.059
+        },
+        {
+          "id": "w4",
+          "text": "，",
+          "start": 1.059,
+          "end": 1.059
+        },
+        {
+          "id": "w5",
+          "text": "挑",
+          "start": 1.179,
+          "end": 1.279
+        },
+        {
+          "id": "w6",
+          "text": "选",
+          "start": 1.279,
+          "end": 1.5
+        },
+        {
+          "id": "w7",
+          "text": "真",
+          "start": 1.5,
+          "end": 1.659
+        },
+        {
+          "id": "w8",
+          "text": "正",
+          "start": 1.659,
+          "end": 1.86
+        },
+        {
+          "id": "w9",
+          "text": "可",
+          "start": 1.86,
+          "end": 2.059
+        },
+        {
+          "id": "w10",
+          "text": "用",
+          "start": 2.059,
+          "end": 2.159
+        },
+        {
+          "id": "w11",
+          "text": "的",
+          "start": 2.159,
+          "end": 2.24
+        },
+        {
+          "id": "w12",
+          "text": "画",
+          "start": 2.24,
+          "end": 2.5
+        },
+        {
+          "id": "w13",
+          "text": "面",
+          "start": 2.5,
+          "end": 2.559
+        },
+        {
+          "id": "w14",
+          "text": "。",
+          "start": 2.559,
+          "end": 2.559
+        }
+      ]
+    },
+    {
+      "id": "09",
+      "path": "assets/voice/09.wav",
+      "duration_s": 2.847,
+      "words": [
+        {
+          "id": "w0",
+          "text": "以",
+          "start": 0.28,
+          "end": 0.34
+        },
+        {
+          "id": "w1",
+          "text": "优",
+          "start": 0.34,
+          "end": 0.459
+        },
+        {
+          "id": "w2",
+          "text": "选",
+          "start": 0.459,
+          "end": 0.62
+        },
+        {
+          "id": "w3",
+          "text": "图",
+          "start": 0.62,
+          "end": 0.839
+        },
+        {
+          "id": "w4",
+          "text": "片",
+          "start": 0.839,
+          "end": 0.979
+        },
+        {
+          "id": "w5",
+          "text": "为",
+          "start": 0.979,
+          "end": 1.1
+        },
+        {
+          "id": "w6",
+          "text": "首",
+          "start": 1.1,
+          "end": 1.399
+        },
+        {
+          "id": "w7",
+          "text": "帧",
+          "start": 1.399,
+          "end": 1.579
+        },
+        {
+          "id": "w8",
+          "text": "，",
+          "start": 1.579,
+          "end": 1.579
+        },
+        {
+          "id": "w9",
+          "text": "一",
+          "start": 1.74,
+          "end": 1.839
+        },
+        {
+          "id": "w10",
+          "text": "键",
+          "start": 1.839,
+          "end": 1.959
+        },
+        {
+          "id": "w11",
+          "text": "生",
+          "start": 1.959,
+          "end": 2.119
+        },
+        {
+          "id": "w12",
+          "text": "成",
+          "start": 2.119,
+          "end": 2.299
+        },
+        {
+          "id": "w13",
+          "text": "视",
+          "start": 2.299,
+          "end": 2.44
+        },
+        {
+          "id": "w14",
+          "text": "频",
+          "start": 2.44,
+          "end": 2.599
+        },
+        {
+          "id": "w15",
+          "text": "。",
+          "start": 2.599,
+          "end": 2.599
+        }
+      ]
+    },
+    {
+      "id": "10",
+      "path": "assets/voice/10.wav",
+      "duration_s": 2.926,
+      "words": [
+        {
+          "id": "w0",
+          "text": "满",
+          "start": 0.219,
+          "end": 0.399
+        },
+        {
+          "id": "w1",
+          "text": "意",
+          "start": 0.399,
+          "end": 0.599
+        },
+        {
+          "id": "w2",
+          "text": "作",
+          "start": 0.599,
+          "end": 0.799
+        },
+        {
+          "id": "w3",
+          "text": "品",
+          "start": 0.799,
+          "end": 1.039
+        },
+        {
+          "id": "w4",
+          "text": "，",
+          "start": 1.039,
+          "end": 1.039
+        },
+        {
+          "id": "w5",
+          "text": "设",
+          "start": 1.12,
+          "end": 1.259
+        },
+        {
+          "id": "w6",
+          "text": "为",
+          "start": 1.259,
+          "end": 1.459
+        },
+        {
+          "id": "w7",
+          "text": "模",
+          "start": 1.459,
+          "end": 1.559
+        },
+        {
+          "id": "w8",
+          "text": "板",
+          "start": 1.559,
+          "end": 1.939
+        },
+        {
+          "id": "w9",
+          "text": "，",
+          "start": 1.939,
+          "end": 1.939
+        },
+        {
+          "id": "w10",
+          "text": "沉",
+          "start": 2.059,
+          "end": 2.139
+        },
+        {
+          "id": "w11",
+          "text": "淀",
+          "start": 2.139,
+          "end": 2.399
+        },
+        {
+          "id": "w12",
+          "text": "方",
+          "start": 2.399,
+          "end": 2.5
+        },
+        {
+          "id": "w13",
+          "text": "法",
+          "start": 2.5,
+          "end": 2.659
+        },
+        {
+          "id": "w14",
+          "text": "。",
+          "start": 2.659,
+          "end": 2.659
+        }
+      ]
+    },
+    {
+      "id": "11",
+      "path": "assets/voice/11.wav",
+      "duration_s": 1.829,
+      "words": [
+        {
+          "id": "w0",
+          "text": "回",
+          "start": 0.239,
+          "end": 0.34
+        },
+        {
+          "id": "w1",
+          "text": "到",
+          "start": 0.34,
+          "end": 0.699
+        },
+        {
+          "id": "w2",
+          "text": "首",
+          "start": 0.699,
+          "end": 0.819
+        },
+        {
+          "id": "w3",
+          "text": "页",
+          "start": 0.819,
+          "end": 1.079
+        },
+        {
+          "id": "w4",
+          "text": "，",
+          "start": 1.079,
+          "end": 1.079
+        },
+        {
+          "id": "w5",
+          "text": "看",
+          "start": 1.179,
+          "end": 1.339
+        },
+        {
+          "id": "w6",
+          "text": "模",
+          "start": 1.339,
+          "end": 1.519
+        },
+        {
+          "id": "w7",
+          "text": "板",
+          "start": 1.519,
+          "end": 1.579
+        },
+        {
+          "id": "w8",
+          "text": "。",
+          "start": 1.579,
+          "end": 1.579
+        }
+      ]
+    }
+  ],
+  "sfx": [],
+  "total_duration_s": 30.747
+}

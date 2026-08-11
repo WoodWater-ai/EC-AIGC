@@ -1,0 +1,154 @@
+- main [ref=e4]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - button [ref=e8] [cursor=pointer]
+      - generic [ref=e11]:
+        - heading "新建图片任务" [level=1] [ref=e12]
+        - paragraph [ref=e13]: 配置、生成与结果在同一页面完成
+    - generic [ref=e16]:
+      - strong [ref=e17]: 青柠格纹家居服上衣 · 绿色 / M
+      - generic [ref=e18]: ERP SKU TEST1-GRN-M
+  - dialog "资源中心" [ref=e24]:
+    - generic [ref=e25]:
+      - generic [ref=e30]:
+        - heading "资源中心" [level=2] [ref=e31]
+        - generic [ref=e32]: 媒体类型优先，素材统一归集
+      - tablist "媒体类型" [ref=e33]:
+        - tab "图片素材 286" [ref=e34] [cursor=pointer]:
+          - text: 图片素材
+          - generic [ref=e39]: "286"
+        - tab "视频素材 42" [selected] [ref=e40] [cursor=pointer]:
+          - text: 视频素材
+          - generic [ref=e44]: "42"
+      - generic [ref=e45]:
+        - textbox "搜索名称、SKU 或标签" [ref=e50]
+        - button "上传" [ref=e51] [cursor=pointer]
+        - button "关闭资源中心" [ref=e55] [cursor=pointer]
+    - generic [ref=e60]:
+      - complementary [ref=e61]:
+        - generic [ref=e62]: 素材范围
+        - navigation "素材范围" [ref=e63]:
+          - button "产品素材 248 SKU" [ref=e64] [cursor=pointer]:
+            - text: 产品素材
+            - generic [ref=e69]: 248 SKU
+          - button "公共素材 326" [ref=e70] [cursor=pointer]:
+            - text: 公共素材
+            - generic [ref=e76]: "326"
+          - button "我的素材 128" [ref=e77] [cursor=pointer]:
+            - text: 我的素材
+            - generic [ref=e81]: "128"
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - generic [ref=e86]:
+              - text: ERP 商品分类
+              - generic [ref=e87]: 唯一分类
+            - generic [ref=e88]:
+              - button "全部产品 248" [ref=e89] [cursor=pointer]:
+                - text: 全部产品
+                - generic [ref=e90]: "248"
+              - button "睡衣 / 家居服 86" [ref=e91] [cursor=pointer]:
+                - text: 睡衣 / 家居服
+                - generic [ref=e92]: "86"
+              - button "围巾 42" [ref=e93] [cursor=pointer]:
+                - text: 围巾
+                - generic [ref=e94]: "42"
+              - button "帽子 35" [ref=e95] [cursor=pointer]:
+                - text: 帽子
+                - generic [ref=e96]: "35"
+              - button "鞋履 28" [ref=e97] [cursor=pointer]:
+                - text: 鞋履
+                - generic [ref=e98]: "28"
+              - button "其他配饰 57" [ref=e99] [cursor=pointer]:
+                - text: 其他配饰
+                - generic [ref=e100]: "57"
+          - generic [ref=e101]:
+            - generic [ref=e102]:
+              - text: 视频用途
+              - generic [ref=e103]: 自动沉淀
+            - generic [ref=e104]:
+              - button "商品展示 18" [ref=e105] [cursor=pointer]:
+                - text: 商品展示
+                - generic [ref=e106]: "18"
+              - button "参考图驱动 11" [ref=e107] [cursor=pointer]:
+                - text: 参考图驱动
+                - generic [ref=e108]: "11"
+              - button "电商复刻 8" [ref=e109] [cursor=pointer]:
+                - text: 电商复刻
+                - generic [ref=e110]: "8"
+              - button "爆款复刻 5" [ref=e111] [cursor=pointer]:
+                - text: 爆款复刻
+                - generic [ref=e112]: "5"
+        - generic [ref=e113]:
+          - generic [ref=e114]:
+            - text: 存储空间
+            - generic [ref=e115]: 82%
+          - text: 已使用 4.1GB / 5.0GB
+      - generic [ref=e120]:
+        - generic [ref=e121]:
+          - generic [ref=e122]:
+            - heading "产品视频素材" [level=3] [ref=e123]
+            - paragraph [ref=e124]: 一张卡片对应一个 SKU 素材集合；同一 SPU 的 SKU 连续排列
+          - generic [ref=e125]:
+            - generic [ref=e126]: ERP 分类只读
+            - button "同步状态" [ref=e127] [cursor=pointer]
+        - generic [ref=e133]:
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - button "全部" [ref=e136] [cursor=pointer]
+              - button "最近有视频" [ref=e137] [cursor=pointer]
+              - button "最近使用" [ref=e138] [cursor=pointer]
+              - button "单规格" [ref=e139] [cursor=pointer]
+              - button "多规格" [ref=e140] [cursor=pointer]
+            - button "最近更新" [ref=e141] [cursor=pointer]
+          - generic [ref=e145]:
+            - generic [ref=e146]:
+              - generic [ref=e147]:
+                - strong [ref=e148]: 青柠格纹居家系列
+                - generic [ref=e149]: SPU · TEST1
+              - generic [ref=e150]: 3 个 SKU
+            - generic [ref=e151]:
+              - article [ref=e152]:
+                - button "选择 SKU" [ref=e153] [cursor=pointer]
+                - generic [ref=e154]: 00:12
+                - generic [ref=e162]:
+                  - heading "青柠格纹家居服上衣" [level=4] [ref=e163]
+                  - paragraph [ref=e164]: 绿色 / M · TEST1-GRN-M
+                  - generic [ref=e165]:
+                    - generic [ref=e166]: 4 条视频 · 26 分钟前
+                    - button "查看素材" [ref=e167] [cursor=pointer]
+              - article [ref=e168]:
+                - button "选择 SKU" [ref=e169] [cursor=pointer]
+                - generic [ref=e170]: 00:08
+                - generic [ref=e178]:
+                  - heading "青柠格纹家居长裤" [level=4] [ref=e179]
+                  - paragraph [ref=e180]: 绿色 / L · PANTS-L
+                  - generic [ref=e181]:
+                    - generic [ref=e182]: 2 条视频 · 昨天
+                    - button "查看素材" [ref=e183] [cursor=pointer]
+              - article [ref=e184]:
+                - button "选择 SKU" [ref=e185] [cursor=pointer]
+                - generic [ref=e186]: 00:15
+                - generic [ref=e194]:
+                  - heading "青柠格纹家居短裤" [level=4] [ref=e195]
+                  - paragraph [ref=e196]: 绿色 / M · SHORTS-M
+                  - generic [ref=e197]:
+                    - generic [ref=e198]: 1 条视频 · 2 天前
+                    - button "查看素材" [ref=e199] [cursor=pointer]
+          - generic [ref=e200]:
+            - generic [ref=e201]:
+              - generic [ref=e202]:
+                - strong [ref=e203]: 珍珠白家居拖鞋
+                - generic [ref=e204]: SPU · SHOES
+              - generic [ref=e205]: 单规格
+            - article [ref=e207]:
+              - button "选择 SKU" [ref=e208] [cursor=pointer]
+              - generic [ref=e209]: 00:10
+              - generic [ref=e217]:
+                - heading "珍珠白家居拖鞋" [level=4] [ref=e218]
+                - paragraph [ref=e219]: 白色 / 均码 · SHOES-01
+                - generic [ref=e220]:
+                  - generic [ref=e221]: 暂无视频
+                  - button "查看素材" [ref=e222] [cursor=pointer]
+    - generic [ref=e223]:
+      - generic [ref=e224]: 选择 SKU 查看素材；图片模式可多选 SKU 进行搭配合成
+      - button "取消" [ref=e226] [cursor=pointer]

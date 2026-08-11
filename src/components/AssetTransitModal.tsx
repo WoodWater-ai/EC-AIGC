@@ -54,6 +54,7 @@ const SLOT_TAGS: Record<string, string | undefined> = {
 };
 
 const SLOT_ASSET_KINDS: Record<string, AssetResourceItem['assetKind'] | undefined> = {
+  reference: 'IMAGE',
   'model-profile-reference': 'IMAGE',
   'model-profile-face_source': 'IMAGE',
   'model-profile-target_appearance': 'IMAGE',
@@ -64,6 +65,7 @@ const SLOT_ASSET_KINDS: Record<string, AssetResourceItem['assetKind'] | undefine
 };
 
 const SLOT_LABELS: Record<string, string> = {
+  reference: '参考图',
   'model-profile-reference': '模特参考图',
   'model-profile-face_source': '脸部来源图',
   'model-profile-target_appearance': '目标形象图',

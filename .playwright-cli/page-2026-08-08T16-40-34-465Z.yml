@@ -1,0 +1,165 @@
+- main [ref=f6e4]:
+  - generic [ref=f6e5]:
+    - generic [ref=f6e6]:
+      - generic [ref=f6e7]:
+        - button "返回产品管理" [ref=f6e8] [cursor=pointer]
+        - generic [ref=f6e11]:
+          - heading "新建图片任务" [level=1] [ref=f6e12]
+          - paragraph [ref=f6e13]: 配置、生成与结果在同一页面完成
+      - generic [ref=f6e14]:
+        - generic [ref=f6e16]:
+          - strong [ref=f6e17]: 青柠格纹家居服上衣 · 绿色 / M
+          - generic [ref=f6e18]: 由产品管理带入 · ERP 规格 1170
+        - generic [ref=f6e19]: 已匹配
+    - generic [ref=f6e20]:
+      - generic [ref=f6e21]:
+        - generic [ref=f6e22]:
+          - generic [ref=f6e23]:
+            - generic [ref=f6e24]:
+              - text: 创作商品
+              - heading "主体素材" [level=2] [ref=f6e25]
+            - button "资源中心" [ref=f6e26] [cursor=pointer]
+          - generic [ref=f6e27]:
+            - generic [ref=f6e29]: ERP 首图 · 已选主体
+            - button "更换" [ref=f6e30] [cursor=pointer]
+        - generic [ref=f6e31]:
+          - generic [ref=f6e32]:
+            - generic [ref=f6e33]:
+              - text: 补充依据
+              - heading "参考图" [level=2] [ref=f6e34]
+              - paragraph [ref=f6e35]: 默认只保留模特与细节；上传后可多选标签
+            - generic [ref=f6e36]: 2 / 5
+          - generic [ref=f6e37]:
+            - generic [ref=f6e38]:
+              - generic [ref=f6e40]:
+                - generic [ref=f6e41]: 模特
+                - button "编辑图片标签" [ref=f6e42] [cursor=pointer]
+              - generic [ref=f6e47]:
+                - generic [ref=f6e48]: 姿势·自然站立
+                - generic [ref=f6e49]: 风格·轻熟
+            - generic [ref=f6e50]:
+              - generic [ref=f6e52]:
+                - generic [ref=f6e53]: 细节
+                - button "编辑图片标签" [ref=f6e54] [cursor=pointer]
+              - generic [ref=f6e59]:
+                - generic [ref=f6e60]: 细节·领口
+                - generic [ref=f6e61]: 材质·棉感
+            - generic [ref=f6e65]:
+              - generic [ref=f6e66]: 添加参考
+              - button "从资源中心添加" [ref=f6e67] [cursor=pointer]
+          - generic [ref=f6e72]: 每张参考图可选择多个现有风格、场景、姿势及业务标签
+        - generic [ref=f6e77]:
+          - generic [ref=f6e78]:
+            - generic [ref=f6e79]:
+              - text: 商品事实
+              - heading "ERP 与素材识别字段" [level=2] [ref=f6e80]
+              - paragraph [ref=f6e81]: 名称、分类来自 ERP；其余字段沿用识别结果并允许修改
+            - button "复制全部商品事实" [ref=f6e82] [cursor=pointer]
+          - generic [ref=f6e86]:
+            - generic [ref=f6e87]:
+              - generic [ref=f6e88]:
+                - generic [ref=f6e89]: 商品名称
+                - emphasis [ref=f6e90]: ERP 只读
+              - generic [ref=f6e91]: 青柠格纹家居服上衣
+            - generic [ref=f6e92]:
+              - generic [ref=f6e93]:
+                - generic [ref=f6e94]: 商品分类
+                - emphasis [ref=f6e95]: ERP 只读
+              - generic [ref=f6e96]: 家居服 / 夏季
+            - generic [ref=f6e97]:
+              - generic [ref=f6e98]:
+                - generic [ref=f6e99]: SEO 优化商品名称
+                - emphasis [ref=f6e100]: AI 优化 · 可编辑
+              - generic [ref=f6e101]: 2026 夏季青柠格纹短袖家居服女款
+            - generic [ref=f6e102]:
+              - generic [ref=f6e103]:
+                - generic [ref=f6e104]: 颜色
+                - emphasis [ref=f6e105]: 素材识别
+              - generic [ref=f6e106]: 青柠绿
+            - generic [ref=f6e107]:
+              - generic [ref=f6e108]:
+                - generic [ref=f6e109]: 图案 / 材质
+                - emphasis [ref=f6e110]: 素材识别
+              - generic [ref=f6e111]: 格纹 / 柔软棉感
+            - generic [ref=f6e112]:
+              - generic [ref=f6e113]:
+                - generic [ref=f6e114]: 版型 / 结构
+                - emphasis [ref=f6e115]: 素材识别
+              - generic [ref=f6e116]: 宽松短袖 / 翻领排扣
+            - generic [ref=f6e117]:
+              - generic [ref=f6e118]:
+                - generic [ref=f6e119]: 核心卖点
+                - emphasis [ref=f6e120]: 素材识别
+              - generic [ref=f6e121]: 轻薄透气、清爽格纹、居家舒适
+      - generic [ref=f6e122]:
+        - generic [ref=f6e123]:
+          - generic [ref=f6e124]:
+            - generic [ref=f6e125]:
+              - text: 输出内容
+              - heading "选择图片类型" [level=2] [ref=f6e126]
+            - generic [ref=f6e127]: 共生成 3 张
+          - generic [ref=f6e128]:
+            - button [ref=f6e129] [cursor=pointer]:
+              - strong [ref=f6e130]: 商品主图
+              - text: 2 张 · 1:1
+            - button [ref=f6e131] [cursor=pointer]:
+              - strong [ref=f6e132]: 场景图
+              - text: 1 张 · 3:4
+            - button [ref=f6e133] [cursor=pointer]:
+              - strong [ref=f6e134]: 细节图
+              - text: 未选择
+            - button [ref=f6e135] [cursor=pointer]:
+              - strong [ref=f6e136]: 三视图
+              - text: 未选择
+        - generic [ref=f6e137]:
+          - generic [ref=f6e138]:
+            - generic [ref=f6e139]:
+              - text: 内容表达
+              - heading "本次图片 Prompt" [level=2] [ref=f6e140]
+              - paragraph [ref=f6e141]: 像对话输入框一样编辑文字，并在底部直接调整创作标签
+            - button "AI 优化" [ref=f6e142] [cursor=pointer]
+          - generic [ref=f6e146]:
+            - textbox [ref=f6e147]: 保持青柠格纹家居服的颜色、翻领、排扣和短袖版型准确。成年女性模特自然居家状态，清晨柔和侧光，奶油色卧室，画面清爽、有呼吸感，突出轻薄透气和柔软棉感，不改变商品结构。
+            - generic [ref=f6e148]:
+              - generic [ref=f6e149]:
+                - generic [ref=f6e150]: 创作标签 · 支持多选
+                - generic [ref=f6e151]: 调整后参与所有已选图片类型的 Prompt
+              - generic [ref=f6e152]:
+                - button [ref=f6e153] [cursor=pointer]:
+                  - text: 风格
+                  - strong [ref=f6e160]: 静奢轻盈
+                - button [ref=f6e163] [cursor=pointer]:
+                  - text: 场景
+                  - strong [ref=f6e167]: 奶油卧室
+                - button [ref=f6e170] [cursor=pointer]:
+                  - text: 姿势
+                  - strong [ref=f6e175]: 自然站立
+                - button [ref=f6e178] [cursor=pointer]:
+                  - text: 模型
+                  - strong [ref=f6e182]: Qwen Image Pro
+                - button [ref=f6e185] [cursor=pointer]:
+                  - text: 比例
+                  - strong [ref=f6e188]: 3:4
+                - button "添加标签" [ref=f6e191] [cursor=pointer]
+              - generic [ref=f6e193]:
+                - generic [ref=f6e194]: 3 张 · 2K · 高质量 · 通道路由由系统自动处理
+                - button "高级设置与负面约束" [ref=f6e195] [cursor=pointer]
+          - generic [ref=f6e198]: 普通用户只编辑文字和标签，不展示 Provider、通道实例、能力编码与 async。
+      - complementary [ref=f6e203]:
+        - generic [ref=f6e204]:
+          - generic [ref=f6e205]:
+            - heading "本次生成结果" [level=2] [ref=f6e206]
+            - generic [ref=f6e207]: 生成中 · 3 / 4
+          - generic [ref=f6e209]:
+            - generic [ref=f6e210]: 正在生成场景图
+            - generic [ref=f6e211]: 75%
+          - generic [ref=f6e214]:
+            - generic [ref=f6e222]:
+              - generic [ref=f6e223]: 任务组 IMG-20260808-1042
+              - generic [ref=f6e224]: 已完成 2 · 生成中 1
+            - generic [ref=f6e225]: 可以离开页面，任务会在后台继续。返回时自动恢复进度和结果。
+          - generic [ref=f6e229]:
+            - button "重试失败项" [ref=f6e230] [cursor=pointer]
+            - button "继续修改" [ref=f6e234] [cursor=pointer]
+            - button "生成视频" [ref=f6e238] [cursor=pointer]
+            - button "保存为资产" [ref=f6e242] [cursor=pointer]

@@ -1,0 +1,201 @@
+- generic [ref=f1e2]:
+  - complementary [ref=f1e3]:
+    - generic [ref=f1e12]:
+      - strong [ref=f1e13]: 达芬奇密码 AI
+      - text: WORKBENCH
+    - button "新建创作" [ref=f1e15] [cursor=pointer]
+    - navigation [ref=f1e20]:
+      - generic [ref=f1e21]: 主模块
+      - button "工作台首页" [ref=f1e22] [cursor=pointer]
+      - button "创作助手" [ref=f1e28] [cursor=pointer]
+      - button "任务列表" [ref=f1e31] [cursor=pointer]
+      - button "智能模板中心" [ref=f1e35] [cursor=pointer]
+      - button "商品素材库" [ref=f1e38] [cursor=pointer]
+      - button "数据效能复盘" [ref=f1e43] [cursor=pointer]
+      - generic [ref=f1e46]: 系统与主数据
+      - button "系统配置模块" [ref=f1e47] [cursor=pointer]
+      - button "通道异步任务" [ref=f1e51] [cursor=pointer]
+      - button "资源分类" [ref=f1e59] [cursor=pointer]
+      - button "商品分类" [ref=f1e65] [cursor=pointer]
+      - button "产品管理" [ref=f1e71] [cursor=pointer]
+      - button "字典管理" [ref=f1e79] [cursor=pointer]
+    - generic [ref=f1e82]:
+      - generic [ref=f1e83]: 潘
+      - generic [ref=f1e84]:
+        - strong [ref=f1e85]: 潘俊杰
+        - text: 产品管理员 · 在线
+  - generic [ref=f1e86]:
+    - generic [ref=f1e87]:
+      - generic [ref=f1e88]:
+        - generic [ref=f1e89]: 达芬奇密码 AI
+        - strong [ref=f1e92]: 产品管理
+      - generic [ref=f1e93]:
+        - generic "效果稿页面切换" [ref=f1e94]:
+          - button "产品管理" [ref=f1e95] [cursor=pointer]
+          - button "商品素材库" [ref=f1e96] [cursor=pointer]
+          - button "图片创作" [ref=f1e97] [cursor=pointer]
+          - button "视频创作" [ref=f1e98] [cursor=pointer]
+        - button "通知" [ref=f1e99] [cursor=pointer]
+        - button "帮助" [ref=f1e103] [cursor=pointer]
+    - main [ref=f1e107]:
+      - generic [ref=f1e108]:
+        - generic [ref=f1e109]:
+          - generic [ref=f1e110]:
+            - heading "产品管理" [level=1] [ref=f1e111]
+            - paragraph [ref=f1e112]: ERP 商品规格主目录 · 商品与分类信息由旺店通同步，只读
+          - generic [ref=f1e113]:
+            - generic [ref=f1e114]: ERP 正常 · 8 分钟前
+            - button "同步记录" [ref=f1e116] [cursor=pointer]
+            - button "立即同步" [ref=f1e121] [cursor=pointer]
+        - generic [ref=f1e127]:
+          - generic [ref=f1e128]:
+            - generic [ref=f1e129]: 有效 ERP 规格
+            - strong [ref=f1e130]: 1,248
+            - text: 本次新增 12
+          - generic [ref=f1e131]:
+            - generic [ref=f1e132]: ERP 分类
+            - strong [ref=f1e133]: "86"
+            - text: 每日全量校准
+          - generic [ref=f1e134]:
+            - generic [ref=f1e135]: 图片已就绪
+            - strong [ref=f1e136]: 1,186
+            - text: 95.0% 规格可直接创作
+          - generic [ref=f1e137]:
+            - generic [ref=f1e138]: 图片处理中
+            - strong [ref=f1e139]: "41"
+            - text: 后台自动转存 COS
+          - generic [ref=f1e140]:
+            - generic [ref=f1e141]: 需处理异常
+            - strong [ref=f1e142]: "21"
+            - text: 16 图片 · 5 字段
+        - generic [ref=f1e143]:
+          - generic [ref=f1e144]:
+            - generic [ref=f1e145]: 搜索商品 / 货品编号 / 规格编码
+            - textbox "例如 TEST1、蓝色、123" [ref=f1e150]
+          - generic [ref=f1e151]:
+            - generic [ref=f1e152]: ERP 分类
+            - combobox [ref=f1e153]:
+              - option "全部分类" [selected]
+              - option "B101 夏季水果类"
+              - option "家居服 / 睡衣"
+          - generic [ref=f1e154]:
+            - generic [ref=f1e155]: 来源
+            - combobox [ref=f1e156]:
+              - option "全部来源" [selected]
+              - option "ERP 同步"
+              - option "本地来源"
+          - generic [ref=f1e157]:
+            - generic [ref=f1e158]: 规格状态
+            - combobox [ref=f1e159]:
+              - option "有效规格" [selected]
+              - option "ERP 已停用"
+              - option "全部状态"
+          - generic [ref=f1e160]:
+            - generic [ref=f1e161]: 图片状态
+            - combobox [ref=f1e162]:
+              - option "全部状态" [selected]
+              - option "已就绪"
+              - option "处理中"
+              - option "部分失败"
+          - button "清除筛选" [ref=f1e165] [cursor=pointer]
+        - generic [ref=f1e169]:
+          - table [ref=f1e170]:
+            - rowgroup [ref=f1e180]:
+              - row [ref=f1e181]:
+                - columnheader "商品 / 规格" [ref=f1e182]
+                - columnheader "货品编号" [ref=f1e183]
+                - columnheader "规格编码" [ref=f1e184]
+                - columnheader "ERP 分类" [ref=f1e185]
+                - columnheader "图片" [ref=f1e186]
+                - columnheader "来源" [ref=f1e187]
+                - columnheader "同步状态" [ref=f1e188]
+                - columnheader "操作" [ref=f1e189]
+            - rowgroup [ref=f1e190]:
+              - row [ref=f1e191]:
+                - cell "青柠格纹家居服上衣 规格：绿色 / M · specid 1170" [ref=f1e192]:
+                  - generic [ref=f1e195]:
+                    - strong [ref=f1e196]: 青柠格纹家居服上衣
+                    - generic [ref=f1e197]: 规格：绿色 / M · specid 1170
+                - cell "TEST1" [ref=f1e198]
+                - cell "Y0010" [ref=f1e199]
+                - cell "家居服 / 夏季" [ref=f1e200]
+                - cell "3 张" [ref=f1e202]
+                - cell "ERP 同步" [ref=f1e203]
+                - cell "已同步" [ref=f1e205]
+                - cell [ref=f1e207]:
+                  - generic [ref=f1e208]:
+                    - button "图片创作" [ref=f1e209] [cursor=pointer]
+                    - button "视频" [ref=f1e210] [cursor=pointer]
+                    - button "···" [ref=f1e211] [cursor=pointer]
+              - row [ref=f1e212]:
+                - cell "青柠格纹家居长裤 规格：绿色 / L · specid 23792" [ref=f1e213]:
+                  - generic [ref=f1e216]:
+                    - strong [ref=f1e217]: 青柠格纹家居长裤
+                    - generic [ref=f1e218]: 规格：绿色 / L · specid 23792
+                - cell "12345" [ref=f1e219]
+                - cell "PANTS-L" [ref=f1e220]
+                - cell "家居服 / 下装" [ref=f1e221]
+                - cell "2 张" [ref=f1e223]
+                - cell "ERP 同步" [ref=f1e224]
+                - cell "已同步" [ref=f1e226]
+                - cell [ref=f1e228]:
+                  - generic [ref=f1e229]:
+                    - button "图片创作" [ref=f1e230] [cursor=pointer]
+                    - button "视频" [ref=f1e231] [cursor=pointer]
+                    - button "···" [ref=f1e232] [cursor=pointer]
+              - row [ref=f1e233]:
+                - cell "清爽格纹家居短裤 规格：薄荷绿 / 均码 · specid 23793" [ref=f1e234]:
+                  - generic [ref=f1e237]:
+                    - strong [ref=f1e238]: 清爽格纹家居短裤
+                    - generic [ref=f1e239]: 规格：薄荷绿 / 均码 · specid 23793
+                - cell "12345" [ref=f1e240]
+                - cell "SHORT-F" [ref=f1e241]
+                - cell "B101 夏季水果类" [ref=f1e242]
+                - cell "1 张" [ref=f1e244]
+                - cell "ERP 同步" [ref=f1e245]
+                - cell "图片处理中" [ref=f1e247]
+                - cell [ref=f1e249]:
+                  - generic [ref=f1e250]:
+                    - button "图片创作" [ref=f1e251] [cursor=pointer]
+                    - button "视频" [ref=f1e252] [cursor=pointer]
+                    - button "···" [ref=f1e253] [cursor=pointer]
+              - row [ref=f1e254]:
+                - cell "轻奢蕾丝吊带睡裙 规格：香槟色 / M · specid 22994" [ref=f1e255]:
+                  - generic [ref=f1e258]:
+                    - strong [ref=f1e259]: 轻奢蕾丝吊带睡裙
+                    - generic [ref=f1e260]: 规格：香槟色 / M · specid 22994
+                - cell "SLP-208" [ref=f1e261]
+                - cell "CHAMP-M" [ref=f1e262]
+                - cell "睡衣 / 吊带裙" [ref=f1e263]
+                - cell "5 张" [ref=f1e265]
+                - cell "ERP 同步" [ref=f1e266]
+                - cell "1 张失败" [ref=f1e268]
+                - cell [ref=f1e270]:
+                  - generic [ref=f1e271]:
+                    - button "图片创作" [ref=f1e272] [cursor=pointer]
+                    - button "视频" [ref=f1e273] [cursor=pointer]
+                    - button "···" [ref=f1e274] [cursor=pointer]
+              - row [ref=f1e275]:
+                - cell "缎面晨雾家居套装 本地商品 · 待匹配 ERP 规格" [ref=f1e276]:
+                  - generic [ref=f1e279]:
+                    - strong [ref=f1e280]: 缎面晨雾家居套装
+                    - generic [ref=f1e281]: 本地商品 · 待匹配 ERP 规格
+                - cell "LOCAL-018" [ref=f1e282]
+                - cell "—" [ref=f1e283]
+                - cell "历史分类" [ref=f1e284]
+                - cell "8 张" [ref=f1e286]
+                - cell "本地来源" [ref=f1e287]
+                - cell "待匹配" [ref=f1e289]
+                - cell [ref=f1e291]:
+                  - generic [ref=f1e292]:
+                    - button "匹配 ERP" [ref=f1e293] [cursor=pointer]
+                    - button "创作" [ref=f1e294] [cursor=pointer]
+                    - button "···" [ref=f1e295] [cursor=pointer]
+          - generic [ref=f1e296]:
+            - generic [ref=f1e297]: 共 1,248 个有效规格 · 当前 1-5
+            - generic [ref=f1e298]:
+              - button [ref=f1e299] [cursor=pointer]
+              - button "1" [ref=f1e302] [cursor=pointer]
+              - button "2" [ref=f1e303] [cursor=pointer]
+              - button "3" [ref=f1e304] [cursor=pointer]
+              - button [ref=f1e305] [cursor=pointer]

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>达芬奇密码 AIGC 电商 Agent - 产品演示</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: Inter; src: url("assets/fonts/Inter-Regular.woff2") format("woff2"); font-weight: 400 700; }
+      @font-face { font-family: Noto; src: url("assets/fonts/NotoSansTC-Regular.woff2") format("woff2"); font-weight: 400 700; }
+      * { box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; margin: 0; overflow: hidden; background: #101820; }
+      body { color: #151c27; font-family: Inter, Noto, sans-serif; }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #f6f8fc; }
+      .clip { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+      .scene { background: #f6f8fc; }
+      .scene.dark { background: #101820; color: #ffffff; }
+      .screen { position: absolute; left: 420px; top: 104px; width: 1422px; height: 800px; overflow: hidden; border: 1px solid rgba(21, 28, 39, .16); border-radius: 8px; background: #ffffff; box-shadow: 0 24px 60px rgba(20, 36, 58, .18); transform-origin: 54% 50%; }
+      .screen img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+      .screen::after { content: "LIVE PRODUCT"; position: absolute; top: 18px; right: 18px; padding: 7px 10px; border: 1px solid rgba(21, 28, 39, .12); border-radius: 4px; background: rgba(255,255,255,.9); color: #2a5bd7; font-family: monospace; font-size: 12px; letter-spacing: .12em; }
+      .dark .screen { border-color: rgba(255,255,255,.18); box-shadow: 0 26px 68px rgba(0,0,0,.42); }
+      .marker { position: absolute; left: 76px; top: 92px; color: #2a5bd7; font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: .13em; }
+      .dark .marker { color: #7ea8ff; }
+      .title { position: absolute; left: 76px; top: 162px; width: 330px; font-size: 48px; font-weight: 700; line-height: 1.14; letter-spacing: 0; }
+      .title .line { display: block; }
+      .description { position: absolute; left: 78px; top: 380px; width: 290px; color: #536074; font-size: 22px; line-height: 1.45; }
+      .dark .description { color: #d5deef; }
+      .step { position: absolute; left: 78px; top: 516px; display: flex; align-items: center; gap: 10px; color: #2d3d56; font-size: 17px; font-weight: 700; }
+      .step b { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 50%; background: #2a5bd7; color: #ffffff; font-family: monospace; font-size: 13px; }
+      .dark .step { color: #e5ecfa; }
+      .caption { position: absolute; left: 76px; bottom: 82px; max-width: 510px; padding: 16px 20px; border-radius: 6px; background: #151c27; color: #ffffff; font-family: Noto, sans-serif; font-size: 25px; font-weight: 700; line-height: 1.35; box-shadow: 0 12px 32px rgba(16,24,32,.2); }
+      .caption::before { content: ""; display: inline-block; width: 8px; height: 8px; margin: 0 11px 3px 0; border-radius: 50%; background: #5d92ff; }
+      .dark .caption { background: #ffffff; color: #151c27; }
+      .dark .caption::before { background: #2a5bd7; }
+      .callout { position: absolute; z-index: 3; padding: 11px 14px; border: 2px solid #2a5bd7; border-radius: 6px; background: rgba(255,255,255,.96); color: #1d4bc1; font-size: 18px; font-weight: 700; box-shadow: 0 0 0 7px rgba(42,91,215,.14); }
+      .callout::before { content: ""; position: absolute; right: -30px; top: 50%; width: 28px; border-top: 2px solid #2a5bd7; }
+      .callout.short::before { display: none; }
+      .scan { position: absolute; z-index: 2; left: 420px; top: 100px; width: 1422px; height: 2px; background: #4d83ff; opacity: .72; box-shadow: 0 0 22px rgba(77,131,255,.75); }
+      .intro, .outro { background: #101820; color: #ffffff; }
+      .intro .hero, .outro .hero { position: absolute; inset: 0; }
+      .intro .hero img, .outro .hero img { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+      .intro .veil, .outro .veil { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(9,18,35,.78), rgba(12,28,55,.3) 60%, rgba(13,25,44,.5)); }
+      .intro-lockup { position: absolute; left: 92px; top: 430px; }
+      .intro-lockup .eyebrow, .outro-lockup .eyebrow { color: #e4eeff; font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: .15em; }
+      .intro-lockup h1 { width: 1000px; margin: 16px 0 0; font-size: 82px; line-height: 1.06; letter-spacing: 0; }
+      .intro-lockup h1 em, .outro-lockup h1 em { color: #c7dcff; font-style: normal; }
+      .outro-lockup { position: absolute; left: 92px; bottom: 132px; }
+      .outro-lockup h1 { width: 980px; margin: 16px 0 0; font-size: 70px; line-height: 1.08; letter-spacing: 0; }
+      .outro-lockup p { margin: 16px 0 0; color: #dae5f8; font-size: 23px; }
+      .focus-frame { position: absolute; z-index: 2; border: 3px solid #2a5bd7; border-radius: 7px; box-shadow: 0 0 0 8px rgba(42,91,215,.13); }
+      .scene-1 .callout { left: 1280px; top: 254px; }
+      .scene-2 .callout { left: 1398px; top: 226px; }
+      .scene-3 .callout { left: 1166px; top: 242px; }
+      .scene-4 .callout { left: 1232px; top: 302px; }
+      .scene-5 .callout { left: 1116px; top: 240px; }
+      .scene-6 .callout { left: 1120px; top: 262px; }
+      .scene-7 .callout { left: 1278px; top: 246px; }
+      .scene-8 .callout { left: 1312px; top: 232px; }
+      .scene-9 .callout { left: 1332px; top: 254px; }
+      .scene-10 .callout { left: 1240px; top: 236px; }
+      .scene-11 .callout { left: 1228px; top: 236px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="dafenqi-demo" data-start="0" data-duration="45" data-width="1920" data-height="1080" data-fps="30">
+      <section id="scene-0" class="clip intro" data-start="0" data-duration="2" data-track-index="1">
+        <div class="hero"><img src="assets/screens/10-home-model-entry.png" alt="达芬奇密码 AIGC 首页" /><div class="veil"></div></div>
+        <div id="intro-lockup" class="intro-lockup"><div class="eyebrow">DAVINCI CODE · AI COMMERCE WORKFLOW</div><h1>达芬奇密码 <em>AIGC</em><br />电商 Agent</h1></div>
+      </section>
+
+      <section id="scene-1" class="clip scene" data-start="2" data-duration="3.5" data-track-index="1">
+        <div id="s1-screen" class="screen"><img src="assets/screens/10-home-model-entry.png" alt="首页模特资源库入口" /></div>
+        <div id="s1-marker" class="marker">01 / MODEL CREATION</div><div id="s1-title" class="title"><span class="line">从首页进入</span><span class="line">模特创作</span></div><div id="s1-desc" class="description">先确定内容里的专业人物主角。</div><div id="s1-step" class="step"><b>01</b>工作台首页</div><div id="s1-copy" class="caption">首页进入模特创作，先确定人物主角。</div><div id="s1-callout" class="callout">模特资源库</div><div id="s1-scan" class="scan"></div>
+      </section>
+
+      <section id="scene-2" class="clip scene" data-start="5.5" data-duration="3" data-track-index="1">
+        <div id="s2-screen" class="screen"><img src="assets/screens/11-model-library.png" alt="模特资源库列表" /></div>
+        <div id="s2-marker" class="marker">02 / MODEL LIBRARY</div><div id="s2-title" class="title"><span class="line">打开模特列表</span><span class="line">新增模特</span></div><div id="s2-desc" class="description">已有模特与新建入口集中在同一处。</div><div id="s2-step" class="step"><b>02</b>模特资源库</div><div id="s2-copy" class="caption">打开模特列表，新增专属模特。</div><div id="s2-callout" class="callout">新建 AI 模特</div>
+      </section>
+
+      <section id="scene-3" class="clip scene" data-start="8.5" data-duration="3.5" data-track-index="1">
+        <div id="s3-screen" class="screen"><img src="assets/screens/12-model-create-methods.png" alt="新建 AI 模特的四种创作方式" /></div>
+        <div id="s3-marker" class="marker">03 / FOUR MODES</div><div id="s3-title" class="title"><span class="line">四种创作方式</span><span class="line">按需选择</span></div><div id="s3-desc" class="description">文本、参考图、换脸与上传已有模特，均以真实界面展示。</div><div id="s3-step" class="step"><b>03</b>新建 AI 模特</div><div id="s3-copy" class="caption">上传照片后，可选择四种创作方式。</div><div id="s3-callout" class="callout">四种方式</div><div id="s3-scan" class="scan"></div>
+      </section>
+
+      <section id="scene-4" class="clip scene" data-start="12" data-duration="4" data-track-index="1">
+        <div id="s4-screen" class="screen"><img src="assets/screens/11-model-library.png" alt="模特创作完成后的模特列表" /></div>
+        <div id="s4-marker" class="marker">04 / CREATED</div><div id="s4-title" class="title"><span class="line">模特创作完成</span><span class="line">资产即时可用</span></div><div id="s4-desc" class="description">生成后的模特形象直接沉淀为可选择的创作资产。</div><div id="s4-step" class="step"><b>04</b>模特资源库</div><div id="s4-copy" class="caption">完成创作，得到可用的模特资产。</div><div id="s4-callout" class="callout short">可用模特</div>
+      </section>
+
+      <section id="scene-5" class="clip scene" data-start="16" data-duration="3" data-track-index="1">
+        <div id="s5-screen" class="screen"><img src="assets/screens/15-resource-model-library.png" alt="资源中心模特库" /></div>
+        <div id="s5-marker" class="marker">05 / ASSET CENTER</div><div id="s5-title" class="title"><span class="line">资源中心</span><span class="line">统一管理</span></div><div id="s5-desc" class="description">模特沉淀为团队可检索、可选择的素材资产。</div><div id="s5-step" class="step"><b>05</b>资源中心</div><div id="s5-copy" class="caption">资源中心统一管理模特库。</div><div id="s5-callout" class="callout">模特库</div>
+      </section>
+
+      <section id="scene-6" class="clip scene" data-start="19" data-duration="5" data-track-index="1">
+        <div id="s6-screen" class="screen"><img src="assets/screens/05-template-reuse.png" alt="新建图片任务" /></div>
+        <div id="s6-marker" class="marker">06 / IMAGE TASK</div><div id="s6-title" class="title"><span class="line">新建图片任务</span><span class="line">带入素材创作</span></div><div id="s6-desc" class="description">商品、模特与创作规则汇集到同一张任务单。</div><div id="s6-step" class="step"><b>06</b>图片生成</div><div id="s6-copy" class="caption">带着模特和商品，新建图片任务。</div><div id="s6-callout" class="callout">已应用模板</div><div id="s6-scan" class="scan"></div>
+      </section>
+
+      <section id="scene-7" class="clip scene" data-start="24" data-duration="4" data-track-index="1">
+        <div id="s7-screen" class="screen"><img src="assets/screens/16-task-list-provided.png" alt="用户提供的任务列表" /></div>
+        <div id="s7-marker" class="marker">07 / TASK TRACKING</div><div id="s7-title" class="title"><span class="line">任务列表</span><span class="line">追踪进度</span></div><div id="s7-desc" class="description">进行中与已完成任务集中管理，随时回看结果。</div><div id="s7-step" class="step"><b>07</b>我的作品</div><div id="s7-copy" class="caption">任务列表，集中追踪生成进度。</div><div id="s7-callout" class="callout short">任务状态</div>
+      </section>
+
+      <section id="scene-8" class="clip scene" data-start="28" data-duration="4" data-track-index="1">
+        <div id="s8-screen" class="screen"><img src="assets/screens/03-approved-image-result.png" alt="图片生成结果" /></div>
+        <div id="s8-marker" class="marker">08 / IMAGE RESULT</div><div id="s8-title" class="title"><span class="line">打开结果</span><span class="line">选择好画面</span></div><div id="s8-desc" class="description">让合格的生成结果成为后续内容生产的起点。</div><div id="s8-step" class="step"><b>08</b>图片成果</div><div id="s8-copy" class="caption">打开结果，挑选真正可用的画面。</div><div id="s8-callout" class="callout short">已审核通过</div>
+      </section>
+
+      <section id="scene-9" class="clip scene dark" data-start="32" data-duration="5" data-track-index="1">
+        <div id="s9-screen" class="screen"><img src="assets/screens/06-video-task.png" alt="视频生成任务" /></div>
+        <div id="s9-marker" class="marker">09 / IMAGE TO VIDEO</div><div id="s9-title" class="title"><span class="line">图片生成视频</span><span class="line">继续扩展</span></div><div id="s9-desc" class="description">优选图片作为视频首帧，保留提示词、模型与输出控制。</div><div id="s9-step" class="step"><b>09</b>视频生成</div><div id="s9-copy" class="caption">以优选图片为首帧，一键生成视频。</div><div id="s9-callout" class="callout">视频首帧</div><div id="s9-scan" class="scan"></div>
+      </section>
+
+      <section id="scene-10" class="clip scene" data-start="37" data-duration="4" data-track-index="1">
+        <div id="s10-screen" class="screen"><img src="assets/screens/02-my-work-set-template.png" alt="我的作品设为模板" /></div>
+        <div id="s10-marker" class="marker">10 / SAVE AS TEMPLATE</div><div id="s10-title" class="title"><span class="line">好作品</span><span class="line">沉淀为模板</span></div><div id="s10-desc" class="description">把经过验证的成果固化为团队下次可直接调用的方法。</div><div id="s10-step" class="step"><b>10</b>我的作品</div><div id="s10-copy" class="caption">满意作品，设为模板，沉淀方法。</div><div id="s10-callout" class="callout">设为模板</div>
+      </section>
+
+      <section id="scene-11" class="clip scene" data-start="41" data-duration="2" data-track-index="1">
+        <div id="s11-screen" class="screen"><img src="assets/screens/08-home-scroll-templates.png" alt="首页图片模板区" /></div>
+        <div id="s11-marker" class="marker">11 / BACK TO HOME</div><div id="s11-title" class="title"><span class="line">回到首页</span><span class="line">查看模板</span></div><div id="s11-copy" class="caption">回到首页，看模板。</div><div id="s11-callout" class="callout short">图片模板</div>
+      </section>
+
+      <section id="scene-12" class="clip outro" data-start="43" data-duration="2" data-track-index="1">
+        <div class="hero"><img src="assets/screens/09-home-video-templates.png" alt="首页视频模板区" /><div class="veil"></div></div>
+        <div id="outro-lockup" class="outro-lockup"><div class="eyebrow">VIDEO TEMPLATE · REUSABLE WORKFLOW</div><h1>让每次创作<br /><em>再次出发</em></h1><p>达芬奇密码 AIGC 电商 Agent</p></div>
+      </section>
+
+      <audio id="bgm" class="clip" data-start="0" data-duration="45" data-track-index="10" src="assets/bgm/track.mp3" preload="auto"></audio>
+      <audio id="vo-01" class="clip" data-start="2" data-duration="3.422" data-track-index="11" src="assets/voice/01.wav" preload="auto"></audio>
+      <audio id="vo-02" class="clip" data-start="5.5" data-duration="2.691" data-track-index="11" src="assets/voice/02.wav" preload="auto"></audio>
+      <audio id="vo-03" class="clip" data-start="8.5" data-duration="3.187" data-track-index="11" src="assets/voice/03.wav" preload="auto"></audio>
+      <audio id="vo-04" class="clip" data-start="12" data-duration="2.743" data-track-index="11" src="assets/voice/04.wav" preload="auto"></audio>
+      <audio id="vo-05" class="clip" data-start="16" data-duration="2.22" data-track-index="11" src="assets/voice/05.wav" preload="auto"></audio>
+      <audio id="vo-06" class="clip" data-start="19" data-duration="3.109" data-track-index="11" src="assets/voice/06.wav" preload="auto"></audio>
+      <audio id="vo-07" class="clip" data-start="24" data-duration="2.978" data-track-index="11" src="assets/voice/07.wav" preload="auto"></audio>
+      <audio id="vo-08" class="clip" data-start="28" data-duration="2.795" data-track-index="11" src="assets/voice/08.wav" preload="auto"></audio>
+      <audio id="vo-09" class="clip" data-start="32" data-duration="2.847" data-track-index="11" src="assets/voice/09.wav" preload="auto"></audio>
+      <audio id="vo-10" class="clip" data-start="37" data-duration="2.926" data-track-index="11" src="assets/voice/10.wav" preload="auto"></audio>
+      <audio id="vo-11" class="clip" data-start="41" data-duration="1.829" data-track-index="11" src="assets/voice/11.wav" preload="auto"></audio>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+      const enter = (ids, at) => tl.fromTo(ids, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: .42, stagger: .06 }, at);
+      const screenIn = (id, at, scale = .94) => tl.fromTo(id, { opacity: 0, x: 80, scale }, { opacity: 1, x: 0, scale: 1, duration: .62 }, at);
+      const scan = (id, at, duration) => tl.fromTo(id, { opacity: 0, y: 0 }, { opacity: .72, y: 760, duration, ease: "power1.inOut" }, at);
+      const scene = (n, at, stay, scanned = false) => {
+        screenIn(`#s${n}-screen`, at);
+        enter([`#s${n}-marker`, `#s${n}-title`, `#s${n}-desc`, `#s${n}-step`], at + .12);
+        enter(`#s${n}-copy`, at + .46);
+        tl.fromTo(`#s${n}-callout`, { opacity: 0, scale: .86 }, { opacity: 1, scale: 1, duration: .36 }, at + Math.max(.75, stay - 1.1));
+        tl.to(`#s${n}-screen`, { scale: 1.045, x: -28, y: -14, duration: Math.max(.7, stay - .45), ease: "power1.inOut" }, at + .45);
+        if (scanned) scan(`#s${n}-scan`, at + .62, Math.max(.8, stay - .9));
+      };
+      tl.fromTo("#intro-lockup", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: .55 }, .2);
+      scene(1, 2, 3.5, true); scene(2, 5.5, 3); scene(3, 8.5, 3.5, true); scene(4, 12, 4); scene(5, 16, 3); scene(6, 19, 5, true); scene(7, 24, 4); scene(8, 28, 4); scene(9, 32, 5, true); scene(10, 37, 4); scene(11, 41, 2);
+      tl.fromTo("#outro-lockup", { opacity: 0, x: -32 }, { opacity: 1, x: 0, duration: .55 }, 43.2);
+      const music = document.getElementById("bgm");
+      if (music) music.volume = .12;
+      window.__timelines["dafenqi-demo"] = tl;
+    </script>
+  </body>
+</html>

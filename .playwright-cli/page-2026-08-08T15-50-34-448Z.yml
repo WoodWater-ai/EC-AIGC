@@ -1,0 +1,168 @@
+- generic [ref=f2e2]:
+  - complementary [ref=f2e3]:
+    - generic [ref=f2e12]:
+      - strong [ref=f2e13]: 达芬奇密码 AI
+      - text: WORKBENCH
+    - button "新建创作" [ref=f2e15] [cursor=pointer]
+    - navigation [ref=f2e20]:
+      - generic [ref=f2e21]: 主模块
+      - button "工作台首页" [ref=f2e22] [cursor=pointer]
+      - button "创作助手" [ref=f2e28] [cursor=pointer]
+      - button "任务列表" [ref=f2e31] [cursor=pointer]
+      - button "智能模板中心" [ref=f2e35] [cursor=pointer]
+      - button "商品素材库" [ref=f2e38] [cursor=pointer]
+      - button "数据效能复盘" [ref=f2e43] [cursor=pointer]
+      - generic [ref=f2e46]: 系统与主数据
+      - button "系统配置模块" [ref=f2e47] [cursor=pointer]
+      - button "通道异步任务" [ref=f2e51] [cursor=pointer]
+      - button "资源分类" [ref=f2e59] [cursor=pointer]
+      - button "商品分类" [ref=f2e65] [cursor=pointer]
+      - button "产品管理" [ref=f2e71] [cursor=pointer]
+      - button "字典管理" [ref=f2e79] [cursor=pointer]
+    - generic [ref=f2e82]:
+      - generic [ref=f2e83]: 潘
+      - generic [ref=f2e84]:
+        - strong [ref=f2e85]: 潘俊杰
+        - text: 产品管理员 · 在线
+  - generic [ref=f2e86]:
+    - generic [ref=f2e87]:
+      - generic [ref=f2e88]:
+        - generic [ref=f2e89]: 达芬奇密码 AI
+        - strong [ref=f2e92]: 商品素材库
+      - generic [ref=f2e93]:
+        - generic "效果稿页面切换" [ref=f2e94]:
+          - button "产品管理" [ref=f2e95] [cursor=pointer]
+          - button "商品素材库" [ref=f2e96] [cursor=pointer]
+          - button "图片创作" [ref=f2e97] [cursor=pointer]
+          - button "视频创作" [ref=f2e98] [cursor=pointer]
+        - button "通知" [ref=f2e99] [cursor=pointer]
+        - button "帮助" [ref=f2e103] [cursor=pointer]
+    - main [ref=f2e107]:
+      - generic [ref=f2e108]:
+        - generic [ref=f2e109]:
+          - generic [ref=f2e110]:
+            - heading "商品素材库" [level=1] [ref=f2e111]
+            - paragraph [ref=f2e112]: 只展示已上传本地素材或提交过创作任务的商品规格
+          - generic [ref=f2e113]:
+            - button "上传素材" [ref=f2e114] [cursor=pointer]
+            - button "新建创作" [ref=f2e118] [cursor=pointer]
+        - generic [ref=f2e121]:
+          - generic [ref=f2e122]:
+            - generic [ref=f2e123]: 活跃商品
+            - strong [ref=f2e124]: "33"
+            - text: 不是全量 ERP 商品
+          - generic [ref=f2e125]:
+            - generic [ref=f2e126]: 输入图片
+            - strong [ref=f2e127]: "188"
+            - text: ERP 选择 + 本地上传
+          - generic [ref=f2e128]:
+            - generic [ref=f2e129]: 生成图片
+            - strong [ref=f2e130]: "126"
+            - text: 本周 +18
+          - generic [ref=f2e131]:
+            - generic [ref=f2e132]: 生成视频
+            - strong [ref=f2e133]: "18"
+            - text: 本周 +4
+          - generic [ref=f2e134]:
+            - generic [ref=f2e135]: 待审核
+            - strong [ref=f2e136]: "183"
+            - text: 需要优先处理
+        - generic [ref=f2e137]:
+          - generic [ref=f2e138]:
+            - generic [ref=f2e139]: 搜索商品 / 规格
+            - textbox "输入商品名称、货品编号或规格" [ref=f2e144]
+          - generic [ref=f2e145]:
+            - generic [ref=f2e146]: ERP 分类
+            - combobox [ref=f2e147]:
+              - option "全部分类" [selected]
+              - option "家居服 / 睡衣"
+          - generic [ref=f2e148]:
+            - generic [ref=f2e149]: 素材类型
+            - combobox [ref=f2e150]:
+              - option "全部素材" [selected]
+              - option "输入素材"
+              - option "生成图片"
+              - option "生成视频"
+          - generic [ref=f2e151]:
+            - generic [ref=f2e152]: 审核状态
+            - combobox [ref=f2e153]:
+              - option "全部状态" [selected]
+              - option "待审核"
+              - option "已通过"
+          - button "清除筛选" [ref=f2e156] [cursor=pointer]
+        - generic [ref=f2e160]:
+          - strong [ref=f2e161]: 近期活跃商品
+          - generic [ref=f2e162]: 按最近创作时间排序 · 共 33 个
+        - generic [ref=f2e163]:
+          - article [ref=f2e164]:
+            - generic [ref=f2e165]: ERP 商品
+            - generic [ref=f2e168]:
+              - heading "轻奢蕾丝吊带睡裙" [level=3] [ref=f2e169]
+              - generic [ref=f2e170]: 香槟色 / M · SLP-208 · 22994
+              - generic [ref=f2e171]:
+                - generic [ref=f2e172]:
+                  - generic [ref=f2e173]: "5"
+                  - text: 输入
+                - generic [ref=f2e174]:
+                  - generic [ref=f2e175]: "18"
+                  - text: 图片
+                - generic [ref=f2e176]:
+                  - generic [ref=f2e177]: "3"
+                  - text: 视频
+              - generic [ref=f2e178]:
+                - generic [ref=f2e179]: 图片创作 · 12 分钟前
+                - button "继续创作" [ref=f2e180] [cursor=pointer]
+          - article [ref=f2e183]:
+            - generic [ref=f2e184]: ERP 商品
+            - generic [ref=f2e187]:
+              - heading "青柠格纹家居服上衣" [level=3] [ref=f2e188]
+              - generic [ref=f2e189]: 绿色 / M · TEST1 · 1170
+              - generic [ref=f2e190]:
+                - generic [ref=f2e191]:
+                  - generic [ref=f2e192]: "3"
+                  - text: 输入
+                - generic [ref=f2e193]:
+                  - generic [ref=f2e194]: "9"
+                  - text: 图片
+                - generic [ref=f2e195]:
+                  - generic [ref=f2e196]: "1"
+                  - text: 视频
+              - generic [ref=f2e197]:
+                - generic [ref=f2e198]: 视频创作 · 1 小时前
+                - button "继续创作" [ref=f2e199] [cursor=pointer]
+          - article [ref=f2e202]:
+            - generic [ref=f2e203]: ERP 商品
+            - generic [ref=f2e206]:
+              - heading "东方印花居家长裙" [level=3] [ref=f2e207]
+              - generic [ref=f2e208]: 藏青 / L · DR-101 · 88521
+              - generic [ref=f2e209]:
+                - generic [ref=f2e210]:
+                  - generic [ref=f2e211]: "4"
+                  - text: 输入
+                - generic [ref=f2e212]:
+                  - generic [ref=f2e213]: "12"
+                  - text: 图片
+                - generic [ref=f2e214]:
+                  - generic [ref=f2e215]: "0"
+                  - text: 视频
+              - generic [ref=f2e216]:
+                - generic [ref=f2e217]: 待审核 4 个 · 昨天
+                - button "查看项目" [ref=f2e218] [cursor=pointer]
+          - article [ref=f2e221]:
+            - generic [ref=f2e222]: 本地来源
+            - generic [ref=f2e225]:
+              - heading "多巴胺条纹睡衣套装" [level=3] [ref=f2e226]
+              - generic [ref=f2e227]: 彩色 / 均码 · LOCAL-018 · 待匹配
+              - generic [ref=f2e228]:
+                - generic [ref=f2e229]:
+                  - generic [ref=f2e230]: "8"
+                  - text: 输入
+                - generic [ref=f2e231]:
+                  - generic [ref=f2e232]: "21"
+                  - text: 图片
+                - generic [ref=f2e233]:
+                  - generic [ref=f2e234]: "4"
+                  - text: 视频
+              - generic [ref=f2e235]:
+                - generic [ref=f2e236]: ERP 待匹配 · 2 天前
+                - button "继续创作" [ref=f2e237] [cursor=pointer]

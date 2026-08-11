@@ -1,0 +1,159 @@
+- generic [ref=f1e2]:
+  - complementary [ref=f1e3]:
+    - generic [ref=f1e12]:
+      - strong [ref=f1e13]: 达芬奇密码 AI
+      - text: WORKBENCH
+    - button "新建创作" [ref=f1e15] [cursor=pointer]
+    - navigation [ref=f1e20]:
+      - generic [ref=f1e21]: 主模块
+      - button "工作台首页" [ref=f1e22] [cursor=pointer]
+      - button "创作助手" [ref=f1e28] [cursor=pointer]
+      - button "任务列表" [ref=f1e31] [cursor=pointer]
+      - button "智能模板中心" [ref=f1e35] [cursor=pointer]
+      - button "素材中心" [ref=f1e38] [cursor=pointer]
+      - button "数据效能复盘" [ref=f1e43] [cursor=pointer]
+      - generic [ref=f1e46]: 系统与主数据
+      - button "系统配置模块" [ref=f1e47] [cursor=pointer]
+      - button "通道异步任务" [ref=f1e51] [cursor=pointer]
+      - button "资源分类" [ref=f1e59] [cursor=pointer]
+      - button "商品分类" [ref=f1e65] [cursor=pointer]
+      - button "产品管理" [ref=f1e71] [cursor=pointer]
+      - button "字典管理" [ref=f1e79] [cursor=pointer]
+    - generic [ref=f1e82]:
+      - generic [ref=f1e83]: 潘
+      - generic [ref=f1e84]:
+        - strong [ref=f1e85]: 潘俊杰
+        - text: 产品管理员 · 在线
+  - generic [ref=f1e86]:
+    - generic [ref=f1e87]:
+      - generic [ref=f1e88]:
+        - generic [ref=f1e89]: 达芬奇密码 AI
+        - strong [ref=f1e92]: 素材中心
+      - generic [ref=f1e93]:
+        - generic "效果稿页面切换" [ref=f1e94]:
+          - button "产品管理" [ref=f1e95] [cursor=pointer]
+          - button "素材中心" [ref=f1e96] [cursor=pointer]
+          - button "SKU 素材集合" [ref=f1e97] [cursor=pointer]
+          - button "图片创作" [ref=f1e98] [cursor=pointer]
+          - button "视频创作" [ref=f1e99] [cursor=pointer]
+        - button "通知" [ref=f1e100] [cursor=pointer]
+        - button "帮助" [ref=f1e104] [cursor=pointer]
+    - main [ref=f1e108]:
+      - generic [ref=f1e109]:
+        - generic [ref=f1e110]:
+          - generic [ref=f1e111]:
+            - heading "素材中心" [level=1] [ref=f1e112]
+            - paragraph [ref=f1e113]: 素材按 SKU 归集，用已有素材继续创作
+          - generic [ref=f1e114]:
+            - button "上传素材" [ref=f1e115] [cursor=pointer]
+            - button "开始创作" [ref=f1e119] [cursor=pointer]
+        - tablist "素材范围" [ref=f1e122]:
+          - tab "产品素材" [selected] [ref=f1e123] [cursor=pointer]
+          - tab "公共素材" [ref=f1e124] [cursor=pointer]
+          - tab "我的素材" [ref=f1e125] [cursor=pointer]
+        - generic [ref=f1e126]:
+          - generic [ref=f1e127]:
+            - generic [ref=f1e128]: 搜索产品素材
+            - textbox "商品名称、SPU 编码或 SKU 编码" [ref=f1e133]
+          - generic [ref=f1e134]:
+            - generic [ref=f1e135]: 排序
+            - combobox [ref=f1e136]:
+              - option "最近活动" [selected]
+              - option "素材数量"
+          - button "清除筛选" [ref=f1e139] [cursor=pointer]
+        - generic [ref=f1e143]:
+          - strong [ref=f1e144]: 近期产品素材
+          - generic [ref=f1e145]: 按最近活动排序 · 12 个 SKU
+        - generic [ref=f1e146]:
+          - generic [ref=f1e147]:
+            - generic [ref=f1e148]:
+              - strong [ref=f1e149]: 青柠格纹家居服
+              - generic [ref=f1e150]: SPU · TEST1
+            - generic [ref=f1e151]: 3 个 SKU · 最近更新 8 分钟前
+          - generic [ref=f1e152]:
+            - article [ref=f1e153]:
+              - generic [ref=f1e154]:
+                - generic [ref=f1e156]: SKU · TEST1-GRN-M
+                - generic [ref=f1e157]: 最近素材 · 8 分钟前
+              - generic [ref=f1e158]:
+                - heading "青柠格纹家居服上衣" [level=3] [ref=f1e159]
+                - generic [ref=f1e160]: 绿色 / M · ERP 规格 1170
+                - generic [ref=f1e161]:
+                  - generic [ref=f1e162]:
+                    - generic [ref=f1e163]: "3"
+                    - text: 上传
+                  - generic [ref=f1e164]:
+                    - generic [ref=f1e165]: "9"
+                    - text: 生成
+                  - generic [ref=f1e166]:
+                    - generic [ref=f1e167]: "1"
+                    - text: 组合
+                - generic [ref=f1e168]:
+                  - generic [ref=f1e169]: 共 13 项素材
+                  - button "查看素材" [ref=f1e170] [cursor=pointer]
+            - article [ref=f1e173]:
+              - generic [ref=f1e174]:
+                - generic [ref=f1e176]: SKU · TEST1-GRN-L
+                - generic [ref=f1e177]: 最近素材 · 34 分钟前
+              - generic [ref=f1e178]:
+                - heading "青柠格纹家居服上衣" [level=3] [ref=f1e179]
+                - generic [ref=f1e180]: 绿色 / L · ERP 规格 1171
+                - generic [ref=f1e181]:
+                  - generic [ref=f1e182]:
+                    - generic [ref=f1e183]: "2"
+                    - text: 上传
+                  - generic [ref=f1e184]:
+                    - generic [ref=f1e185]: "6"
+                    - text: 生成
+                  - generic [ref=f1e186]:
+                    - generic [ref=f1e187]: "0"
+                    - text: 组合
+                - generic [ref=f1e188]:
+                  - generic [ref=f1e189]: 共 8 项素材
+                  - button "查看素材" [ref=f1e190] [cursor=pointer]
+            - article [ref=f1e193]:
+              - generic [ref=f1e194]:
+                - generic [ref=f1e196]: SKU · TEST1-WHT-M
+                - generic [ref=f1e197]: 最近素材 · 昨天
+              - generic [ref=f1e198]:
+                - heading "青柠格纹家居服上衣" [level=3] [ref=f1e199]
+                - generic [ref=f1e200]: 米白 / M · ERP 规格 1172
+                - generic [ref=f1e201]:
+                  - generic [ref=f1e202]:
+                    - generic [ref=f1e203]: "1"
+                    - text: 上传
+                  - generic [ref=f1e204]:
+                    - generic [ref=f1e205]: "4"
+                    - text: 生成
+                  - generic [ref=f1e206]:
+                    - generic [ref=f1e207]: "0"
+                    - text: 组合
+                - generic [ref=f1e208]:
+                  - generic [ref=f1e209]: 共 5 项素材
+                  - button "查看素材" [ref=f1e210] [cursor=pointer]
+        - generic [ref=f1e213]:
+          - generic [ref=f1e214]:
+            - generic [ref=f1e215]:
+              - strong [ref=f1e216]: 轻奢蕾丝吊带睡裙
+              - generic [ref=f1e217]: SPU · SLP-208
+            - generic [ref=f1e218]: 单规格 · 最近更新 12 分钟前
+          - article [ref=f1e220]:
+            - generic [ref=f1e221]:
+              - generic [ref=f1e223]: SKU · CHAMP-M
+              - generic [ref=f1e224]: 最近素材 · 12 分钟前
+            - generic [ref=f1e225]:
+              - heading "轻奢蕾丝吊带睡裙" [level=3] [ref=f1e226]
+              - generic [ref=f1e227]: 香槟色 / M · ERP 规格 22994
+              - generic [ref=f1e228]:
+                - generic [ref=f1e229]:
+                  - generic [ref=f1e230]: "5"
+                  - text: 上传
+                - generic [ref=f1e231]:
+                  - generic [ref=f1e232]: "18"
+                  - text: 生成
+                - generic [ref=f1e233]:
+                  - generic [ref=f1e234]: "2"
+                  - text: 组合
+              - generic [ref=f1e235]:
+                - generic [ref=f1e236]: 共 25 项素材
+                - button "查看素材" [ref=f1e237] [cursor=pointer]

@@ -1,0 +1,1679 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ERP 商品创作闭环 V2.5 - 设计稿</title>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      --primary: #d85c42;
+      --primary-hover: #c94f37;
+      --primary-light: #fff0ea;
+      --success: #10b981;
+      --warning: #e59a21;
+      --danger: #ef4444;
+      --info: #6c79b8;
+      --bg: #faf9f7;
+      --surface: #ffffff;
+      --surface-soft: #f6f4f1;
+      --dark: #201f1d;
+      --dark-2: #302d29;
+      --border: #e8e4df;
+      --text: #201f1d;
+      --muted: #79736d;
+      --muted-2: #a9a39c;
+      --shadow: 0 7px 22px rgba(53, 44, 37, 0.055);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-width: 1180px; height: 100%; overflow: hidden; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      font-size: 13px;
+      letter-spacing: 0;
+    }
+    button, input, select, textarea { font: inherit; letter-spacing: 0; }
+    button { cursor: pointer; }
+    .app { display: flex; height: 100vh; }
+    .sidebar {
+      width: 216px;
+      flex: 0 0 216px;
+      background: var(--dark);
+      color: #c8c2bc;
+      border-right: 1px solid #302d29;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .brand {
+      height: 66px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 15px;
+      border-bottom: 1px solid #302d29;
+    }
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: var(--primary);
+      border-radius: 6px;
+      box-shadow: 3px 3px 0 rgba(216, 92, 66, 0.22);
+    }
+    .brand strong { display: block; color: white; font-size: 13px; line-height: 1.15; }
+    .brand small { font: 9px ui-monospace, monospace; color: #77716b; }
+    .new-action { padding: 12px; }
+    .new-action button {
+      width: 100%; height: 39px; border: 0; border-radius: 6px;
+      background: var(--primary); color: white; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      box-shadow: 0 6px 16px rgba(216, 92, 66, 0.18);
+    }
+    .menu { flex: 1; overflow: auto; padding: 0 8px 12px; }
+    .menu-title { padding: 9px 10px 5px; font-size: 9px; font-weight: 800; color: #77716b; text-transform: uppercase; }
+    .menu-item {
+      width: 100%; height: 35px; padding: 0 10px; border: 0; border-radius: 6px;
+      background: transparent; color: #9f9993; display: flex; align-items: center; gap: 10px;
+      text-align: left; font-size: 12px; margin: 1px 0;
+    }
+    .menu-item:hover { background: #2a2724; color: #f5f2ef; }
+    .menu-item.active { background: #37322e; color: white; }
+    .menu-item.active svg { color: var(--primary); }
+    .menu-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); margin-left: auto; }
+    .user {
+      height: 62px; padding: 11px 14px; border-top: 1px solid #302d29; background: #191816;
+      display: flex; align-items: center; gap: 9px;
+    }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #49443f; color: white; font-weight: 800; }
+    .user strong { color: white; display: block; font-size: 11px; }
+    .user small { color: #8c857f; font-size: 9px; }
+    .shell { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+    .global-header {
+      height: 55px; flex: 0 0 55px; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 20px; background: rgba(255,255,255,.96);
+      border-bottom: 1px solid var(--border);
+    }
+    .crumbs { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; }
+    .crumbs strong { color: var(--text); font-size: 13px; }
+    .header-tools { display: flex; align-items: center; gap: 8px; }
+    .prototype-switcher { display: flex; gap: 2px; padding: 3px; background: #f2efeb; border: 1px solid var(--border); border-radius: 7px; }
+    .prototype-switcher button { height: 28px; border: 0; padding: 0 9px; border-radius: 5px; color: var(--muted); background: transparent; font-size: 10px; font-weight: 700; }
+    .prototype-switcher button.active { background: white; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .icon-btn { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--border); color: var(--muted); background: white; border-radius: 6px; }
+    .page { display: none; min-height: 0; flex: 1; overflow: auto; background: var(--bg); }
+    .page.active { display: block; }
+    .page-inner { padding: 20px; max-width: 1500px; margin: 0 auto; }
+    .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    .page-head h1 { margin: 0; font-size: 20px; line-height: 1.2; }
+    .page-head p { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+    .actions { display: flex; align-items: center; gap: 8px; }
+    .btn { height: 34px; border: 1px solid var(--border); background: white; color: var(--text); border-radius: 6px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; font-weight: 700; }
+    .btn.primary { color: white; background: var(--primary); border-color: var(--primary); }
+    .btn.primary:hover { background: var(--primary-hover); }
+    .btn.subtle { background: var(--surface-soft); }
+    .btn.icon-only { width: 34px; padding: 0; }
+    .sync-health { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 6px; background: #ecfdf5; color: #047857; font-size: 10px; font-weight: 700; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
+    .metric { min-width: 0; padding: 12px 14px; border: 1px solid var(--border); background: white; border-radius: 7px; box-shadow: var(--shadow); }
+    .metric span { display: block; color: var(--muted); font-size: 10px; }
+    .metric strong { display: block; margin-top: 4px; font-size: 19px; line-height: 1; }
+    .metric small { color: var(--muted-2); font-size: 9px; }
+    .toolbar { display: grid; grid-template-columns: minmax(230px,1.4fr) repeat(4,minmax(130px,.7fr)) auto; gap: 9px; padding: 12px; border: 1px solid var(--border); background: white; border-radius: 7px 7px 0 0; }
+    .field { min-width: 0; }
+    .field label { display: block; color: var(--muted); font-size: 9px; font-weight: 800; margin-bottom: 5px; }
+    .control { width: 100%; height: 32px; border: 1px solid var(--border); border-radius: 5px; background: #fbfaf8; color: var(--text); padding: 0 9px; outline: none; font-size: 11px; }
+    textarea.control { height: auto; padding: 9px; resize: none; line-height: 1.6; }
+    .search-wrap { position: relative; }
+    .search-wrap svg { position: absolute; left: 9px; top: 9px; color: var(--muted-2); }
+    .search-wrap .control { padding-left: 29px; }
+    .table-wrap { border: 1px solid var(--border); border-top: 0; border-radius: 0 0 7px 7px; background: white; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th { height: 37px; padding: 0 10px; background: #f7f5f2; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 9px; text-align: left; font-weight: 800; }
+    td { height: 68px; padding: 8px 10px; border-bottom: 1px solid #f0ede9; vertical-align: middle; font-size: 10px; overflow: hidden; }
+    tr:last-child td { border-bottom: 0; }
+    .product-cell { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .thumb { width: 46px; height: 46px; flex: 0 0 46px; border: 1px solid var(--border); border-radius: 5px; background: #f4f2ef; object-fit: cover; }
+    .product-cell strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+    .product-cell small { display: block; margin-top: 4px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; }
+    .badge { display: inline-flex; max-width: 100%; align-items: center; gap: 4px; border-radius: 4px; padding: 3px 6px; font-size: 9px; line-height: 1.15; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .badge.green { color: #047857; background: #ecfdf5; }
+    .badge.amber { color: #a16207; background: #fffbeb; }
+    .badge.rose { color: #be123c; background: #fff1f2; }
+    .badge.gray { color: #69635e; background: #f0eeeb; }
+    .badge.info { color: #515f9f; background: #f0f1f9; }
+    .row-actions { display: flex; gap: 4px; }
+    .row-actions button { height: 27px; border: 1px solid var(--border); background: white; border-radius: 5px; padding: 0 7px; font-size: 9px; color: var(--muted); font-weight: 700; }
+    .row-actions button.primary-outline { border-color: #efb9ad; color: var(--primary); background: var(--primary-light); }
+    .pagination { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 9px; }
+    .pager { display: flex; gap: 4px; }
+    .pager button { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 5px; background: white; color: var(--muted); }
+    .pager button.active { color: white; border-color: var(--primary); background: var(--primary); }
+    .library-tabs { display: flex; gap: 3px; width: fit-content; padding: 3px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 7px; background: #f2efeb; }
+    .library-tabs button { height: 31px; padding: 0 14px; border: 0; border-radius: 5px; color: var(--muted); background: transparent; font-size: 10px; font-weight: 750; }
+    .library-tabs button.active { color: var(--text); background: white; box-shadow: 0 1px 4px rgba(35,31,27,.09); }
+    .library-toolbar { display: grid; grid-template-columns: minmax(300px,1fr) 150px auto; gap: 9px; padding: 12px; background: white; border: 1px solid var(--border); border-radius: 7px; margin-bottom: 12px; }
+    .section-bar { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 10px; }
+    .section-bar strong { font-size: 12px; }
+    .section-bar span { color: var(--muted); font-size: 10px; }
+    .spu-group { margin-top: 14px; }
+    .spu-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; padding: 0 2px; }
+    .spu-heading div { display: flex; min-width: 0; align-items: center; gap: 8px; }
+    .spu-heading strong { font-size: 12px; }
+    .spu-heading small { color: var(--muted); font-size: 9px; }
+    .product-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+    .product-card { min-width: 0; border: 1px solid var(--border); background: white; border-radius: 7px; overflow: hidden; box-shadow: var(--shadow); }
+    .product-card:hover { border-color: #d8cfc7; box-shadow: 0 10px 24px rgba(53,44,37,.08); }
+    .product-visual { height: 150px; position: relative; background: #f1efec; }
+    .product-visual img { width: 100%; height: 100%; object-fit: cover; }
+    .source-chip { position: absolute; top: 8px; left: 8px; background: rgba(32,31,29,.78); color: white; padding: 4px 7px; border-radius: 4px; font-size: 8px; font-weight: 700; }
+    .recent-chip { position: absolute; right: 8px; bottom: 8px; background: rgba(255,255,255,.92); color: var(--text); padding: 4px 7px; border-radius: 4px; font-size: 8px; font-weight: 700; box-shadow: 0 2px 7px rgba(0,0,0,.08); }
+    .product-card-body { padding: 11px; }
+    .product-card h3 { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .product-card .spec { margin: 4px 0 10px; color: var(--muted); font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .asset-counts { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 0 -11px 10px; }
+    .asset-counts span { padding: 8px 4px; text-align: center; border-left: 1px solid var(--border); color: var(--muted); font-size: 8px; }
+    .asset-counts span:first-child { border-left: 0; }
+    .asset-counts b { display: block; color: var(--text); font-size: 12px; margin-bottom: 2px; }
+    .card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .card-footer small { color: var(--muted-2); font-size: 8px; }
+    .card-footer .btn { height: 28px; padding: 0 8px; font-size: 9px; }
+    .collection-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+    .collection-product { display: flex; align-items: center; min-width: 0; gap: 11px; }
+    .collection-product .back-btn { flex: 0 0 auto; }
+    .collection-product img { width: 48px; height: 48px; border: 1px solid var(--border); border-radius: 6px; object-fit: cover; background: #f1efec; }
+    .collection-product h1 { margin: 0; font-size: 18px; }
+    .collection-product p { margin: 5px 0 0; color: var(--muted); font-size: 9px; }
+    .collection-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; background: white; }
+    .filter-chips { display: flex; align-items: center; gap: 5px; }
+    .filter-chips button { height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 5px; color: var(--muted); background: transparent; font-size: 9px; font-weight: 700; }
+    .filter-chips button.active { color: var(--primary); border-color: #efb9ad; background: var(--primary-light); }
+    .collection-meta { color: var(--muted); font-size: 9px; }
+    .asset-grid { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 11px; }
+    .asset-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: white; box-shadow: var(--shadow); }
+    .asset-card-visual { position: relative; aspect-ratio: 4 / 5; overflow: hidden; background: #f1efec; }
+    .asset-card-visual img { width: 100%; height: 100%; object-fit: cover; }
+    .asset-kind { position: absolute; top: 7px; left: 7px; padding: 3px 6px; border-radius: 4px; background: rgba(32,31,29,.78); color: white; font-size: 8px; font-weight: 700; }
+    .asset-check { position: absolute; top: 7px; right: 7px; width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.7); border-radius: 4px; background: rgba(255,255,255,.9); color: var(--muted); }
+    .asset-check svg { display: none; }
+    .asset-card-body { padding: 9px; }
+    .asset-card-body strong { display: block; overflow: hidden; font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }
+    .asset-card-body small { display: block; margin-top: 4px; color: var(--muted); font-size: 8px; }
+    .resource-modal-page { position: relative; overflow: hidden; background: #f5f7fb; }
+    .resource-underlay { position: absolute; inset: 0; background: #f5f7fb; }
+    .resource-underlay-grid { display: grid; grid-template-columns: 290px minmax(540px,1fr) 330px; gap: 14px; height: calc(100% - 53px); padding: 14px 16px; opacity: .82; }
+    .resource-underlay-col { border: 1px solid #dfe3e8; border-radius: 7px; background: white; }
+    .resource-backdrop { position: absolute; inset: 0; z-index: 100; display: grid; place-items: center; padding: 34px; background: rgba(25,24,22,.5); }
+    .resource-modal { position: relative; width: min(1280px, calc(100vw - 68px)); height: min(820px, calc(100vh - 68px)); min-height: 650px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #d9d5d0; border-radius: 8px; background: white; box-shadow: 0 26px 64px rgba(24,21,18,.24); }
+    .resource-modal [hidden] { display: none !important; }
+    .resource-modal-head { height: 58px; flex: 0 0 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border); }
+    .resource-modal-title { display: flex; align-items: center; gap: 9px; }
+    .resource-modal-title span { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 6px; color: white; background: var(--primary); }
+    .resource-modal-title h2 { margin: 0; font-size: 15px; }
+    .resource-modal-title small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; }
+    .resource-modal-tabs { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 6px; background: #f2efeb; }
+    .resource-modal-tabs button { height: 29px; padding: 0 12px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font-size: 9px; font-weight: 750; }
+    .resource-modal-tabs button.active { color: var(--text); background: white; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .resource-close { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); background: white; }
+    .resource-modal-body { min-height: 0; flex: 1; padding: 14px 16px; overflow: auto; background: #faf9f7; }
+    .resource-context { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; background: white; }
+    .resource-context-product { display: flex; min-width: 0; align-items: center; gap: 9px; }
+    .resource-context-product img { width: 42px; height: 42px; flex: 0 0 42px; border: 1px solid var(--border); border-radius: 5px; object-fit: cover; }
+    .resource-context-product strong { display: block; font-size: 11px; }
+    .resource-context-product small { display: block; margin-top: 4px; color: var(--muted); font-size: 8px; }
+    .resource-tools { display: flex; align-items: center; gap: 7px; }
+    .resource-search { width: 270px; }
+    .resource-assets { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; }
+    .resource-asset { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: white; }
+    .resource-asset.selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(216,92,66,.12); }
+    .resource-asset-visual { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #f0eeeb; }
+    .resource-asset-visual img { width: 100%; height: 100%; object-fit: cover; }
+    .resource-selected { position: absolute; top: 7px; right: 7px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: white; background: var(--primary); }
+    .resource-selected svg { width: 12px; height: 12px; }
+    .resource-asset-body { padding: 8px 9px; }
+    .resource-asset-body strong { display: block; overflow: hidden; font-size: 9px; white-space: nowrap; text-overflow: ellipsis; }
+    .resource-asset-body small { display: block; margin-top: 4px; color: var(--muted); font-size: 7px; }
+    .resource-product-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+    .resource-product-card { display: grid; grid-template-columns: 92px minmax(0,1fr); min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: white; text-align: left; }
+    .resource-product-card:hover { border-color: #d8cfc7; background: #fffdfb; }
+    .resource-product-card img { width: 92px; height: 92px; object-fit: cover; background: #f0eeeb; }
+    .resource-product-copy { min-width: 0; padding: 9px; }
+    .resource-product-copy strong { display: block; overflow: hidden; font-size: 9px; white-space: nowrap; text-overflow: ellipsis; }
+    .resource-product-copy span { display: block; margin-top: 5px; color: var(--muted); font-size: 7px; }
+    .resource-product-copy b { display: block; margin-top: 10px; color: var(--primary); font-size: 8px; }
+    .resource-mode-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .resource-mode-switch { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 6px; background: #f2efeb; }
+    .resource-mode-switch button { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 11px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font-size: 9px; font-weight: 750; }
+    .resource-mode-switch button.active { color: var(--text); background: white; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .resource-mode-note { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 8px; }
+    .resource-catalog-layout { display: grid; grid-template-columns: 178px minmax(0,1fr); gap: 12px; align-items: start; }
+    .resource-filter-panel { padding: 11px; border: 1px solid var(--border); border-radius: 7px; background: white; }
+    .resource-filter-section + .resource-filter-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid #eeeae5; }
+    .resource-filter-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; color: var(--text); font-size: 9px; font-weight: 800; }
+    .resource-filter-title small { color: var(--muted); font-size: 7px; font-weight: 500; }
+    .resource-filter-list { display: flex; flex-direction: column; gap: 3px; }
+    .resource-filter-list button { min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font-size: 8px; text-align: left; }
+    .resource-filter-list button.active { color: var(--primary); background: #fff2ed; font-weight: 750; }
+    .resource-filter-list button span { color: #9a938c; font-size: 7px; }
+    .resource-filter-list button.active span { color: var(--primary); }
+    .resource-content { min-width: 0; }
+    .resource-content .collection-toolbar { margin-bottom: 8px; }
+    .resource-tag-row { display: flex; align-items: center; gap: 5px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 2px; }
+    .resource-tag-row > span { flex: 0 0 auto; color: var(--muted); font-size: 8px; font-weight: 750; }
+    .resource-tag-row button { height: 25px; flex: 0 0 auto; padding: 0 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); background: white; font-size: 8px; }
+    .resource-tag-row button.active { border-color: #efb4a5; color: var(--primary); background: #fff4f0; }
+    .resource-asset-tags { display: flex; gap: 4px; margin-top: 6px; overflow: hidden; }
+    .resource-asset-tags span { padding: 2px 4px; border-radius: 3px; color: #796e65; background: #f2efeb; font-size: 6px; white-space: nowrap; }
+    .resource-assets.catalog { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .resource-empty-selection { color: #8b837a; font-size: 8px; }
+    .resource-tab-context { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .resource-tab-context h3 { margin: 0; font-size: 12px; }
+    .resource-tab-context p { margin: 4px 0 0; color: var(--muted); font-size: 8px; }
+    .combine-layout { display: grid; grid-template-columns: 165px minmax(0,1fr) 278px; gap: 12px; align-items: start; }
+    .combine-source-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 9px; }
+    .combine-source { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: white; }
+    .combine-source img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #f0eeeb; }
+    .combine-source-copy { padding: 8px; }
+    .combine-source-copy strong { display: block; overflow: hidden; font-size: 9px; white-space: nowrap; text-overflow: ellipsis; }
+    .combine-source-copy small { display: block; margin-top: 4px; color: var(--muted); font-size: 7px; }
+    .combine-source-actions { display: flex; gap: 4px; margin-top: 7px; }
+    .combine-source-actions button { height: 24px; flex: 1; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); background: white; font-size: 7px; }
+    .combine-source-actions button.primary-choice { border-color: #efb4a5; color: var(--primary); background: #fff4f0; }
+    .combine-tray { position: sticky; top: 0; padding: 11px; border: 1px solid var(--border); border-radius: 7px; background: white; }
+    .combine-tray-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+    .combine-tray-head strong { font-size: 10px; }
+    .combine-tray-head small { display: block; margin-top: 3px; color: var(--muted); font-size: 7px; }
+    .combo-slots { display: flex; flex-direction: column; gap: 7px; }
+    .combo-slot { min-height: 62px; display: grid; grid-template-columns: 36px minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 7px; border: 1px dashed #d8d1ca; border-radius: 6px; background: #fcfbfa; }
+    .combo-slot.filled { border-style: solid; border-color: #d9d5d0; background: white; }
+    .combo-slot img { width: 36px; height: 46px; border-radius: 4px; object-fit: cover; background: #f0eeeb; }
+    .combo-slot-icon { width: 36px; height: 46px; display: grid; place-items: center; border-radius: 4px; color: #aaa19a; background: #f0eeeb; }
+    .combo-slot-copy { min-width: 0; }
+    .combo-slot-copy b { display: block; color: var(--primary); font-size: 7px; }
+    .combo-slot-copy strong { display: block; margin-top: 3px; overflow: hidden; font-size: 8px; white-space: nowrap; text-overflow: ellipsis; }
+    .combo-slot-copy small { display: block; margin-top: 3px; color: var(--muted); font-size: 6px; }
+    .combo-slot button { width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: 4px; color: var(--muted); background: #f2efeb; }
+    .combine-tray-note { margin: 9px 0; padding: 7px; border-radius: 5px; color: #6d655e; background: #f7f4f0; font-size: 7px; line-height: 1.45; }
+    .combine-tray .btn { width: 100%; justify-content: center; }
+    .combine-tray .btn:disabled, .resource-modal-foot .btn:disabled { cursor: not-allowed; opacity: .45; }
+    .resource-modal-foot { height: 56px; flex: 0 0 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-top: 1px solid var(--border); background: white; }
+    .resource-modal-foot span { color: var(--muted); font-size: 9px; }
+    .resource-v3-head { height: 62px; flex-basis: 62px; gap: 16px; }
+    .resource-v3-head .resource-modal-title { flex: 0 0 210px; }
+    .resource-v3-head .resource-modal-title h2 { font-size: 16px; }
+    .resource-v3-head .resource-modal-title small { font-size: 10px; }
+    .resource-scope-tabs { align-self: stretch; display: flex; align-items: flex-end; gap: 22px; margin-left: 8px; }
+    .resource-scope-tabs button { position: relative; height: 61px; display: inline-flex; align-items: center; gap: 7px; padding: 0 2px; border: 0; color: #7f7770; background: transparent; font-size: 12px; font-weight: 800; }
+    .resource-scope-tabs button::after { content: ''; position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: transparent; }
+    .resource-scope-tabs button.active { color: var(--text); }
+    .resource-scope-tabs button.active::after { background: var(--primary); }
+    .resource-scope-tabs .count { padding: 2px 6px; border-radius: 9px; color: #8d857e; background: #f0ece8; font-size: 9px; }
+    .resource-scope-tabs button.active .count { color: var(--primary); background: var(--primary-light); }
+    .resource-media-tabs { display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 6px; background: #f2efeb; }
+    .resource-media-tabs button { height: 32px; min-width: 104px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 13px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font-size: 9px; font-weight: 800; }
+    .resource-media-tabs button.active { color: var(--text); background: white; box-shadow: 0 1px 4px rgba(38,32,27,.1); }
+    .resource-media-tabs button .count { padding: 2px 5px; border-radius: 9px; color: #8d857e; background: #ebe7e2; font-size: 7px; }
+    .resource-media-tabs button.active .count { color: var(--primary); background: var(--primary-light); }
+    .resource-head-tools { min-width: 0; flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+    .resource-head-tools .resource-search { width: min(290px, 32vw); }
+    .resource-modal-body.resource-v3-body { min-height: 0; padding: 0; overflow: hidden; }
+    .resource-shell { height: 100%; display: grid; grid-template-columns: 188px minmax(0,1fr); }
+    .resource-side { min-height: 0; display: flex; flex-direction: column; padding: 12px 10px; border-right: 1px solid var(--border); background: #f8f6f3; }
+    .resource-side-label { margin: 3px 8px 8px; color: #8c847c; font-size: 10px; font-weight: 800; }
+    .resource-scope-nav { display: flex; flex-direction: column; gap: 2px; }
+    .resource-scope-nav button { min-height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 9px; border: 0; border-radius: 5px; color: #6f6862; background: transparent; font-size: 9px; font-weight: 750; text-align: left; }
+    .resource-scope-nav button svg { width: 14px; height: 14px; color: #9a9189; }
+    .resource-scope-nav button span { margin-left: auto; color: #aaa29b; font-size: 7px; font-weight: 650; }
+    .resource-scope-nav button.active { color: var(--primary); background: #fff0ea; }
+    .resource-scope-nav button.active svg, .resource-scope-nav button.active span { color: var(--primary); }
+    .resource-side-divider { height: 1px; margin: 12px 8px; background: #e8e3de; }
+    .resource-side-filters { min-height: 0; overflow: auto; }
+    .resource-side-filters .resource-filter-section { padding: 0 4px; }
+    .resource-side-filters .resource-filter-section + .resource-filter-section { margin-top: 12px; padding-top: 11px; border-top: 1px solid #e8e3de; }
+    .resource-side-filters .resource-filter-list button { min-height: 32px; font-size: 11px; }
+    .resource-side-filters .resource-filter-list button span { font-size: 9px; }
+    .resource-side-filters .resource-filter-title { font-size: 11px; }
+    .resource-side-filters .resource-filter-title small { font-size: 9px; }
+    .resource-media-filter { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 6px; background: #ece8e4; }
+    .resource-media-filter button { height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 4px; color: #7d756e; background: transparent; font-size: 11px; font-weight: 800; }
+    .resource-media-filter button.active { color: var(--text); background: white; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .resource-media-filter svg { width: 12px; height: 12px; }
+    .resource-capacity { margin-top: auto; padding: 10px; border: 1px solid #e5ddd6; border-radius: 6px; background: white; }
+    .resource-capacity-head { display: flex; align-items: center; justify-content: space-between; color: #615a54; font-size: 10px; font-weight: 800; }
+    .resource-capacity-head span { color: var(--primary); }
+    .resource-capacity-track { height: 4px; margin: 8px 0 6px; overflow: hidden; border-radius: 2px; background: #eee9e4; }
+    .resource-capacity-track i { display: block; width: 82%; height: 100%; background: var(--primary); }
+    .resource-capacity small { color: #8e867f; font-size: 9px; }
+    .resource-workspace { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #fbfaf8; }
+    .resource-workspace > [data-resource-tab-panel] { min-height: 0; height: 100%; display: flex; flex-direction: column; }
+    .resource-workspace [data-resource-panel] { min-height: 0; height: 100%; display: flex; flex-direction: column; }
+    .resource-workspace-head { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 16px; border-bottom: 1px solid var(--border); background: white; }
+    .resource-workspace-head h3 { margin: 0; font-size: 15px; }
+    .resource-workspace-head p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
+    .resource-workspace-tools { display: flex; align-items: center; gap: 6px; }
+    .resource-workspace-scroll { min-height: 0; flex: 1; overflow: auto; padding: 15px 16px 20px; }
+    .resource-filter-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .resource-filter-strip .filter-chips { min-width: 0; overflow-x: auto; }
+    .resource-filter-strip .filter-chips button { flex: 0 0 auto; border-color: var(--border); background: white; }
+    .resource-filter-strip .filter-chips button.active { border-color: #efb9ad; background: var(--primary-light); }
+    .resource-filter-strip .filter-chips button { height: 32px; font-size: 10px; }
+    .resource-sort { height: 29px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); background: white; font-size: 8px; font-weight: 700; }
+    .resource-spu { margin-top: 15px; }
+    .resource-spu:first-child { margin-top: 0; }
+    .resource-spu-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .resource-spu-head > div { min-width: 0; display: flex; align-items: center; gap: 7px; }
+    .resource-spu-head strong { font-size: 12px; }
+    .resource-spu-head small { color: var(--muted); font-size: 10px; }
+    .sku-collection-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+    .sku-collection { min-width: 0; position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: white; box-shadow: 0 3px 12px rgba(45,38,32,.035); cursor: pointer; }
+    .sku-collection:hover { border-color: #d3c9c1; }
+    .sku-collection.selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(216,92,66,.12); }
+    .sku-cover { position: relative; height: 154px; overflow: hidden; background: #f2f0ed; }
+    .sku-cover img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+    .sku-placeholder { width: 100%; height: 100%; display: grid; place-items: center; align-content: center; gap: 6px; color: #aaa29b; background: white; }
+    .sku-placeholder svg { width: 36px; height: 36px; stroke-width: 1.35; }
+    .sku-placeholder small { font-size: 7px; }
+    .sku-cover-label { position: absolute; left: 9px; bottom: 9px; padding: 4px 7px; border: 1px solid rgba(226,221,215,.92); border-radius: 4px; color: #68615b; background: rgba(255,255,255,.94); font-size: 9px; font-weight: 750; }
+    .sku-collage { height: 112px; display: grid; grid-template-columns: 1.65fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; background: #eeeae6; }
+    .sku-collage img { width: 100%; height: 100%; object-fit: cover; }
+    .sku-collage img:first-child { grid-row: 1 / 3; }
+    .sku-collage .video-cover { position: relative; grid-row: 1 / 3; grid-column: 1 / 3; }
+    .sku-collage .video-cover img { width: 100%; height: 100%; object-fit: cover; }
+    .video-play { position: absolute; inset: 0; display: grid; place-items: center; color: white; background: rgba(20,18,16,.18); }
+    .video-play i { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 50%; background: rgba(32,31,29,.72); }
+    .media-duration { position: absolute; right: 6px; bottom: 6px; padding: 3px 5px; border-radius: 3px; color: white; background: rgba(32,31,29,.74); font-size: 7px; font-weight: 750; }
+    .sku-toggle { position: absolute; top: 9px; right: 9px; z-index: 3; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #d8d1ca; border-radius: 6px; color: #7d756e; background: rgba(255,255,255,.96); }
+    .sku-toggle svg { visibility: hidden; }
+    .sku-collection.selected .sku-toggle { border-color: var(--primary); color: white; background: var(--primary); }
+    .sku-collection.selected .sku-toggle svg { visibility: visible; }
+    .sku-collection-copy { padding: 11px 12px 12px; }
+    .sku-collection-copy h4 { margin: 0; overflow: hidden; font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+    .sku-collection-copy p { margin: 6px 0 10px; overflow: hidden; color: var(--muted); font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }
+    .sku-collection-meta { display: flex; align-items: center; justify-content: space-between; gap: 7px; color: #807870; font-size: 9px; }
+    .sku-open { height: 28px; display: inline-flex; align-items: center; gap: 4px; padding: 0 9px; border: 1px solid #e2d9d2; border-radius: 5px; color: var(--primary); background: #fff8f5; font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .resource-asset-grid-v3 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 11px; }
+    .resource-asset-body strong { font-size: 11px; }
+    .resource-asset-body small { font-size: 9px; }
+    .resource-asset-tags span { font-size: 8px; }
+    .resource-tag-row > span, .resource-tag-row button { font-size: 10px; }
+    .resource-modal-foot span { font-size: 10px; }
+    .resource-workspace-tools .btn { height: 36px; font-size: 11px; }
+    .resource-workspace-tools .btn.primary { box-shadow: 0 2px 7px rgba(216,92,66,.18); }
+    .resource-workspace-tools .btn:disabled { cursor: not-allowed; opacity: .42; box-shadow: none; }
+    .resource-asset-grid-v3 .resource-asset-visual { aspect-ratio: 4 / 3; }
+    .resource-asset-grid-v3 .resource-asset-visual.video { position: relative; }
+    .resource-breadcrumb { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 8px; }
+    .resource-breadcrumb button { border: 0; padding: 0; color: var(--primary); background: transparent; font-size: 8px; font-weight: 750; }
+    .compose-workspace { display: grid; grid-template-columns: 250px minmax(260px,1fr) 260px; gap: 12px; align-items: start; }
+    .compose-panel { padding: 11px; border: 1px solid var(--border); border-radius: 7px; background: white; }
+    .compose-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+    .compose-panel-head strong { font-size: 10px; }
+    .compose-panel-head small { display: block; margin-top: 3px; color: var(--muted); font-size: 7px; }
+    .compose-source-list { display: flex; flex-direction: column; gap: 7px; }
+    .compose-source-item { display: grid; grid-template-columns: 42px minmax(0,1fr) 22px; align-items: center; gap: 8px; padding: 6px; border: 1px solid #ece7e2; border-radius: 6px; background: #fcfbfa; }
+    .compose-source-item img { width: 42px; height: 52px; border-radius: 4px; object-fit: cover; }
+    .compose-source-thumb { width: 42px; height: 52px; display: grid; place-items: center; border-radius: 4px; color: #aaa29b; background: white; }
+    .compose-source-thumb svg { width: 20px; height: 20px; }
+    .compose-source-item b { display: block; color: var(--primary); font-size: 7px; }
+    .compose-source-item strong { display: block; margin-top: 3px; overflow: hidden; font-size: 8px; white-space: nowrap; text-overflow: ellipsis; }
+    .compose-source-item small { display: block; margin-top: 3px; color: var(--muted); font-size: 6px; }
+    .compose-source-item button { width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: 4px; color: var(--muted); background: #eeeae6; }
+    .compose-preview-stage { min-height: 360px; display: grid; place-items: center; padding: 12px; border: 1px dashed #d7cfc8; border-radius: 7px; background: #f4f1ed; }
+    .compose-preview { width: min(260px,100%); display: flex; flex-direction: column; overflow: hidden; border: 7px solid white; background: white; box-shadow: 0 10px 30px rgba(42,35,29,.14); }
+    .compose-preview.horizontal { width: 100%; flex-direction: row; }
+    .compose-preview img { width: 100%; height: 100px; object-fit: cover; }
+    .compose-preview-placeholder { width: 100%; height: 100px; display: grid; place-items: center; color: #aaa29b; background: white; }
+    .compose-preview-placeholder svg { width: 28px; height: 28px; }
+    .compose-preview.horizontal img { width: 33.333%; height: 190px; }
+    .compose-preview.horizontal .compose-preview-placeholder { width: 33.333%; height: 190px; }
+    .compose-directions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 3px; border: 1px solid var(--border); border-radius: 6px; background: #f2efeb; }
+    .compose-directions button { height: 29px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font-size: 8px; font-weight: 750; }
+    .compose-directions button.active { color: var(--text); background: white; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .compose-data-note { margin: 10px 0; padding: 9px; border-radius: 6px; color: #665f59; background: #f7f3ef; font-size: 7px; line-height: 1.55; }
+    .compose-data-note b { color: var(--text); }
+    .compose-panel .btn { width: 100%; }
+    .resource-selection-actions { display: flex; align-items: center; gap: 7px; }
+    .resource-selection-actions .btn[hidden] { display: none; }
+    .resource-upload-actions { display: flex; align-items: center; gap: 6px; }
+    .resource-upload-actions .btn { white-space: nowrap; }
+    .resource-scope-note { margin: 0 4px 11px; padding: 8px; border-radius: 5px; color: #756d66; background: #efebe7; font-size: 7px; line-height: 1.45; }
+    .config-page { max-width: 980px; }
+    .config-section { overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: white; }
+    .config-section-head { padding: 18px 20px; border-bottom: 1px solid var(--border); }
+    .config-section-head h2 { margin: 0; font-size: 16px; }
+    .config-section-head p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+    .config-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px; }
+    .config-row strong { display: block; font-size: 13px; }
+    .config-row small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+    .config-segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 6px; background: #f2efeb; }
+    .config-segmented button { width: 88px; height: 34px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font-size: 11px; font-weight: 800; }
+    .config-segmented button.active { color: var(--text); background: white; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .sku-collection-grid { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 12px; }
+    .sku-cover { height: auto; aspect-ratio: 9 / 16; }
+    .sku-collection-copy { padding: 10px; }
+    .sku-collection-meta { min-height: 32px; align-items: flex-end; }
+    .resource-dimension-filters { position: relative; display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+    .resource-dimension-filters > button { height: 32px; display: inline-flex; align-items: center; gap: 5px; padding: 0 10px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); background: white; font-size: 10px; font-weight: 750; }
+    .resource-dimension-filters > button.active { border-color: #efb9ad; color: var(--primary); background: var(--primary-light); }
+    .resource-dimension-filters > button span { color: var(--primary); font-size: 9px; }
+    .resource-dimension-menu { position: absolute; z-index: 20; top: 38px; left: 0; width: 310px; max-height: 330px; overflow: auto; padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: white; box-shadow: 0 16px 36px rgba(43,35,29,.16); }
+    .dimension-group + .dimension-group { margin-top: 10px; padding-top: 9px; border-top: 1px solid #eeeae5; }
+    .dimension-group > strong { display: block; margin-bottom: 6px; color: var(--text); font-size: 10px; }
+    .dimension-option { min-height: 30px; display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 4px; color: #625b55; font-size: 10px; cursor: pointer; }
+    .dimension-option:hover { background: #faf5f2; }
+    .dimension-option input { width: 15px; height: 15px; accent-color: var(--primary); }
+    .resource-flow-overlay { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px; background: rgba(30,27,24,.42); }
+    .resource-flow-dialog { width: min(760px, calc(100% - 40px)); max-height: calc(100% - 36px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #d9d4cf; border-radius: 8px; background: white; box-shadow: 0 24px 58px rgba(25,21,18,.24); }
+    .resource-flow-dialog.compact { width: min(480px, calc(100% - 40px)); }
+    .resource-flow-dialog > header { min-height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border); }
+    .resource-flow-dialog h3 { margin: 0; font-size: 15px; }
+    .resource-flow-dialog > header button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 5px; color: var(--muted); background: #f3f0ed; }
+    .resource-flow-search { display: grid; grid-template-columns: minmax(0,1fr) 160px; gap: 8px; padding: 12px 16px 0; }
+    .resource-flow-skus { min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; overflow: auto; padding: 12px 16px 16px; }
+    .resource-flow-sku { min-width: 0; overflow: hidden; padding: 0; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: white; text-align: left; }
+    .resource-flow-sku.selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(216,92,66,.12); }
+    .resource-flow-sku img { width: 100%; aspect-ratio: 9 / 16; display: block; object-fit: contain; background: #f5f3f0; }
+    .resource-flow-sku strong, .resource-flow-sku small { display: block; margin: 8px 9px 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .resource-flow-sku strong { font-size: 10px; }
+    .resource-flow-sku small { margin-bottom: 9px; color: var(--muted); font-size: 8px; }
+    .resource-flow-dialog > footer { min-height: 58px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); }
+    .resource-flow-dialog > footer span { margin-right: auto; color: var(--muted); font-size: 10px; }
+    .resource-model-confirm { padding: 22px 20px; }
+    .resource-model-confirm p { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
+    .model-grid .resource-asset-visual { aspect-ratio: 3 / 4; }
+    @media (max-width: 1360px) {
+      .sku-collection-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+      .resource-asset-grid-v3 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+      .compose-workspace { grid-template-columns: 220px minmax(240px,1fr) 230px; }
+    }
+    .creation-page { overflow: hidden; background: #f5f7fb; }
+    .creation-wrap { height: calc(100vh - 55px); display: flex; flex-direction: column; }
+    .app.image-focus .sidebar, .app.image-focus .global-header { display: none; }
+    .app.image-focus .creation-wrap { height: 100vh; }
+    .app.image-focus .shell { width: 100%; }
+    .creation-top { height: 53px; flex: 0 0 53px; background: white; border-bottom: 1px solid #e1e5eb; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+    .creation-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .back-btn { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid #dfe3e8; border-radius: 6px; color: #657082; background: white; }
+    .creation-title h1 { margin: 0; font-size: 15px; }
+    .creation-title p { margin: 3px 0 0; font-size: 9px; color: #8b95a3; }
+    .product-context { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid #d7e9df; background: #f0fbf5; border-radius: 6px; }
+    .product-context img { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; }
+    .product-context strong { display: block; font-size: 9px; }
+    .product-context small { display: block; color: #58806a; font-size: 8px; margin-top: 2px; }
+    .three-col { min-height: 0; flex: 1; display: grid; gap: 12px; padding: 12px; overflow: hidden; }
+    .three-col.image { grid-template-columns: 290px minmax(540px,1fr) 330px; padding: 14px 16px; }
+    .three-col.video { grid-template-columns: 290px minmax(540px,1fr) 330px; padding: 14px 16px; }
+    .col { min-width: 0; height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+    .panel { background: white; border: 1px solid #dfe3e8; border-radius: 7px; padding: 12px; }
+    .panel.flush { padding: 0; overflow: hidden; }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+    .eyebrow { color: var(--primary); font-size: 8px; font-weight: 800; }
+    .panel h2 { margin: 3px 0 0; font-size: 12px; }
+    .panel p.help { margin: 4px 0 0; color: #8b95a3; font-size: 8px; line-height: 1.5; }
+    .asset-main { height: 136px; position: relative; overflow: hidden; border-radius: 6px; background: #f3f5f7; border: 1px solid #e2e6eb; }
+    .asset-main img { width: 100%; height: 100%; object-fit: cover; }
+    .asset-main .selected { position: absolute; top: 7px; left: 7px; color: white; background: #087b55; border-radius: 4px; padding: 3px 6px; font-size: 8px; font-weight: 800; }
+    .asset-main .change { position: absolute; right: 7px; bottom: 7px; height: 25px; border: 0; background: rgba(32,31,29,.78); color: white; border-radius: 4px; padding: 0 7px; font-size: 8px; }
+    .refs { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+    .ref { min-width: 0; position: relative; }
+    .ref img, .ref-add { width: 100%; aspect-ratio: 1; border-radius: 5px; border: 1px solid #e2e6eb; object-fit: cover; background: #f4f6f8; }
+    .ref-add { display: grid; place-items: center; border-style: dashed; color: #9aa3ae; }
+    .ref span { display: block; margin-top: 3px; font-size: 7px; color: #788391; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ref-role { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+    .ref-role b { font-size: 8px; color: #4c5664; }
+    .ref-role button { width: 20px; height: 20px; padding: 0; border: 1px solid #e2e6eb; border-radius: 4px; background: white; color: #7d8794; display: grid; place-items: center; }
+    .ref-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 5px; }
+    .ref-tag { max-width: 100%; padding: 2px 4px; border-radius: 3px; background: #f0f1f9; color: #5969a0; font-size: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .reference-role-picker { position: relative; }
+    .reference-role-picker > button.active { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .reference-role-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 60; display: none; width: 142px; padding: 5px; border: 1px solid #d9dee5; border-radius: 6px; background: white; box-shadow: 0 12px 28px rgba(39,49,62,.16); }
+    .ref:nth-child(2) .reference-role-menu { right: 0; left: auto; }
+    .reference-role-picker.open .reference-role-menu { display: grid; gap: 2px; }
+    .ref-role .reference-role-option { width: 100%; height: 25px; min-height: 25px; padding: 0 6px; border: 0; border-radius: 4px; background: white; display: flex; align-items: center; justify-content: flex-start; gap: 6px; color: #5d6877; font-size: 7px; text-align: left; }
+    .reference-role-option:hover { background: #f5f7f9; }
+    .reference-role-option.selected { color: var(--primary); background: var(--primary-light); font-weight: 800; }
+    .reference-role-option i { width: 12px; height: 12px; border: 1px solid #cdd3db; border-radius: 3px; display: grid; place-items: center; font-style: normal; font-size: 8px; }
+    .reference-role-option.selected i { border-color: var(--primary); background: var(--primary); color: white; }
+    .tag-hint { display: flex; align-items: center; gap: 5px; margin-top: 7px; color: #8b95a3; font-size: 7px; }
+    .facts { display: grid; grid-template-columns: 66px 1fr; gap: 6px 8px; font-size: 8px; }
+    .facts dt { color: #929aa5; }
+    .facts dd { margin: 0; color: #3e4651; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .facts dd.editable { color: var(--primary); font-weight: 700; }
+    .facts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .fact-item { min-width: 0; border-bottom: 1px solid #edf0f3; padding: 2px 0 6px; }
+    .fact-item.full { grid-column: 1 / -1; }
+    .fact-label { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: #929aa5; font-size: 7px; }
+    .fact-label em { padding: 1px 4px; border-radius: 3px; background: #f0f1f9; color: #6573a5; font-style: normal; font-size: 6px; }
+    .fact-label em.ai { background: var(--primary-light); color: var(--primary); }
+    .fact-value { margin-top: 3px; color: #3e4651; font-size: 8px; line-height: 1.45; overflow-wrap: anywhere; }
+    .fact-value.editable { color: var(--primary); font-weight: 700; }
+    .segmented { display: flex; gap: 3px; padding: 3px; border-radius: 6px; background: #f1f3f6; }
+    .segmented button { flex: 1; height: 29px; border: 0; border-radius: 4px; color: #748092; background: transparent; font-size: 9px; font-weight: 700; }
+    .segmented button.active { background: white; color: var(--text); box-shadow: 0 1px 4px rgba(44,52,64,.1); }
+    .video-mode-groups { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+    .video-mode-group { min-width: 0; }
+    .video-mode-group > span { display: block; margin: 0 0 4px 2px; color: #8b95a3; font-size: 7px; font-weight: 800; letter-spacing: .04em; }
+    .video-product-picker { width: 100%; padding: 8px; border: 1px solid #dfe3e8; border-radius: 6px; background: #fbfcfd; display: flex; align-items: center; gap: 8px; color: var(--text); text-align: left; }
+    .video-product-picker img { width: 42px; height: 48px; border-radius: 4px; object-fit: cover; }
+    .video-product-picker strong { display: block; font-size: 9px; }
+    .video-product-picker small { display: block; margin-top: 3px; color: #8b95a3; font-size: 7px; }
+    .video-product-picker i:last-child { margin-left: auto; color: var(--primary); }
+    .video-timeline-panel[hidden] { display: none; }
+    .video-timeline { position: relative; display: grid; gap: 9px; margin-top: 10px; padding-left: 25px; }
+    .video-timeline::before { content: ''; position: absolute; top: 12px; bottom: 18px; left: 9px; width: 1px; background: #cbd5e1; }
+    .video-timeline-item { position: relative; display: grid; grid-template-columns: 62px minmax(0,1fr); gap: 8px; padding: 8px; border: 1px solid #dfe3e8; border-radius: 6px; background: #fbfcfd; }
+    .video-timeline-item::before { content: ''; position: absolute; top: 14px; left: -21px; width: 11px; height: 11px; border: 3px solid white; border-radius: 50%; background: #b8c2cf; box-shadow: 0 0 0 1px #b8c2cf; }
+    .video-timeline-item.start { border-color: #9fdcc5; background: #f4fcf8; }
+    .video-timeline-item.start::before { background: #0f9f6e; box-shadow: 0 0 0 1px #0f9f6e; }
+    .video-timeline-item img { width: 62px; height: 54px; border-radius: 4px; object-fit: cover; }
+    .video-timeline-item h3 { margin: 0; font-size: 9px; }
+    .video-timeline-item p { margin: 3px 0 0; color: #7b8796; font-size: 7px; line-height: 1.45; }
+    .segment-prompt { width: 100%; height: 37px; margin-top: 5px; padding: 6px; border: 1px solid #dfe3e8; border-radius: 4px; background: white; color: #687484; font-size: 7px; line-height: 1.45; resize: none; }
+    .segment-meta { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: #8893a0; font-size: 7px; }
+    .segment-meta span { padding: 2px 4px; border: 1px solid #dde3ea; border-radius: 3px; background: white; color: #667486; }
+    .video-global-rule { padding: 11px; color: #607087; background: #f7faff; font-size: 8px; line-height: 1.55; }
+    .video-global-rule[hidden] { display: none; }
+    .video-global-rule strong { color: #2f3946; }
+    .video-global-rule ul { margin: 6px 0 0 14px; padding: 0; }
+    .video-global-rule details { margin-top: 8px; padding-top: 7px; border-top: 1px solid #dfe8f8; }
+    .video-global-rule summary { cursor: pointer; color: var(--primary); font-weight: 700; }
+    .video-global-rule textarea { width: 100%; height: 45px; margin-top: 7px; padding: 6px; border: 1px solid #dfe3e8; border-radius: 4px; background: white; color: #687484; font-size: 7px; resize: none; }
+    .video-mode-panel[hidden] { display: none; }
+    .video-mode-summary { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: #788391; font-size: 8px; }
+    .video-mode-summary i { color: var(--primary); }
+    .source-video { position: relative; height: 160px; overflow: hidden; border: 1px solid #e2e6eb; border-radius: 6px; background: #161616; }
+    .source-video img { width: 100%; height: 100%; object-fit: cover; opacity: .88; }
+    .source-video .play { position: absolute; inset: 0; display: grid; place-items: center; }
+    .source-video .play i { width: 30px; height: 30px; padding: 8px; border-radius: 50%; color: var(--primary); background: rgba(255,255,255,.92); }
+    .source-video .selected { position: absolute; top: 7px; left: 7px; color: white; background: rgba(32,31,29,.78); border-radius: 4px; padding: 3px 6px; font-size: 8px; font-weight: 800; }
+    .replacement-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin-top: 8px; }
+    .replacement-item { min-width: 0; display: grid; grid-template-columns: 42px minmax(0,1fr); align-items: center; gap: 7px; padding: 6px; border: 1px solid #e2e6eb; border-radius: 6px; background: #fbfcfd; }
+    .replacement-item img { width: 42px; height: 42px; border-radius: 4px; object-fit: cover; }
+    .replacement-item strong { display: block; font-size: 8px; }
+    .replacement-item small { display: block; margin-top: 3px; color: #8b95a3; font-size: 7px; }
+    .type-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
+    .type-card { height: 52px; border: 1px solid #dfe3e8; background: white; border-radius: 6px; padding: 8px; text-align: left; color: #566171; font-size: 8px; }
+    .type-card.active { border-color: #e9aa9d; background: var(--primary-light); color: var(--primary); }
+    .type-card strong { display: block; font-size: 9px; color: inherit; margin-bottom: 3px; }
+    .prompt-box { width: 100%; height: 108px; border: 1px solid #dfe3e8; border-radius: 6px; padding: 9px; color: #4a5462; background: #fbfcfd; font-size: 9px; line-height: 1.55; resize: none; }
+    .prompt-composer { border: 1px solid #dfe3e8; border-radius: 7px; background: #fbfcfd; overflow: visible; box-shadow: inset 0 1px 0 rgba(255,255,255,.9); }
+    .prompt-composer textarea { width: 100%; height: 150px; padding: 11px; border: 0; outline: 0; resize: none; color: #4a5462; background: transparent; font-size: 9px; line-height: 1.65; }
+    .three-col.image > .col:nth-child(2) > .panel:last-child { min-height: 0; flex: 1; display: flex; flex-direction: column; }
+    .three-col.image > .col:nth-child(2) .prompt-composer { min-height: 300px; flex: 1; display: flex; flex-direction: column; }
+    .three-col.image > .col:nth-child(2) .prompt-composer textarea { min-height: 210px; height: auto; flex: 1; }
+    .three-col.video > .col:nth-child(2) .video-prompt-panel { display: flex; flex-direction: column; }
+    .three-col.video > .col:nth-child(2) .prompt-composer textarea { height: 112px; }
+    .composer-footer { border-top: 1px solid #e5e8ed; background: white; padding: 8px; }
+    .composer-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: #8b95a3; font-size: 7px; }
+    .composer-tags { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+    .param-chip { max-width: 170px; height: 26px; padding: 0 7px; border: 1px solid #dfe3e8; border-radius: 6px; background: #f8fafc; color: #556171; display: inline-flex; align-items: center; gap: 4px; font-size: 7px; font-weight: 700; }
+    .param-chip strong { color: #26313f; font-size: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .param-chip.primary { border-color: #efc0b6; background: var(--primary-light); color: var(--primary); }
+    .param-chip.active { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(203,87,65,.12); }
+    .param-chip:disabled { cursor: not-allowed; border-color: #dfe3e8; background: #f1f3f5; color: #9aa3ae; box-shadow: none; }
+    .param-chip:disabled strong { color: #74808e; }
+    .composer-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: #8c96a2; font-size: 7px; }
+    .composer-meta span:last-child { color: #64748b; font-weight: 700; }
+    .tag-picker { position: relative; }
+    .tag-menu { position: absolute; left: 0; bottom: calc(100% + 7px); z-index: 50; display: none; width: min(500px, calc(100vw - 40px)); padding: 7px; border: 1px solid #d9dee5; border-radius: 7px; background: white; box-shadow: 0 14px 34px rgba(39,49,62,.16); }
+    .tag-picker.open .tag-menu { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+    .tag-picker[data-tag-picker="scene"] .tag-menu, .tag-picker[data-tag-picker="pose"] .tag-menu { width: 360px; grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .tag-option { min-width: 0; min-height: 54px; padding: 5px; border: 1px solid transparent; border-radius: 5px; background: white; display: grid; grid-template-columns: 42px minmax(0,1fr); align-items: center; gap: 7px; text-align: left; color: #667181; }
+    .tag-option:hover { background: #f7f8fa; border-color: #e5e8ed; }
+    .tag-option.selected { border-color: #e9aa9d; background: var(--primary-light); }
+    .tag-option img { width: 42px; height: 42px; border: 1px solid #e4e7eb; border-radius: 4px; background: #f3f5f7; object-fit: cover; }
+    .tag-option strong { display: block; color: #2f3946; font-size: 8px; line-height: 1.35; }
+    .tag-option small { display: block; margin-top: 3px; color: #8b95a3; font-size: 6px; line-height: 1.35; }
+    .tag-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }
+    .tag-select { border: 1px solid #dfe3e8; background: #fbfcfd; border-radius: 6px; padding: 8px; }
+    .tag-select span { color: #9099a5; font-size: 7px; }
+    .tag-select strong { display: block; margin-top: 4px; font-size: 9px; }
+    .model-row { display: grid; grid-template-columns: 1.2fr repeat(3,.65fr); gap: 7px; }
+    .model-field { border: 1px solid #dfe3e8; background: white; border-radius: 6px; padding: 7px 8px; min-width: 0; }
+    .model-field span { display: block; color: #969eaa; font-size: 7px; }
+    .model-field strong { display: block; margin-top: 4px; font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .notice { display: flex; gap: 7px; padding: 8px; border: 1px solid #d8e3f5; background: #f3f7fd; color: #536b91; border-radius: 6px; font-size: 8px; line-height: 1.5; }
+    .result-panel { min-height: 100%; display: flex; flex-direction: column; background: #fff; border: 1px solid #dfe3e8; border-radius: 7px; overflow: hidden; }
+    .result-head { padding: 12px; border-bottom: 1px solid #e5e8ed; display: flex; align-items: center; justify-content: space-between; }
+    .result-head h2 { margin: 0; font-size: 12px; }
+    .progress { padding: 10px 12px; background: #fbfcfd; border-bottom: 1px solid #e5e8ed; }
+    .progress-line { display: flex; align-items: center; justify-content: space-between; font-size: 8px; color: #758092; }
+    .progress-track { height: 5px; margin-top: 7px; border-radius: 5px; background: #e9edf1; overflow: hidden; }
+    .progress-track span { display: block; height: 100%; width: 75%; background: var(--primary); border-radius: inherit; }
+    .result-body { min-height: 0; flex: 1; padding: 10px; overflow: auto; }
+    .result-hero { width: 100%; aspect-ratio: 1 / 1.16; border-radius: 6px; object-fit: cover; background: #eef1f4; }
+    .result-thumbs { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-top: 7px; }
+    .result-thumbs img, .result-loading { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 5px; border: 1px solid #dfe3e8; }
+    .result-thumbs img.active { border: 2px solid var(--primary); }
+    .result-loading { display: grid; place-items: center; color: #9aa3ae; background: #f4f6f8; }
+    .result-meta { margin-top: 8px; display: flex; align-items: center; justify-content: space-between; color: #8c96a2; font-size: 8px; }
+    .result-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; border-top: 1px solid #e5e8ed; }
+    .result-actions .btn { height: 31px; padding: 0 8px; font-size: 9px; }
+    .video-preview { position: relative; aspect-ratio: 9/13; max-height: 390px; margin: 0 auto; overflow: hidden; border-radius: 7px; background: #161616; }
+    .video-preview img { width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+    .play { position: absolute; inset: 0; display: grid; place-items: center; }
+    .play button { width: 48px; height: 48px; border: 0; border-radius: 50%; background: rgba(255,255,255,.9); color: var(--primary); display: grid; place-items: center; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+    .storyboard { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }
+    .shot { min-width: 0; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden; background: #fbfcfd; }
+    .shot img { width: 100%; height: 68px; object-fit: cover; }
+    .shot div { padding: 6px; font-size: 8px; line-height: 1.45; color: #687383; }
+    .shot strong { display: block; color: #3e4651; margin-bottom: 2px; }
+    svg { width: 15px; height: 15px; stroke-width: 1.8; flex: 0 0 auto; }
+    @media (max-width: 1280px) {
+      .sidebar { width: 190px; flex-basis: 190px; }
+      .three-col.image { grid-template-columns: 265px minmax(450px,1fr) 300px; }
+      .three-col.video { grid-template-columns: 265px minmax(450px,1fr) 300px; }
+      .product-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+      .asset-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+      .resource-assets { grid-template-columns: repeat(4, minmax(0,1fr)); }
+      .resource-assets.catalog { grid-template-columns: repeat(3, minmax(0,1fr)); }
+      .resource-product-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+      .resource-catalog-layout { grid-template-columns: 160px minmax(0,1fr); }
+      .combine-layout { grid-template-columns: 150px minmax(0,1fr) 250px; }
+      .combine-source-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><i data-lucide="aperture"></i></div>
+        <div><strong>达芬奇密码 AI</strong><small>WORKBENCH</small></div>
+      </div>
+      <div class="new-action"><button data-go="image"><i data-lucide="circle-plus"></i>新建创作<i data-lucide="chevron-down"></i></button></div>
+      <nav class="menu">
+        <div class="menu-title">主模块</div>
+        <button class="menu-item"><i data-lucide="layout-dashboard"></i>工作台首页</button>
+        <button class="menu-item"><i data-lucide="sparkles"></i>创作助手</button>
+        <button class="menu-item"><i data-lucide="clock-3"></i>任务列表</button>
+        <button class="menu-item"><i data-lucide="panels-top-left"></i>智能模板中心</button>
+        <button class="menu-item" data-go="library"><i data-lucide="archive"></i>商品素材库<span class="dot"></span></button>
+        <button class="menu-item"><i data-lucide="chart-no-axes-combined"></i>数据效能复盘</button>
+        <div class="menu-title">系统与主数据</div>
+        <button class="menu-item" data-go="config"><i data-lucide="settings"></i>系统配置模块</button>
+        <button class="menu-item"><i data-lucide="git-compare-arrows"></i>通道异步任务</button>
+        <button class="menu-item"><i data-lucide="folder-tree"></i>资源分类</button>
+        <button class="menu-item"><i data-lucide="network"></i>商品分类</button>
+        <button class="menu-item" data-go="products"><i data-lucide="package-search"></i>产品管理<span class="dot"></span></button>
+        <button class="menu-item"><i data-lucide="book-open"></i>字典管理</button>
+      </nav>
+      <div class="user"><div class="avatar">潘</div><div><strong>潘俊杰</strong><small>产品管理员 · 在线</small></div></div>
+    </aside>
+
+    <section class="shell">
+      <header class="global-header">
+        <div class="crumbs"><span>达芬奇密码 AI</span><i data-lucide="chevron-right"></i><strong id="page-crumb">产品管理</strong></div>
+        <div class="header-tools">
+          <div class="prototype-switcher" aria-label="效果稿页面切换">
+            <button data-go="products">产品管理</button>
+            <button data-go="library">商品素材库</button>
+            <button data-go="resource">资源中心弹窗</button>
+            <button data-go="image">图片创作</button>
+            <button data-go="video">视频创作</button>
+            <button data-go="config">系统配置</button>
+          </div>
+          <button class="icon-btn" title="通知"><i data-lucide="bell"></i></button>
+          <button class="icon-btn" title="帮助"><i data-lucide="circle-help"></i></button>
+        </div>
+      </header>
+
+      <main class="page" data-page="products">
+        <div class="page-inner">
+          <div class="page-head">
+            <div><h1>产品管理</h1><p>ERP 商品规格主目录 · 商品与分类信息由旺店通同步，只读</p></div>
+            <div class="actions"><div class="sync-health"><span class="status-dot"></span>ERP 正常 · 8 分钟前</div><button class="btn"><i data-lucide="history"></i>同步记录</button><button class="btn primary"><i data-lucide="refresh-cw"></i>立即同步</button></div>
+          </div>
+          <div class="metrics">
+            <div class="metric"><span>有效 ERP 规格</span><strong>1,248</strong><small>本次新增 12</small></div>
+            <div class="metric"><span>ERP 分类</span><strong>86</strong><small>每日全量校准</small></div>
+            <div class="metric"><span>图片已就绪</span><strong>1,186</strong><small>95.0% 规格可直接创作</small></div>
+            <div class="metric"><span>图片处理中</span><strong>41</strong><small>后台自动转存 COS</small></div>
+            <div class="metric"><span>需处理异常</span><strong style="color:var(--warning)">21</strong><small>16 图片 · 5 字段</small></div>
+          </div>
+          <div class="toolbar">
+            <div class="field"><label>搜索商品 / 货品编号 / 规格编码</label><div class="search-wrap"><i data-lucide="search"></i><input class="control" value="" placeholder="例如 TEST1、蓝色、123" /></div></div>
+            <div class="field"><label>ERP 分类</label><select class="control"><option>全部分类</option><option>B101 夏季水果类</option><option>家居服 / 睡衣</option></select></div>
+            <div class="field"><label>来源</label><select class="control"><option>全部来源</option><option>ERP 同步</option><option>本地来源</option></select></div>
+            <div class="field"><label>规格状态</label><select class="control"><option>有效规格</option><option>ERP 已停用</option><option>全部状态</option></select></div>
+            <div class="field"><label>图片状态</label><select class="control"><option>全部状态</option><option>已就绪</option><option>处理中</option><option>部分失败</option></select></div>
+            <div class="field"><label>&nbsp;</label><button class="btn icon-only" title="清除筛选"><i data-lucide="rotate-ccw"></i></button></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <colgroup><col style="width:29%"><col style="width:9%"><col style="width:9%"><col style="width:14%"><col style="width:7%"><col style="width:9%"><col style="width:10%"><col style="width:13%"></colgroup>
+              <thead><tr><th>商品 / 规格</th><th>货品编号</th><th>规格编码</th><th>ERP 分类</th><th>图片</th><th>来源</th><th>同步状态</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr><td><div class="product-cell"><img class="thumb" src="../../dist/mock-assets/source/green-pajama-top.jpg"><div><strong>青柠格纹家居服上衣</strong><small>规格：绿色 / M · specid 1170</small></div></div></td><td class="mono">TEST1</td><td class="mono">Y0010</td><td><span class="badge gray">家居服 / 夏季</span></td><td><b>3</b> 张</td><td><span class="badge info">ERP 同步</span></td><td><span class="badge green">已同步</span></td><td><div class="row-actions"><button class="primary-outline" data-go="image">图片创作</button><button data-go="video">视频</button><button class="icon-only" title="以当前规格为上衣或下装创建组合项目"><i data-lucide="layers-3"></i></button></div></td></tr>
+                <tr><td><div class="product-cell"><img class="thumb" src="../../dist/mock-assets/source/green-pajama-pants.jpg"><div><strong>青柠格纹家居长裤</strong><small>规格：绿色 / L · specid 23792</small></div></div></td><td class="mono">12345</td><td class="mono">PANTS-L</td><td><span class="badge gray">家居服 / 下装</span></td><td><b>2</b> 张</td><td><span class="badge info">ERP 同步</span></td><td><span class="badge green">已同步</span></td><td><div class="row-actions"><button class="primary-outline" data-go="image">图片创作</button><button data-go="video">视频</button><button class="icon-only" title="以当前规格为上衣或下装创建组合项目"><i data-lucide="layers-3"></i></button></div></td></tr>
+                <tr><td><div class="product-cell"><img class="thumb" src="../../dist/mock-assets/source/green-pajama-shorts.jpg"><div><strong>清爽格纹家居短裤</strong><small>规格：薄荷绿 / 均码 · specid 23793</small></div></div></td><td class="mono">12345</td><td class="mono">SHORT-F</td><td><span class="badge gray">B101 夏季水果类</span></td><td><b>1</b> 张</td><td><span class="badge info">ERP 同步</span></td><td><span class="badge amber">图片处理中</span></td><td><div class="row-actions"><button class="primary-outline" data-go="image">图片创作</button><button data-go="video">视频</button><button>···</button></div></td></tr>
+                <tr><td><div class="product-cell"><img class="thumb" src="../../dist/mock-assets/lark/sleepdress-pure.jpg"><div><strong>轻奢蕾丝吊带睡裙</strong><small>规格：香槟色 / M · specid 22994</small></div></div></td><td class="mono">SLP-208</td><td class="mono">CHAMP-M</td><td><span class="badge gray">睡衣 / 吊带裙</span></td><td><b>5</b> 张</td><td><span class="badge info">ERP 同步</span></td><td><span class="badge amber">1 张失败</span></td><td><div class="row-actions"><button class="primary-outline" data-go="image">图片创作</button><button data-go="video">视频</button><button>···</button></div></td></tr>
+                <tr><td><div class="product-cell"><img class="thumb" src="../../dist/mock-assets/lark/sleepdress-senior.jpg"><div><strong>缎面晨雾家居套装</strong><small>本地商品 · 待匹配 ERP 规格</small></div></div></td><td class="mono">LOCAL-018</td><td class="mono">—</td><td><span class="badge gray">历史分类</span></td><td><b>8</b> 张</td><td><span class="badge gray">本地来源</span></td><td><span class="badge rose">待匹配</span></td><td><div class="row-actions"><button class="primary-outline">匹配 ERP</button><button data-go="image">创作</button><button>···</button></div></td></tr>
+              </tbody>
+            </table>
+            <div class="pagination"><span>共 1,248 个有效规格 · 当前 1-5</span><div class="pager"><button><i data-lucide="chevron-left"></i></button><button class="active">1</button><button>2</button><button>3</button><button><i data-lucide="chevron-right"></i></button></div></div>
+          </div>
+        </div>
+      </main>
+
+      <main class="page" data-page="library">
+        <div class="page-inner">
+          <div class="page-head"><div><h1>商品素材库</h1><p>只展示已上传本地素材或提交过创作任务的单规格项目和组合项目</p></div><div class="actions"><button class="btn"><i data-lucide="upload"></i>上传素材</button><button class="btn primary" data-go="image"><i data-lucide="sparkles"></i>新建创作</button></div></div>
+          <div class="metrics">
+            <div class="metric"><span>活跃商品</span><strong>33</strong><small>不是全量 ERP 商品</small></div>
+            <div class="metric"><span>输入图片</span><strong>188</strong><small>ERP 选择 + 本地上传</small></div>
+            <div class="metric"><span>生成图片</span><strong>126</strong><small>本周 +18</small></div>
+            <div class="metric"><span>生成视频</span><strong>18</strong><small>本周 +4</small></div>
+            <div class="metric"><span>待审核</span><strong style="color:var(--warning)">183</strong><small>需要优先处理</small></div>
+          </div>
+          <div class="library-toolbar">
+            <div class="field"><label>搜索商品 / 规格</label><div class="search-wrap"><i data-lucide="search"></i><input class="control" placeholder="输入商品名称、货品编号或规格" /></div></div>
+            <div class="field"><label>ERP 分类</label><select class="control"><option>全部分类</option><option>家居服 / 睡衣</option></select></div>
+            <div class="field"><label>素材类型</label><select class="control"><option>全部素材</option><option>输入素材</option><option>生成图片</option><option>生成视频</option></select></div>
+            <div class="field"><label>审核状态</label><select class="control"><option>全部状态</option><option>待审核</option><option>已通过</option></select></div>
+            <div class="field"><label>&nbsp;</label><button class="btn icon-only" title="清除筛选"><i data-lucide="rotate-ccw"></i></button></div>
+          </div>
+          <div class="section-bar"><strong>近期活跃商品</strong><span>按最近创作时间排序 · 共 33 个</span></div>
+          <div class="product-grid">
+            <article class="product-card"><div class="product-visual"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><span class="source-chip">组合套装</span></div><div class="product-card-body"><h3>青柠格纹家居服套装</h3><div class="spec">上衣 TEST1 / 1170 + 下装 PANTS-L / 23792</div><div class="asset-counts"><span><b>2</b>输入</span><span><b>6</b>图片</span><span><b>1</b>视频</span></div><div class="card-footer"><small>一份组合素材 · 9 分钟前</small><button class="btn" data-go="image">继续创作<i data-lucide="arrow-right"></i></button></div></div></article>
+            <article class="product-card"><div class="product-visual"><img src="../../dist/mock-assets/results/sleepdress-bedroom.png"><span class="source-chip">ERP 商品</span></div><div class="product-card-body"><h3>轻奢蕾丝吊带睡裙</h3><div class="spec">香槟色 / M · SLP-208 · 22994</div><div class="asset-counts"><span><b>5</b>输入</span><span><b>18</b>图片</span><span><b>3</b>视频</span></div><div class="card-footer"><small>图片创作 · 12 分钟前</small><button class="btn" data-go="image">继续创作<i data-lucide="arrow-right"></i></button></div></div></article>
+            <article class="product-card"><div class="product-visual"><img src="../../dist/mock-assets/results/sleepdress-three-view-bedroom.png"><span class="source-chip">ERP 商品</span></div><div class="product-card-body"><h3>青柠格纹家居服上衣</h3><div class="spec">绿色 / M · TEST1 · 1170</div><div class="asset-counts"><span><b>3</b>输入</span><span><b>9</b>图片</span><span><b>1</b>视频</span></div><div class="card-footer"><small>视频创作 · 1 小时前</small><button class="btn" data-go="video">继续创作<i data-lucide="arrow-right"></i></button></div></div></article>
+            <article class="product-card"><div class="product-visual"><img src="../../dist/mock-assets/template-gallery/new-chinese-garden.jpg"><span class="source-chip">ERP 商品</span></div><div class="product-card-body"><h3>东方印花居家长裙</h3><div class="spec">藏青 / L · DR-101 · 88521</div><div class="asset-counts"><span><b>4</b>输入</span><span><b>12</b>图片</span><span><b>0</b>视频</span></div><div class="card-footer"><small>待审核 4 个 · 昨天</small><button class="btn" data-go="image">查看项目<i data-lucide="arrow-right"></i></button></div></div></article>
+            <article class="product-card"><div class="product-visual"><img src="../../dist/mock-assets/template-gallery/dopamine-home.jpg"><span class="source-chip">本地来源</span></div><div class="product-card-body"><h3>多巴胺条纹睡衣套装</h3><div class="spec">彩色 / 均码 · LOCAL-018 · 待匹配</div><div class="asset-counts"><span><b>8</b>输入</span><span><b>21</b>图片</span><span><b>4</b>视频</span></div><div class="card-footer"><small>ERP 待匹配 · 2 天前</small><button class="btn" data-go="image">继续创作<i data-lucide="arrow-right"></i></button></div></div></article>
+          </div>
+        </div>
+      </main>
+
+      <main class="page" data-page="config">
+        <div class="page-inner config-page">
+          <div class="page-head"><div><h1>系统配置</h1><p>工作空间级规则，仅管理员可修改</p></div></div>
+          <section class="config-section">
+            <div class="config-section-head"><div><h2>资源中心</h2><p>控制未关联产品的通用素材可见范围</p></div></div>
+            <div class="config-row">
+              <div><strong>通用素材可见范围</strong><small>产品素材始终团队共享，不受此设置影响</small></div>
+              <div class="config-segmented" data-general-scope><button class="active" data-general-scope-value="personal">个人</button><button data-general-scope-value="team">团队</button></div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <main class="page resource-modal-page" data-page="resource">
+        <div class="resource-underlay">
+          <div class="creation-top"><div class="creation-title"><button class="back-btn"><i data-lucide="arrow-left"></i></button><div><h1>新建图片任务</h1><p>配置、生成与结果在同一页面完成</p></div></div><div class="product-context"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><div><strong>青柠格纹家居服上衣 · 绿色 / M</strong><small>ERP SKU TEST1-GRN-M</small></div></div></div>
+          <div class="resource-underlay-grid"><div class="resource-underlay-col"></div><div class="resource-underlay-col"></div><div class="resource-underlay-col"></div></div>
+        </div>
+        <div class="resource-backdrop">
+          <section class="resource-modal" role="dialog" aria-modal="true" aria-label="资源中心">
+            <header class="resource-modal-head resource-v3-head">
+              <div class="resource-modal-title"><span><i data-lucide="library"></i></span><div><h2>资源中心</h2><small>按归属管理，按类型筛选</small></div></div>
+              <div class="resource-scope-tabs" role="tablist" aria-label="素材归属">
+                <button class="active" role="tab" aria-selected="true" data-resource-tab="product"><i data-lucide="package"></i>产品素材 <span class="count">248 SKU</span></button>
+                <button role="tab" aria-selected="false" data-resource-tab="general"><i data-lucide="shapes"></i>通用素材 <span class="count">31</span></button>
+                <button role="tab" aria-selected="false" data-resource-tab="model"><i data-lucide="user-round"></i>模特素材 <span class="count">12</span></button>
+              </div>
+              <div class="resource-head-tools"><div class="search-wrap resource-search"><i data-lucide="search"></i><input class="control" placeholder="搜索名称、SKU 或标签"></div><button class="resource-close" data-go="image" title="关闭资源中心"><i data-lucide="x"></i></button></div>
+            </header>
+            <div class="resource-modal-body resource-v3-body">
+              <div class="resource-shell">
+                <aside class="resource-side">
+                  <div data-resource-media-filter><div class="resource-side-label">素材类型</div><div class="resource-media-filter" role="group" aria-label="素材类型筛选"><button class="active" aria-pressed="true" data-resource-media="image"><i data-lucide="image"></i>图片</button><button aria-pressed="false" data-resource-media="video"><i data-lucide="video"></i>视频</button></div><div class="resource-side-divider"></div></div>
+                  <div class="resource-side-filters">
+                    <div data-resource-side-panel="product">
+                      <div class="resource-filter-section"><div class="resource-filter-title">商品分类</div><div class="resource-filter-list"><button class="active">全部产品<span>248</span></button><button>睡衣 / 家居服<span>86</span></button><button>围巾<span>42</span></button><button>帽子<span>35</span></button><button>鞋履<span>28</span></button><button>其他配饰<span>57</span></button></div></div>
+                    </div>
+                    <div data-resource-side-panel="general" hidden>
+                      <p class="resource-scope-note" data-general-scope-copy>仅显示我上传或生成、且尚未关联产品的素材。</p>
+                      <div class="resource-filter-section"><div class="resource-filter-title">来源</div><div class="resource-filter-list"><button class="active">全部来源<span>31</span></button><button>本地上传<span>14</span></button><button>目录导入<span>9</span></button><button>生成沉淀<span>8</span></button></div></div>
+                    </div>
+                    <div data-resource-side-panel="model" hidden>
+                      <div class="resource-filter-section"><div class="resource-filter-title">模特状态</div><div class="resource-filter-list"><button class="active">全部模特<span>12</span></button><button>已发布<span>9</span></button><button>草稿<span>3</span></button></div></div>
+                    </div>
+                  </div>
+                  <div class="resource-capacity"><div class="resource-capacity-head">存储空间<span>82%</span></div><div class="resource-capacity-track"><i></i></div><small>已使用 4.1GB / 5.0GB</small></div>
+                </aside>
+
+                <section class="resource-workspace">
+                  <div data-resource-tab-panel="product">
+                    <div data-resource-panel="products">
+                      <div class="resource-workspace-head"><div><h3 data-resource-product-title>产品素材</h3><p>勾选多个 SKU 可进行搭配合成；进入单个 SKU 查看全部素材</p></div><div class="resource-workspace-tools"><button class="btn primary" data-resource-combine-start disabled><i data-lucide="layers-3"></i>搭配合成</button><button class="btn" data-import-action="upload" data-product-import disabled title="选择一个 SKU 后上传"><i data-lucide="upload"></i>本地上传</button><button class="btn" data-import-action="scan" data-product-import disabled title="选择一个 SKU 后扫描目录"><i data-lucide="folder-search"></i>目录扫描</button></div></div>
+                      <div class="resource-workspace-scroll">
+                        <div class="resource-filter-strip"><div class="filter-chips"><button class="active">全部</button><button>最近使用</button></div><button class="resource-sort"><i data-lucide="arrow-down-up"></i>最近更新</button></div>
+                        <section class="resource-spu"><div class="resource-spu-head"><div><strong>青柠格纹居家系列</strong><span class="badge info">SPU · TEST1</span></div><small>3 个 SKU</small></div><div class="sku-collection-grid">
+                          <article class="sku-collection" data-sku-id="TEST1-GRN-M" data-sku-role="上装"><button class="sku-toggle" data-sku-toggle title="选择 SKU"><i data-lucide="check"></i></button><div class="sku-cover"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><span class="sku-cover-label">当前白底图</span></div><div class="sku-collection-copy"><h4>青柠格纹家居服上衣</h4><p>绿色 / M · TEST1-GRN-M</p><div class="sku-collection-meta"><span data-media-only="image">13 张图片 · 8 分钟前</span><span data-media-only="video" hidden>4 条视频 · 26 分钟前</span><button class="sku-open" data-sku-open><i data-lucide="images"></i>查看素材</button></div></div></article>
+                          <article class="sku-collection" data-sku-id="PANTS-L" data-sku-role="下装"><button class="sku-toggle" data-sku-toggle title="选择 SKU"><i data-lucide="check"></i></button><div class="sku-cover"><img src="../../dist/mock-assets/source/green-pajama-pants.jpg"><span class="sku-cover-label">当前白底图</span></div><div class="sku-collection-copy"><h4>青柠格纹家居长裤</h4><p>绿色 / L · PANTS-L</p><div class="sku-collection-meta"><span data-media-only="image">8 张图片 · 34 分钟前</span><span data-media-only="video" hidden>2 条视频 · 昨天</span><button class="sku-open" data-sku-open><i data-lucide="images"></i>查看素材</button></div></div></article>
+                          <article class="sku-collection" data-sku-id="SHORTS-M" data-sku-role="下装"><button class="sku-toggle" data-sku-toggle title="选择 SKU"><i data-lucide="check"></i></button><div class="sku-cover"><img src="../../dist/mock-assets/source/green-pajama-shorts.jpg"><span class="sku-cover-label">当前白底图</span></div><div class="sku-collection-copy"><h4>青柠格纹家居短裤</h4><p>绿色 / M · SHORTS-M</p><div class="sku-collection-meta"><span data-media-only="image">5 张图片 · 昨天</span><span data-media-only="video" hidden>1 条视频 · 2 天前</span><button class="sku-open" data-sku-open><i data-lucide="images"></i>查看素材</button></div></div></article>
+                        </div></section>
+                        <section class="resource-spu"><div class="resource-spu-head"><div><strong>单规格商品</strong></div><small>直接按 SKU 展示</small></div><div class="sku-collection-grid">
+                          <article class="sku-collection" data-sku-id="SHOES-01" data-sku-role="鞋履"><button class="sku-toggle" data-sku-toggle title="选择 SKU"><i data-lucide="check"></i></button><div class="sku-cover"><div class="sku-placeholder"><i data-lucide="footprints"></i><small>ERP 白底图占位</small></div><span class="sku-cover-label">当前白底图</span></div><div class="sku-collection-copy"><h4>珍珠白家居拖鞋</h4><p>白色 / 均码 · SHOES-01</p><div class="sku-collection-meta"><span data-media-only="image">6 张图片 · 2 小时前</span><span data-media-only="video" hidden>暂无视频</span><button class="sku-open" data-sku-open><i data-lucide="images"></i>查看素材</button></div></div></article>
+                          <article class="sku-collection" data-sku-id="SCARF-01" data-sku-role="配饰"><button class="sku-toggle" data-sku-toggle title="选择 SKU"><i data-lucide="check"></i></button><div class="sku-cover"><img src="../../dist/mock-assets/template-gallery/eastern-elegance.jpg"><span class="sku-cover-label">当前白底图</span></div><div class="sku-collection-copy"><h4>雾蓝真丝方巾</h4><p>雾蓝 / 65cm · SCARF-01</p><div class="sku-collection-meta"><span>4 张图片 · 昨天</span><button class="sku-open" data-sku-open><i data-lucide="images"></i>查看素材</button></div></div></article>
+                          <article class="sku-collection" data-sku-id="HAT-01" data-sku-role="配饰"><button class="sku-toggle" data-sku-toggle title="选择 SKU"><i data-lucide="check"></i></button><div class="sku-cover"><img src="../../dist/mock-assets/template-gallery/dopamine-home.jpg"><span class="sku-cover-label">当前白底图</span></div><div class="sku-collection-copy"><h4>元气撞色遮阳帽</h4><p>柠檬黄 / 均码 · HAT-01</p><div class="sku-collection-meta"><span>3 张图片 · 2 天前</span><button class="sku-open" data-sku-open><i data-lucide="images"></i>查看素材</button></div></div></article>
+                          <article class="sku-collection" data-sku-id="DRESS-01" data-sku-role="连衣裙"><button class="sku-toggle" data-sku-toggle title="选择 SKU"><i data-lucide="check"></i></button><div class="sku-cover"><img src="../../dist/mock-assets/lark/sleepdress-pure.jpg"><span class="sku-cover-label">当前白底图</span></div><div class="sku-collection-copy"><h4>轻奢蕾丝吊带睡裙</h4><p>香槟色 / M · DRESS-01</p><div class="sku-collection-meta"><span>18 张图片 · 12 分钟前</span><button class="sku-open" data-sku-open><i data-lucide="images"></i>查看素材</button></div></div></article>
+                          <article class="sku-collection" data-sku-id="PAJAMA-01" data-sku-role="套装"><button class="sku-toggle" data-sku-toggle title="选择 SKU"><i data-lucide="check"></i></button><div class="sku-cover"><img src="../../dist/mock-assets/lark/sleepdress-senior.jpg"><span class="sku-cover-label">当前白底图</span></div><div class="sku-collection-copy"><h4>缎面晨雾家居套装</h4><p>晨雾灰 / L · PAJAMA-01</p><div class="sku-collection-meta"><span>9 张图片 · 3 天前</span><button class="sku-open" data-sku-open><i data-lucide="images"></i>查看素材</button></div></div></article>
+                        </div></section>
+                      </div>
+                    </div>
+
+                    <div data-resource-panel="current" hidden>
+                      <div class="resource-workspace-head"><div><div class="resource-breadcrumb"><button data-resource-view="products">产品素材</button><i data-lucide="chevron-right"></i><span>TEST1-GRN-M</span></div><h3 style="margin-top:5px">青柠格纹家居服上衣</h3><p>绿色 / M · 睡衣 / 家居服 · 默认图来自 ERP 或用户更换</p></div><div class="resource-workspace-tools"><button class="btn"><i data-lucide="upload"></i>上传到此 SKU</button></div></div>
+                      <div class="resource-workspace-scroll"><div class="resource-filter-strip"><div class="filter-chips"><button class="active">全部</button><button data-media-only="image">ERP 同步</button><button data-media-only="image">用户上传</button><button>生成结果</button><button data-media-only="image">搭配合成</button></div><button class="resource-sort"><i data-lucide="arrow-down-up"></i>最近更新</button></div><div class="resource-tag-row"><span>标签</span><button class="active">全部</button><button>静奢老钱</button><button>窗边居家</button><button>自然站姿</button><button>细节</button></div><div class="resource-asset-grid-v3">
+                        <article class="resource-asset selected" data-resource-select data-media-only="image"><div class="resource-asset-visual"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><span class="resource-selected"><i data-lucide="check"></i></span></div><div class="resource-asset-body"><strong>ERP 商品正面图</strong><small>ERP 同步 · 当前主体图</small><div class="resource-asset-tags"><span>商品主体</span><span>正面</span></div></div></article>
+                        <article class="resource-asset" data-resource-select data-media-only="image"><div class="resource-asset-visual"><img src="../../dist/mock-assets/results/sleepdress-three-view-bedroom.png"></div><div class="resource-asset-body"><strong>静奢三视图 · V3</strong><small>生成结果 · 8 分钟前</small><div class="resource-asset-tags"><span>静奢老钱</span><span>场景</span></div></div></article>
+                        <article class="resource-asset" data-resource-select data-media-only="image"><div class="resource-asset-visual"><img src="../../dist/mock-assets/results/sleepdress-bedroom.png"></div><div class="resource-asset-body"><strong>窗边居家展示图</strong><small>生成结果 · 26 分钟前</small><div class="resource-asset-tags"><span>窗边居家</span><span>模特</span></div></div></article>
+                        <article class="resource-asset" data-resource-select data-media-only="image"><div class="resource-asset-visual"><img src="../../dist/mock-assets/template-gallery/quiet-satin-morning.jpg"></div><div class="resource-asset-body"><strong>上装 + 长裤 + 鞋履</strong><small>搭配合成 · 共用文件</small><div class="resource-asset-tags"><span>搭配合成</span><span>3 SKU</span></div></div></article>
+                        <article class="resource-asset" data-resource-select data-media-only="video" hidden><div class="resource-asset-visual video"><img src="../../dist/mock-assets/results/sleepdress-three-view-bedroom.png"><span class="video-play"><i><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></i></span><span class="media-duration">00:12</span></div><div class="resource-asset-body"><strong>居家服三镜展示</strong><small>商品展示 · 26 分钟前</small><div class="resource-asset-tags"><span>三镜</span><span>自然转身</span></div></div></article>
+                        <article class="resource-asset" data-resource-select data-media-only="video" hidden><div class="resource-asset-visual video"><img src="../../dist/mock-assets/template-gallery/quiet-satin-morning.jpg"><span class="video-play"><i><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></i></span><span class="media-duration">00:08</span></div><div class="resource-asset-body"><strong>窗边静奢短片</strong><small>参考图驱动 · 昨天</small><div class="resource-asset-tags"><span>静奢老钱</span><span>窗边</span></div></div></article>
+                      </div></div>
+                    </div>
+
+                    <div data-resource-panel="combine" hidden>
+                      <div class="resource-workspace-head"><div><div class="resource-breadcrumb"><button data-resource-view="products">产品素材</button><i data-lucide="chevron-right"></i><span>搭配合成</span></div><h3 style="margin-top:5px">搭配合成</h3><p>只读取每个已选 SKU 的当前白底图，按顺序上下或左右拼接</p></div><span class="badge green">3 个 SKU · 文件只存一份</span></div>
+                      <div class="resource-workspace-scroll"><div class="compose-workspace">
+                        <section class="compose-panel"><div class="compose-panel-head"><div><strong>参与商品</strong><small>每个 SKU 自动使用当前白底图</small></div><span class="badge gray">3</span></div><div class="compose-source-list">
+                          <div class="compose-source-item"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><div><b>上装</b><strong>青柠格纹家居服上衣</strong><small>TEST1-GRN-M · 当前白底图</small></div><i data-lucide="lock"></i></div>
+                          <div class="compose-source-item"><img src="../../dist/mock-assets/source/green-pajama-pants.jpg"><div><b>下装</b><strong>青柠格纹家居长裤</strong><small>PANTS-L · 当前白底图</small></div><i data-lucide="lock"></i></div>
+                          <div class="compose-source-item"><span class="compose-source-thumb"><i data-lucide="footprints"></i></span><div><b>鞋履</b><strong>珍珠白家居拖鞋</strong><small>SHOES-01 · 当前白底图</small></div><i data-lucide="lock"></i></div>
+                        </div></section>
+                        <section class="compose-panel"><div class="compose-panel-head"><div><strong>合成预览</strong><small>按左侧顺序生成，不改变原图内容</small></div><span class="badge info">PNG</span></div><div class="compose-preview-stage"><div class="compose-preview" data-compose-preview><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><img src="../../dist/mock-assets/source/green-pajama-pants.jpg"><span class="compose-preview-placeholder"><i data-lucide="footprints"></i></span></div></div></section>
+                        <aside class="compose-panel"><div class="compose-panel-head"><div><strong>合成设置</strong><small>形式服务于商品搭配关系</small></div></div><div class="compose-directions"><button class="active" data-compose-direction="vertical">上下拼接</button><button data-compose-direction="horizontal">左右拼接</button></div><div class="compose-data-note"><b>保存规则</b><br>底层文件只存一份；为上装、下装、鞋履分别生成一条 SKU 素材引用，因此每个产品素材集合都能看到该结果。</div><button class="btn primary" data-combine-save><i data-lucide="save"></i>保存搭配素材</button></aside>
+                      </div></div>
+                    </div>
+                  </div>
+
+                  <div data-resource-tab-panel="general" hidden>
+                    <div class="resource-workspace-head"><div><h3 data-resource-general-title>通用素材 · 图片</h3><p>当前范围：个人；仅展示我拥有且尚未关联产品的素材</p></div><div class="resource-workspace-tools"><button class="btn" data-set-product disabled><i data-lucide="package-plus"></i>设为产品素材</button><button class="btn" data-set-model disabled><i data-lucide="user-round-plus"></i>设为模特</button><button class="btn" data-import-action="upload"><i data-lucide="upload"></i>本地上传</button><button class="btn" data-import-action="scan"><i data-lucide="folder-search"></i>目录扫描</button></div></div>
+                    <div class="resource-workspace-scroll"><div class="resource-filter-strip"><div class="filter-chips"><button class="active">全部</button><button>最近使用</button></div><button class="resource-sort"><i data-lucide="arrow-down-up"></i>最近更新</button></div>
+                      <div class="resource-dimension-filters">
+                        <button data-resource-dimension="style">风格 <span data-dimension-count="style"></span><i data-lucide="chevron-down"></i></button>
+                        <button data-resource-dimension="scene">场景 <span data-dimension-count="scene"></span><i data-lucide="chevron-down"></i></button>
+                        <button data-resource-dimension="detail">细节 <span data-dimension-count="detail"></span><i data-lucide="chevron-down"></i></button>
+                        <button data-resource-dimension="pose">姿势 <span data-dimension-count="pose"></span><i data-lucide="chevron-down"></i></button>
+                        <div class="resource-dimension-menu" data-dimension-menu hidden></div>
+                      </div>
+                      <div class="resource-asset-grid-v3">
+                        <article class="resource-asset" data-resource-select data-media-only="image"><div class="resource-asset-visual"><img src="../../dist/mock-assets/template-gallery/quiet-satin-morning.jpg"></div><div class="resource-asset-body"><strong>静奢缎面晨光</strong><small>我生成的 · 今天 10:24</small><div class="resource-asset-tags"><span>静奢深睡品质感</span><span>窗边安静居家</span></div></div></article>
+                        <article class="resource-asset" data-resource-select data-media-only="image"><div class="resource-asset-visual"><img src="../../dist/mock-assets/template-gallery/creamy-bedroom.jpg"></div><div class="resource-asset-body"><strong>奶油卧室布景</strong><small>我上传的 · 昨天</small><div class="resource-asset-tags"><span>奶油甜妹卧室</span><span>奶油卧室</span></div></div></article>
+                        <article class="resource-asset" data-resource-select data-media-only="image"><div class="resource-asset-visual"><img src="../../dist/mock-assets/template-gallery/new-chinese-garden.jpg"></div><div class="resource-asset-body"><strong>新中式园林</strong><small>目录导入 · 2 天前</small><div class="resource-asset-tags"><span>新中式极简</span><span>庭院</span></div></div></article>
+                        <article class="resource-asset" data-resource-select data-media-only="video" hidden><div class="resource-asset-visual video"><img src="../../dist/mock-assets/template-gallery/dark-sweet-cool.jpg"><span class="video-play"><i><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></i></span><span class="media-duration">00:06</span></div><div class="resource-asset-body"><strong>快速转身镜头</strong><small>我上传的 · 今天 09:18</small><div class="resource-asset-tags"><span>转身</span><span>中景</span></div></div></article>
+                        <article class="resource-asset" data-resource-select data-media-only="video" hidden><div class="resource-asset-visual video"><img src="../../dist/mock-assets/template-gallery/vintage-home.jpg"><span class="video-play"><i><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></i></span><span class="media-duration">00:15</span></div><div class="resource-asset-body"><strong>复古居家运镜</strong><small>目录导入 · 昨天</small><div class="resource-asset-tags"><span>推进</span><span>家居</span></div></div></article>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div data-resource-tab-panel="model" hidden>
+                    <div class="resource-workspace-head"><div><h3>模特素材</h3><p>选择已发布模特；创建、编辑与发布仍在模特库完成</p></div><div class="resource-workspace-tools"><button class="btn"><i data-lucide="external-link"></i>打开模特库</button></div></div>
+                    <div class="resource-workspace-scroll"><div class="resource-filter-strip"><div class="filter-chips"><button class="active">全部</button><button>最近使用</button></div><button class="resource-sort"><i data-lucide="arrow-down-up"></i>最近更新</button></div><div class="resource-asset-grid-v3 model-grid">
+                      <article class="resource-asset" data-resource-select><div class="resource-asset-visual"><img src="../../dist/mock-assets/reference/model-senior.jpg"></div><div class="resource-asset-body"><strong>知性成熟模特</strong><small>已发布 · 适合主图与场景图</small><div class="resource-asset-tags"><span>成熟</span><span>自然</span></div></div></article>
+                      <article class="resource-asset" data-resource-select><div class="resource-asset-visual"><img src="../../dist/mock-assets/reference/model-pure.jpg"></div><div class="resource-asset-body"><strong>清透自然模特</strong><small>已发布 · 适合家居服</small><div class="resource-asset-tags"><span>清透</span><span>居家</span></div></div></article>
+                      <article class="resource-asset" data-resource-select><div class="resource-asset-visual"><img src="../../dist/mock-assets/reference/model-sweet.jpg"></div><div class="resource-asset-body"><strong>甜美活力模特</strong><small>已发布 · 适合明快场景</small><div class="resource-asset-tags"><span>甜美</span><span>活力</span></div></div></article>
+                      <article class="resource-asset" data-resource-select><div class="resource-asset-visual"><img src="../../dist/mock-assets/reference/pose-tryon.jpg"></div><div class="resource-asset-body"><strong>自然试穿模特</strong><small>草稿 · 仅本人可见</small><div class="resource-asset-tags"><span>试穿</span><span>站姿</span></div></div></article>
+                    </div></div>
+                  </div>
+
+                </section>
+              </div>
+            </div>
+            <div class="resource-flow-overlay" data-resource-flow="product" hidden>
+              <section class="resource-flow-dialog">
+                <header><h3>选择关联产品</h3><button data-resource-flow-close title="关闭"><i data-lucide="x"></i></button></header>
+                <div class="resource-flow-search"><input class="control" placeholder="搜索 ERP 商品名称、SPU 或 SKU"><select class="control"><option>全部 ERP 分类</option><option>睡衣 / 家居服</option><option>围巾</option><option>帽子</option><option>鞋履</option></select></div>
+                <div class="resource-flow-skus">
+                  <button class="resource-flow-sku" data-flow-sku="TEST1-GRN-M"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><strong>青柠格纹家居服上衣</strong><small>绿色 / M · TEST1-GRN-M</small></button>
+                  <button class="resource-flow-sku" data-flow-sku="PANTS-L"><img src="../../dist/mock-assets/source/green-pajama-pants.jpg"><strong>青柠格纹家居长裤</strong><small>绿色 / L · PANTS-L</small></button>
+                  <button class="resource-flow-sku" data-flow-sku="DRESS-01"><img src="../../dist/mock-assets/lark/sleepdress-pure.jpg"><strong>轻奢蕾丝吊带睡裙</strong><small>香槟色 / M · DRESS-01</small></button>
+                  <button class="resource-flow-sku" data-flow-sku="PAJAMA-01"><img src="../../dist/mock-assets/lark/sleepdress-senior.jpg"><strong>缎面晨雾家居套装</strong><small>晨雾灰 / L · PAJAMA-01</small></button>
+                </div>
+                <footer><span>一个素材只能关联一个 SKU</span><button class="btn" data-resource-flow-close>取消</button><button class="btn primary" data-product-convert-confirm disabled>确认关联</button></footer>
+              </section>
+            </div>
+            <div class="resource-flow-overlay" data-resource-flow="model" hidden>
+              <section class="resource-flow-dialog compact">
+                <header><h3>设为模特</h3><button data-resource-flow-close title="关闭"><i data-lucide="x"></i></button></header>
+                <div class="resource-model-confirm"><p>素材将移入模特素材，名称默认使用当前素材名称。后续可在模特库编辑档案。</p></div>
+                <footer><button class="btn" data-resource-flow-close>取消</button><button class="btn primary" data-model-convert-confirm>确认移入</button></footer>
+              </section>
+            </div>
+            <footer class="resource-modal-foot"><span data-resource-status>选择一个 SKU 查看素材，或多选 SKU 进行搭配合成</span><div class="resource-selection-actions"><button class="btn" data-resource-clear hidden><i data-lucide="x-circle"></i>清除选择</button><button class="btn" data-resource-view="products" data-resource-back-list hidden><i data-lucide="arrow-left"></i>返回产品列表</button><button class="btn" data-go="image">取消</button><button class="btn primary" data-go="image" data-resource-confirm hidden disabled>确认使用</button></div></footer>
+          </section>
+        </div>
+      </main>
+
+      <main class="page creation-page" data-page="image">
+        <div class="creation-wrap">
+          <div class="creation-top"><div class="creation-title"><button class="back-btn" data-go="products" title="返回产品管理"><i data-lucide="arrow-left"></i></button><div><h1>新建图片任务</h1><p>配置、生成与结果在同一页面完成</p></div></div><div class="product-context"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><div><strong>青柠格纹家居服上衣 · 绿色 / M</strong><small>由产品管理带入 · ERP 规格 1170</small></div><span class="badge green">已匹配</span></div></div>
+          <div class="three-col image">
+            <section class="col">
+              <div class="panel"><div class="panel-head"><div><span class="eyebrow">创作商品</span><h2>主体素材</h2></div><button class="btn" data-go="resource" style="height:26px;padding:0 7px;font-size:8px">资源中心</button></div><div class="asset-main"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><span class="selected">ERP 首图 · 已选主体</span><button class="change">更换</button></div></div>
+              <div class="panel"><div class="panel-head"><div><span class="eyebrow">补充依据</span><h2>参考图</h2><p class="help">每张图片可承担多个参考角色</p></div><span class="badge gray">2 / 5</span></div><div class="refs"><div class="ref"><img src="../../dist/mock-assets/reference/model-senior.jpg"><div class="ref-role"><b>参考图 1</b><div class="reference-role-picker" data-reference-id="reference-1"><button title="选择参考角色" aria-expanded="false"><i data-lucide="tags"></i></button><div class="reference-role-menu" role="listbox" aria-label="参考图 1 角色"></div></div></div><div class="ref-tags" data-reference-tags="reference-1"></div></div><div class="ref"><img src="../../dist/mock-assets/results/sleepdress-lace-detail.png"><div class="ref-role"><b>参考图 2</b><div class="reference-role-picker" data-reference-id="reference-2"><button title="选择参考角色" aria-expanded="false"><i data-lucide="tags"></i></button><div class="reference-role-menu" role="listbox" aria-label="参考图 2 角色"></div></div></div><div class="ref-tags" data-reference-tags="reference-2"></div></div><div class="ref"><div class="ref-add"><i data-lucide="plus"></i></div><div class="ref-role"><b>添加参考</b><button title="从资源中心添加"><i data-lucide="image-plus"></i></button></div></div></div><div class="tag-hint"><i data-lucide="tags"></i>角色枚举：模特、风格、场景、姿势、细节</div></div>
+              <div class="panel"><div class="panel-head"><div><span class="eyebrow">ERP 商品事实</span><h2>青柠格纹家居服上衣</h2><p class="help">家居服 / 夏季</p></div><button class="btn icon-only" style="width:26px;height:26px" title="复制全部商品事实"><i data-lucide="copy"></i></button></div><div class="facts-grid"><div class="fact-item full"><div class="fact-label"><span>SEO 优化商品名称</span></div><div class="fact-value editable">2026 夏季青柠格纹短袖家居服女款</div></div><div class="fact-item"><div class="fact-label"><span>颜色</span></div><div class="fact-value editable">青柠绿</div></div><div class="fact-item"><div class="fact-label"><span>图案 / 材质</span></div><div class="fact-value editable">格纹 / 柔软棉感</div></div><div class="fact-item"><div class="fact-label"><span>版型 / 结构</span></div><div class="fact-value editable">宽松短袖 / 翻领排扣</div></div><div class="fact-item"><div class="fact-label"><span>核心卖点</span></div><div class="fact-value editable">轻薄透气、清爽格纹、居家舒适</div></div></div></div>
+            </section>
+            <section class="col">
+              <div class="panel"><div class="panel-head"><div><span class="eyebrow">输出内容</span><h2>选择图片类型</h2></div><span class="badge gray">共生成 3 张</span></div><div class="type-row"><button class="type-card active"><strong>商品主图</strong>2 张 · 1:1</button><button class="type-card active"><strong>场景图</strong>1 张 · 3:4</button><button class="type-card"><strong>细节图</strong>未选择</button><button class="type-card"><strong>三视图</strong>未选择</button></div></div>
+              <div class="panel"><div class="panel-head"><div><span class="eyebrow">内容表达</span><h2>本次图片 Prompt</h2><p class="help">像对话输入框一样编辑文字，并在底部直接调整创作标签</p></div><button class="btn" style="height:28px;padding:0 8px;font-size:8px"><i data-lucide="wand-sparkles"></i>AI 优化</button></div><div class="prompt-composer"><textarea data-reference-prompt>模特、风格与场景参考图 1；细节参考图 2。保持青柠格纹家居服的颜色、翻领、排扣和短袖版型准确，人物自然站立，突出轻薄透气和柔软棉感，不改变商品结构。</textarea><div class="composer-footer"><div class="composer-label"><span>创作标签</span><span>已引用参考图的标签自动锁定</span></div><div class="composer-tags"><div class="tag-picker" data-tag-picker="style"><button class="param-chip primary" aria-expanded="false"><i data-lucide="palette"></i>风格 <strong data-tag-value>静奢深睡品质感</strong><i data-lucide="chevron-down"></i></button><div class="tag-menu" role="listbox" aria-label="风格选项"></div></div><div class="tag-picker" data-tag-picker="scene"><button class="param-chip primary" aria-expanded="false"><i data-lucide="mountain-snow"></i>场景 <strong data-tag-value>窗边安静居家</strong><i data-lucide="chevron-down"></i></button><div class="tag-menu" role="listbox" aria-label="场景选项"></div></div><div class="tag-picker" data-tag-picker="pose"><button class="param-chip primary" aria-expanded="false"><i data-lucide="person-standing"></i>姿势 <strong data-tag-value>自然站姿</strong><i data-lucide="chevron-down"></i></button><div class="tag-menu" role="listbox" aria-label="姿势选项"></div></div><button class="param-chip"><i data-lucide="box"></i>模型 <strong>Qwen Image Pro</strong><i data-lucide="chevron-down"></i></button><button class="param-chip"><i data-lucide="rectangle-horizontal"></i>比例 <strong>3:4</strong><i data-lucide="chevron-down"></i></button></div><div class="composer-meta"><span>3 张 · 2K · 高质量</span><span>商品保真与安全约束已应用</span></div></div></div></div>
+            </section>
+            <aside class="col">
+              <div class="result-panel"><div class="result-head"><h2>本次生成结果</h2><span class="badge amber">生成中 · 3 / 4</span></div><div class="progress"><div class="progress-line"><span>正在生成场景图</span><b>75%</b></div><div class="progress-track"><span></span></div></div><div class="result-body"><img class="result-hero" src="../../dist/mock-assets/results/sleepdress-bedroom.png"><div class="result-thumbs"><img class="active" src="../../dist/mock-assets/results/sleepdress-bedroom.png"><img src="../../dist/mock-assets/results/sleepdress-lace-detail.png"><div class="result-loading"><i data-lucide="loader-circle"></i></div></div><div class="result-meta"><span>任务组 IMG-20260808-1042</span><span>已完成 2 · 生成中 1</span></div><div class="notice" style="margin-top:8px"><i data-lucide="info"></i><span>可以离开页面，任务会在后台继续。返回时自动恢复进度和结果。</span></div></div><div class="result-actions"><button class="btn"><i data-lucide="rotate-ccw"></i>重试失败项</button><button class="btn"><i data-lucide="pencil-line"></i>继续修改</button><button class="btn"><i data-lucide="video"></i>生成视频</button><button class="btn primary"><i data-lucide="archive"></i>保存为资产</button></div></div>
+            </aside>
+          </div>
+        </div>
+      </main>
+
+      <main class="page creation-page" data-page="video">
+        <div class="creation-wrap">
+          <div class="creation-top"><div class="creation-title"><button class="back-btn" data-go="library" title="返回商品素材库"><i data-lucide="arrow-left"></i></button><div><h1>新建视频任务</h1><p>先选择产品，再按创作方式提供必要素材</p></div></div></div>
+          <div class="three-col video">
+            <section class="col">
+              <div class="panel"><div class="panel-head"><div><span class="eyebrow">创作商品</span><h2>选择产品</h2></div><span class="badge gray">必填</span></div><button class="video-product-picker"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><span><strong>青柠格纹家居服上衣 · 青柠绿 / M</strong><small>ERP 同步 · SKU 1170 · 从产品库选择或更换</small></span><i data-lucide="chevron-right"></i></button></div>
+              <div class="panel video-mode-panel" data-video-source="first-frame" hidden><div class="panel-head"><div><span class="eyebrow">输入素材</span><h2>视频首帧</h2><p class="help">此模式只接收 1 张首帧，不再添加参考图</p></div><button class="btn" style="height:26px;padding:0 7px;font-size:8px">更换</button></div><div class="asset-main" style="height:190px"><img src="../../dist/mock-assets/results/sleepdress-bedroom.png"><span class="selected">唯一图像输入 · 首帧</span></div><div class="video-mode-summary"><i data-lucide="image"></i><span>已上传 1 / 1 张，商品主体和构图以此图为准</span></div></div>
+
+              <div class="panel video-mode-panel" data-video-source="multi-frame" hidden><div class="panel-head"><div><span class="eyebrow">输入素材</span><h2>首帧与关键帧</h2><p class="help">首帧确定起点，2～9 段关键帧按顺序推进画面</p></div><span class="badge gray">3 段</span></div><div class="refs"><div class="ref"><img src="../../dist/mock-assets/results/sleepdress-bedroom.png"><span>首帧 · 起始画面</span></div><div class="ref"><img src="../../dist/mock-assets/results/sleepdress-three-view-bedroom.png"><span>关键帧 1 · 转身</span></div><div class="ref"><img src="../../dist/mock-assets/results/sleepdress-lace-detail.png"><span>关键帧 2 · 细节</span></div></div><div class="notice" style="margin-top:9px"><i data-lucide="git-branch"></i><span>每段只描述与上一帧的变化；画面风格、场景与姿势由已选图片决定。</span></div></div>
+
+              <div class="panel video-mode-panel" data-video-source="commerce" hidden><div class="panel-head"><div><span class="eyebrow">输入素材</span><h2>电商源视频</h2><p class="help">保留标准电商展示结构，替换为当前 ERP 商品</p></div><button class="btn" style="height:26px;padding:0 7px;font-size:8px">更换</button></div><div class="source-video"><img src="../../dist/mock-assets/template-gallery/quiet-satin-video.jpg"><span class="selected">源视频 · 8 秒</span><div class="play"><i data-lucide="play"></i></div></div><div class="replacement-grid"><div class="replacement-item"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><div><strong>替换商品</strong><small>ERP 商品主图</small></div></div><div class="replacement-item"><img src="../../dist/mock-assets/reference/model-pure.jpg"><div><strong>可选模特</strong><small>保留原模特</small></div></div></div></div>
+
+              <div class="panel video-mode-panel" data-video-source="viral" hidden><div class="panel-head"><div><span class="eyebrow">输入素材</span><h2>爆款源视频</h2><p class="help">拆解钩子、镜头节奏和转场，再替换商品素材</p></div><button class="btn" style="height:26px;padding:0 7px;font-size:8px">更换</button></div><div class="source-video"><img src="../../dist/mock-assets/template-gallery/dopamine-video.jpg"><span class="selected">爆款源视频 · 12 秒</span><div class="play"><i data-lucide="play"></i></div></div><div class="replacement-grid"><div class="replacement-item"><img src="../../dist/mock-assets/source/green-pajama-top.jpg"><div><strong>替换商品</strong><small>ERP 商品主图</small></div></div><div class="replacement-item"><img src="../../dist/mock-assets/reference/model-sweet.jpg"><div><strong>替换模特</strong><small>可更换为公司模特</small></div></div></div></div>
+
+              <div class="panel"><div class="panel-head"><div><span class="eyebrow">ERP 商品事实</span><h2>青柠格纹家居服上衣</h2><p class="help">家居服 / 夏季</p></div><span class="badge info">只读同步</span></div><dl class="facts"><dt>规格</dt><dd>青柠绿 / M</dd><dt>来源结果</dt><dd>IMG-1042 / V1</dd><dt>核心卖点</dt><dd>轻薄透气、清爽格纹</dd><dt>材质</dt><dd>柔软棉感</dd><dt>版型 / 结构</dt><dd>宽松短袖 / 翻领排扣</dd></dl></div>
+            </section>
+            <section class="col">
+              <div class="panel"><div class="panel-head"><div><span class="eyebrow">视频模式</span><h2>选择创作方式</h2></div><span class="badge gray" data-video-mode-badge>单张首帧驱动</span></div><div class="video-mode-groups"><div class="video-mode-group"><span>图生视频</span><div class="segmented"><button class="active" data-video-mode="first-frame">首帧图生</button><button data-video-mode="multi-frame">智能多帧</button></div></div><div class="video-mode-group"><span>视频复刻</span><div class="segmented"><button data-video-mode="viral">爆款复刻</button><button data-video-mode="commerce">电商复刻</button></div></div></div><div class="video-mode-summary"><i data-lucide="route"></i><span data-video-mode-summary>1 张首帧 → 补充动作与镜头 → 生成视频</span></div></div>
+
+              <div class="panel video-prompt-panel"><div class="panel-head"><div><span class="eyebrow">内容表达</span><h2 data-video-prompt-title>本次视频 Prompt</h2><p class="help" data-video-mode-help>首帧已确定画面，请补充动作、镜头与节奏</p></div><button class="btn" style="height:28px;padding:0 8px;font-size:8px"><i data-lucide="wand-sparkles"></i>AI 优化</button></div><div class="prompt-composer"><textarea data-video-prompt>保持已选首帧中的商品主体和构图，模特先自然站立，再缓慢转身，镜头从中景平稳推进至面料细节。保持青柠格纹家居服的颜色、翻领、排扣和短袖版型准确。</textarea><div class="video-global-rule" data-video-global-rule hidden><strong>全局规则已自动应用</strong><ul><li>选中商品的事实、首帧和关键帧约束</li><li>全片商品一致性、镜头连续性与安全约束</li></ul><details><summary>补充全局要求（可选）</summary><textarea placeholder="例如：全片保持克制节奏，不要快速切镜或出现字幕。"></textarea></details></div><div class="composer-footer"><div class="composer-label"><span>模型配置</span><span data-video-composer-hint>首帧已定义画面风格、场景、模特与姿势</span></div><div class="composer-tags video-param-tags"><button class="param-chip"><i data-lucide="box"></i>模型 <strong data-video-param-model>Vidu Q3 Turbo</strong><i data-lucide="chevron-down"></i></button><button class="param-chip"><i data-lucide="timer"></i>时长 <strong data-video-param-duration>5 秒</strong><i data-lucide="chevron-down"></i></button><button class="param-chip"><i data-lucide="monitor"></i>分辨率 <strong data-video-param-resolution>720P</strong><i data-lucide="chevron-down"></i></button><button class="param-chip"><i data-lucide="rectangle-vertical"></i>比例 <strong data-video-param-ratio>9:16</strong><i data-lucide="chevron-down"></i></button><button class="param-chip"><i data-lucide="volume-2"></i>音频 <strong data-video-param-audio>生成音频</strong><i data-lucide="chevron-down"></i></button></div><div class="composer-meta"><span data-video-visual-owner>画面视觉以首帧图片为准</span><span>商品保真与安全约束已应用</span></div></div></div></div>
+
+              <div class="panel video-timeline-panel" data-video-timeline hidden><div class="panel-head"><div><span class="eyebrow">时间轴编排</span><h2>分镜关键帧与段 Prompt</h2><p class="help">全局 Prompt 定义整体目标；每段 Prompt 只描述从上一帧到当前关键帧的运动与画面变化。</p></div><button class="btn" style="height:27px;padding:0 8px;font-size:8px"><i data-lucide="plus"></i>新增关键帧</button></div><div class="video-timeline"><article class="video-timeline-item start"><img src="../../dist/mock-assets/results/sleepdress-bedroom.png"><div><h3>START · 视频首帧</h3><p>起始画面由首帧定义，作为整条视频的视觉基线。</p><div class="segment-meta"><span>0 秒</span><span>严格首帧</span></div></div></article><article class="video-timeline-item"><img src="../../dist/mock-assets/results/sleepdress-three-view-bedroom.png"><div><h3>第 1 段 · 0 - 5 秒</h3><textarea class="segment-prompt">镜头保持中景，人物从自然站立缓慢转身，衣摆随动作自然摆动。</textarea><div class="segment-meta"><span>关键帧 1</span><span>时长 5 秒 ▾</span></div></div></article><article class="video-timeline-item"><img src="../../dist/mock-assets/results/sleepdress-lace-detail.png"><div><h3>第 2 段 · 5 - 10 秒</h3><textarea class="segment-prompt">从人物中景平稳推进至翻领和面料细节，保持光线与商品结构稳定。</textarea><div class="segment-meta"><span>关键帧 2</span><span>时长 5 秒 ▾</span></div></div></article></div></div>
+
+              <div class="panel" data-video-storyboard-panel><div class="panel-head"><div><span class="eyebrow">AI 分镜</span><h2>3 个镜头</h2><p class="help" data-video-storyboard-help>已根据首帧和 Prompt 生成，不引入其他参考图</p></div><button class="btn" style="height:27px;padding:0 8px;font-size:8px"><i data-lucide="wand-sparkles"></i>重新生成</button></div><div class="storyboard"><div class="shot"><img src="../../dist/mock-assets/results/sleepdress-bedroom.png"><div><strong data-video-shot-title="0">镜头 1 · 0-2s</strong><span data-video-shot-copy="0">首帧构图，人物保持稳定</span></div></div><div class="shot"><img src="../../dist/mock-assets/results/sleepdress-three-view-bedroom.png"><div><strong data-video-shot-title="1">镜头 2 · 2-5s</strong><span data-video-shot-copy="1">轻转身，展示格纹与垂感</span></div></div><div class="shot"><img src="../../dist/mock-assets/results/sleepdress-lace-detail.png"><div><strong data-video-shot-title="2">镜头 3 · 5-8s</strong><span data-video-shot-copy="2">稳定推进，强调翻领排扣</span></div></div></div></div>
+            </section>
+            <aside class="col">
+              <div class="result-panel"><div class="result-head"><h2>视频结果</h2><span class="badge green">已完成</span></div><div class="result-body"><div class="video-preview"><img src="../../dist/mock-assets/template-gallery/quiet-satin-video.jpg"><div class="play"><button title="播放视频"><i data-lucide="play"></i></button></div></div><div class="result-meta"><span>VID-20260808-0526 · V1</span><span>8 秒 · 9:16 · 1080P</span></div><div class="notice" style="margin-top:8px"><i data-lucide="check-circle-2"></i><span>生成完成。输入素材、Prompt、分镜和模型参数已随任务快照保存。</span></div></div><div class="result-actions"><button class="btn"><i data-lucide="download"></i>下载</button><button class="btn"><i data-lucide="pencil-line"></i>继续修改</button><button class="btn"><i data-lucide="star"></i>提交审核</button><button class="btn primary"><i data-lucide="archive"></i>保存为资产</button></div></div>
+            </aside>
+          </div>
+        </div>
+      </main>
+    </section>
+  </div>
+  <script>
+    const pageNames = { products: '产品管理', library: '商品素材库', resource: '资源中心弹窗', image: '图片创作', video: '视频创作', config: '系统配置' };
+    const tagAssetRoot = '../../dist/mock-assets/tag-icons';
+    const imagePromptTags = {
+      styles: [
+        { id: 'SWEET_CREAMY', label: '奶油甜妹卧室', description: '柔光、浅色床品与轻松生活感', image: `${tagAssetRoot}/style-sweet-creamy.png`, defaultScene: 'CREAMY_BEDROOM', defaultPose: 'NATURAL_STAND', scenes: ['CREAMY_BEDROOM', 'QUIET_WINDOW'], poses: ['NATURAL_STAND', 'BED_EDGE_SIT', 'LOOK_BACK'] },
+        { id: 'QUIET_LUXURY', label: '静奢深睡品质感', description: '灰绿低饱和、垂感面料与窗边漫反射', image: `${tagAssetRoot}/style-quiet-luxury.png`, defaultScene: 'QUIET_WINDOW', defaultPose: 'WINDOW_WALK', scenes: ['QUIET_WINDOW', 'LIGHT_HOME', 'DARK_HOME'], poses: ['NATURAL_STAND', 'BED_EDGE_SIT', 'WINDOW_WALK'] },
+        { id: 'VINTAGE_HOME', label: '复古田园居家', description: '旧木、奶油织物与柔和晨光', image: `${tagAssetRoot}/style-vintage-home.png`, defaultScene: 'VINTAGE_WOOD', defaultPose: 'BED_EDGE_SIT', scenes: ['VINTAGE_WOOD', 'QUIET_WINDOW'], poses: ['BED_EDGE_SIT', 'WINDOW_WALK', 'SLEEVE_ADJUST'] },
+        { id: 'EASTERN_MATURE', label: '东方雅致轻熟', description: '雾蓝米白、端庄实穿与温和日光', image: `${tagAssetRoot}/style-eastern-mature.png`, defaultScene: 'LIGHT_HOME', defaultPose: 'THREE_QUARTER', scenes: ['LIGHT_HOME', 'QUIET_WINDOW', 'CHINESE_MINIMAL'], poses: ['NATURAL_STAND', 'THREE_QUARTER', 'SLEEVE_ADJUST'] },
+        { id: 'NEW_CHINESE_MINIMAL', label: '新中式雅致', description: '留白、木质与低饱和东方线条', image: `${tagAssetRoot}/style-new-chinese-minimal.png`, defaultScene: 'CHINESE_MINIMAL', defaultPose: 'SLEEVE_ADJUST', scenes: ['CHINESE_MINIMAL', 'LIGHT_HOME'], poses: ['NATURAL_STAND', 'THREE_QUARTER', 'SLEEVE_ADJUST'] },
+        { id: 'DOPAMINE_PLAYFUL', label: '多巴胺元气居家', description: '粉橘黄绿的明快生活氛围', image: `${tagAssetRoot}/style-dopamine-playful.png`, defaultScene: 'COLORFUL_ROOM', defaultPose: 'TURN_BACK', scenes: ['COLORFUL_ROOM', 'CREAMY_BEDROOM'], poses: ['NATURAL_STAND', 'TURN_BACK', 'LOOK_BACK'] },
+        { id: 'DARK_GOTHIC', label: '甜酷暗黑辣妹', description: '黑银侧光、修身线条与画册感', image: `${tagAssetRoot}/style-dark-gothic.png`, defaultScene: 'DARK_HOME', defaultPose: 'LOOK_BACK', scenes: ['DARK_HOME', 'WHITE_STUDIO'], poses: ['NATURAL_STAND', 'THREE_QUARTER', 'LOOK_BACK'] },
+        { id: 'SWEET_COOL_STREET', label: '甜酷美式街头', description: '低角度直给、轻松反差与个性细节', image: `${tagAssetRoot}/style-sweet-cool-street.png`, defaultScene: 'WHITE_STUDIO', defaultPose: 'THREE_QUARTER', scenes: ['WHITE_STUDIO', 'COLORFUL_ROOM'], poses: ['NATURAL_STAND', 'THREE_QUARTER', 'TURN_BACK'] },
+        { id: 'FRENCH_FEMININE', label: '法式轻奢裙装', description: '柔和轮廓、自然光与轻盈浪漫', image: `${tagAssetRoot}/style-french-feminine.png`, defaultScene: 'VINTAGE_WOOD', defaultPose: 'LOOK_BACK', scenes: ['VINTAGE_WOOD', 'QUIET_WINDOW', 'LIGHT_HOME'], poses: ['NATURAL_STAND', 'THREE_QUARTER', 'LOOK_BACK'] }
+      ],
+      scenes: [
+        { id: 'CREAMY_BEDROOM', label: '奶油柔光卧室', description: '浅色床品、柔和散射光', image: `${tagAssetRoot}/scene-creamy-bedroom.png` },
+        { id: 'QUIET_WINDOW', label: '窗边安静居家', description: '自然窗光、留白与真实景深', image: `${tagAssetRoot}/scene-quiet-window.png` },
+        { id: 'VINTAGE_WOOD', label: '旧木田园空间', description: '木质、织物与温暖晨光', image: `${tagAssetRoot}/scene-vintage-wood.png` },
+        { id: 'LIGHT_HOME', label: '浅色质感家居', description: '米白雾蓝、干净生活空间', image: `${tagAssetRoot}/scene-light-home.png` },
+        { id: 'CHINESE_MINIMAL', label: '留白新中式', description: '木质屏风、淡墨绿色与留白', image: `${tagAssetRoot}/scene-chinese-minimal.png` },
+        { id: 'COLORFUL_ROOM', label: '元气彩色房间', description: '克制彩色道具与明快日光', image: `${tagAssetRoot}/scene-colorful-room.png` },
+        { id: 'DARK_HOME', label: '暗调缎面居家', description: '深灰暗红、局部高光与私域感', image: `${tagAssetRoot}/scene-dark-home.png` },
+        { id: 'WHITE_STUDIO', label: '明亮低干扰影棚', description: '商品优先、背景克制、轮廓清晰', image: `${tagAssetRoot}/scene-white-studio.png` }
+      ],
+      poses: [
+        { id: 'NATURAL_STAND', label: '自然站姿', description: '全身完整，手部不遮挡商品', image: `${tagAssetRoot}/pose-natural-stand.svg` },
+        { id: 'THREE_QUARTER', label: '45 度微侧身', description: '兼顾版型轮廓与正面信息', image: `${tagAssetRoot}/pose-three-quarter.svg` },
+        { id: 'BED_EDGE_SIT', label: '床边自然坐姿', description: '松弛居家，衣摆自然展开', image: `${tagAssetRoot}/pose-bed-edge-sit.svg` },
+        { id: 'WINDOW_WALK', label: '窗边缓步', description: '展示垂感与衣摆动态', image: `${tagAssetRoot}/pose-window-walk.svg` },
+        { id: 'SLEEVE_ADJUST', label: '轻整理袖口', description: '突出袖口细节，不遮挡主体', image: `${tagAssetRoot}/pose-sleeve-adjust.svg` },
+        { id: 'TURN_BACK', label: '轻转身', description: '展示侧背面轮廓与松量', image: `${tagAssetRoot}/pose-turn-back.svg` },
+        { id: 'LOOK_BACK', label: '侧身回望', description: '保留人物神态，同时保持商品可见', image: `${tagAssetRoot}/pose-look-back.svg` }
+      ]
+    };
+    const selectedPromptTags = { style: 'QUIET_LUXURY', scene: 'QUIET_WINDOW', pose: 'NATURAL_STAND' };
+    const referenceRoleOptions = [
+      { id: 'model', label: '模特' },
+      { id: 'style', label: '风格' },
+      { id: 'scene', label: '场景' },
+      { id: 'pose', label: '姿势' },
+      { id: 'detail', label: '细节' }
+    ];
+    const referenceNames = { 'reference-1': '参考图 1', 'reference-2': '参考图 2' };
+    const referenceRoleSelections = {
+      'reference-1': new Set(['model', 'style', 'scene']),
+      'reference-2': new Set(['detail'])
+    };
+
+    function referenceSourcesFor(role) {
+      return Object.entries(referenceRoleSelections)
+        .filter(([, roles]) => roles.has(role))
+        .map(([referenceId]) => referenceNames[referenceId]);
+    }
+
+    function joinChinese(items) {
+      if (items.length < 2) return items[0] || '';
+      return `${items.slice(0, -1).join('、')}与${items.at(-1)}`;
+    }
+
+    function renderReferenceRolePickers() {
+      document.querySelectorAll('[data-reference-id]').forEach((picker) => {
+        const referenceId = picker.dataset.referenceId;
+        const selectedRoles = referenceRoleSelections[referenceId];
+        const tags = document.querySelector(`[data-reference-tags="${referenceId}"]`);
+        tags.innerHTML = referenceRoleOptions
+          .filter((role) => selectedRoles.has(role.id))
+          .map((role) => `<span class="ref-tag">${role.label}</span>`)
+          .join('');
+        picker.querySelector('.reference-role-menu').innerHTML = referenceRoleOptions.map((role) => {
+          const selected = selectedRoles.has(role.id);
+          return `<button class="reference-role-option ${selected ? 'selected' : ''}" data-reference-role="${role.id}" role="option" aria-selected="${selected}"><i>${selected ? '✓' : ''}</i>${role.label}</button>`;
+        }).join('');
+      });
+    }
+
+    function renderReferencePrompt() {
+      const referenceClauses = Object.entries(referenceRoleSelections).map(([referenceId, roles]) => {
+        const labels = referenceRoleOptions.filter((role) => roles.has(role.id)).map((role) => role.label);
+        return labels.length ? `${joinChinese(labels)}${referenceNames[referenceId]}` : '';
+      }).filter(Boolean);
+      const selectedStyle = imagePromptTags.styles.find((item) => item.id === selectedPromptTags.style);
+      const selectedScene = imagePromptTags.scenes.find((item) => item.id === selectedPromptTags.scene);
+      const selectedPose = imagePromptTags.poses.find((item) => item.id === selectedPromptTags.pose);
+      const directParameters = [];
+      if (!referenceSourcesFor('style').length) directParameters.push(`风格使用${selectedStyle.label}`);
+      if (!referenceSourcesFor('scene').length) directParameters.push(`场景使用${selectedScene.label}`);
+      if (!referenceSourcesFor('pose').length) directParameters.push(`人物${selectedPose.label}`);
+      const guidance = [...referenceClauses, ...directParameters].join('；');
+      document.querySelector('[data-reference-prompt]').value = `${guidance}。保持青柠格纹家居服的颜色、翻领、排扣和短袖版型准确，突出轻薄透气和柔软棉感，不改变商品结构。`;
+    }
+
+    function tagOptions(kind) {
+      const style = imagePromptTags.styles.find((item) => item.id === selectedPromptTags.style);
+      if (kind === 'style') return imagePromptTags.styles;
+      const allowedIds = kind === 'scene' ? style.scenes : style.poses;
+      return imagePromptTags[`${kind}s`].filter((item) => allowedIds.includes(item.id));
+    }
+
+    function renderTagPickers() {
+      document.querySelectorAll('[data-tag-picker]').forEach((picker) => {
+        const kind = picker.dataset.tagPicker;
+        const options = tagOptions(kind);
+        const selected = options.find((item) => item.id === selectedPromptTags[kind]) || options[0];
+        const referenceSources = referenceSourcesFor(kind);
+        const locked = referenceSources.length > 0;
+        const button = picker.querySelector('.param-chip');
+        selectedPromptTags[kind] = selected.id;
+        picker.querySelector('[data-tag-value]').textContent = locked ? referenceSources.join('、') : selected.label;
+        button.disabled = locked;
+        button.title = locked ? `${kind === 'style' ? '风格' : kind === 'scene' ? '场景' : '姿势'}已由${referenceSources.join('、')}提供` : '';
+        button.setAttribute('aria-expanded', 'false');
+        picker.classList.remove('open');
+        picker.querySelector('.tag-menu').innerHTML = options.map((item) => `
+          <button class="tag-option ${item.id === selected.id ? 'selected' : ''}" data-tag-option="${item.id}" role="option" aria-selected="${item.id === selected.id}">
+            <img src="${item.image}" alt="${item.label}预览">
+            <span><strong>${item.label}</strong><small>${item.description}</small></span>
+          </button>
+        `).join('');
+      });
+    }
+
+    function closeReferenceRolePickers(except) {
+      document.querySelectorAll('[data-reference-id]').forEach((picker) => {
+        if (picker === except) return;
+        picker.classList.remove('open');
+        picker.querySelector(':scope > button').classList.remove('active');
+        picker.querySelector(':scope > button').setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    function closeTagPickers(except) {
+      document.querySelectorAll('[data-tag-picker]').forEach((picker) => {
+        if (picker === except) return;
+        picker.classList.remove('open');
+        picker.querySelector('.param-chip').classList.remove('active');
+        picker.querySelector('.param-chip').setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    const videoModes = {
+      'first-frame': {
+        badge: '单张首帧驱动',
+        summary: '1 张首帧 → 补充动作与镜头 → 生成视频',
+        help: '以首帧为唯一图像输入，补充动作、镜头与节奏',
+        visualOwner: '画面视觉以首帧图片为准',
+        composerHint: '首帧已定义画面风格、场景、模特与姿势',
+        params: { model: 'Vidu Q3 Turbo', duration: '5 秒', resolution: '720P', ratio: '9:16', audio: '生成音频' },
+        prompt: '以已上传的单张首帧为唯一图像输入，保持青柠格纹家居服的颜色、翻领、排扣和短袖版型准确。模特先自然站立，再缓慢转身，镜头从中景平稳推进至面料细节。',
+        storyboardHelp: '已根据首帧和 Prompt 生成，不引入其他参考图',
+        shots: ['首帧构图，人物保持稳定', '轻转身，展示格纹与垂感', '稳定推进，强调翻领排扣']
+      },
+      'multi-frame': {
+        badge: '首帧 + 关键帧',
+        summary: '首帧 → 关键帧分段推进 → 生成视频',
+        help: '首帧和关键帧已定义画面，每段只描述与上一帧的变化',
+        visualOwner: '画面视觉以首帧和关键帧为准',
+        composerHint: '不展示画面标签；关键帧决定风格、场景、模特与姿势',
+        params: { model: 'Vidu Q2 Pro', duration: '10 秒', resolution: '1080P', ratio: '9:16', audio: '不生成音频' },
+        prompt: '保持商品主体、颜色和结构准确。第 1 段从自然站姿缓慢转身；第 2 段推进至翻领和面料细节。关键帧已确定每段画面，补充平滑的运动和衔接即可。',
+        storyboardHelp: '关键帧按顺序推进，已保留每段的时长与变化描述',
+        shots: ['首帧 → 关键帧 1：自然转身', '关键帧 1 → 关键帧 2：推进细节', '结束：稳定停留于商品细节']
+      },
+      commerce: {
+        badge: '电商结构复刻',
+        summary: '电商源视频 → 拆解展示结构 → 替换 ERP 商品',
+        help: '保留源视频的商品展示逻辑，用当前商品替换',
+        visualOwner: '镜头、节奏与场景以源视频为准',
+        composerHint: '不展示画面标签；替换素材用途仅在左侧素材卡维护',
+        params: { model: 'Vidu Q3 Pro', duration: '跟随源视频', resolution: '1080P', ratio: '9:16', audio: '生成音频' },
+        prompt: '复刻源视频的标准电商展示结构：整体上身、版型动态、翻领排扣细节。将原商品替换为青柠格纹家居服上衣，保持源视频的镜头时长和转场，不改变 ERP 商品事实。',
+        storyboardHelp: '已从电商源视频拆解 3 段商品展示结构',
+        shots: ['整体上身，快速建立商品印象', '轻转身，展示版型和垂感', '细节特写，强调翻领与排扣']
+      },
+      viral: {
+        badge: '爆款结构复刻',
+        summary: '爆款源视频 → 拆解钩子与节奏 → 替换商品素材',
+        help: '复刻源视频的钩子、镜头节奏与转场，商品事实保持不变',
+        visualOwner: '镜头、节奏与场景以源视频为准',
+        composerHint: '不展示画面标签；替换素材用途仅在左侧素材卡维护',
+        params: { model: 'Vidu Q3 Turbo', duration: '跟随源视频', resolution: '720P', ratio: '9:16', audio: '生成音频' },
+        prompt: '复刻爆款源视频的前 3 秒钩子、快慢节奏和转场结构，将原商品与模特替换为当前素材。突出青柠格纹的视觉记忆点与轻薄透气卖点，不修改商品颜色、版型和结构。',
+        storyboardHelp: '已从爆款源视频拆解钩子、节奏与转场',
+        shots: ['前 2 秒钩子，快速给出格纹记忆点', '节奏切换，展示上身与版型', '卖点收束，强调轻薄透气']
+      }
+    };
+
+    function setVideoMode(mode) {
+      const selected = videoModes[mode] ? mode : 'first-frame';
+      const config = videoModes[selected];
+      document.querySelectorAll('[data-video-mode]').forEach((button) => button.classList.toggle('active', button.dataset.videoMode === selected));
+      document.querySelectorAll('[data-video-source]').forEach((panel) => { panel.hidden = panel.dataset.videoSource !== selected; });
+      document.querySelector('[data-video-mode-badge]').textContent = config.badge;
+      document.querySelector('[data-video-mode-summary]').textContent = config.summary;
+      document.querySelector('[data-video-mode-help]').textContent = config.help;
+      document.querySelector('[data-video-prompt]').value = config.prompt;
+      document.querySelector('[data-video-storyboard-help]').textContent = config.storyboardHelp;
+      document.querySelectorAll('[data-video-shot-copy]').forEach((node) => { node.textContent = config.shots[Number(node.dataset.videoShotCopy)]; });
+      document.querySelector('[data-video-composer-hint]').textContent = config.composerHint;
+      document.querySelector('[data-video-visual-owner]').textContent = config.visualOwner;
+      const isMultiFrame = selected === 'multi-frame';
+      document.querySelector('[data-video-prompt-title]').textContent = isMultiFrame ? '全局规则' : '本次视频 Prompt';
+      document.querySelector('[data-video-prompt]').hidden = isMultiFrame;
+      document.querySelector('[data-video-global-rule]').hidden = !isMultiFrame;
+      document.querySelector('[data-video-timeline]').hidden = !isMultiFrame;
+      document.querySelector('[data-video-storyboard-panel]').hidden = isMultiFrame;
+      Object.entries(config.params).forEach(([key, value]) => {
+        document.querySelector(`[data-video-param-${key}]`).textContent = value;
+      });
+      if (window.lucide) lucide.createIcons();
+    }
+
+    let generalAssetScope = 'personal';
+    let currentResourceDimension = null;
+    let selectedFlowSku = null;
+    const resourceDimensionOptions = {
+      style: [
+        { label: '甜美', children: ['奶油甜妹卧室', '法式轻奢裙装'] },
+        { label: '质感', children: ['静奢深睡品质感', '复古田园居家', '东方雅致轻熟'] },
+        { label: '个性', children: ['甜酷美式街头', '甜酷暗黑辣妹', '多巴胺元气居家', '新中式雅致'] },
+      ],
+      scene: [
+        { label: '室内', children: ['奶油柔光卧室', '窗边安静居家', '浅色质感家居', '暗调缎面居家'] },
+        { label: '室外', children: ['留白新中式', '旧木田园空间'] },
+      ],
+      detail: ['领口', '袖口', '面料', '图案', '纽扣'],
+      pose: [
+        { label: '站姿', children: ['自然站姿', '45 度微侧身', '窗边缓步'] },
+        { label: '坐姿与动作', children: ['床边自然坐姿', '侧身回望', '轻整理袖口'] },
+      ],
+    };
+    const selectedResourceDimensions = { style: new Set(), scene: new Set(), detail: new Set(), pose: new Set() };
+
+    function setGeneralAssetScope(scope) {
+      generalAssetScope = scope === 'team' ? 'team' : 'personal';
+      document.querySelectorAll('[data-general-scope-value]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.generalScopeValue === generalAssetScope);
+      });
+      const copy = document.querySelector('[data-general-scope-copy]');
+      if (copy) copy.textContent = generalAssetScope === 'team'
+        ? '显示团队未关联产品的通用素材。'
+        : '仅显示我上传或生成、且尚未关联产品的素材。';
+    }
+
+    function renderResourceDimensionMenu(kind) {
+      const menu = document.querySelector('[data-dimension-menu]');
+      const options = resourceDimensionOptions[kind];
+      if (!menu || !options) return;
+      currentResourceDimension = kind;
+      const renderOption = (label) => `<label class="dimension-option"><input type="checkbox" data-dimension-option="${kind}" value="${label}" ${selectedResourceDimensions[kind].has(label) ? 'checked' : ''}><span>${label}</span></label>`;
+      menu.innerHTML = typeof options[0] === 'string'
+        ? `<div class="dimension-group"><strong>细节</strong>${options.map(renderOption).join('')}</div>`
+        : options.map((group) => `<div class="dimension-group"><strong>${group.label}</strong>${group.children.map(renderOption).join('')}</div>`).join('');
+      menu.hidden = false;
+      document.querySelectorAll('[data-resource-dimension]').forEach((button) => button.classList.toggle('active', button.dataset.resourceDimension === kind));
+    }
+
+    function updateResourceDimensionCounts() {
+      Object.entries(selectedResourceDimensions).forEach(([kind, selected]) => {
+        const count = document.querySelector(`[data-dimension-count="${kind}"]`);
+        if (count) count.textContent = selected.size ? `已选 ${selected.size}` : '';
+      });
+    }
+
+    function closeResourceDimensionMenu() {
+      const menu = document.querySelector('[data-dimension-menu]');
+      if (menu) menu.hidden = true;
+      currentResourceDimension = null;
+      document.querySelectorAll('[data-resource-dimension]').forEach((button) => button.classList.remove('active'));
+    }
+
+    let currentResourceMedia = 'image';
+    let currentResourceTab = 'product';
+    let currentResourceView = 'products';
+    const selectedResourceSkus = new Set();
+
+    function updateResourceFooter() {
+      const status = document.querySelector('[data-resource-status]');
+      const confirm = document.querySelector('[data-resource-confirm]');
+      const combine = document.querySelector('[data-resource-combine-start]');
+      const back = document.querySelector('[data-resource-back-list]');
+      const clear = document.querySelector('[data-resource-clear]');
+      const setProduct = document.querySelector('[data-set-product]');
+      const setModel = document.querySelector('[data-set-model]');
+      confirm.hidden = true;
+      combine.hidden = true;
+      back.hidden = true;
+      clear.hidden = true;
+      if (setProduct) setProduct.disabled = true;
+      if (setModel) {
+        setModel.hidden = currentResourceMedia !== 'image';
+        setModel.disabled = true;
+      }
+      document.querySelectorAll('[data-product-import]').forEach((button) => { button.disabled = true; });
+
+      if (currentResourceTab === 'product' && currentResourceView === 'products') {
+        const count = selectedResourceSkus.size;
+        status.textContent = currentResourceMedia === 'video'
+          ? '选择一个 SKU 查看其视频素材'
+          : count
+            ? `已选择 ${count} 个 SKU${count < 2 ? '，再选 1 个即可搭配合成' : '，合成结果将分别归集到参与商品'}`
+            : '选择 SKU 查看素材；可多选 SKU 进行搭配合成';
+        combine.hidden = currentResourceMedia !== 'image';
+        combine.disabled = count < 2;
+        document.querySelectorAll('[data-product-import]').forEach((button) => {
+          button.disabled = count !== 1;
+          button.title = count === 1 ? '' : '选择一个 SKU 后操作';
+        });
+        clear.hidden = count === 0;
+        return;
+      }
+
+      if (currentResourceTab === 'product' && currentResourceView === 'combine') {
+        status.textContent = '搭配图只存一份文件，并为每个参与 SKU 建立独立资源引用';
+        back.hidden = false;
+        return;
+      }
+
+      const activePanel = currentResourceTab === 'product'
+        ? document.querySelector('[data-resource-panel="current"]')
+        : document.querySelector(`[data-resource-tab-panel="${currentResourceTab}"]`);
+      const count = [...activePanel.querySelectorAll('.resource-asset.selected')]
+        .filter((asset) => !asset.hidden).length;
+      status.textContent = count
+        ? currentResourceTab === 'model'
+          ? `已选择 ${count} 个模特素材`
+          : `已选择 ${count} 项 · ${currentResourceMedia === 'image' ? '图片' : '视频'}可多选`
+        : currentResourceTab === 'model'
+          ? '选择已发布模特素材'
+          : `未选择${currentResourceMedia === 'image' ? '图片' : '视频'}素材`;
+      confirm.hidden = false;
+      confirm.disabled = count === 0;
+      clear.hidden = count === 0;
+      if (currentResourceTab === 'general' && count === 1) {
+        if (setProduct) setProduct.disabled = false;
+        if (setModel && currentResourceMedia === 'image') setModel.disabled = false;
+      }
+      if (currentResourceTab === 'product') back.hidden = false;
+    }
+
+    function renderResourceProductPanel() {
+      document.querySelectorAll('[data-resource-panel]').forEach((panel) => {
+        panel.hidden = panel.dataset.resourcePanel !== currentResourceView;
+      });
+      updateResourceFooter();
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function setResourceMedia(media) {
+      currentResourceMedia = currentResourceTab === 'model' ? 'image' : media === 'video' ? 'video' : 'image';
+      if (currentResourceMedia === 'video' && currentResourceView === 'combine') currentResourceView = 'products';
+      document.querySelectorAll('[data-resource-media]').forEach((button) => {
+        const selected = button.dataset.resourceMedia === currentResourceMedia;
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-pressed', String(selected));
+      });
+      document.querySelectorAll('[data-media-only]').forEach((node) => {
+        node.hidden = node.dataset.mediaOnly !== currentResourceMedia;
+      });
+      document.querySelectorAll('[data-resource-category-media]').forEach((node) => {
+        node.hidden = node.dataset.resourceCategoryMedia !== currentResourceMedia;
+      });
+      document.querySelector('[data-resource-product-title]').textContent = currentResourceMedia === 'image' ? '产品素材 · 图片' : '产品素材 · 视频';
+      document.querySelector('[data-resource-general-title]').textContent = currentResourceMedia === 'image' ? '通用素材 · 图片' : '通用素材 · 视频';
+      const url = new URL(location.href);
+      url.searchParams.set('media', currentResourceMedia);
+      if (currentResourceView !== 'combine') url.searchParams.set('view', currentResourceView);
+      history.replaceState({}, '', url);
+      renderResourceProductPanel();
+    }
+
+    function setResourceTab(tab) {
+      closeResourceDimensionMenu();
+      currentResourceTab = ['product', 'general', 'model'].includes(tab) ? tab : 'product';
+      if (currentResourceTab !== 'product') currentResourceView = 'products';
+      if (currentResourceTab === 'model') currentResourceMedia = 'image';
+      document.querySelectorAll('[data-resource-tab-panel]').forEach((panel) => {
+        panel.hidden = panel.dataset.resourceTabPanel !== currentResourceTab;
+      });
+      document.querySelectorAll('[data-resource-tab]').forEach((button) => {
+        const selected = button.dataset.resourceTab === currentResourceTab;
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-selected', String(selected));
+      });
+      document.querySelectorAll('[data-resource-side-panel]').forEach((panel) => {
+        panel.hidden = panel.dataset.resourceSidePanel !== currentResourceTab;
+      });
+      const mediaFilter = document.querySelector('[data-resource-media-filter]');
+      if (mediaFilter) mediaFilter.hidden = currentResourceTab === 'model';
+      document.querySelectorAll('[data-resource-media]').forEach((button) => {
+        const selected = button.dataset.resourceMedia === currentResourceMedia;
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-pressed', String(selected));
+      });
+      document.querySelectorAll('[data-media-only]').forEach((node) => {
+        node.hidden = node.dataset.mediaOnly !== currentResourceMedia;
+      });
+      const url = new URL(location.href);
+      url.searchParams.set('tab', currentResourceTab);
+      url.searchParams.set('media', currentResourceMedia);
+      history.replaceState({}, '', url);
+      updateResourceFooter();
+    }
+
+    function setResourceView(view) {
+      const allowed = ['products', 'current', 'combine'];
+      currentResourceView = allowed.includes(view) ? view : 'products';
+      if (currentResourceMedia === 'video' && currentResourceView === 'combine') currentResourceView = 'products';
+      renderResourceProductPanel();
+      const url = new URL(location.href);
+      url.searchParams.set('view', currentResourceView);
+      history.replaceState({}, '', url);
+    }
+
+    function toggleResourceSku(card) {
+      const skuId = card.dataset.skuId;
+      if (selectedResourceSkus.has(skuId)) selectedResourceSkus.delete(skuId);
+      else selectedResourceSkus.add(skuId);
+      card.classList.toggle('selected', selectedResourceSkus.has(skuId));
+      updateResourceFooter();
+    }
+
+    function showPage(page) {
+      const target = pageNames[page] ? page : 'products';
+      document.querySelector('.app').classList.toggle('image-focus', target === 'image' || target === 'video' || target === 'resource');
+      document.querySelectorAll('[data-page]').forEach((node) => node.classList.toggle('active', node.dataset.page === target));
+      document.querySelectorAll('[data-go]').forEach((node) => {
+        node.classList.toggle('active', node.dataset.go === target);
+      });
+      document.getElementById('page-crumb').textContent = pageNames[target];
+      const url = new URL(location.href); url.searchParams.set('page', target); history.replaceState({}, '', url);
+      if (window.lucide) lucide.createIcons();
+    }
+    document.addEventListener('click', (event) => {
+      const trigger = event.target.closest('[data-go]');
+      if (trigger) showPage(trigger.dataset.go);
+      const resourceViewButton = event.target.closest('[data-resource-view]');
+      if (resourceViewButton) {
+        setResourceView(resourceViewButton.dataset.resourceView);
+        return;
+      }
+      const resourceTabButton = event.target.closest('[data-resource-tab]');
+      if (resourceTabButton) {
+        setResourceTab(resourceTabButton.dataset.resourceTab);
+        return;
+      }
+      const resourceMediaButton = event.target.closest('[data-resource-media]');
+      if (resourceMediaButton) {
+        setResourceMedia(resourceMediaButton.dataset.resourceMedia);
+        return;
+      }
+      const generalScopeButton = event.target.closest('[data-general-scope-value]');
+      if (generalScopeButton) {
+        setGeneralAssetScope(generalScopeButton.dataset.generalScopeValue);
+        return;
+      }
+      const dimensionButton = event.target.closest('[data-resource-dimension]');
+      if (dimensionButton) {
+        const kind = dimensionButton.dataset.resourceDimension;
+        if (currentResourceDimension === kind) closeResourceDimensionMenu();
+        else renderResourceDimensionMenu(kind);
+        return;
+      }
+      const dimensionOption = event.target.closest('[data-dimension-option]');
+      if (dimensionOption) {
+        const selected = selectedResourceDimensions[dimensionOption.dataset.dimensionOption];
+        if (dimensionOption.checked) selected.add(dimensionOption.value);
+        else selected.delete(dimensionOption.value);
+        updateResourceDimensionCounts();
+        return;
+      }
+      const setProduct = event.target.closest('[data-set-product]');
+      if (setProduct && !setProduct.disabled) {
+        closeResourceDimensionMenu();
+        document.querySelector('[data-resource-flow="product"]').hidden = false;
+        return;
+      }
+      const setModel = event.target.closest('[data-set-model]');
+      if (setModel && !setModel.disabled) {
+        closeResourceDimensionMenu();
+        document.querySelector('[data-resource-flow="model"]').hidden = false;
+        return;
+      }
+      const flowClose = event.target.closest('[data-resource-flow-close]');
+      if (flowClose) {
+        flowClose.closest('[data-resource-flow]').hidden = true;
+        return;
+      }
+      const flowSku = event.target.closest('[data-flow-sku]');
+      if (flowSku) {
+        selectedFlowSku = flowSku.dataset.flowSku;
+        document.querySelectorAll('[data-flow-sku]').forEach((button) => button.classList.toggle('selected', button === flowSku));
+        document.querySelector('[data-product-convert-confirm]').disabled = false;
+        return;
+      }
+      const productConvert = event.target.closest('[data-product-convert-confirm]');
+      if (productConvert && !productConvert.disabled) {
+        document.querySelector('[data-resource-flow="product"]').hidden = true;
+        document.querySelectorAll('[data-resource-tab-panel="general"] .resource-asset.selected').forEach((asset) => {
+          asset.classList.remove('selected');
+          asset.querySelector('.resource-selected')?.remove();
+        });
+        document.querySelector('[data-resource-status]').textContent = `已移入 SKU ${selectedFlowSku} 的产品素材`;
+        document.querySelector('[data-set-product]').disabled = true;
+        document.querySelector('[data-set-model]').disabled = true;
+        return;
+      }
+      const modelConvert = event.target.closest('[data-model-convert-confirm]');
+      if (modelConvert) {
+        document.querySelector('[data-resource-flow="model"]').hidden = true;
+        document.querySelectorAll('[data-resource-tab-panel="general"] .resource-asset.selected').forEach((asset) => {
+          asset.classList.remove('selected');
+          asset.querySelector('.resource-selected')?.remove();
+        });
+        document.querySelector('[data-resource-status]').textContent = '已移入模特素材';
+        document.querySelector('[data-set-product]').disabled = true;
+        document.querySelector('[data-set-model]').disabled = true;
+        return;
+      }
+      const skuToggle = event.target.closest('[data-sku-toggle]');
+      if (skuToggle) {
+        toggleResourceSku(skuToggle.closest('[data-sku-id]'));
+        return;
+      }
+      const skuOpen = event.target.closest('[data-sku-open]');
+      if (skuOpen) {
+        setResourceView('current');
+        return;
+      }
+      const skuCard = event.target.closest('.sku-collection');
+      if (skuCard) {
+        toggleResourceSku(skuCard);
+        return;
+      }
+      const combineStart = event.target.closest('[data-resource-combine-start]');
+      if (combineStart && !combineStart.disabled) {
+        setResourceView('combine');
+        return;
+      }
+      const resourceAsset = event.target.closest('[data-resource-select]');
+      if (resourceAsset) {
+        const willSelect = !resourceAsset.classList.contains('selected');
+        resourceAsset.classList.toggle('selected', willSelect);
+        resourceAsset.querySelector('.resource-selected')?.remove();
+        if (willSelect) resourceAsset.querySelector('.resource-asset-visual').insertAdjacentHTML('beforeend', '<span class="resource-selected"><i data-lucide="check"></i></span>');
+        updateResourceFooter();
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+      const resourceClear = event.target.closest('[data-resource-clear]');
+      if (resourceClear) {
+        selectedResourceSkus.clear();
+        document.querySelectorAll('[data-sku-id].selected').forEach((card) => card.classList.remove('selected'));
+        document.querySelectorAll('[data-resource-select].selected').forEach((asset) => {
+          asset.classList.remove('selected');
+          asset.querySelector('.resource-selected')?.remove();
+        });
+        updateResourceFooter();
+        return;
+      }
+      const importAction = event.target.closest('[data-import-action]');
+      if (importAction) {
+        const selectedSku = [...selectedResourceSkus][0];
+        if (importAction.dataset.importAction === 'scan') {
+          document.querySelector('[data-resource-status]').textContent = currentResourceTab === 'product'
+            ? `扫描目录并导入到 SKU ${selectedSku}`
+            : '扫描目录并批量导入通用素材';
+        } else {
+          document.querySelector('[data-resource-status]').textContent = currentResourceTab === 'product'
+            ? `选择图片或视频上传到 SKU ${selectedSku}`
+            : '选择本地图片或视频上传到通用素材';
+        }
+        return;
+      }
+      const composeDirection = event.target.closest('[data-compose-direction]');
+      if (composeDirection) {
+        document.querySelectorAll('[data-compose-direction]').forEach((button) => button.classList.toggle('active', button === composeDirection));
+        document.querySelector('[data-compose-preview]').classList.toggle('horizontal', composeDirection.dataset.composeDirection === 'horizontal');
+        return;
+      }
+      const combineSave = event.target.closest('[data-combine-save]');
+      if (combineSave) {
+        combineSave.innerHTML = '<i data-lucide="check"></i>已保存到 3 个 SKU';
+        combineSave.disabled = true;
+        document.querySelector('[data-resource-status]').textContent = '搭配素材已保存：1 个底层文件，3 条 SKU 资源引用';
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+      const resourceFilterButton = event.target.closest('.resource-filter-list button, .resource-tag-row button, .filter-chips button');
+      if (resourceFilterButton) {
+        const group = resourceFilterButton.parentElement;
+        group.querySelectorAll(':scope > button').forEach((button) => button.classList.remove('active'));
+        resourceFilterButton.classList.add('active');
+        return;
+      }
+      const videoModeButton = event.target.closest('[data-video-mode]');
+      if (videoModeButton) {
+        setVideoMode(videoModeButton.dataset.videoMode);
+        return;
+      }
+      const referenceRoleButton = event.target.closest('[data-reference-id] > button');
+      if (referenceRoleButton) {
+        const picker = referenceRoleButton.parentElement;
+        const willOpen = !picker.classList.contains('open');
+        closeReferenceRolePickers(picker);
+        closeTagPickers();
+        picker.classList.toggle('open', willOpen);
+        referenceRoleButton.classList.toggle('active', willOpen);
+        referenceRoleButton.setAttribute('aria-expanded', String(willOpen));
+        return;
+      }
+      const referenceRoleOption = event.target.closest('[data-reference-role]');
+      if (referenceRoleOption) {
+        const picker = referenceRoleOption.closest('[data-reference-id]');
+        const selectedRoles = referenceRoleSelections[picker.dataset.referenceId];
+        const role = referenceRoleOption.dataset.referenceRole;
+        if (selectedRoles.has(role)) selectedRoles.delete(role); else selectedRoles.add(role);
+        renderReferenceRolePickers();
+        renderTagPickers();
+        renderReferencePrompt();
+        picker.classList.add('open');
+        picker.querySelector(':scope > button').classList.add('active');
+        picker.querySelector(':scope > button').setAttribute('aria-expanded', 'true');
+        return;
+      }
+      const pickerButton = event.target.closest('[data-tag-picker] > .param-chip');
+      if (pickerButton) {
+        const picker = pickerButton.parentElement;
+        const willOpen = !picker.classList.contains('open');
+        closeReferenceRolePickers();
+        closeTagPickers(picker);
+        picker.classList.toggle('open', willOpen);
+        pickerButton.classList.toggle('active', willOpen);
+        pickerButton.setAttribute('aria-expanded', String(willOpen));
+        return;
+      }
+      const option = event.target.closest('[data-tag-option]');
+      if (option) {
+        const picker = option.closest('[data-tag-picker]');
+        const kind = picker.dataset.tagPicker;
+        selectedPromptTags[kind] = option.dataset.tagOption;
+        if (kind === 'style') {
+          const style = imagePromptTags.styles.find((item) => item.id === selectedPromptTags.style);
+          if (!style.scenes.includes(selectedPromptTags.scene)) selectedPromptTags.scene = style.defaultScene;
+          if (!style.poses.includes(selectedPromptTags.pose)) selectedPromptTags.pose = style.defaultPose;
+        }
+        renderTagPickers();
+        renderReferencePrompt();
+        closeTagPickers();
+        return;
+      }
+      if (!event.target.closest('[data-tag-picker]')) closeTagPickers();
+      if (!event.target.closest('[data-reference-id]')) closeReferenceRolePickers();
+      if (!event.target.closest('.resource-dimension-filters')) closeResourceDimensionMenu();
+    });
+    renderReferenceRolePickers();
+    renderTagPickers();
+    renderReferencePrompt();
+    setVideoMode('first-frame');
+    setGeneralAssetScope('personal');
+    updateResourceDimensionCounts();
+    const initialParams = new URLSearchParams(location.search);
+    if (initialParams.get('selection') === 'empty') {
+      document.querySelectorAll('[data-resource-panel="current"] .resource-asset.selected').forEach((asset) => {
+        asset.classList.remove('selected');
+        asset.querySelector('.resource-selected')?.remove();
+      });
+    }
+    if (initialParams.get('combo') === 'ready' || initialParams.get('view') === 'combine') {
+      ['TEST1-GRN-M', 'PANTS-L', 'SHOES-01'].forEach((skuId) => {
+        selectedResourceSkus.add(skuId);
+        document.querySelector(`[data-sku-id="${skuId}"]`)?.classList.add('selected');
+      });
+    }
+    setResourceTab(initialParams.get('tab') || 'product');
+    setResourceMedia(initialParams.get('media') || 'image');
+    setResourceView(initialParams.get('view') || 'products');
+    showPage(initialParams.get('page') || 'products');
+  </script>
+</body>
+</html>

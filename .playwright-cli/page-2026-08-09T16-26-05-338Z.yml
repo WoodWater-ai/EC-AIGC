@@ -1,0 +1,115 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e12]:
+      - strong [ref=e13]: 达芬奇密码 AI
+      - text: WORKBENCH
+    - button "新建创作" [ref=e15] [cursor=pointer]
+    - navigation [ref=e20]:
+      - generic [ref=e21]: 主模块
+      - button "工作台首页" [ref=e22] [cursor=pointer]
+      - button "创作助手" [ref=e28] [cursor=pointer]
+      - button "任务列表" [ref=e31] [cursor=pointer]
+      - button "智能模板中心" [ref=e35] [cursor=pointer]
+      - button "素材中心" [ref=e38] [cursor=pointer]
+      - button "数据效能复盘" [ref=e43] [cursor=pointer]
+      - generic [ref=e46]: 系统与主数据
+      - button "系统配置模块" [ref=e47] [cursor=pointer]
+      - button "通道异步任务" [ref=e51] [cursor=pointer]
+      - button "资源分类" [ref=e59] [cursor=pointer]
+      - button "商品分类" [ref=e65] [cursor=pointer]
+      - button "产品管理" [ref=e71] [cursor=pointer]
+      - button "字典管理" [ref=e79] [cursor=pointer]
+    - generic [ref=e82]:
+      - generic [ref=e83]: 潘
+      - generic [ref=e84]:
+        - strong [ref=e85]: 潘俊杰
+        - text: 产品管理员 · 在线
+  - generic [ref=e86]:
+    - generic [ref=e87]:
+      - generic [ref=e88]:
+        - generic [ref=e89]: 达芬奇密码 AI
+        - strong [ref=e92]: SKU 素材集合
+      - generic [ref=e93]:
+        - generic "效果稿页面切换" [ref=e94]:
+          - button "产品管理" [ref=e95] [cursor=pointer]
+          - button "素材中心" [ref=e96] [cursor=pointer]
+          - button "SKU 素材集合" [ref=e97] [cursor=pointer]
+          - button "图片创作" [ref=e98] [cursor=pointer]
+          - button "视频创作" [ref=e99] [cursor=pointer]
+        - button "通知" [ref=e100] [cursor=pointer]
+        - button "帮助" [ref=e104] [cursor=pointer]
+    - main [ref=e303]:
+      - generic [ref=e304]:
+        - generic [ref=e305]:
+          - generic [ref=e306]:
+            - button "返回素材中心" [ref=e307] [cursor=pointer]
+            - generic [ref=e311]:
+              - heading "青柠格纹家居服上衣" [level=1] [ref=e312]
+              - paragraph [ref=e313]: SKU TEST1-GRN-M · SPU TEST1 · 绿色 / M · 家居服 / 夏季
+          - generic [ref=e314]:
+            - button "上传素材" [ref=e315] [cursor=pointer]
+            - button "开始创作" [ref=e319] [cursor=pointer]
+        - generic [ref=e324]:
+          - generic [ref=e325]:
+            - button "全部 13" [ref=e326] [cursor=pointer]
+            - button "上传素材 3" [ref=e327] [cursor=pointer]
+            - button "生成结果 9" [ref=e328] [cursor=pointer]
+            - button "组合结果 1" [ref=e329] [cursor=pointer]
+          - generic [ref=e330]: 最新优先 · 当前资源归属 productId 1170
+        - generic [ref=e331]:
+          - article [ref=e332]:
+            - generic [ref=e333]:
+              - generic [ref=e335]: 生成结果
+              - button "选择素材" [ref=e336] [cursor=pointer]
+            - generic [ref=e339]:
+              - strong [ref=e340]: 静奢三视图 · V3
+              - generic [ref=e341]: 8 分钟前 · 图片创作
+          - article [ref=e342]:
+            - generic [ref=e343]:
+              - generic [ref=e345]: 生成结果
+              - button "选择素材" [ref=e346] [cursor=pointer]
+            - generic [ref=e349]:
+              - strong [ref=e350]: 窗边居家展示图
+              - generic [ref=e351]: 26 分钟前 · 图片创作
+          - article [ref=e352]:
+            - generic [ref=e353]:
+              - generic [ref=e355]: 组合结果
+              - button "选择素材" [ref=e356] [cursor=pointer]
+            - generic [ref=e359]:
+              - strong [ref=e360]: 上装 + 长裤 + 鞋履
+              - generic [ref=e361]: 1 小时前 · 关联 3 个 SKU
+          - article [ref=e362]:
+            - generic [ref=e363]:
+              - generic [ref=e365]: 上传素材
+              - button "选择素材" [ref=e366] [cursor=pointer]
+            - generic [ref=e369]:
+              - strong [ref=e370]: ERP 商品正面图
+              - generic [ref=e371]: 昨天 · 本地上传
+          - article [ref=e372]:
+            - generic [ref=e373]:
+              - generic [ref=e375]: 生成结果
+              - button "选择素材" [ref=e376] [cursor=pointer]
+            - generic [ref=e379]:
+              - strong [ref=e380]: 翻领排扣细节
+              - generic [ref=e381]: 昨天 · 图片创作
+          - article [ref=e382]:
+            - generic [ref=e383]:
+              - generic [ref=e385]: 生成结果
+              - button "选择素材" [ref=e386] [cursor=pointer]
+            - generic [ref=e389]:
+              - strong [ref=e390]: 奶油卧室场景图
+              - generic [ref=e391]: 2 天前 · 图片创作
+          - article [ref=e392]:
+            - generic [ref=e393]:
+              - generic [ref=e395]: 上传素材
+              - button "选择素材" [ref=e396] [cursor=pointer]
+            - generic [ref=e399]:
+              - strong [ref=e400]: 模特试穿参考
+              - generic [ref=e401]: 3 天前 · 本地上传
+          - article [ref=e402]:
+            - generic [ref=e403]:
+              - generic [ref=e405]: 生成结果
+              - button "选择素材" [ref=e406] [cursor=pointer]
+            - generic [ref=e409]:
+              - strong [ref=e410]: 东方雅致展示图
+              - generic [ref=e411]: 4 天前 · 图片创作

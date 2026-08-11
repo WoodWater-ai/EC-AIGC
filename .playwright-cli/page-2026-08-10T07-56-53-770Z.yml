@@ -1,0 +1,142 @@
+- main [ref=e4]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - button [ref=e8] [cursor=pointer]
+      - generic [ref=e11]:
+        - heading "新建图片任务" [level=1] [ref=e12]
+        - paragraph [ref=e13]: 配置、生成与结果在同一页面完成
+    - generic [ref=e16]:
+      - strong [ref=e17]: 青柠格纹家居服上衣 · 绿色 / M
+      - generic [ref=e18]: ERP SKU TEST1-GRN-M
+  - dialog "资源中心" [ref=e24]:
+    - generic [ref=e25]:
+      - generic [ref=e30]:
+        - heading "资源中心" [level=2] [ref=e31]
+        - generic [ref=e32]: 媒体类型优先，素材统一归集
+      - tablist "媒体类型" [ref=e33]:
+        - tab "图片素材 286" [selected] [ref=e34] [cursor=pointer]:
+          - text: 图片素材
+          - generic [ref=e39]: "286"
+        - tab "视频素材 42" [ref=e40] [cursor=pointer]:
+          - text: 视频素材
+          - generic [ref=e44]: "42"
+      - generic [ref=e45]:
+        - textbox "搜索名称、SKU 或标签" [ref=e50]
+        - button "上传" [ref=e51] [cursor=pointer]
+        - button "关闭资源中心" [ref=e55] [cursor=pointer]
+    - generic [ref=e60]:
+      - complementary [ref=e61]:
+        - generic [ref=e62]: 素材范围
+        - navigation "素材范围" [ref=e63]:
+          - button "产品素材 248 SKU" [ref=e64] [cursor=pointer]:
+            - text: 产品素材
+            - generic [ref=e69]: 248 SKU
+          - button "公共素材 326" [ref=e70] [cursor=pointer]:
+            - text: 公共素材
+            - generic [ref=e76]: "326"
+          - button "我的素材 128" [ref=e77] [cursor=pointer]:
+            - text: 我的素材
+            - generic [ref=e81]: "128"
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - generic [ref=e86]:
+              - text: ERP 商品分类
+              - generic [ref=e87]: 唯一分类
+            - generic [ref=e88]:
+              - button "全部产品 248" [ref=e89] [cursor=pointer]:
+                - text: 全部产品
+                - generic [ref=e90]: "248"
+              - button "睡衣 / 家居服 86" [ref=e91] [cursor=pointer]:
+                - text: 睡衣 / 家居服
+                - generic [ref=e92]: "86"
+              - button "围巾 42" [ref=e93] [cursor=pointer]:
+                - text: 围巾
+                - generic [ref=e94]: "42"
+              - button "帽子 35" [ref=e95] [cursor=pointer]:
+                - text: 帽子
+                - generic [ref=e96]: "35"
+              - button "鞋履 28" [ref=e97] [cursor=pointer]:
+                - text: 鞋履
+                - generic [ref=e98]: "28"
+              - button "其他配饰 57" [ref=e99] [cursor=pointer]:
+                - text: 其他配饰
+                - generic [ref=e100]: "57"
+          - generic [ref=e101]:
+            - generic [ref=e102]:
+              - text: 图片用途
+              - generic [ref=e103]: 自动沉淀
+            - generic [ref=e104]:
+              - button "商品主图 54" [ref=e105] [cursor=pointer]:
+                - text: 商品主图
+                - generic [ref=e106]: "54"
+              - button "场景图 73" [ref=e107] [cursor=pointer]:
+                - text: 场景图
+                - generic [ref=e108]: "73"
+              - button "细节图 46" [ref=e109] [cursor=pointer]:
+                - text: 细节图
+                - generic [ref=e110]: "46"
+              - button "参考图 31" [ref=e111] [cursor=pointer]:
+                - text: 参考图
+                - generic [ref=e112]: "31"
+              - button "搭配合成 12" [ref=e113] [cursor=pointer]:
+                - text: 搭配合成
+                - generic [ref=e114]: "12"
+        - generic [ref=e115]:
+          - generic [ref=e116]:
+            - text: 存储空间
+            - generic [ref=e117]: 82%
+          - text: 已使用 4.1GB / 5.0GB
+      - generic [ref=e122]:
+        - generic [ref=e123]:
+          - generic [ref=e124]:
+            - generic [ref=e125]:
+              - button "产品素材" [ref=e126] [cursor=pointer]
+              - generic [ref=e129]: 搭配合成
+            - heading "搭配合成" [level=3] [ref=e130]
+            - paragraph [ref=e131]: 从每个已选 SKU 取一张代表图，按顺序上下或左右拼接
+          - generic [ref=e132]: 3 个 SKU · 文件只存一份
+        - generic [ref=e134]:
+          - generic [ref=e135]:
+            - generic [ref=e136]:
+              - generic [ref=e137]:
+                - strong [ref=e138]: 参与商品
+                - generic [ref=e139]: 每个 SKU 一张源图，可更换
+              - generic [ref=e140]: "3"
+            - generic [ref=e141]:
+              - generic [ref=e142]:
+                - generic [ref=e144]:
+                  - generic [ref=e145]: 上装
+                  - strong [ref=e146]: 青柠格纹家居服上衣
+                  - generic [ref=e147]: TEST1-GRN-M · ERP 图
+                - button "更换源图" [ref=e148] [cursor=pointer]
+              - generic [ref=e154]:
+                - generic [ref=e156]:
+                  - generic [ref=e157]: 下装
+                  - strong [ref=e158]: 青柠格纹家居长裤
+                  - generic [ref=e159]: PANTS-L · ERP 图
+                - button "更换源图" [ref=e160] [cursor=pointer]
+              - generic [ref=e166]:
+                - generic [ref=e168]:
+                  - generic [ref=e169]: 鞋履
+                  - strong [ref=e170]: 珍珠白家居拖鞋
+                  - generic [ref=e171]: SHOES-01 · 最近素材
+                - button "更换源图" [ref=e172] [cursor=pointer]
+          - generic [ref=e179]:
+            - generic [ref=e180]:
+              - strong [ref=e181]: 合成预览
+              - generic [ref=e182]: 按左侧顺序生成，不改变原图内容
+            - generic [ref=e183]: PNG
+          - complementary [ref=e189]:
+            - generic [ref=e191]:
+              - strong [ref=e192]: 合成设置
+              - generic [ref=e193]: 形式服务于商品搭配关系
+            - generic [ref=e194]:
+              - button "上下拼接" [ref=e195] [cursor=pointer]
+              - button "左右拼接" [ref=e196] [cursor=pointer]
+            - generic [ref=e197]: 保存规则底层文件只存一份；为上装、下装、鞋履分别生成一条 SKU 素材引用，因此每个产品素材集合都能看到该结果。
+            - button "保存搭配素材" [ref=e198] [cursor=pointer]
+    - generic [ref=e203]:
+      - generic [ref=e204]: 搭配图只存一份文件，并为每个参与 SKU 建立独立资源引用
+      - generic [ref=e205]:
+        - button "返回产品列表" [ref=e206] [cursor=pointer]
+        - button "取消" [ref=e209] [cursor=pointer]
