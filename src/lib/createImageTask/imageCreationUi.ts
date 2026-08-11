@@ -60,7 +60,7 @@ const toDictOptions = (
     value: definition.code,
     label: definition.label,
     description: definition.description,
-    imageUrl: definition.imageUrl,
+    imageUrl: apiOption?.imageUrl ?? definition.imageUrl,
     fileResourceId: apiOption?.fileResourceId,
     fileKey: apiOption?.fileKey,
   };

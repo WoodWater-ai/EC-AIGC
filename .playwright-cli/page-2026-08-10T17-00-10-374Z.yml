@@ -1,0 +1,143 @@
+- generic [ref=e2]:
+  - generic [ref=e55]:
+    - complementary [ref=e56]:
+      - generic [ref=e57]:
+        - generic [ref=e59]:
+          - generic [ref=e60]: blur_on
+          - generic [ref=e62]:
+            - heading "达芬奇密码 AI" [level=1] [ref=e63]
+            - text: WORKBENCH
+        - button "add_circle 新建创作 keyboard_arrow_down" [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: add_circle
+          - text: 新建创作
+          - generic [ref=e67]: keyboard_arrow_down
+        - navigation [ref=e68]:
+          - generic [ref=e69]: 主模块
+          - button "dashboard 工作台首页" [ref=e70] [cursor=pointer]:
+            - generic [ref=e71]:
+              - generic [ref=e72]: dashboard
+              - generic [ref=e73]: 工作台首页
+          - button "auto_awesome 创作助手" [ref=e75] [cursor=pointer]:
+            - generic [ref=e76]:
+              - generic [ref=e77]: auto_awesome
+              - generic [ref=e78]: 创作助手
+          - button "auto_schedule 任务列表" [ref=e79] [cursor=pointer]:
+            - generic [ref=e80]:
+              - generic [ref=e81]: auto_schedule
+              - generic [ref=e82]: 任务列表
+          - button "dashboard_customize 智能模板中心" [ref=e83] [cursor=pointer]:
+            - generic [ref=e84]:
+              - generic [ref=e85]: dashboard_customize
+              - generic [ref=e86]: 智能模板中心
+          - button "inventory_2 商品素材库" [ref=e87] [cursor=pointer]:
+            - generic [ref=e88]:
+              - generic [ref=e89]: inventory_2
+              - generic [ref=e90]: 商品素材库
+          - button "insights 数据效能复盘" [ref=e91] [cursor=pointer]:
+            - generic [ref=e92]:
+              - generic [ref=e93]: insights
+              - generic [ref=e94]: 数据效能复盘
+          - button "settings_applications 系统配置模块" [ref=e95] [cursor=pointer]:
+            - generic [ref=e96]:
+              - generic [ref=e97]: settings_applications
+              - generic [ref=e98]: 系统配置模块
+          - button "sync_alt 通道异步任务" [ref=e99] [cursor=pointer]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: sync_alt
+              - generic [ref=e102]: 通道异步任务
+          - button "account_tree 资源分类" [ref=e103] [cursor=pointer]:
+            - generic [ref=e104]:
+              - generic [ref=e105]: account_tree
+              - generic [ref=e106]: 资源分类
+          - button "category 商品分类" [ref=e107] [cursor=pointer]:
+            - generic [ref=e108]:
+              - generic [ref=e109]: category
+              - generic [ref=e110]: 商品分类
+          - button "inventory_2 产品管理" [ref=e111] [cursor=pointer]:
+            - generic [ref=e112]:
+              - generic [ref=e113]: inventory_2
+              - generic [ref=e114]: 产品管理
+          - button "dataset 字典分类管理" [ref=e115] [cursor=pointer]:
+            - generic [ref=e116]:
+              - generic [ref=e117]: dataset
+              - generic [ref=e118]: 字典分类管理
+          - button "menu_book 字典管理" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]:
+              - generic [ref=e121]: menu_book
+              - generic [ref=e122]: 字典管理
+        - generic [ref=e123]:
+          - generic [ref=e124]: 快捷工具
+          - button "grid_view 资源中心" [ref=e125] [cursor=pointer]:
+            - generic [ref=e126]: grid_view
+            - text: 资源中心
+          - button "face_3 模特资源库" [ref=e127] [cursor=pointer]:
+            - generic [ref=e128]:
+              - generic [ref=e129]: face_3
+              - text: 模特资源库
+      - generic [ref=e131]:
+        - img "管理员" [ref=e133]
+        - generic [ref=e135]:
+          - paragraph [ref=e136]: 管理员
+          - paragraph [ref=e137]: 管理员
+    - generic [ref=e138]:
+      - banner [ref=e139]:
+        - generic [ref=e140]:
+          - generic [ref=e141] [cursor=pointer]: 达芬奇密码 AI
+          - generic [ref=e142]: chevron_right
+          - generic [ref=e143]: 工作台首页
+        - generic [ref=e145]:
+          - button "add 新建任务 keyboard_arrow_down" [ref=e147] [cursor=pointer]:
+            - generic [ref=e148]: add
+            - generic [ref=e149]: 新建任务
+            - generic [ref=e150]: keyboard_arrow_down
+          - button "notifications 2" [ref=e153] [cursor=pointer]:
+            - generic [ref=e154]: notifications
+            - generic [ref=e155]: "2"
+          - button "help" [ref=e156] [cursor=pointer]
+          - button "logout 退出" [ref=e158] [cursor=pointer]:
+            - generic [ref=e159]: logout
+            - generic [ref=e160]: 退出
+      - main [ref=e161]:
+        - generic [ref=e162]:
+          - region "生产状态" [ref=e163]:
+            - button "progress_activity 进行中0 个任务" [ref=e165]:
+              - generic [ref=e166]: progress_activity
+              - generic [ref=e167]: 进行中0 个任务
+            - button "notifications 待处理0 项需关注" [ref=e168]:
+              - generic [ref=e169]: notifications
+              - generic [ref=e170]: 待处理0 项需关注
+            - generic [ref=e171]: 模板成片可直接复用
+          - generic [ref=e172]:
+            - generic [ref=e174]:
+              - button "模板营地0" [ref=e175]
+              - button "我的作品0" [ref=e176]
+            - generic [ref=e178]:
+              - tablist "模板媒介" [ref=e179]:
+                - tab "image 图片 0" [selected] [ref=e180]:
+                  - generic [ref=e181]: image
+                  - text: 图片
+                  - generic [ref=e182]: "0"
+                - tab "play_circle 视频 0" [ref=e183]:
+                  - generic [ref=e184]: play_circle
+                  - text: 视频
+                  - generic [ref=e185]: "0"
+              - generic [ref=e186]:
+                - generic [ref=e187]: 风格
+                - button "全部" [ref=e188]
+              - generic [ref=e189]:
+                - generic [ref=e190]:
+                  - generic [ref=e191]: category
+                  - generic [ref=e192]: 品类
+                  - combobox "品类" [ref=e193]:
+                    - option "全部" [selected]
+                - generic [ref=e194]:
+                  - generic [ref=e195]: sort
+                  - generic [ref=e196]: 排序
+                  - combobox "排序" [ref=e197]:
+                    - option "推荐"
+                    - option "最新" [selected]
+            - generic [ref=e199]:
+              - generic [ref=e200]: auto_awesome
+              - paragraph [ref=e201]: 没有匹配的模板
+              - button "重置筛选" [ref=e202]
+  - region "Notifications alt+T"

@@ -4,12 +4,18 @@ import { toast } from 'sonner';
 import type { ProductAsset } from '../types';
 import { assetApi, type AssetResourceItem, type AssetResourceQueryRequest } from '../api/modules/asset';
 import { ApiError } from '../api/error';
-import {
-  productLibraryApi,
-  type ProductLibraryAsset,
-} from '../api/modules/productLibrary';
+import { productLibraryApi } from '../api/modules/productLibrary';
 import { assetCategoryApi, type AssetCategoryNode } from '../api/modules/assetCategory';
 import { modelProfileApi, type ModelProfileDTO } from '../api/modules/modelProfile';
+import {
+  toProductLibrarySpu,
+  type ProductSkuView,
+  type ProductSpuView,
+} from './productManagement/productManagementModel';
+import {
+  buildProductDetailAssets,
+  type ResourceMediaFilter,
+} from './resourceCenterModel';
 import { useAuth } from '../auth/AuthContext';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { useConfirm } from './common/ConfirmProvider';
@@ -45,30 +51,24 @@ interface ScannedFile {
 /** TransitAsset 直接 alias 到后端 AssetResourceItem —— 单一数据源 */
 type TransitAsset = AssetResourceItem;
 export type ResourceCenterSource = 'UPLOAD' | 'PRODUCT' | 'MODEL';
+type ResourceTagDimension = 'style' | 'scene' | 'detail' | 'pose';
 
-const toTransitAsset = (asset: ProductLibraryAsset): TransitAsset => ({
-  id: asset.id,
-  name: [asset.productName, asset.imageType ?? asset.taskType]
-    .filter(Boolean)
-    .join('-') || `商品素材-${asset.id}`,
-  assetKind: asset.mediaType,
-  assetType: 'AI_GENERATED',
-  width: asset.width,
-  height: asset.height,
-  durationSec: asset.durationSec,
-  thumbnailUrl: asset.thumbnailUrl ?? asset.url,
-  originalUrl: asset.url,
-  description: asset.taskCode ? `来源任务：${asset.taskCode}` : undefined,
-  tags: ['商品素材', asset.style, asset.scene, asset.action].filter(Boolean).join(','),
-  uploadUserId: '',
-  productId: asset.productId,
-  sourceType: asset.mediaType === 'IMAGE' ? 'GENERATED_IMAGE' : 'GENERATED_VIDEO',
-  sourceId: asset.id,
-  status: 'NORMAL',
-  visibility: 'PRIVATE',
-  categoryIds: [],
-  createTime: asset.createTime,
-});
+const RESOURCE_TAG_FILTERS: Record<ResourceTagDimension, Array<{ group?: string; values: string[] }>> = {
+  style: [
+    { group: '甜美', values: ['奶油甜妹卧室', '法式轻奢裙装'] },
+    { group: '质感', values: ['静奢深睡品质感', '复古田园居家', '东方雅致轻熟'] },
+    { group: '个性', values: ['甜酷美式街头', '甜酷暗黑辣妹', '多巴胺元气居家', '新中式雅致'] },
+  ],
+  scene: [
+    { group: '室内', values: ['奶油柔光卧室', '窗边安静居家', '浅色质感家居', '暗调缎面居家'] },
+    { group: '室外', values: ['留白新中式', '旧木田园空间'] },
+  ],
+  detail: [{ values: ['领口', '袖口', '面料', '图案', '纽扣'] }],
+  pose: [
+    { group: '站姿', values: ['自然站姿', '45 度微侧身', '窗边缓步'] },
+    { group: '坐姿与动作', values: ['床边自然坐姿', '侧身回望', '轻整理袖口'] },
+  ],
+};
 
 const modelProfileToTransitAsset = (profile: ModelProfileDTO): TransitAsset => ({
   id: profile.assetResourceId,
@@ -140,21 +140,43 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   assetKind = 'IMAGE',
   multiSelect = false,
   mode = 'picker',
-  initialSource = 'UPLOAD',
+  initialSource,
   allowedSources = ['UPLOAD', 'PRODUCT', 'MODEL'],
   onModelImported,
   selectionOnly = false,
 }) => {
   const productSourceAvailable = allowedSources.includes('PRODUCT') && assetKind !== 'AUDIO';
   const modelSourceAvailable = allowedSources.includes('MODEL') && assetKind === 'IMAGE';
+  const requestedInitialSource = initialSource ?? (mode === 'manager' ? 'PRODUCT' : 'UPLOAD');
   const [activeSource, setActiveSource] = useState<ResourceCenterSource>(
-    initialSource === 'MODEL' && modelSourceAvailable
+    requestedInitialSource === 'MODEL' && modelSourceAvailable
       ? 'MODEL'
-      : initialSource === 'PRODUCT' && productSourceAvailable
+      : requestedInitialSource === 'PRODUCT' && productSourceAvailable
         ? 'PRODUCT'
         : 'UPLOAD',
   );
+  const [mediaFilter, setMediaFilter] = useState<ResourceMediaFilter>(
+    assetKind,
+  );
   const [searchQuery, setSearchQuery] = useState('');
+  const [productSpus, setProductSpus] = useState<ProductSpuView[]>([]);
+  const [productLoading, setProductLoading] = useState(false);
+  const [productError, setProductError] = useState<Error | null>(null);
+  const [focusedProduct, setFocusedProduct] = useState<{
+    spuName: string;
+    productId: string;
+    sku: ProductSkuView;
+  } | null>(null);
+  const [selectedProductSkuIds, setSelectedProductSkuIds] = useState<string[]>([]);
+  const [selectedProductCategory, setSelectedProductCategory] = useState<string | null>(null);
+  const [primaryFilter, setPrimaryFilter] = useState<'all' | 'recent'>('all');
+  const [openTagDimension, setOpenTagDimension] = useState<ResourceTagDimension | null>(null);
+  const [selectedTagFilters, setSelectedTagFilters] = useState<Record<ResourceTagDimension, string[]>>({
+    style: [],
+    scene: [],
+    detail: [],
+    pose: [],
+  });
   /** 分类树折叠状态 —— 存被折叠的节点 id,默认空 = 全部展开 */
   const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
   const toggleCollapse = (id: number) => {
@@ -196,9 +218,13 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
       pageNum: 1,
       pageSize: 100,
     };
-    // picker mode 才按 kind 过滤;manager mode 不传(查全部)
-    if (mode !== 'manager' && assetKind) {
-      base.assetKind = assetKind as 'IMAGE' | 'VIDEO' | 'AUDIO';
+    if (mediaFilter !== 'ALL') {
+      base.assetKind = mediaFilter;
+    }
+    if (primaryFilter === 'recent') {
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      base.startTime = since.toISOString();
     }
     if (selectedCategoryId !== null) {
       return { ...base, categoryId: selectedCategoryId };
@@ -226,18 +252,25 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
           .filter((profile) => Boolean(profile.assetResourceId && profile.image))
           .map(modelProfileToTransitAsset));
       } else if (activeSource === 'PRODUCT') {
-        const page = await productLibraryApi.assetPage({
-          pageNum: 1,
-          pageSize: 100,
-          keyword: searchQuery || undefined,
-          mediaType: mode !== 'manager' && assetKind !== 'AUDIO'
-            ? (assetKind === 'VIDEO' ? 'VIDEO' : 'IMAGE')
-            : undefined,
-          sortBy: 'latest',
-        });
-        setAssets(page.list
-          .filter((item) => Boolean(item.url))
-          .map(toTransitAsset));
+        if (!focusedProduct) {
+          setAssets([]);
+          return;
+        }
+        const detail = await productLibraryApi.productDetail(focusedProduct.productId);
+        const recentThreshold = primaryFilter === 'recent'
+          ? Date.now() - 30 * 24 * 60 * 60 * 1000
+          : null;
+        const keyword = searchQuery.trim().toLowerCase();
+        setAssets(buildProductDetailAssets(detail, mediaFilter).filter((asset) => {
+          if (recentThreshold !== null) {
+            const createdAt = asset.createTime ? new Date(asset.createTime).getTime() : 0;
+            if (!createdAt || createdAt < recentThreshold) return false;
+          }
+          if (!keyword) return true;
+          return [asset.name, asset.description, asset.tags]
+            .filter(Boolean)
+            .some((value) => value!.toLowerCase().includes(keyword));
+        }));
       } else {
         const query = { ...buildQuery(), keyword: searchQuery || undefined };
         const page = await assetApi.page(query);
@@ -255,7 +288,34 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   useEffect(() => {
     refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, currentUserId, productId, selectedCategoryId, activeSource]);
+  }, [searchQuery, currentUserId, productId, selectedCategoryId, activeSource, mediaFilter, primaryFilter, focusedProduct]);
+
+  useEffect(() => {
+    if (activeSource !== 'PRODUCT' || focusedProduct) return;
+    let cancelled = false;
+    setProductLoading(true);
+    setProductError(null);
+    productLibraryApi.productPage({
+      pageNum: 1,
+      pageSize: 100,
+      keyword: searchQuery || undefined,
+      sortBy: 'latest',
+    }).then((page) => {
+      if (!cancelled) {
+        setProductSpus(page.list.map(toProductLibrarySpu));
+      }
+    }).catch((error: Error) => {
+      if (!cancelled) {
+        setProductError(error);
+        setProductSpus([]);
+      }
+    }).finally(() => {
+      if (!cancelled) setProductLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSource, focusedProduct, searchQuery]);
 
   const handleSourceChange = (source: ResourceCenterSource) => {
     if (!allowedSources.includes(source)
@@ -266,6 +326,11 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setSelectedAssetIds([]);
     setMergeDrawerItems(null);
     setSelectedCategoryId(null);
+    setSelectedProductSkuIds([]);
+    setFocusedProduct(null);
+    setPrimaryFilter('all');
+    setOpenTagDimension(null);
+    if (source === 'MODEL') setMediaFilter('IMAGE');
   };
 
   /**
@@ -306,8 +371,39 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   // Hidden inputs refs
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Filter logic —— 服务端 query 已处理 keyword/categoryId,客户端不兜底过滤
-  const filteredAssets = assets;
+  const filteredAssets = assets.filter((asset) => {
+    if (activeSource !== 'UPLOAD') return true;
+    if (asset.productId) return false;
+    if (asset.inModelLibrary) return false;
+    if (currentUserId && String(asset.uploadUserId) !== currentUserId) return false;
+    const assetTags = asset.tags ?? '';
+    return (Object.keys(selectedTagFilters) as ResourceTagDimension[]).every((dimension) => {
+      const selected = selectedTagFilters[dimension];
+      return selected.length === 0 || selected.some((tag) => assetTags.includes(tag));
+    });
+  });
+  const selectedProductSkus = productSpus.flatMap((spu) =>
+    spu.skus
+      .filter((sku) => selectedProductSkuIds.includes(sku.id))
+      .map((sku) => ({ spu, sku })),
+  );
+  const productCategories = Array.from(new Set(productSpus
+    .map((spu) => spu.category ?? spu.categories[0]?.categoryName)
+    .filter((value): value is string => Boolean(value))));
+  const visibleProductSpus = selectedProductCategory == null
+    ? productSpus
+    : productSpus.filter((spu) =>
+        (spu.category ?? spu.categories[0]?.categoryName) === selectedProductCategory,
+      );
+  const selectedUploadProductId = selectedProductSkus.length === 1
+    ? selectedProductSkus[0].sku.productId
+    : undefined;
+  const effectiveProductId = activeSource === 'PRODUCT'
+    ? selectedUploadProductId ?? focusedProduct?.productId
+    : productId;
+  const currentSelectionCount = activeSource === 'PRODUCT' && !focusedProduct
+    ? selectedProductSkuIds.length
+    : selectedAssetIds.length;
   const canDeleteSelected = canDelete
     && selectedAssetIds.length > 0
     && selectedAssetIds
@@ -360,6 +456,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
   const handleClearSelection = () => {
     setSelectedAssetIds([]);
+    setSelectedProductSkuIds([]);
+    setSelectedProductCategory(null);
     setMergeDrawerItems(null);
   };
 
@@ -367,6 +465,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     if (!canMerge || !canMergeSelected) return;
     setMergeDrawerItems(selectedItems);
   };
+
+  const productComposeDisabledReason = selectedProductSkus.length < 2
+    ? '至少选择两个 SKU'
+    : selectedProductSkus.some(({ sku }) => !sku.imageId)
+      ? '所选 SKU 需要有当前白底图'
+      : '多 SKU 素材引用接口接入后可用';
 
   const handleSetAsModel = async () => {
     if (!canSetSelectedAsModel) return;
@@ -584,15 +688,29 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   // Local File Upload
   const handleLocalUploadTrigger = () => {
     if (!canUpload) return;
+    if (activeSource === 'PRODUCT' && !effectiveProductId) {
+      toast.warning('请先选择一个 SKU');
+      return;
+    }
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
+  const handleDirectoryScanOpen = () => {
+    if (activeSource === 'PRODUCT' && !effectiveProductId) {
+      toast.warning('请先选择一个 SKU');
+      return;
+    }
+    setIsScanOpen(true);
+  };
+
   // 真上传 hook —— 走腾讯云 COS
   const { upload, loading: uploadLoading } = useFileUpload({
-    purpose: (purpose ?? 'OTHER') as 'AVATAR' | 'PRODUCT' | 'OTHER',
-    productId,
+    purpose: effectiveProductId == null
+      ? (purpose ?? 'OTHER') as 'AVATAR' | 'PRODUCT' | 'OTHER'
+      : 'PRODUCT',
+    productId: effectiveProductId,
   });
 
   const handleLocalUploadChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -613,7 +731,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
           fileResourceId,
           fileMd5,
           name: file.name,
-          productId,
+          productId: effectiveProductId,
           assetKind: inferAssetKind(file),
           assetType: 'PRODUCT_ORIGINAL',
         });
@@ -791,7 +909,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
         fileResourceId,
         fileMd5,
         name: target.name,
-        productId,
+        productId: effectiveProductId,
         assetKind: kind,
         assetType: 'PRODUCT_ORIGINAL',
       });
@@ -904,7 +1022,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   };
 
   return (
-    <div className={`fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 md:p-10 select-none animate-fadeIn ${
+    <div className={`fixed inset-0 flex items-center justify-center bg-black/40 p-4 md:p-8 select-none animate-fadeIn ${
       targetSlot.startsWith('model-profile-') ? 'z-[90]' : 'z-50'
     }`}>
       
@@ -921,51 +1039,54 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
       )}
 
       {/* Main Modal Container */}
-      <div className="bg-white w-full max-w-[1040px] h-[720px] rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+      <div className="bg-white w-full max-w-[1280px] h-[min(820px,calc(100vh-64px))] min-h-[620px] rounded-lg shadow-2xl flex flex-col overflow-hidden relative">
         
         {/* Header section matching prototype */}
-        <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+        <header className="flex min-h-16 items-center justify-between gap-5 border-b border-slate-200 bg-white px-5">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+            <div className="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center text-white">
               <span className="material-symbols-outlined font-bold text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>dataset</span>
             </div>
             <h1 className="text-base font-extrabold text-slate-800">资源中心</h1>
-            <div className="ml-3 flex items-center rounded-lg bg-slate-100 p-1">
-              <button
-                type="button"
-                onClick={() => handleSourceChange('UPLOAD')}
-                className={`rounded-md px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                  activeSource === 'UPLOAD'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {selectionOnly ? '素材库' : '上传资源'}
-              </button>
+            <div className="ml-4 flex h-16 items-end gap-6">
               {productSourceAvailable && (
                 <button
                   type="button"
                   onClick={() => handleSourceChange('PRODUCT')}
-                  className={`rounded-md px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  className={`relative flex h-16 items-center gap-2 border-b-2 px-0 text-xs font-extrabold transition-colors ${
                     activeSource === 'PRODUCT'
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
+                      ? 'border-blue-600 text-slate-900'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
                   }`}
                 >
-                  商品素材
+                  <span className="material-symbols-outlined text-base">inventory_2</span>
+                  产品素材
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => handleSourceChange('UPLOAD')}
+                className={`relative flex h-16 items-center gap-2 border-b-2 px-0 text-xs font-extrabold transition-colors ${
+                  activeSource === 'UPLOAD'
+                    ? 'border-blue-600 text-slate-900'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">category</span>
+                通用素材
+              </button>
               {modelSourceAvailable && (
                 <button
                   type="button"
                   onClick={() => handleSourceChange('MODEL')}
-                  className={`rounded-md px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  className={`relative flex h-16 items-center gap-2 border-b-2 px-0 text-xs font-extrabold transition-colors ${
                     activeSource === 'MODEL'
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
+                      ? 'border-blue-600 text-slate-900'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
                   }`}
                 >
-                  模特库
+                  <span className="material-symbols-outlined text-base">person</span>
+                  模特素材
                 </button>
               )}
             </div>
@@ -982,11 +1103,37 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
         <div className="flex flex-1 overflow-hidden">
           
           {/* Left Navigation (分类导航) */}
-          <aside className="w-[240px] border-r border-slate-200 bg-white flex flex-col p-4 gap-4 shrink-0 overflow-y-auto">
+          <aside className="w-[210px] shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50 p-4 flex flex-col gap-4">
+
+            {activeSource !== 'MODEL' && assetKind !== 'AUDIO' && (
+              <div>
+                <p className="mb-2 px-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">素材类型</p>
+                <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
+                  {(['IMAGE', 'VIDEO'] as const).map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => {
+                        setMediaFilter(kind);
+                        setSelectedAssetIds([]);
+                      }}
+                      className={`flex h-8 items-center justify-center gap-1 rounded-md text-[11px] font-bold ${
+                        mediaFilter === kind
+                          ? 'bg-white text-slate-800 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-sm">{kind === 'IMAGE' ? 'image' : 'videocam'}</span>
+                      {kind === 'IMAGE' ? '图片' : '视频'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 我的分类 —— 真实分类树(从 assetCategoryApi.tree 加载) */}
             <div className={`flex flex-col gap-2 ${activeSource !== 'UPLOAD' ? 'hidden' : ''}`}>
-              <p className="text-[10px] font-extrabold text-slate-400 px-3 uppercase tracking-wider">我的分类</p>
+              <p className="text-[10px] font-extrabold text-slate-400 px-3 uppercase tracking-wider">通用素材分类</p>
               {categoryTreeError ? (
                 <div className="px-3 py-2 text-[10px] text-red-500 font-medium">
                   加载失败: {categoryTreeError}
@@ -1086,17 +1233,33 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             {activeSource === 'PRODUCT' && (
               <div className="flex flex-col gap-2">
                 <p className="text-[10px] font-extrabold text-slate-400 px-3 uppercase tracking-wider">
-                  商品素材
+                  产品素材
                 </p>
                 <button
                   type="button"
-                  className="flex items-center gap-2 w-full rounded-lg bg-blue-50 px-3 py-2 text-left text-xs font-bold text-blue-600"
+                  onClick={() => setSelectedProductCategory(null)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold ${
+                    selectedProductCategory == null ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-white'
+                  }`}
                 >
                   <span className="material-symbols-outlined text-base">photo_library</span>
-                  <span>全部商品素材</span>
+                  <span>全部产品</span>
                 </button>
+                {productCategories.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setSelectedProductCategory(category)}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[11px] font-bold ${
+                      selectedProductCategory === category ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-white'
+                    }`}
+                  >
+                    <span className="truncate">{category}</span>
+                    <span className="text-[9px] text-slate-400">{productSpus.filter((spu) => (spu.category ?? spu.categories[0]?.categoryName) === category).length}</span>
+                  </button>
+                ))}
                 <p className="px-3 pt-2 text-[10px] leading-5 text-slate-400">
-                  展示已生成的商品图片和视频。选择后会自动转换为任务可使用的标准资源。
+                  先按 SKU 选择产品，再查看其图片或视频素材。
                 </p>
               </div>
             )}
@@ -1104,7 +1267,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             {activeSource === 'MODEL' && (
               <div className="flex flex-col gap-2">
                 <p className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                  模特库
+                  模特素材
                 </p>
                 <button
                   type="button"
@@ -1120,9 +1283,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             )}
 
             {/* Storage Progress Meter in bottom of navigation */}
-            <div className={`mt-auto p-4 bg-blue-50/50 rounded-xl border border-blue-100 ${
-              activeSource !== 'UPLOAD' ? 'hidden' : ''
-            }`}>
+            <div className="mt-auto rounded-lg border border-blue-100 bg-white p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">存储空间</span>
                 <span className="text-[10px] font-bold text-slate-500">82%</span>
@@ -1140,17 +1301,28 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             {/* Action panel & search filters */}
             <div className="p-4 bg-white border-b border-slate-200 flex items-center justify-between gap-4">
               {activeSource === 'UPLOAD' ? (
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  {canMerge && (
+                    <button
+                      type="button"
+                      onClick={handleMergeClick}
+                      disabled={!canMergeSelected}
+                      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span className="material-symbols-outlined text-sm">view_quilt</span>
+                      合并图片
+                    </button>
+                  )}
                   {canUpload && <button
                     onClick={handleLocalUploadTrigger}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
                   >
                     <span className="material-symbols-outlined text-sm">cloud_upload</span>
                     <span>本地上传</span>
                   </button>}
                   {canUpload && <button
-                    onClick={() => setIsScanOpen(true)}
-                    className="flex items-center gap-2 bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold border border-slate-200 hover:bg-slate-100 transition-colors shadow-xs cursor-pointer"
+                    onClick={handleDirectoryScanOpen}
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
                   >
                     <span className="material-symbols-outlined text-sm">scan</span>
                     <span>目录扫描</span>
@@ -1167,9 +1339,54 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   )}
                 </div>
               ) : activeSource === 'PRODUCT' ? (
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                  <span className="material-symbols-outlined text-base text-blue-500">auto_awesome</span>
-                  <span>商品任务生成素材</span>
+                <div className="flex items-center gap-2">
+                  {focusedProduct && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFocusedProduct(null);
+                        setSelectedAssetIds([]);
+                      }}
+                      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                    >
+                      <span className="material-symbols-outlined text-sm">arrow_back</span>
+                      返回产品列表
+                    </button>
+                  )}
+                  {!focusedProduct && canMerge && (
+                    <span title={productComposeDisabledReason}>
+                      <button
+                        type="button"
+                        disabled
+                        className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white opacity-40"
+                      >
+                        <span className="material-symbols-outlined text-sm">view_quilt</span>
+                        搭配合成
+                      </button>
+                    </span>
+                  )}
+                  {canUpload && (
+                    <button
+                      type="button"
+                      onClick={handleLocalUploadTrigger}
+                      disabled={!effectiveProductId}
+                      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span className="material-symbols-outlined text-sm">cloud_upload</span>
+                      本地上传
+                    </button>
+                  )}
+                  {canUpload && (
+                    <button
+                      type="button"
+                      onClick={handleDirectoryScanOpen}
+                      disabled={!effectiveProductId}
+                      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span className="material-symbols-outlined text-sm">scan</span>
+                      目录扫描
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -1198,7 +1415,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                     type="text" 
                     placeholder={
                       activeSource === 'PRODUCT'
-                        ? '搜索商品、任务或素材'
+                        ? focusedProduct ? '搜索当前 SKU 素材' : '搜索 ERP 商品名称、SPU 或 SKU'
                         : activeSource === 'MODEL'
                           ? '搜索模特名称或标签'
                           : '搜索资源文件名'
@@ -1211,18 +1428,198 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                 <div className="flex gap-2">
                   <span className="text-[10px] font-bold text-slate-400 self-center">
                     {activeSource === 'PRODUCT'
-                      ? '商品素材'
+                      ? focusedProduct ? `${focusedProduct.spuName} · ${focusedProduct.sku.code}` : '按 SKU 展示'
                       : activeSource === 'MODEL'
                         ? '模特资源'
-                        : '左侧选择分类'}
+                        : '仅我的未关联素材'}
                   </span>
                 </div>
               </div>
             </div>
 
+            {activeSource !== 'MODEL' && (
+              <div className="flex min-h-14 items-center gap-2 border-b border-slate-200 bg-white px-5">
+                {(['all', 'recent'] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setPrimaryFilter(value)}
+                    className={`h-8 rounded-md border px-3 text-[11px] font-bold ${
+                      primaryFilter === value
+                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {value === 'all' ? '全部' : '最近使用'}
+                  </button>
+                ))}
+                {activeSource === 'UPLOAD' && (
+                  <div className="relative ml-2 flex items-center gap-2">
+                    {(Object.keys(RESOURCE_TAG_FILTERS) as ResourceTagDimension[]).map((dimension) => {
+                      const label = { style: '风格', scene: '场景', detail: '细节', pose: '姿势' }[dimension];
+                      const selectedCount = selectedTagFilters[dimension].length;
+                      return (
+                        <button
+                          key={dimension}
+                          type="button"
+                          onClick={() => setOpenTagDimension((current) => current === dimension ? null : dimension)}
+                          className={`flex h-8 items-center gap-1 rounded-md border px-3 text-[11px] font-bold ${
+                            openTagDimension === dimension || selectedCount > 0
+                              ? 'border-blue-200 bg-blue-50 text-blue-700'
+                              : 'border-slate-200 bg-white text-slate-500'
+                          }`}
+                        >
+                          {label}
+                          {selectedCount > 0 && <span className="text-[9px]">已选 {selectedCount}</span>}
+                          <span className="material-symbols-outlined text-sm">expand_more</span>
+                        </button>
+                      );
+                    })}
+                    {openTagDimension && (
+                      <div className="absolute left-0 top-10 z-30 max-h-80 w-80 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 shadow-xl">
+                        {RESOURCE_TAG_FILTERS[openTagDimension].map((group, index) => (
+                          <div key={group.group ?? index} className={index > 0 ? 'mt-3 border-t border-slate-100 pt-3' : ''}>
+                            {group.group && <p className="mb-2 text-[10px] font-extrabold text-slate-700">{group.group}</p>}
+                            <div className="space-y-1">
+                              {group.values.map((value) => {
+                                const checked = selectedTagFilters[openTagDimension].includes(value);
+                                return (
+                                  <label key={value} className="flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-[11px] text-slate-600 hover:bg-slate-50">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => setSelectedTagFilters((current) => ({
+                                        ...current,
+                                        [openTagDimension]: checked
+                                          ? current[openTagDimension].filter((item) => item !== value)
+                                          : [...current[openTagDimension], value],
+                                      }))}
+                                      className="h-4 w-4 accent-blue-600"
+                                    />
+                                    {value}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Scrollable grid area */}
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              {activeSource === 'PRODUCT' && !focusedProduct ? (
+                <div className="space-y-6">
+                  {productLoading && (
+                    <div className="flex items-center justify-center py-16 text-xs font-bold text-slate-400">
+                      <span className="material-symbols-outlined mr-2 animate-spin text-base">progress_activity</span>
+                      正在加载产品...
+                    </div>
+                  )}
+                  {!productLoading && productError && (
+                    <div className="py-16 text-center text-xs font-bold text-red-500">产品加载失败：{productError.message}</div>
+                  )}
+                  {!productLoading && !productError && (() => {
+                    const renderSkuCard = (spu: ProductSpuView, sku: ProductSkuView) => {
+                      const selected = selectedProductSkuIds.includes(sku.id);
+                      return (
+                        <article
+                          key={sku.id}
+                          onClick={() => setSelectedProductSkuIds((current) =>
+                            current.includes(sku.id)
+                              ? current.filter((id) => id !== sku.id)
+                              : [...current, sku.id],
+                          )}
+                          className={`group relative min-w-0 cursor-pointer overflow-hidden rounded-lg border bg-white transition-all hover:shadow-md ${
+                            selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'
+                          }`}
+                        >
+                          <div className="relative aspect-[9/16] overflow-hidden bg-white">
+                            <AssetImage
+                              urls={[sku.imageUrl, spu.imageUrl]}
+                              alt={`${spu.name} ${sku.name}`}
+                              assetKind="IMAGE"
+                              objectFit="contain"
+                              className="h-full w-full"
+                            />
+                            <span className="absolute bottom-2 left-2 rounded border border-slate-200 bg-white/95 px-2 py-1 text-[9px] font-bold text-slate-600">当前白底图</span>
+                            <span className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md border text-[11px] ${
+                              selected
+                                ? 'border-blue-600 bg-blue-600 text-white'
+                                : 'border-slate-300 bg-white/95 text-transparent'
+                            }`}>✓</span>
+                          </div>
+                          <div className="p-3">
+                            <h4 className="truncate text-xs font-extrabold text-slate-800">{spu.name}</h4>
+                            <p className="mt-1 truncate text-[10px] text-slate-500">{sku.name} · {sku.code}</p>
+                            <div className="mt-3 flex min-h-8 items-end justify-between gap-2">
+                              <span className="text-[9px] text-slate-400">{sku.materialCount} 张素材</span>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setFocusedProduct({ spuName: spu.name, productId: sku.productId, sku });
+                                  setSelectedAssetIds([]);
+                                }}
+                                className="flex h-8 items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 text-[10px] font-bold text-blue-700 hover:bg-blue-100"
+                              >
+                                <span className="material-symbols-outlined text-sm">photo_library</span>
+                                查看素材
+                              </button>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    };
+                    const multiSpec = visibleProductSpus.filter((spu) => spu.skus.length > 1);
+                    const singleSpec = visibleProductSpus.filter((spu) => spu.skus.length === 1);
+                    return (
+                      <>
+                        {multiSpec.map((spu) => (
+                          <section key={spu.id}>
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-xs font-extrabold text-slate-800">{spu.name}</h3>
+                                <span className="rounded bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700">{spu.code}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-400">{spu.skus.length} 个 SKU</span>
+                            </div>
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4">
+                              {spu.skus.map((sku) => renderSkuCard(spu, sku))}
+                            </div>
+                          </section>
+                        ))}
+                        {singleSpec.length > 0 && (
+                          <section>
+                            <div className="mb-3 flex items-center justify-between"><h3 className="text-xs font-extrabold text-slate-800">单规格商品</h3><span className="text-[10px] text-slate-400">直接按 SKU 展示</span></div>
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4">
+                              {singleSpec.map((spu) => renderSkuCard(spu, spu.skus[0]))}
+                            </div>
+                          </section>
+                        )}
+                        {visibleProductSpus.length === 0 && (
+                          <div className="py-16 text-center text-xs font-bold text-slate-400">暂无符合条件的产品</div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+              <>
+              {focusedProduct && (
+                <div className="mb-4 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-800">{focusedProduct.spuName}</h3>
+                    <p className="mt-1 text-[10px] text-slate-500">{focusedProduct.sku.name} · {focusedProduct.sku.code}</p>
+                  </div>
+                  <span className="rounded bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700">产品素材</span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {loading && (
                   <div className="col-span-full flex items-center justify-center py-16 text-xs font-bold text-slate-400">
                     <span className="material-symbols-outlined mr-2 animate-spin text-base">progress_activity</span>
@@ -1258,7 +1655,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                     const isSelected = selectedAssetIds.includes(asset.id);
                     const selectIndex = selectedAssetIds.indexOf(asset.id) + 1;
                     const resourceLabel = asset.inModelLibrary
-                      ? '模特库'
+                      ? '模特素材'
                       : asset.tags?.split(',')[0] ?? '';
                     return (
                       <div
@@ -1308,23 +1705,9 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                         </div>
                         <div className="p-3">
                           <div className="mb-1 flex items-center gap-1">
-                            {asset.visibility === 'PUBLIC' ? (
-                              <Globe className="h-3 w-3 shrink-0 text-emerald-500" aria-label="公共资源" />
-                            ) : (
-                              <Lock className="h-3 w-3 shrink-0 text-slate-400" aria-label="个人资源" />
-                            )}
                             <p className="min-w-0 flex-1 truncate text-xs font-bold text-slate-800">
                               {asset.name}
                             </p>
-                            <span
-                              className={`shrink-0 rounded px-1 py-0.5 text-[8px] font-bold ${
-                                asset.visibility === 'PUBLIC'
-                                  ? 'bg-emerald-50 text-emerald-600'
-                                  : 'bg-slate-100 text-slate-500'
-                              }`}
-                            >
-                              {asset.visibility === 'PUBLIC' ? '公共' : '个人'}
-                            </span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold ${
@@ -1344,6 +1727,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                 })()}
 
               </div>
+              </>
+              )}
             </div>
 
             {/* Footer matching prototype strictly */}
@@ -1351,9 +1736,11 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
                   <span className="material-symbols-outlined text-blue-600 text-sm font-bold" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                  <span className="text-xs font-extrabold text-blue-600">已选择 {selectedAssetIds.length} 个资源</span>
+                  <span className="text-xs font-extrabold text-blue-600">
+                    已选择 {currentSelectionCount} 个{activeSource === 'PRODUCT' && !focusedProduct ? ' SKU' : '资源'}
+                  </span>
                 </div>
-                {selectedAssetIds.length > 0 && (
+                {currentSelectionCount > 0 && (
                   <>
                     <button
                       onClick={handleClearSelection}
@@ -1413,7 +1800,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                 </button>
                 <button
                   onClick={handleConfirmSelection}
-                  disabled={mode === 'manager' || selectedAssetIds.length === 0 || confirmingSelection}
+                  disabled={
+                    mode === 'manager'
+                    || (activeSource === 'PRODUCT' && !focusedProduct)
+                    || selectedAssetIds.length === 0
+                    || confirmingSelection
+                  }
                   title={
                     mode === 'manager'
                       ? '管理型入口,不需要选择资源'

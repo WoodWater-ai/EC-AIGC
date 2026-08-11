@@ -1,0 +1,1038 @@
+- generic [ref=e2]:
+  - generic [ref=e501]:
+    - banner [ref=e502]:
+      - generic [ref=e503]:
+        - button "返回任务列表" [ref=e504]:
+          - generic [ref=e505]: arrow_back
+        - generic [ref=e506]:
+          - heading "新建图片任务" [level=1] [ref=e507]
+          - paragraph [ref=e508]: 配置、生成与结果在同一页面完成
+    - main [ref=e509]:
+      - generic [ref=e510]:
+        - generic [ref=e511]:
+          - generic [ref=e512]:
+            - generic [ref=e513]:
+              - paragraph [ref=e514]: 创作商品
+              - heading "主体素材" [level=2] [ref=e515]
+            - button "资源中心" [ref=e516]
+          - button "添加主体素材" [ref=e518]:
+            - generic [ref=e519]: add
+        - generic [ref=e521]:
+          - generic [ref=e522]:
+            - generic [ref=e523]:
+              - paragraph [ref=e524]: 补充依据
+              - heading "参考图" [level=2] [ref=e525]
+            - generic [ref=e526]: 1 / 5
+          - generic [ref=e527]:
+            - generic [ref=e1190]:
+              - generic [ref=e1191]:
+                - img "无限的模特2" [ref=e1192]
+                - generic [ref=e1193]: 参考图 1
+                - button "移除参考图 1" [ref=e1194]
+              - button "模特" [ref=e1200]
+            - button "添加参考" [active] [ref=e1204]
+          - paragraph [ref=e537]: 每张图片可多选标签；同一标签仅归属一张图，重复选择会自动转移。
+        - generic [ref=e538]:
+          - generic [ref=e539]:
+            - generic [ref=e540]:
+              - paragraph [ref=e541]: ERP 商品事实
+              - heading "待匹配 ERP 商品" [level=2] [ref=e542]
+              - paragraph [ref=e543]: 未获取 ERP 分类
+            - button "复制商品事实" [disabled] [ref=e544]
+          - generic [ref=e549]:
+            - text: SEO 优化商品名称
+            - textbox "SEO 优化商品名称" [disabled] [ref=e550]:
+              - /placeholder: 用于生成 Prompt，不回写 ERP
+          - generic [ref=e551]:
+            - paragraph [ref=e552]: 图片理解提取
+            - generic [ref=e553]:
+              - generic [ref=e554]:
+                - generic [ref=e555]: 颜色
+                - textbox "颜色" [disabled] [ref=e556]
+              - generic [ref=e557]:
+                - generic [ref=e558]: 图案 / 材质
+                - textbox "图案 / 材质" [disabled] [ref=e559]
+              - generic [ref=e560]:
+                - generic [ref=e561]: 版型 / 结构
+                - textbox "版型 / 结构" [disabled] [ref=e562]
+            - generic [ref=e563]:
+              - text: 核心卖点
+              - textbox "核心卖点" [disabled] [ref=e564]
+      - generic [ref=e566]:
+        - generic [ref=e567]:
+          - generic [ref=e568]:
+            - generic [ref=e569]:
+              - paragraph [ref=e570]: 输出内容
+              - heading "选择图片类型" [level=2] [ref=e571]
+            - generic [ref=e572]: 共 5 张
+          - generic [ref=e575]:
+            - generic [ref=e576]:
+              - button "取消选择商品主图" [pressed] [ref=e577]:
+                - generic [ref=e578]: check_circle
+                - generic [ref=e579]: 商品主图
+              - group "商品主图张数" [ref=e580]:
+                - button "减少一张" [disabled] [ref=e581]: −
+                - generic [ref=e582]: "1"
+                - button "增加一张" [ref=e583]: +
+            - generic [ref=e584]:
+              - button "取消选择场景图" [pressed] [ref=e694]:
+                - generic [ref=e586]: check_circle
+                - generic [ref=e587]: 场景图
+              - group "场景图张数" [ref=e695]:
+                - button "减少一张" [ref=e696]: −
+                - generic [ref=e697]: "2"
+                - button "增加一张" [ref=e698]: +
+            - generic [ref=e588]:
+              - button "取消选择细节图" [pressed] [ref=e699]:
+                - generic [ref=e590]: check_circle
+                - generic [ref=e591]: 细节图
+              - group "细节图张数" [ref=e700]:
+                - button "减少一张" [disabled] [ref=e701]: −
+                - generic [ref=e702]: "1"
+                - button "增加一张" [ref=e703]: +
+            - generic [ref=e592]:
+              - button "取消选择三视图" [pressed] [ref=e704]:
+                - generic [ref=e594]: check_circle
+                - generic [ref=e595]: 三视图
+              - group "三视图张数" [ref=e705]:
+                - button "减少一张" [disabled] [ref=e706]: −
+                - generic [ref=e707]: "1"
+                - button "增加一张" [ref=e708]: +
+        - generic [ref=e596]:
+          - generic [ref=e598]:
+            - paragraph [ref=e599]: 内容表达
+            - heading "本次图片 Prompt" [level=2] [ref=e600]
+            - paragraph [ref=e601]: 像对话输入框一样编辑文字，并在底部直接调整创作标签
+          - generic [ref=e602]: 请先在左侧选择已绑定商品的素材,商品事实与 Prompt 才能解析。
+          - generic [ref=e603]:
+            - generic [ref=e604]:
+              - paragraph [ref=e605]: 将应用到 4 个图片类型 · 共 5 张
+              - button "按表单重算" [disabled] [ref=e607]
+            - textbox "本次图片 Prompt" [disabled] [ref=e608]:
+              - /placeholder: 选择主体素材后，可编辑本次图片 Prompt
+          - generic [ref=e609]:
+            - generic [ref=e611]:
+              - paragraph [ref=e612]: 创作标签
+              - paragraph [ref=e613]: 已引用参考图的标签自动锁定
+            - generic [ref=e614]:
+              - generic [ref=e615]:
+                - button "风格奶油甜妹卧室" [ref=e617]
+                - button "场景奶油柔光卧室" [ref=e622]
+                - button "姿势自然站姿" [ref=e627]
+              - generic [ref=e631]:
+                - button "模型q3-lite" [ref=e780]
+                - button "比例1:1" [ref=e838]
+                - button "分辨率1K" [ref=e650]
+                - group [ref=e658]:
+                  - generic "高级执行设置" [ref=e659] [cursor=pointer]
+                  - option "vidu-正式" [selected]
+                  - option "vidu-测试"
+                  - option "vidu-正式-nano2"
+      - complementary [ref=e661]:
+        - generic [ref=e662]:
+          - generic [ref=e663]:
+            - heading "本次生成结果" [level=2] [ref=e664]
+            - generic [ref=e665]: 待生成 · 5 张
+          - generic [ref=e666]:
+            - paragraph [ref=e673]: 结果将在这里显示
+            - paragraph [ref=e674]: 提交后可离开页面，任务会在后台继续；任务列表会自动恢复进度与最终结果。
+            - generic [ref=e675]:
+              - generic [ref=e676]:
+                - term [ref=e677]: 图片类型
+                - definition [ref=e678]: 4 类
+              - generic [ref=e679]:
+                - term [ref=e680]: 生成数量
+                - definition [ref=e681]: 5 张
+              - generic [ref=e682]:
+                - term [ref=e683]: 模型
+                - definition [ref=e684]: q3-lite
+              - generic [ref=e685]:
+                - term [ref=e686]: 输出规格
+                - definition [ref=e687]: 1:1 · 1K
+          - generic [ref=e688]:
+            - button "检查并生成 5 张" [ref=e709]
+            - paragraph [ref=e693]: 提交前会展示完整校验、耗时与失败处理策略。
+    - generic [ref=e1208]:
+      - banner [ref=e1209]:
+        - generic [ref=e1210]:
+          - generic [ref=e1211]: dataset
+          - heading "资源中心" [level=1] [ref=e1213]
+          - generic [ref=e1214]:
+            - button "上传资源" [ref=e1215] [cursor=pointer]
+            - button "商品素材" [ref=e1216] [cursor=pointer]
+            - button "模特库" [ref=e1217] [cursor=pointer]
+        - button "close" [ref=e1218] [cursor=pointer]
+      - generic [ref=e1220]:
+        - complementary [ref=e1221]:
+          - generic [ref=e1222]:
+            - paragraph [ref=e1223]: 我的分类
+            - navigation [ref=e1224]:
+              - button "label 图片分类 image 公开分类" [ref=e1225] [cursor=pointer]:
+                - button "折叠" [ref=e1226]
+                - generic [ref=e1229]: label
+                - generic [ref=e1230]: 图片分类
+                - generic "IMAGE" [ref=e1231]: image
+                - img "公开分类" [ref=e1232]
+              - button "subdirectory_arrow_right 白底图 image 公开分类" [ref=e1235] [cursor=pointer]:
+                - generic [ref=e1237]: subdirectory_arrow_right
+                - generic [ref=e1238]: 白底图
+                - generic "IMAGE" [ref=e1239]: image
+                - img "公开分类" [ref=e1240]
+              - button "subdirectory_arrow_right 睡衣 image 公开分类" [ref=e1243] [cursor=pointer]:
+                - generic [ref=e1245]: subdirectory_arrow_right
+                - generic [ref=e1246]: 睡衣
+                - generic "IMAGE" [ref=e1247]: image
+                - img "公开分类" [ref=e1248]
+              - button "subdirectory_arrow_right 项链 image 公开分类" [ref=e1251] [cursor=pointer]:
+                - generic [ref=e1253]: subdirectory_arrow_right
+                - generic [ref=e1254]: 项链
+                - generic "IMAGE" [ref=e1255]: image
+                - img "公开分类" [ref=e1256]
+              - button "label 视频 videocam 公开分类" [ref=e1259] [cursor=pointer]:
+                - button "折叠" [ref=e1260]
+                - generic [ref=e1263]: label
+                - generic [ref=e1264]: 视频
+                - generic "VIDEO" [ref=e1265]: videocam
+                - img "公开分类" [ref=e1266]
+              - button "subdirectory_arrow_right 视频私有 videocam 私有分类" [ref=e1269] [cursor=pointer]:
+                - generic [ref=e1271]: subdirectory_arrow_right
+                - generic [ref=e1272]: 视频私有
+                - generic "VIDEO" [ref=e1273]: videocam
+                - img "私有分类" [ref=e1274]
+          - generic [ref=e1277]:
+            - generic [ref=e1278]:
+              - generic [ref=e1279]: 存储空间
+              - generic [ref=e1280]: 82%
+            - paragraph [ref=e1283]: 已使用 4.1GB / 5.0GB
+        - main [ref=e1284]:
+          - generic [ref=e1285]:
+            - generic [ref=e1286]:
+              - button "cloud_upload 本地上传" [ref=e1287] [cursor=pointer]:
+                - generic [ref=e1288]: cloud_upload
+                - generic [ref=e1289]: 本地上传
+              - button "scan 目录扫描" [ref=e1290] [cursor=pointer]:
+                - generic [ref=e1291]: scan
+                - generic [ref=e1292]: 目录扫描
+            - generic [ref=e1293]:
+              - generic [ref=e1294]:
+                - generic [ref=e1295]: search
+                - textbox "搜索资源文件名" [ref=e1296]
+              - generic [ref=e1297]: 左侧选择分类
+          - generic [ref=e1300]:
+            - generic [ref=e1301] [cursor=pointer]:
+              - generic [ref=e1302]: add_photo_alternate
+              - paragraph [ref=e1303]: 上传资源...
+            - generic [ref=e1304] [cursor=pointer]:
+              - generic [ref=e1305]:
+                - img "Clipboard - 2026-08-10 16.11.28.png" [ref=e1307]
+                - generic "图片": image
+              - generic [ref=e1311]:
+                - img "公共资源" [ref=e1312]
+                - paragraph [ref=e1315]: Clipboard - 2026-08-10 16.11.28.png
+                - generic [ref=e1316]: 公共
+            - generic [ref=e1319] [cursor=pointer]:
+              - generic [ref=e1320]:
+                - img "Clipboard - 2026-08-10 20.11.26.png" [ref=e1322]
+                - generic "图片": image
+              - generic [ref=e1325]:
+                - generic [ref=e1326]:
+                  - img "公共资源" [ref=e1327]
+                  - paragraph [ref=e1330]: Clipboard - 2026-08-10 20.11.26.png
+                  - generic [ref=e1331]: 公共
+                - generic [ref=e1332]: 模特库
+            - generic [ref=e1334] [cursor=pointer]:
+              - generic [ref=e1335]:
+                - img "Clipboard - 2026-08-10 18.37.07.png" [ref=e1337]
+                - generic "图片": image
+              - generic [ref=e1341]:
+                - img "公共资源" [ref=e1342]
+                - paragraph [ref=e1345]: Clipboard - 2026-08-10 18.37.07.png
+                - generic [ref=e1346]: 公共
+            - generic [ref=e1349] [cursor=pointer]:
+              - generic [ref=e1350]:
+                - img "1778922802779.png" [ref=e1352]
+                - generic "图片": image
+              - generic [ref=e1356]:
+                - img "公共资源" [ref=e1357]
+                - paragraph [ref=e1360]: 1778922802779.png
+                - generic [ref=e1361]: 公共
+            - generic [ref=e1364] [cursor=pointer]:
+              - generic [ref=e1365]:
+                - img "微信图片_20260808145934_207_1289.jpg" [ref=e1367]
+                - generic "图片": image
+              - generic [ref=e1371]:
+                - img "公共资源" [ref=e1372]
+                - paragraph [ref=e1375]: 微信图片_20260808145934_207_1289.jpg
+                - generic [ref=e1376]: 公共
+            - generic [ref=e1379] [cursor=pointer]:
+              - generic [ref=e1380]:
+                - img "e1fd0d664e296a30c1ea7f45e86d43bd.jpg" [ref=e1382]
+                - generic "图片": image
+              - generic [ref=e1386]:
+                - img "公共资源" [ref=e1387]
+                - paragraph [ref=e1390]: e1fd0d664e296a30c1ea7f45e86d43bd.jpg
+                - generic [ref=e1391]: 公共
+            - generic [ref=e1394] [cursor=pointer]:
+              - generic [ref=e1395]:
+                - img "助手生成图片" [ref=e1397]
+                - generic "图片": image
+              - generic [ref=e1401]:
+                - img "公共资源" [ref=e1402]
+                - paragraph [ref=e1405]: 助手生成图片
+                - generic [ref=e1406]: 公共
+            - generic [ref=e1409] [cursor=pointer]:
+              - generic [ref=e1410]:
+                - img "be223968bf3bb6c23365ce5d5e53e555.png" [ref=e1412]
+                - generic "图片": image
+              - generic [ref=e1416]:
+                - img "公共资源" [ref=e1417]
+                - paragraph [ref=e1420]: be223968bf3bb6c23365ce5d5e53e555.png
+                - generic [ref=e1421]: 公共
+            - generic [ref=e1424] [cursor=pointer]:
+              - generic [ref=e1425]:
+                - img "jimeng-2026-07-08-6409.png" [ref=e1427]
+                - generic "图片": image
+              - generic [ref=e1431]:
+                - img "公共资源" [ref=e1432]
+                - paragraph [ref=e1435]: jimeng-2026-07-08-6409.png
+                - generic [ref=e1436]: 公共
+            - generic [ref=e1439] [cursor=pointer]:
+              - generic [ref=e1440]:
+                - img "jimeng-2026-08-07-7985-保持图1人物完全不变，让图1模特自然融入到图2场景里去，人物正面站立画面正中间，....png" [ref=e1442]
+                - generic "图片": image
+              - generic [ref=e1446]:
+                - img "公共资源" [ref=e1447]
+                - paragraph [ref=e1450]: jimeng-2026-08-07-7985-保持图1人物完全不变，让图1模特自然融入到图2场景里去，人物正面站立画面正中间，....png
+                - generic [ref=e1451]: 公共
+            - generic [ref=e1454] [cursor=pointer]:
+              - generic [ref=e1455]:
+                - img "a5eda6f47e80b685e2243e0d2ecf5638.png" [ref=e1457]
+                - generic "图片": image
+              - generic [ref=e1461]:
+                - img "公共资源" [ref=e1462]
+                - paragraph [ref=e1465]: a5eda6f47e80b685e2243e0d2ecf5638.png
+                - generic [ref=e1466]: 公共
+            - generic [ref=e1469] [cursor=pointer]:
+              - generic [ref=e1470]:
+                - img "ScreenShot_2026-07-12_124837_356.png" [ref=e1472]
+                - generic "图片": image
+              - generic [ref=e1476]:
+                - img "公共资源" [ref=e1477]
+                - paragraph [ref=e1480]: ScreenShot_2026-07-12_124837_356.png
+                - generic [ref=e1481]: 公共
+            - generic [ref=e1484] [cursor=pointer]:
+              - generic [ref=e1485]:
+                - img "样貌气质提示词 (2).png" [ref=e1487]
+                - generic "图片": image
+              - generic [ref=e1491]:
+                - img "公共资源" [ref=e1492]
+                - paragraph [ref=e1495]: 样貌气质提示词 (2).png
+                - generic [ref=e1496]: 公共
+            - generic [ref=e1499] [cursor=pointer]:
+              - generic [ref=e1500]:
+                - img "微信图片_20260614021814_16_5.jpg" [ref=e1502]
+                - generic "图片": image
+              - generic [ref=e1506]:
+                - img "公共资源" [ref=e1507]
+                - paragraph [ref=e1510]: 微信图片_20260614021814_16_5.jpg
+                - generic [ref=e1511]: 公共
+            - generic [ref=e1514] [cursor=pointer]:
+              - generic [ref=e1515]:
+                - img "微信图片_20260614014905_19_2.jpg" [ref=e1517]
+                - generic "图片": image
+              - generic [ref=e1521]:
+                - img "公共资源" [ref=e1522]
+                - paragraph [ref=e1525]: 微信图片_20260614014905_19_2.jpg
+                - generic [ref=e1526]: 公共
+            - generic [ref=e1529] [cursor=pointer]:
+              - generic [ref=e1530]:
+                - img "image-1781373704274.png" [ref=e1532]
+                - generic "图片": image
+              - generic [ref=e1536]:
+                - img "公共资源" [ref=e1537]
+                - paragraph [ref=e1540]: image-1781373704274.png
+                - generic [ref=e1541]: 公共
+            - generic [ref=e1544] [cursor=pointer]:
+              - generic [ref=e1545]:
+                - img "13427466271464298.jpeg" [ref=e1547]
+                - generic "图片": image
+              - generic [ref=e1551]:
+                - img "公共资源" [ref=e1552]
+                - paragraph [ref=e1555]: 13427466271464298.jpeg
+                - generic [ref=e1556]: 公共
+            - generic [ref=e1559] [cursor=pointer]:
+              - generic [ref=e1560]:
+                - img "图片生成-1781798219535_副本.png" [ref=e1562]
+                - generic "图片": image
+              - generic [ref=e1566]:
+                - img "公共资源" [ref=e1567]
+                - paragraph [ref=e1570]: 图片生成-1781798219535_副本.png
+                - generic [ref=e1571]: 公共
+            - generic [ref=e1574] [cursor=pointer]:
+              - generic [ref=e1575]:
+                - img "微信图片_20260731135125_936_10.png" [ref=e1577]
+                - generic "图片": image
+              - generic [ref=e1581]:
+                - img "公共资源" [ref=e1582]
+                - paragraph [ref=e1585]: 微信图片_20260731135125_936_10.png
+                - generic [ref=e1586]: 公共
+            - generic [ref=e1589] [cursor=pointer]:
+              - generic [ref=e1590]:
+                - img "jimeng-2026-07-23-7966-保持图1人物不变、环境不变，人物与画面比例一致，让图1模特换上图2的上衣和裤子长....png" [ref=e1592]
+                - generic "图片": image
+              - generic [ref=e1596]:
+                - img "公共资源" [ref=e1597]
+                - paragraph [ref=e1600]: jimeng-2026-07-23-7966-保持图1人物不变、环境不变，人物与画面比例一致，让图1模特换上图2的上衣和裤子长....png
+                - generic [ref=e1601]: 公共
+            - generic [ref=e1604] [cursor=pointer]:
+              - generic [ref=e1605]:
+                - img "微信图片_20260806144420_1055_10.png" [ref=e1607]
+                - generic "图片": image
+              - generic [ref=e1611]:
+                - img "公共资源" [ref=e1612]
+                - paragraph [ref=e1615]: 微信图片_20260806144420_1055_10.png
+                - generic [ref=e1616]: 公共
+            - generic [ref=e1619] [cursor=pointer]:
+              - generic [ref=e1620]:
+                - img "微信图片_20260621111158_12_73副本.png" [ref=e1622]
+                - generic "图片": image
+              - generic [ref=e1626]:
+                - img "公共资源" [ref=e1627]
+                - paragraph [ref=e1630]: 微信图片_20260621111158_12_73副本.png
+                - generic [ref=e1631]: 公共
+            - generic [ref=e1634] [cursor=pointer]:
+              - generic [ref=e1635]:
+                - img "上海故事秋冬新款绵羊毛围巾女格子保暖空调披肩围脖送长辈礼盒装-tmall.com天猫.jpg" [ref=e1637]
+                - generic "图片": image
+              - generic [ref=e1641]:
+                - img "公共资源" [ref=e1642]
+                - paragraph [ref=e1645]: 上海故事秋冬新款绵羊毛围巾女格子保暖空调披肩围脖送长辈礼盒装-tmall.com天猫.jpg
+                - generic [ref=e1646]: 公共
+            - generic [ref=e1649] [cursor=pointer]:
+              - generic [ref=e1650]:
+                - img "DSC00062.jpg" [ref=e1652]
+                - generic "图片": image
+              - generic [ref=e1656]:
+                - img "公共资源" [ref=e1657]
+                - paragraph [ref=e1660]: DSC00062.jpg
+                - generic [ref=e1661]: 公共
+            - generic [ref=e1664] [cursor=pointer]:
+              - generic [ref=e1665]:
+                - img "DSC00061.jpg" [ref=e1667]
+                - generic "图片": image
+              - generic [ref=e1671]:
+                - img "公共资源" [ref=e1672]
+                - paragraph [ref=e1675]: DSC00061.jpg
+                - generic [ref=e1676]: 公共
+            - generic [ref=e1679] [cursor=pointer]:
+              - generic [ref=e1680]:
+                - img "DSC00059.jpg" [ref=e1682]
+                - generic "图片": image
+              - generic [ref=e1686]:
+                - img "公共资源" [ref=e1687]
+                - paragraph [ref=e1690]: DSC00059.jpg
+                - generic [ref=e1691]: 公共
+            - generic [ref=e1694] [cursor=pointer]:
+              - generic [ref=e1695]:
+                - img "DSC00058.jpg" [ref=e1697]
+                - generic "图片": image
+              - generic [ref=e1701]:
+                - img "公共资源" [ref=e1702]
+                - paragraph [ref=e1705]: DSC00058.jpg
+                - generic [ref=e1706]: 公共
+            - generic [ref=e1709] [cursor=pointer]:
+              - generic [ref=e1710]:
+                - img "DSC00056.jpg" [ref=e1712]
+                - generic "图片": image
+              - generic [ref=e1716]:
+                - img "公共资源" [ref=e1717]
+                - paragraph [ref=e1720]: DSC00056.jpg
+                - generic [ref=e1721]: 公共
+            - generic [ref=e1724] [cursor=pointer]:
+              - generic [ref=e1725]:
+                - img "DSC00051.jpg" [ref=e1727]
+                - generic "图片": image
+              - generic [ref=e1731]:
+                - img "公共资源" [ref=e1732]
+                - paragraph [ref=e1735]: DSC00051.jpg
+                - generic [ref=e1736]: 公共
+            - generic [ref=e1739] [cursor=pointer]:
+              - generic [ref=e1740]:
+                - img "DSC00050.jpg" [ref=e1742]
+                - generic "图片": image
+              - generic [ref=e1746]:
+                - img "公共资源" [ref=e1747]
+                - paragraph [ref=e1750]: DSC00050.jpg
+                - generic [ref=e1751]: 公共
+            - generic [ref=e1754] [cursor=pointer]:
+              - generic [ref=e1755]:
+                - img "DSC00049.jpg" [ref=e1757]
+                - generic "图片": image
+              - generic [ref=e1761]:
+                - img "公共资源" [ref=e1762]
+                - paragraph [ref=e1765]: DSC00049.jpg
+                - generic [ref=e1766]: 公共
+            - generic [ref=e1769] [cursor=pointer]:
+              - generic [ref=e1770]:
+                - img "DSC00048.jpg" [ref=e1772]
+                - generic "图片": image
+              - generic [ref=e1776]:
+                - img "公共资源" [ref=e1777]
+                - paragraph [ref=e1780]: DSC00048.jpg
+                - generic [ref=e1781]: 公共
+            - generic [ref=e1784] [cursor=pointer]:
+              - generic [ref=e1785]:
+                - img "DSC00047.jpg" [ref=e1787]
+                - generic "图片": image
+              - generic [ref=e1791]:
+                - img "公共资源" [ref=e1792]
+                - paragraph [ref=e1795]: DSC00047.jpg
+                - generic [ref=e1796]: 公共
+            - generic [ref=e1799] [cursor=pointer]:
+              - generic [ref=e1800]:
+                - img "DSC00043.jpg" [ref=e1802]
+                - generic "图片": image
+              - generic [ref=e1806]:
+                - img "公共资源" [ref=e1807]
+                - paragraph [ref=e1810]: DSC00043.jpg
+                - generic [ref=e1811]: 公共
+            - generic [ref=e1814] [cursor=pointer]:
+              - generic [ref=e1815]:
+                - img "DSC00041.jpg" [ref=e1817]
+                - generic "图片": image
+              - generic [ref=e1821]:
+                - img "公共资源" [ref=e1822]
+                - paragraph [ref=e1825]: DSC00041.jpg
+                - generic [ref=e1826]: 公共
+            - generic [ref=e1829] [cursor=pointer]:
+              - generic [ref=e1830]:
+                - img "DSC00040.jpg" [ref=e1832]
+                - generic "图片": image
+              - generic [ref=e1836]:
+                - img "公共资源" [ref=e1837]
+                - paragraph [ref=e1840]: DSC00040.jpg
+                - generic [ref=e1841]: 公共
+            - generic [ref=e1844] [cursor=pointer]:
+              - generic [ref=e1845]:
+                - img "DSC00039.jpg" [ref=e1847]
+                - generic "图片": image
+              - generic [ref=e1851]:
+                - img "公共资源" [ref=e1852]
+                - paragraph [ref=e1855]: DSC00039.jpg
+                - generic [ref=e1856]: 公共
+            - generic [ref=e1859] [cursor=pointer]:
+              - generic [ref=e1860]:
+                - img "DSC00037.jpg" [ref=e1862]
+                - generic "图片": image
+              - generic [ref=e1866]:
+                - img "公共资源" [ref=e1867]
+                - paragraph [ref=e1870]: DSC00037.jpg
+                - generic [ref=e1871]: 公共
+            - generic [ref=e1874] [cursor=pointer]:
+              - generic [ref=e1875]:
+                - img "DSC00035.jpg" [ref=e1877]
+                - generic "图片": image
+              - generic [ref=e1881]:
+                - img "公共资源" [ref=e1882]
+                - paragraph [ref=e1885]: DSC00035.jpg
+                - generic [ref=e1886]: 公共
+            - generic [ref=e1889] [cursor=pointer]:
+              - generic [ref=e1890]:
+                - img "DSC00034.jpg" [ref=e1892]
+                - generic "图片": image
+              - generic [ref=e1896]:
+                - img "公共资源" [ref=e1897]
+                - paragraph [ref=e1900]: DSC00034.jpg
+                - generic [ref=e1901]: 公共
+            - generic [ref=e1904] [cursor=pointer]:
+              - generic [ref=e1905]:
+                - img "DSC00032.jpg" [ref=e1907]
+                - generic "图片": image
+              - generic [ref=e1911]:
+                - img "公共资源" [ref=e1912]
+                - paragraph [ref=e1915]: DSC00032.jpg
+                - generic [ref=e1916]: 公共
+            - generic [ref=e1919] [cursor=pointer]:
+              - generic [ref=e1920]:
+                - img "DSC00030.jpg" [ref=e1922]
+                - generic "图片": image
+              - generic [ref=e1926]:
+                - img "公共资源" [ref=e1927]
+                - paragraph [ref=e1930]: DSC00030.jpg
+                - generic [ref=e1931]: 公共
+            - generic [ref=e1934] [cursor=pointer]:
+              - generic [ref=e1935]:
+                - img "DSC00028.jpg" [ref=e1937]
+                - generic "图片": image
+              - generic [ref=e1941]:
+                - img "公共资源" [ref=e1942]
+                - paragraph [ref=e1945]: DSC00028.jpg
+                - generic [ref=e1946]: 公共
+            - generic [ref=e1949] [cursor=pointer]:
+              - generic [ref=e1950]:
+                - img "DSC00026.jpg" [ref=e1952]
+                - generic "图片": image
+              - generic [ref=e1956]:
+                - img "公共资源" [ref=e1957]
+                - paragraph [ref=e1960]: DSC00026.jpg
+                - generic [ref=e1961]: 公共
+            - generic [ref=e1964] [cursor=pointer]:
+              - generic [ref=e1965]:
+                - img "DSC00022.jpg" [ref=e1967]
+                - generic "图片": image
+              - generic [ref=e1971]:
+                - img "公共资源" [ref=e1972]
+                - paragraph [ref=e1975]: DSC00022.jpg
+                - generic [ref=e1976]: 公共
+            - generic [ref=e1979] [cursor=pointer]:
+              - generic [ref=e1980]:
+                - img "DSC00020.jpg" [ref=e1982]
+                - generic "图片": image
+              - generic [ref=e1986]:
+                - img "公共资源" [ref=e1987]
+                - paragraph [ref=e1990]: DSC00020.jpg
+                - generic [ref=e1991]: 公共
+            - generic [ref=e1994] [cursor=pointer]:
+              - generic [ref=e1995]:
+                - img "DSC00019.jpg" [ref=e1997]
+                - generic "图片": image
+              - generic [ref=e2001]:
+                - img "公共资源" [ref=e2002]
+                - paragraph [ref=e2005]: DSC00019.jpg
+                - generic [ref=e2006]: 公共
+            - generic [ref=e2009] [cursor=pointer]:
+              - generic [ref=e2010]:
+                - img "DSC00013.jpg" [ref=e2012]
+                - generic "图片": image
+              - generic [ref=e2016]:
+                - img "公共资源" [ref=e2017]
+                - paragraph [ref=e2020]: DSC00013.jpg
+                - generic [ref=e2021]: 公共
+            - generic [ref=e2024] [cursor=pointer]:
+              - generic [ref=e2025]:
+                - img "DSC00012.jpg" [ref=e2027]
+                - generic "图片": image
+              - generic [ref=e2031]:
+                - img "公共资源" [ref=e2032]
+                - paragraph [ref=e2035]: DSC00012.jpg
+                - generic [ref=e2036]: 公共
+            - generic [ref=e2039] [cursor=pointer]:
+              - generic [ref=e2040]:
+                - img "DSC00010.jpg" [ref=e2042]
+                - generic "图片": image
+              - generic [ref=e2046]:
+                - img "公共资源" [ref=e2047]
+                - paragraph [ref=e2050]: DSC00010.jpg
+                - generic [ref=e2051]: 公共
+            - generic [ref=e2054] [cursor=pointer]:
+              - generic [ref=e2055]:
+                - img "DSC00009.jpg" [ref=e2057]
+                - generic "图片": image
+              - generic [ref=e2061]:
+                - img "公共资源" [ref=e2062]
+                - paragraph [ref=e2065]: DSC00009.jpg
+                - generic [ref=e2066]: 公共
+            - generic [ref=e2069] [cursor=pointer]:
+              - generic [ref=e2070]:
+                - img "DSC00007.jpg" [ref=e2072]
+                - generic "图片": image
+              - generic [ref=e2076]:
+                - img "公共资源" [ref=e2077]
+                - paragraph [ref=e2080]: DSC00007.jpg
+                - generic [ref=e2081]: 公共
+            - generic [ref=e2084] [cursor=pointer]:
+              - generic [ref=e2085]:
+                - img "DSC000651 (3).png" [ref=e2087]
+                - generic "图片": image
+              - generic [ref=e2091]:
+                - img "公共资源" [ref=e2092]
+                - paragraph [ref=e2095]: DSC000651 (3).png
+                - generic [ref=e2096]: 公共
+            - generic [ref=e2099] [cursor=pointer]:
+              - generic [ref=e2100]:
+                - img "DSC000651 (2).png" [ref=e2102]
+                - generic "图片": image
+              - generic [ref=e2106]:
+                - img "公共资源" [ref=e2107]
+                - paragraph [ref=e2110]: DSC000651 (2).png
+                - generic [ref=e2111]: 公共
+            - generic [ref=e2114] [cursor=pointer]:
+              - generic [ref=e2115]:
+                - img "DSC000521 (3).png" [ref=e2117]
+                - generic "图片": image
+              - generic [ref=e2121]:
+                - img "公共资源" [ref=e2122]
+                - paragraph [ref=e2125]: DSC000521 (3).png
+                - generic [ref=e2126]: 公共
+            - generic [ref=e2129] [cursor=pointer]:
+              - generic [ref=e2130]:
+                - img "DSC000651 (1).png" [ref=e2132]
+                - generic "图片": image
+              - generic [ref=e2136]:
+                - img "公共资源" [ref=e2137]
+                - paragraph [ref=e2140]: DSC000651 (1).png
+                - generic [ref=e2141]: 公共
+            - generic [ref=e2144] [cursor=pointer]:
+              - generic [ref=e2145]:
+                - img "DSC000521 (2).png" [ref=e2147]
+                - generic "图片": image
+              - generic [ref=e2151]:
+                - img "公共资源" [ref=e2152]
+                - paragraph [ref=e2155]: DSC000521 (2).png
+                - generic [ref=e2156]: 公共
+            - generic [ref=e2159] [cursor=pointer]:
+              - generic [ref=e2160]:
+                - img "DSC000521 (1).png" [ref=e2162]
+                - generic "图片": image
+              - generic [ref=e2166]:
+                - img "公共资源" [ref=e2167]
+                - paragraph [ref=e2170]: DSC000521 (1).png
+                - generic [ref=e2171]: 公共
+            - generic [ref=e2174] [cursor=pointer]:
+              - generic [ref=e2175]:
+                - img "DSC000441 (3).png" [ref=e2177]
+                - generic "图片": image
+              - generic [ref=e2181]:
+                - img "公共资源" [ref=e2182]
+                - paragraph [ref=e2185]: DSC000441 (3).png
+                - generic [ref=e2186]: 公共
+            - generic [ref=e2189] [cursor=pointer]:
+              - generic [ref=e2190]:
+                - img "DSC000441 (2).png" [ref=e2192]
+                - generic "图片": image
+              - generic [ref=e2196]:
+                - img "公共资源" [ref=e2197]
+                - paragraph [ref=e2200]: DSC000441 (2).png
+                - generic [ref=e2201]: 公共
+            - generic [ref=e2204] [cursor=pointer]:
+              - generic [ref=e2205]:
+                - img "DSC000441 (1).png" [ref=e2207]
+                - generic "图片": image
+              - generic [ref=e2211]:
+                - img "公共资源" [ref=e2212]
+                - paragraph [ref=e2215]: DSC000441 (1).png
+                - generic [ref=e2216]: 公共
+            - generic [ref=e2219] [cursor=pointer]:
+              - generic [ref=e2220]:
+                - img "DSC000331 (3).png" [ref=e2222]
+                - generic "图片": image
+              - generic [ref=e2226]:
+                - img "公共资源" [ref=e2227]
+                - paragraph [ref=e2230]: DSC000331 (3).png
+                - generic [ref=e2231]: 公共
+            - generic [ref=e2234] [cursor=pointer]:
+              - generic [ref=e2235]:
+                - img "DSC000331 (2).png" [ref=e2237]
+                - generic "图片": image
+              - generic [ref=e2241]:
+                - img "公共资源" [ref=e2242]
+                - paragraph [ref=e2245]: DSC000331 (2).png
+                - generic [ref=e2246]: 公共
+            - generic [ref=e2249] [cursor=pointer]:
+              - generic [ref=e2250]:
+                - img "DSC000331 (1).png" [ref=e2252]
+                - generic "图片": image
+              - generic [ref=e2256]:
+                - img "公共资源" [ref=e2257]
+                - paragraph [ref=e2260]: DSC000331 (1).png
+                - generic [ref=e2261]: 公共
+            - generic [ref=e2264] [cursor=pointer]:
+              - generic [ref=e2265]:
+                - img "DSC000241 (3).png" [ref=e2267]
+                - generic "图片": image
+              - generic [ref=e2271]:
+                - img "公共资源" [ref=e2272]
+                - paragraph [ref=e2275]: DSC000241 (3).png
+                - generic [ref=e2276]: 公共
+            - generic [ref=e2279] [cursor=pointer]:
+              - generic [ref=e2280]:
+                - img "DSC000241 (2).png" [ref=e2282]
+                - generic "图片": image
+              - generic [ref=e2286]:
+                - img "公共资源" [ref=e2287]
+                - paragraph [ref=e2290]: DSC000241 (2).png
+                - generic [ref=e2291]: 公共
+            - generic [ref=e2294] [cursor=pointer]:
+              - generic [ref=e2295]:
+                - img "DSC000141 (3).png" [ref=e2297]
+                - generic "图片": image
+              - generic [ref=e2301]:
+                - img "公共资源" [ref=e2302]
+                - paragraph [ref=e2305]: DSC000141 (3).png
+                - generic [ref=e2306]: 公共
+            - generic [ref=e2309] [cursor=pointer]:
+              - generic [ref=e2310]:
+                - img "DSC000241 (1).png" [ref=e2312]
+                - generic "图片": image
+              - generic [ref=e2316]:
+                - img "公共资源" [ref=e2317]
+                - paragraph [ref=e2320]: DSC000241 (1).png
+                - generic [ref=e2321]: 公共
+            - generic [ref=e2324] [cursor=pointer]:
+              - generic [ref=e2325]:
+                - img "DSC000141 (2).png" [ref=e2327]
+                - generic "图片": image
+              - generic [ref=e2331]:
+                - img "公共资源" [ref=e2332]
+                - paragraph [ref=e2335]: DSC000141 (2).png
+                - generic [ref=e2336]: 公共
+            - generic [ref=e2339] [cursor=pointer]:
+              - generic [ref=e2340]:
+                - img "DSC000031 (3).png" [ref=e2342]
+                - generic "图片": image
+              - generic [ref=e2346]:
+                - img "公共资源" [ref=e2347]
+                - paragraph [ref=e2350]: DSC000031 (3).png
+                - generic [ref=e2351]: 公共
+            - generic [ref=e2354] [cursor=pointer]:
+              - generic [ref=e2355]:
+                - img "DSC000031 (2).png" [ref=e2357]
+                - generic "图片": image
+              - generic [ref=e2361]:
+                - img "公共资源" [ref=e2362]
+                - paragraph [ref=e2365]: DSC000031 (2).png
+                - generic [ref=e2366]: 公共
+            - generic [ref=e2369] [cursor=pointer]:
+              - generic [ref=e2370]:
+                - img "DSC000031 (1).png" [ref=e2372]
+                - generic "图片": image
+              - generic [ref=e2376]:
+                - img "公共资源" [ref=e2377]
+                - paragraph [ref=e2380]: DSC000031 (1).png
+                - generic [ref=e2381]: 公共
+            - generic [ref=e2384] [cursor=pointer]:
+              - generic [ref=e2385]:
+                - img "DSC000141 (3).jpg" [ref=e2387]
+                - generic "图片": image
+              - generic [ref=e2391]:
+                - img "公共资源" [ref=e2392]
+                - paragraph [ref=e2395]: DSC000141 (3).jpg
+                - generic [ref=e2396]: 公共
+            - generic [ref=e2399] [cursor=pointer]:
+              - generic [ref=e2400]:
+                - img "Clipboard - 2026-08-05 21.25.18.png" [ref=e2402]
+                - generic "图片": image
+              - generic [ref=e2406]:
+                - img "公共资源" [ref=e2407]
+                - paragraph [ref=e2410]: Clipboard - 2026-08-05 21.25.18.png
+                - generic [ref=e2411]: 公共
+            - generic [ref=e2414] [cursor=pointer]:
+              - generic [ref=e2415]:
+                - img "产物 1.jpg" [ref=e2417]
+                - generic "图片": image
+              - generic [ref=e2421]:
+                - img "公共资源" [ref=e2422]
+                - paragraph [ref=e2425]: 产物 1.jpg
+                - generic [ref=e2426]: 公共
+            - generic [ref=e2429] [cursor=pointer]:
+              - generic [ref=e2430]:
+                - img "勉强.png" [ref=e2432]
+                - generic "图片": image
+              - generic [ref=e2436]:
+                - img "公共资源" [ref=e2437]
+                - paragraph [ref=e2440]: 勉强.png
+                - generic [ref=e2441]: 公共
+            - generic [ref=e2444] [cursor=pointer]:
+              - generic [ref=e2445]:
+                - img "content.png" [ref=e2447]
+                - generic "图片": image
+              - generic [ref=e2450]:
+                - generic [ref=e2451]:
+                  - img "公共资源" [ref=e2452]
+                  - paragraph [ref=e2455]: content.png
+                  - generic [ref=e2456]: 公共
+                - generic [ref=e2457]: 模特库
+            - generic [ref=e2459] [cursor=pointer]:
+              - generic [ref=e2460]:
+                - img "围巾人像（图ZMzk0MzU1MDM2） - 人像摄影 - 站酷设计师原沐摄影原创素材 - 站酷ZCOOL.jpg" [ref=e2462]
+                - generic "图片": image
+              - generic [ref=e2466]:
+                - img "公共资源" [ref=e2467]
+                - paragraph [ref=e2470]: 围巾人像（图ZMzk0MzU1MDM2） - 人像摄影 - 站酷设计师原沐摄影原创素材 - 站酷ZCOOL.jpg
+                - generic [ref=e2471]: 公共
+            - generic [ref=e2474] [cursor=pointer]:
+              - generic [ref=e2475]:
+                - img "Clipboard - 2026-08-04 22.11.32.png" [ref=e2477]
+                - generic "图片": image
+              - generic [ref=e2481]:
+                - img "公共资源" [ref=e2482]
+                - paragraph [ref=e2485]: Clipboard - 2026-08-04 22.11.32.png
+                - generic [ref=e2486]: 公共
+            - generic [ref=e2489] [cursor=pointer]:
+              - generic [ref=e2490]:
+                - img "13a38253778f5f9470750f7a50670162.jpg" [ref=e2492]
+                - generic "图片": image
+              - generic [ref=e2496]:
+                - img "公共资源" [ref=e2497]
+                - paragraph [ref=e2500]: 13a38253778f5f9470750f7a50670162.jpg
+                - generic [ref=e2501]: 公共
+            - generic [ref=e2504] [cursor=pointer]:
+              - generic [ref=e2505]:
+                - img "1.png" [ref=e2507]
+                - generic "图片": image
+              - generic [ref=e2511]:
+                - img "公共资源" [ref=e2512]
+                - paragraph [ref=e2515]: 1.png
+                - generic [ref=e2516]: 公共
+            - generic [ref=e2519] [cursor=pointer]:
+              - generic [ref=e2520]:
+                - img "1-1.jpg" [ref=e2522]
+                - generic "图片": image
+              - generic [ref=e2526]:
+                - img "公共资源" [ref=e2527]
+                - paragraph [ref=e2530]: 1-1.jpg
+                - generic [ref=e2531]: 公共
+            - generic [ref=e2534] [cursor=pointer]:
+              - generic [ref=e2535]:
+                - img "Clipboard - 2026-07-29 14.49.55.png" [ref=e2537]
+                - generic "图片": image
+              - generic [ref=e2540]:
+                - generic [ref=e2541]:
+                  - img "公共资源" [ref=e2542]
+                  - paragraph [ref=e2545]: Clipboard - 2026-07-29 14.49.55.png
+                  - generic [ref=e2546]: 公共
+                - generic [ref=e2547]: 模特库
+            - generic [ref=e2549] [cursor=pointer]:
+              - generic [ref=e2550]:
+                - img "Clipboard - 2026-07-22 21.03.25.png" [ref=e2552]
+                - generic "图片": image
+              - generic [ref=e2556]:
+                - img "公共资源" [ref=e2557]
+                - paragraph [ref=e2560]: Clipboard - 2026-07-22 21.03.25.png
+                - generic [ref=e2561]: 公共
+            - generic [ref=e2564] [cursor=pointer]:
+              - generic [ref=e2565]:
+                - img "Clipboard - 2026-08-01 20.01.30.png" [ref=e2567]
+                - generic "图片": image
+              - generic [ref=e2571]:
+                - img "公共资源" [ref=e2572]
+                - paragraph [ref=e2575]: Clipboard - 2026-08-01 20.01.30.png
+                - generic [ref=e2576]: 公共
+            - generic [ref=e2579] [cursor=pointer]:
+              - generic [ref=e2580]:
+                - img "微信图片_20260706233211_2968_482.jpg" [ref=e2582]
+                - generic "图片": image
+              - generic [ref=e2586]:
+                - img "公共资源" [ref=e2587]
+                - paragraph [ref=e2590]: 微信图片_20260706233211_2968_482.jpg
+                - generic [ref=e2591]: 公共
+            - generic [ref=e2594] [cursor=pointer]:
+              - generic [ref=e2595]:
+                - img "6w而已，简单的小家～_1_方远远_来自小红书网页版.jpg" [ref=e2597]
+                - generic "图片": image
+              - generic [ref=e2601]:
+                - img "公共资源" [ref=e2602]
+                - paragraph [ref=e2605]: 6w而已，简单的小家～_1_方远远_来自小红书网页版.jpg
+                - generic [ref=e2606]: 公共
+            - generic [ref=e2609] [cursor=pointer]:
+              - generic [ref=e2610]:
+                - img "10.jfif" [ref=e2612]
+                - generic "图片": image
+              - generic [ref=e2616]:
+                - img "公共资源" [ref=e2617]
+                - paragraph [ref=e2620]: 10.jfif
+                - generic [ref=e2621]: 公共
+            - generic [ref=e2624] [cursor=pointer]:
+              - generic [ref=e2625]:
+                - img "蓝豹纹睡衣AI.jpeg" [ref=e2627]
+                - generic "图片": image
+              - generic [ref=e2631]:
+                - img "公共资源" [ref=e2632]
+                - paragraph [ref=e2635]: 蓝豹纹睡衣AI.jpeg
+                - generic [ref=e2636]: 公共
+            - generic [ref=e2639] [cursor=pointer]:
+              - generic [ref=e2640]:
+                - img "百年英国经典红咖格Cashmere100纯山羊绒围巾英伦风女冬季高级感-淘宝网.jpg" [ref=e2642]
+                - generic "图片": image
+              - generic [ref=e2646]:
+                - img "公共资源" [ref=e2647]
+                - paragraph [ref=e2650]: 百年英国经典红咖格Cashmere100纯山羊绒围巾英伦风女冬季高级感-淘宝网.jpg
+                - generic [ref=e2651]: 公共
+            - generic [ref=e2654] [cursor=pointer]:
+              - generic [ref=e2655]:
+                - img "藏青.jpg" [ref=e2657]
+                - generic "图片": image
+              - generic [ref=e2661]:
+                - img "公共资源" [ref=e2662]
+                - paragraph [ref=e2665]: 藏青.jpg
+                - generic [ref=e2666]: 公共
+            - generic [ref=e2669] [cursor=pointer]:
+              - generic [ref=e2670]:
+                - img "2.1.4.png" [ref=e2672]
+                - generic "图片": image
+              - generic [ref=e2676]:
+                - img "公共资源" [ref=e2677]
+                - paragraph [ref=e2680]: 2.1.4.png
+                - generic [ref=e2681]: 公共
+            - generic [ref=e2684] [cursor=pointer]:
+              - generic [ref=e2685]:
+                - img "ScreenShot_2026-07-29_160600_558.png" [ref=e2687]
+                - generic "图片": image
+              - generic [ref=e2691]:
+                - img "公共资源" [ref=e2692]
+                - paragraph [ref=e2695]: ScreenShot_2026-07-29_160600_558.png
+                - generic [ref=e2696]: 公共
+            - generic [ref=e2699] [cursor=pointer]:
+              - generic [ref=e2700]:
+                - img "ScreenShot_2026-07-21_135828_497.png" [ref=e2702]
+                - generic "图片": image
+              - generic [ref=e2706]:
+                - img "公共资源" [ref=e2707]
+                - paragraph [ref=e2710]: ScreenShot_2026-07-21_135828_497.png
+                - generic [ref=e2711]: 公共
+            - generic [ref=e2714] [cursor=pointer]:
+              - generic [ref=e2715]:
+                - img "AR309717-2.jpg" [ref=e2717]
+                - generic "图片": image
+              - generic [ref=e2721]:
+                - img "公共资源" [ref=e2722]
+                - paragraph [ref=e2725]: AR309717-2.jpg
+                - generic [ref=e2726]: 公共
+            - generic [ref=e2729] [cursor=pointer]:
+              - generic [ref=e2730]:
+                - img "17a5c987e6e1b70a7642792c9e4ad616.jpg" [ref=e2732]
+                - generic "图片": image
+              - generic [ref=e2736]:
+                - img "公共资源" [ref=e2737]
+                - paragraph [ref=e2740]: 17a5c987e6e1b70a7642792c9e4ad616.jpg
+                - generic [ref=e2741]: 公共
+            - generic [ref=e2744] [cursor=pointer]:
+              - generic [ref=e2745]:
+                - img "AR309705-2.jpg" [ref=e2747]
+                - generic "图片": image
+              - generic [ref=e2751]:
+                - img "公共资源" [ref=e2752]
+                - paragraph [ref=e2755]: AR309705-2.jpg
+                - generic [ref=e2756]: 公共
+            - generic [ref=e2759] [cursor=pointer]:
+              - generic [ref=e2760]:
+                - img "AR309713-2.png" [ref=e2762]
+                - generic "图片": image
+              - generic [ref=e2766]:
+                - img "公共资源" [ref=e2767]
+                - paragraph [ref=e2770]: AR309713-2.png
+                - generic [ref=e2771]: 公共
+            - generic [ref=e2774] [cursor=pointer]:
+              - generic [ref=e2775]:
+                - img "ScreenShot_2026-07-14_000220_399.png" [ref=e2777]
+                - generic "图片": image
+              - generic [ref=e2781]:
+                - img "公共资源" [ref=e2782]
+                - paragraph [ref=e2785]: ScreenShot_2026-07-14_000220_399.png
+                - generic [ref=e2786]: 公共
+            - generic [ref=e2789] [cursor=pointer]:
+              - generic [ref=e2790]:
+                - img "minid9a3cdf9.png" [ref=e2792]
+                - generic "图片": image
+              - generic [ref=e2796]:
+                - img "公共资源" [ref=e2797]
+                - paragraph [ref=e2800]: minid9a3cdf9.png
+                - generic [ref=e2801]: 公共
+          - generic [ref=e2804]:
+            - generic [ref=e2806]:
+              - generic [ref=e2807]: check_circle
+              - generic [ref=e2808]: 已选择 0 个资源
+            - generic [ref=e2809]:
+              - button "取消" [ref=e2810] [cursor=pointer]
+              - button "确认选择" [disabled] [ref=e2811]
+  - region "Notifications alt+T"

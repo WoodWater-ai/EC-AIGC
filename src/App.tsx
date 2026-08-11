@@ -151,7 +151,11 @@ export default function App() {
   const [notifications, setNotifications] = useState<SystemNotification[]>(mockNotifications);
 
   // 工作台摘要仍使用 /v1/task/my-page；任务列表页内部使用批次分页接口。
-  const tasksQuery = useServiceQuery(() => taskApi.myPage({ pageNum: 1, pageSize: 50 }), []);
+  const tasksQuery = useServiceQuery(
+    () => taskApi.myPage({ pageNum: 1, pageSize: 50 }),
+    [],
+    isAuthenticated,
+  );
   const realTasks: GenerationTask[] = useMemo(() => {
     const list = tasksQuery.data?.list ?? [];
     return list.map((r) => toUIGenerationTask(r, products));
@@ -168,7 +172,8 @@ export default function App() {
   // 修法:用 `data` 本身做依赖(引用稳定),内部 null 短路退出
   const userListQuery = useServiceQuery<UserDTO[]>(
     () => userApi.listAll(),
-    []
+    [],
+    isAuthenticated,
   );
   const [users, setUsers] = useState<SystemUser[]>([]);
   useEffect(() => {
@@ -199,6 +204,7 @@ export default function App() {
   const modelProfilesQuery = useServiceQuery(
     () => modelProfileApi.page({ pageNum: 1, pageSize: 100, status: 'active' }),
     [],
+    isAuthenticated,
   );
 
   const requestModelAsset = (
@@ -281,9 +287,7 @@ export default function App() {
           />
         );
       case AppScreen.CREATE_IMAGE_TASK:
-        return (
-          <div className="p-4 text-center text-slate-400">已在独立窗口打开</div>
-        );
+        return null;
       case AppScreen.CREATE_VIDEO_TASK:
         return (
           <div className="p-4 text-center text-slate-400">已在独立窗口打开</div>

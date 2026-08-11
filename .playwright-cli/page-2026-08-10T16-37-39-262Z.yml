@@ -1,0 +1,454 @@
+- generic [ref=e2]:
+  - generic [ref=e55]:
+    - complementary [ref=e56]:
+      - generic [ref=e57]:
+        - generic [ref=e59]:
+          - generic [ref=e60]: blur_on
+          - generic [ref=e62]:
+            - heading "达芬奇密码 AI" [level=1] [ref=e63]
+            - text: WORKBENCH
+        - button "add_circle 新建创作 keyboard_arrow_down" [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: add_circle
+          - text: 新建创作
+          - generic [ref=e67]: keyboard_arrow_down
+        - navigation [ref=e68]:
+          - generic [ref=e69]: 主模块
+          - button "dashboard 工作台首页" [ref=e70] [cursor=pointer]:
+            - generic [ref=e71]:
+              - generic [ref=e72]: dashboard
+              - generic [ref=e73]: 工作台首页
+          - button "auto_awesome 创作助手" [ref=e75] [cursor=pointer]:
+            - generic [ref=e76]:
+              - generic [ref=e77]: auto_awesome
+              - generic [ref=e78]: 创作助手
+          - button "auto_schedule 任务列表" [ref=e79] [cursor=pointer]:
+            - generic [ref=e80]:
+              - generic [ref=e81]: auto_schedule
+              - generic [ref=e82]: 任务列表
+          - button "dashboard_customize 智能模板中心" [ref=e83] [cursor=pointer]:
+            - generic [ref=e84]:
+              - generic [ref=e85]: dashboard_customize
+              - generic [ref=e86]: 智能模板中心
+          - button "inventory_2 商品素材库" [ref=e87] [cursor=pointer]:
+            - generic [ref=e88]:
+              - generic [ref=e89]: inventory_2
+              - generic [ref=e90]: 商品素材库
+          - button "insights 数据效能复盘" [ref=e91] [cursor=pointer]:
+            - generic [ref=e92]:
+              - generic [ref=e93]: insights
+              - generic [ref=e94]: 数据效能复盘
+          - button "settings_applications 系统配置模块" [ref=e95] [cursor=pointer]:
+            - generic [ref=e96]:
+              - generic [ref=e97]: settings_applications
+              - generic [ref=e98]: 系统配置模块
+          - button "sync_alt 通道异步任务" [ref=e99] [cursor=pointer]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: sync_alt
+              - generic [ref=e102]: 通道异步任务
+          - button "account_tree 资源分类" [ref=e103] [cursor=pointer]:
+            - generic [ref=e104]:
+              - generic [ref=e105]: account_tree
+              - generic [ref=e106]: 资源分类
+          - button "category 商品分类" [ref=e107] [cursor=pointer]:
+            - generic [ref=e108]:
+              - generic [ref=e109]: category
+              - generic [ref=e110]: 商品分类
+          - button "inventory_2 产品管理" [ref=e111] [cursor=pointer]:
+            - generic [ref=e112]:
+              - generic [ref=e113]: inventory_2
+              - generic [ref=e114]: 产品管理
+          - button "dataset 字典分类管理" [ref=e115] [cursor=pointer]:
+            - generic [ref=e116]:
+              - generic [ref=e117]: dataset
+              - generic [ref=e118]: 字典分类管理
+          - button "menu_book 字典管理" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]:
+              - generic [ref=e121]: menu_book
+              - generic [ref=e122]: 字典管理
+        - generic [ref=e123]:
+          - generic [ref=e124]: 快捷工具
+          - button "grid_view 资源中心" [ref=e125] [cursor=pointer]:
+            - generic [ref=e126]: grid_view
+            - text: 资源中心
+          - button "face_3 模特资源库" [ref=e127] [cursor=pointer]:
+            - generic [ref=e128]:
+              - generic [ref=e129]: face_3
+              - text: 模特资源库
+      - generic [ref=e131]:
+        - img "管理员" [ref=e133]
+        - generic [ref=e135]:
+          - paragraph [ref=e136]: 管理员
+          - paragraph [ref=e137]: 管理员
+    - generic [ref=e138]:
+      - banner [ref=e139]:
+        - generic [ref=e140]:
+          - generic [ref=e141] [cursor=pointer]: 达芬奇密码 AI
+          - generic [ref=e142]: chevron_right
+          - generic [ref=e143]: 工作台首页
+        - generic [ref=e145]:
+          - button "add 新建任务 keyboard_arrow_down" [ref=e147] [cursor=pointer]:
+            - generic [ref=e148]: add
+            - generic [ref=e149]: 新建任务
+            - generic [ref=e150]: keyboard_arrow_down
+          - button "notifications 2" [ref=e153] [cursor=pointer]:
+            - generic [ref=e154]: notifications
+            - generic [ref=e155]: "2"
+          - button "help" [ref=e156] [cursor=pointer]
+          - button "logout 退出" [ref=e158] [cursor=pointer]:
+            - generic [ref=e159]: logout
+            - generic [ref=e160]: 退出
+      - main [ref=e161]:
+        - generic [ref=e162]:
+          - region "生产状态" [ref=e163]:
+            - button "progress_activity 进行中0 个任务" [ref=e165]:
+              - generic [ref=e166]: progress_activity
+              - generic [ref=e167]: 进行中0 个任务
+            - button "notifications 待处理15 项需关注" [ref=e168]:
+              - generic [ref=e169]: notifications
+              - generic [ref=e170]: 待处理15 项需关注
+            - generic [ref=e171]: 模板成片可直接复用
+          - generic [ref=e172]:
+            - generic [ref=e174]:
+              - button "模板营地17" [ref=e175]
+              - button "我的作品123" [ref=e176]
+            - generic [ref=e178]:
+              - tablist "模板媒介" [ref=e179]:
+                - tab "image 图片 12" [selected] [ref=e180]:
+                  - generic [ref=e181]: image
+                  - text: 图片
+                  - generic [ref=e182]: "12"
+                - tab "play_circle 视频 5" [ref=e183]:
+                  - generic [ref=e184]: play_circle
+                  - text: 视频
+                  - generic [ref=e185]: "5"
+              - generic [ref=e186]:
+                - generic [ref=e187]: 风格
+                - button "全部" [ref=e188]
+                - button "未标注" [ref=e189]
+                - button "甜美网红风" [ref=e190]
+              - generic [ref=e191]:
+                - generic [ref=e192]:
+                  - generic [ref=e193]: category
+                  - generic [ref=e194]: 品类
+                  - combobox "品类" [ref=e195]:
+                    - option "全部" [selected]
+                - generic [ref=e196]:
+                  - generic [ref=e197]: sort
+                  - generic [ref=e198]: 排序
+                  - combobox "排序" [ref=e199]:
+                    - option "推荐"
+                    - option "最新" [selected]
+            - generic [ref=e200]:
+              - article [ref=e201]:
+                - generic [ref=e202]:
+                  - button "查看模板详情：商品主图 · 流苏围巾" [ref=e203] [cursor=pointer]:
+                    - img "商品主图 · 流苏围巾模板成片" [ref=e204]
+                    - generic [ref=e205]:
+                      - generic [ref=e206]: arrow_forward
+                      - figure "主体图" [ref=e208]:
+                        - img "可替换的主体商品图" [ref=e209]
+                  - generic [ref=e211]:
+                    - heading "商品主图 · 流苏围巾" [level=2] [ref=e212]
+                    - generic [ref=e213]:
+                      - generic [ref=e214]: 类型PRODUCT_MAIN
+                      - generic [ref=e215]: 风格未标注
+                      - generic [ref=e216]: 场景未标注
+                      - generic [ref=e217]: 姿势未标注
+                    - generic [ref=e218]:
+                      - generic [ref=e219]:
+                        - generic [ref=e220]:
+                          - generic [ref=e221]: visibility
+                          - text: "4"
+                        - button "favorite 1" [ref=e222]:
+                          - generic [ref=e223]: favorite
+                          - text: "1"
+                      - button "做同款 arrow_outward" [ref=e224]:
+                        - text: 做同款
+                        - generic [ref=e225]: arrow_outward
+              - article [ref=e226]:
+                - generic [ref=e227]:
+                  - button "查看模板详情：流苏围巾主图" [ref=e228] [cursor=pointer]:
+                    - img "流苏围巾主图模板成片" [ref=e229]
+                    - generic [ref=e230]:
+                      - generic [ref=e231]: arrow_forward
+                      - figure "主体图" [ref=e233]:
+                        - img "可替换的主体商品图" [ref=e234]
+                  - generic [ref=e236]:
+                    - heading "流苏围巾主图" [level=2] [ref=e237]
+                    - generic [ref=e238]:
+                      - generic [ref=e239]: 类型PRODUCT_MAIN
+                      - generic [ref=e240]: 风格未标注
+                      - generic [ref=e241]: 场景未标注
+                      - generic [ref=e242]: 姿势未标注
+                    - generic [ref=e243]:
+                      - generic [ref=e244]:
+                        - generic [ref=e245]:
+                          - generic [ref=e246]: visibility
+                          - text: "2"
+                        - button "favorite 0" [ref=e247]:
+                          - generic [ref=e248]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e249]:
+                        - text: 做同款
+                        - generic [ref=e250]: arrow_outward
+              - article [ref=e251]:
+                - generic [ref=e252]:
+                  - button "查看模板详情：围巾佩戴 提炼" [ref=e253] [cursor=pointer]:
+                    - img "围巾佩戴 提炼模板成片" [ref=e254]
+                    - generic [ref=e255]:
+                      - generic [ref=e256]: arrow_forward
+                      - figure "主体图" [ref=e258]:
+                        - img "可替换的主体商品图" [ref=e259]
+                  - generic [ref=e261]:
+                    - heading "围巾佩戴 提炼" [level=2] [ref=e262]
+                    - generic [ref=e263]:
+                      - generic [ref=e264]: 类型PRODUCT_MAIN
+                      - generic [ref=e265]: 风格未标注
+                      - generic [ref=e266]: 场景未标注
+                      - generic [ref=e267]: 姿势未标注
+                    - generic [ref=e268]:
+                      - generic [ref=e269]:
+                        - generic [ref=e270]:
+                          - generic [ref=e271]: visibility
+                          - text: "3"
+                        - button "favorite 0" [ref=e272]:
+                          - generic [ref=e273]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e274]:
+                        - text: 做同款
+                        - generic [ref=e275]: arrow_outward
+              - article [ref=e276]:
+                - generic [ref=e277]:
+                  - button "查看模板详情：商品主图 · 毛绒针织家居服套装" [ref=e278] [cursor=pointer]:
+                    - img "商品主图 · 毛绒针织家居服套装模板成片" [ref=e279]
+                    - generic [ref=e280]:
+                      - generic [ref=e281]: arrow_forward
+                      - figure "主体图" [ref=e283]:
+                        - img "可替换的主体商品图" [ref=e284]
+                  - generic [ref=e286]:
+                    - heading "商品主图 · 毛绒针织家居服套装" [level=2] [ref=e287]
+                    - generic [ref=e288]:
+                      - generic [ref=e289]: 类型PRODUCT_MAIN
+                      - generic [ref=e290]: 风格未标注
+                      - generic [ref=e291]: 场景未标注
+                      - generic [ref=e292]: 姿势未标注
+                    - generic [ref=e293]:
+                      - generic [ref=e294]:
+                        - generic [ref=e295]:
+                          - generic [ref=e296]: visibility
+                          - text: "6"
+                        - button "favorite 0" [ref=e297]:
+                          - generic [ref=e298]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e299]:
+                        - text: 做同款
+                        - generic [ref=e300]: arrow_outward
+              - article [ref=e301]:
+                - generic [ref=e302]:
+                  - button "查看模板详情：商品主图 · 浅蓝色毛绒家居服套装" [ref=e303] [cursor=pointer]:
+                    - img "商品主图 · 浅蓝色毛绒家居服套装模板成片" [ref=e304]
+                    - generic [ref=e305]:
+                      - generic [ref=e306]: arrow_forward
+                      - figure "主体图" [ref=e308]:
+                        - img "可替换的主体商品图" [ref=e309]
+                  - generic [ref=e311]:
+                    - heading "商品主图 · 浅蓝色毛绒家居服套装" [level=2] [ref=e312]
+                    - generic [ref=e313]:
+                      - generic [ref=e314]: 类型PRODUCT_MAIN
+                      - generic [ref=e315]: 风格未标注
+                      - generic [ref=e316]: 场景未标注
+                      - generic [ref=e317]: 姿势未标注
+                    - generic [ref=e318]:
+                      - generic [ref=e319]:
+                        - generic [ref=e320]:
+                          - generic [ref=e321]: visibility
+                          - text: "8"
+                        - button "favorite 0" [ref=e322]:
+                          - generic [ref=e323]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e324]:
+                        - text: 做同款
+                        - generic [ref=e325]: arrow_outward
+              - article [ref=e326]:
+                - generic [ref=e327]:
+                  - button "查看模板详情：商品主图 · 拼色流苏围巾" [ref=e328] [cursor=pointer]:
+                    - img "商品主图 · 拼色流苏围巾模板成片" [ref=e329]
+                    - generic [ref=e330]:
+                      - generic [ref=e331]: arrow_forward
+                      - figure "主体图" [ref=e333]:
+                        - img "可替换的主体商品图" [ref=e334]
+                  - generic [ref=e336]:
+                    - heading "商品主图 · 拼色流苏围巾" [level=2] [ref=e337]
+                    - generic [ref=e338]:
+                      - generic [ref=e339]: 类型PRODUCT_MAIN
+                      - generic [ref=e340]: 风格未标注
+                      - generic [ref=e341]: 场景未标注
+                      - generic [ref=e342]: 姿势未标注
+                    - generic [ref=e343]:
+                      - generic [ref=e344]:
+                        - generic [ref=e345]:
+                          - generic [ref=e346]: visibility
+                          - text: "8"
+                        - button "favorite 0" [ref=e347]:
+                          - generic [ref=e348]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e349]:
+                        - text: 做同款
+                        - generic [ref=e350]: arrow_outward
+              - article [ref=e351]:
+                - generic [ref=e352]:
+                  - button "查看模板详情：商品主图 · 毛绒针织家居服套装" [ref=e353] [cursor=pointer]:
+                    - img "商品主图 · 毛绒针织家居服套装模板成片" [ref=e354]
+                    - generic [ref=e355]:
+                      - generic [ref=e356]: arrow_forward
+                      - figure "主体图" [ref=e358]:
+                        - img "可替换的主体商品图" [ref=e359]
+                  - generic [ref=e361]:
+                    - heading "商品主图 · 毛绒针织家居服套装" [level=2] [ref=e362]
+                    - generic [ref=e363]:
+                      - generic [ref=e364]: 类型PRODUCT_MAIN
+                      - generic [ref=e365]: 风格未标注
+                      - generic [ref=e366]: 场景未标注
+                      - generic [ref=e367]: 姿势未标注
+                    - generic [ref=e368]:
+                      - generic [ref=e369]:
+                        - generic [ref=e370]:
+                          - generic [ref=e371]: visibility
+                          - text: "8"
+                        - button "favorite 0" [ref=e372]:
+                          - generic [ref=e373]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e374]:
+                        - text: 做同款
+                        - generic [ref=e375]: arrow_outward
+              - article [ref=e376]:
+                - generic [ref=e377]:
+                  - button "查看模板详情：商品主图 · 坐姿模特主图" [ref=e378] [cursor=pointer]:
+                    - img "商品主图 · 坐姿模特主图模板成片" [ref=e379]
+                    - generic [ref=e380]:
+                      - generic [ref=e381]: arrow_forward
+                      - figure "主体图" [ref=e383]:
+                        - img "可替换的主体商品图" [ref=e384]
+                  - generic [ref=e386]:
+                    - heading "商品主图 · 坐姿模特主图" [level=2] [ref=e387]
+                    - generic [ref=e388]:
+                      - generic [ref=e389]: 类型PRODUCT_MAIN
+                      - generic [ref=e390]: 风格未标注
+                      - generic [ref=e391]: 场景未标注
+                      - generic [ref=e392]: 姿势未标注
+                    - generic [ref=e393]:
+                      - generic [ref=e394]:
+                        - generic [ref=e395]:
+                          - generic [ref=e396]: visibility
+                          - text: "10"
+                        - button "favorite 0" [ref=e397]:
+                          - generic [ref=e398]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e399]:
+                        - text: 做同款
+                        - generic [ref=e400]: arrow_outward
+              - article [ref=e401]:
+                - generic [ref=e402]:
+                  - button "查看模板详情：商品主图 ·半边绒套装" [ref=e403] [cursor=pointer]:
+                    - img "商品主图 ·半边绒套装模板成片" [ref=e404]
+                    - generic [ref=e405]:
+                      - generic [ref=e406]: arrow_forward
+                      - figure "主体图" [ref=e408]:
+                        - img "可替换的主体商品图" [ref=e409]
+                  - generic [ref=e411]:
+                    - heading "商品主图 ·半边绒套装" [level=2] [ref=e412]
+                    - generic [ref=e413]:
+                      - generic [ref=e414]: 类型PRODUCT_MAIN
+                      - generic [ref=e415]: 风格未标注
+                      - generic [ref=e416]: 场景未标注
+                      - generic [ref=e417]: 姿势未标注
+                    - generic [ref=e418]:
+                      - generic [ref=e419]:
+                        - generic [ref=e420]:
+                          - generic [ref=e421]: visibility
+                          - text: "3"
+                        - button "favorite 0" [ref=e422]:
+                          - generic [ref=e423]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e424]:
+                        - text: 做同款
+                        - generic [ref=e425]: arrow_outward
+              - article [ref=e426]:
+                - generic [ref=e427]:
+                  - button "查看模板详情：细节图 · 吊带睡裙" [ref=e428] [cursor=pointer]:
+                    - img "细节图 · 吊带睡裙模板成片" [ref=e429]
+                    - generic [ref=e430]:
+                      - generic [ref=e431]: arrow_forward
+                      - figure "主体图" [ref=e433]:
+                        - img "可替换的主体商品图" [ref=e434]
+                  - generic [ref=e436]:
+                    - heading "细节图 · 吊带睡裙" [level=2] [ref=e437]
+                    - generic [ref=e438]:
+                      - generic [ref=e439]: 类型DETAIL_CLOSEUP
+                      - generic [ref=e440]: 风格未标注
+                      - generic [ref=e441]: 场景未标注
+                      - generic [ref=e442]: 姿势未标注
+                    - generic [ref=e443]:
+                      - generic [ref=e444]:
+                        - generic [ref=e445]:
+                          - generic [ref=e446]: visibility
+                          - text: "5"
+                        - button "favorite 0" [ref=e447]:
+                          - generic [ref=e448]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e449]:
+                        - text: 做同款
+                        - generic [ref=e450]: arrow_outward
+              - article [ref=e451]:
+                - generic [ref=e452]:
+                  - button "查看模板详情：商品主图 · 黑色蕾丝拼接链条印花吊带睡裙" [ref=e453] [cursor=pointer]:
+                    - img "商品主图 · 黑色蕾丝拼接链条印花吊带睡裙模板成片" [ref=e454]
+                    - generic [ref=e455]:
+                      - generic [ref=e456]: arrow_forward
+                      - figure "主体图" [ref=e458]:
+                        - img "可替换的主体商品图" [ref=e459]
+                  - generic [ref=e461]:
+                    - heading "商品主图 · 黑色蕾丝拼接链条印花吊带睡裙" [level=2] [ref=e462]
+                    - generic [ref=e463]:
+                      - generic [ref=e464]: 类型PRODUCT_MAIN
+                      - generic [ref=e465]: 风格未标注
+                      - generic [ref=e466]: 场景未标注
+                      - generic [ref=e467]: 姿势未标注
+                    - generic [ref=e468]:
+                      - generic [ref=e469]:
+                        - generic [ref=e470]:
+                          - generic [ref=e471]: visibility
+                          - text: "4"
+                        - button "favorite 0" [ref=e472]:
+                          - generic [ref=e473]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e474]:
+                        - text: 做同款
+                        - generic [ref=e475]: arrow_outward
+              - article [ref=e476]:
+                - generic [ref=e477]:
+                  - button "查看模板详情：商品主图 · 女性长袖睡衣套装" [ref=e478] [cursor=pointer]:
+                    - img "商品主图 · 女性长袖睡衣套装模板成片" [ref=e479]
+                    - generic [ref=e480]:
+                      - generic [ref=e481]: arrow_forward
+                      - figure "主体图" [ref=e483]:
+                        - img "可替换的主体商品图" [ref=e484]
+                  - generic [ref=e486]:
+                    - heading "商品主图 · 女性长袖睡衣套装" [level=2] [ref=e487]
+                    - generic [ref=e488]:
+                      - generic [ref=e489]: 类型PRODUCT_MAIN
+                      - generic [ref=e490]: 风格甜美网红风
+                      - generic [ref=e491]: 场景客厅
+                      - generic [ref=e492]: 姿势轻松坐姿
+                    - generic [ref=e493]:
+                      - generic [ref=e494]:
+                        - generic [ref=e495]:
+                          - generic [ref=e496]: visibility
+                          - text: "3"
+                        - button "favorite 0" [ref=e497]:
+                          - generic [ref=e498]: favorite
+                          - text: "0"
+                      - button "做同款 arrow_outward" [ref=e499]:
+                        - text: 做同款
+                        - generic [ref=e500]: arrow_outward
+  - region "Notifications alt+T"

@@ -304,11 +304,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   }, [pose, poseDictOptions, scene, sceneDictOptions, setPose, setScene, setStyle, styleOptions]);
 
   useEffect(() => {
-    if (style || lockedByReference.style || styleOptions.length === 0) return;
-    handleStyleChange(styleOptions[0].label);
-  }, [handleStyleChange, lockedByReference.style, style, styleOptions]);
-
-  useEffect(() => {
     if (!assistantPrefill || assistantPrefill.targetScreen !== 'CREATE_IMAGE_TASK') return;
     if (appliedAssistantPrefillRef.current === assistantPrefill.sourceResultId) return;
     const reference = assistantPrefill.references.find((item) => item.type === 'IMAGE');
@@ -620,6 +615,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       {/* Header */}
       <TopHeader
         onBack={onBack ?? (() => setScreen(AppScreen.DASHBOARD))}
+        productName={selectedFromLibrary?.name}
+        productCategory={selectedFromLibrary?.categoryName ?? productFacts.productCategory}
+        imageUrl={mainValue?.thumbnailUrl ?? mainValue?.originalUrl}
+        isMatched={isProductBound}
       />
 
       {/* 3-column layout */}
@@ -725,7 +724,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
           targetSlot={pendingSlot === 'model' ? 'reference-model' : pendingSlot ?? 'main'}
           purpose="OTHER"
           assetKind="IMAGE"
-          initialSource={pendingSlot === 'model' ? 'MODEL' : 'UPLOAD'}
+          initialSource={pendingSlot === 'model' ? 'MODEL' : 'PRODUCT'}
           onCreateModel={pendingSlot === 'model'
             ? () => {
                 setPendingSlot(null);

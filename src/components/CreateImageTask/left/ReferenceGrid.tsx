@@ -32,10 +32,11 @@ const roleLabel = (role: ReferenceSlot) =>
 interface RolePickerProps {
   referenceNumber: number;
   value: ReferenceSlot[];
+  roleOwners: Partial<Record<ReferenceSlot, number>>;
   onChange: (roles: ReferenceSlot[]) => void;
 }
 
-const RolePicker: React.FC<RolePickerProps> = ({ referenceNumber, value, onChange }) => {
+const RolePicker: React.FC<RolePickerProps> = ({ referenceNumber, value, roleOwners, onChange }) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -75,11 +76,14 @@ const RolePicker: React.FC<RolePickerProps> = ({ referenceNumber, value, onChang
         >
           {ROLE_OPTIONS.map((role) => {
             const active = value.includes(role.id);
+            const owner = roleOwners[role.id];
+            const occupiedByAnother = !active && owner !== undefined && owner !== referenceNumber;
             return (
               <button
                 type="button"
                 key={role.id}
                 onClick={() => toggleRole(role.id)}
+                title={occupiedByAnother ? `当前属于参考图 ${owner}，选择后将自动转移` : undefined}
                 className={`flex h-8 w-full items-center gap-2 px-2 text-left text-[11px] ${
                   active ? 'bg-orange-50 font-bold text-[#c84d38]' : 'text-slate-600 hover:bg-slate-50'
                 }`}
@@ -88,7 +92,10 @@ const RolePicker: React.FC<RolePickerProps> = ({ referenceNumber, value, onChang
                   {active && <Check className="h-3 w-3" strokeWidth={3} />}
                 </span>
                 <span className="material-symbols-outlined text-sm">{role.icon}</span>
-                {role.label}
+                <span className="min-w-0 flex-1">{role.label}</span>
+                {occupiedByAnother && (
+                  <span className="shrink-0 text-[9px] font-medium text-slate-400">图 {owner}</span>
+                )}
               </button>
             );
           })}
@@ -106,24 +113,31 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
 }) => {
   const groupedReferences = groupReferenceSlots(orderedRefs);
   const usedRoles = new Set(groupedReferences.flatMap((reference) => reference.roles));
+  const roleOwners = groupedReferences.reduce<Partial<Record<ReferenceSlot, number>>>(
+    (owners, reference, index) => {
+      reference.roles.forEach((role) => { owners[role] = index + 1; });
+      return owners;
+    },
+    {},
+  );
   const nextRole = (['model', 'detail', 'style', 'scene', 'pose'] as ReferenceSlot[])
     .find((role) => !usedRoles.has(role));
 
   return (
-    <div id="reference-grid" className="border border-slate-200 bg-white p-3">
+    <section id="reference-grid" className="border border-[#dfe3e8] bg-white p-3">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[9px] font-bold text-[#df5b43]">补充依据</p>
           <h2 className="mt-0.5 text-xs font-black">参考图</h2>
         </div>
         <span className="bg-slate-100 px-1.5 py-1 text-[9px] font-bold text-slate-500">
-          {groupedReferences.length} 张
+          {groupedReferences.length} / 5
         </span>
       </div>
 
       {groupedReferences.length === 0 ? (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {(['model', 'detail'] as ReferenceSlot[]).map((slot) => (
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {(['model', 'detail', 'style'] as ReferenceSlot[]).map((slot) => (
             <button
               key={slot}
               type="button"
@@ -138,7 +152,7 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
           ))}
         </div>
       ) : (
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           {groupedReferences.map((reference, index) => (
             <div key={reference.key} className="group min-w-0">
               <div className="relative aspect-[4/3] overflow-hidden border border-slate-200 bg-slate-50">
@@ -169,6 +183,7 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
                 <RolePicker
                   referenceNumber={index + 1}
                   value={reference.roles}
+                  roleOwners={roleOwners}
                   onChange={(roles) => onRolesChange(reference, roles)}
                 />
               </div>
@@ -187,8 +202,8 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
         </div>
       )}
       <p className="mt-2 text-[9px] leading-4 text-slate-400">
-        每张图片可多选模特、细节、风格、场景和姿势标签。
+        每张图片可多选标签；同一标签仅归属一张图，重复选择会自动转移。
       </p>
-    </div>
+    </section>
   );
 };

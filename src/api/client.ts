@@ -20,8 +20,10 @@ import { signRequest } from '../utils/sign';
  * 后端契约：ServiceResult.success === true 才算请求成功；失败时 errMessage 是后端 i18n 中文
  */
 
+const apiBaseUrl = import.meta.env?.VITE_API_BASE_URL ?? '/api';
+
 const httpRaw: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL, // '/api'
+  baseURL: apiBaseUrl,
   withCredentials: true, // 双通道兜底
   timeout: 30_000,
   headers: { 'Content-Type': 'application/json' },

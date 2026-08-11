@@ -36,7 +36,7 @@ export const ImageTypeSelector: React.FC<ImageTypeSelectorProps> = ({
           <div
             key={t}
             className={`relative flex h-16 min-w-0 items-center border px-2 transition-colors ${
-              isSelected ? 'border-primary bg-blue-50' : 'border-slate-100 bg-slate-50 opacity-60 hover:opacity-100'
+              isSelected ? 'border-[#df5b43] bg-[#fff5f1]' : 'border-slate-200 bg-slate-50 opacity-70 hover:opacity-100'
             }`}
           >
             <button

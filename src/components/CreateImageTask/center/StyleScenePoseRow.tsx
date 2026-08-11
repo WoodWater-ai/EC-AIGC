@@ -165,7 +165,7 @@ function VisualTagPicker({
         <span className="min-w-0 flex-1">
           <span className="mr-1 text-[10px] font-bold text-slate-400">{label}</span>
           <span className="text-[11px] font-bold text-slate-700">
-            {lockedLabel || (loading ? '加载中…' : isEmpty ? '暂无可用字典项' : selected?.label ?? value ?? '请选择')}
+            {lockedLabel || (loading ? '加载中…' : isEmpty ? '暂无可用字典项' : selected?.label || value || '不设置')}
           </span>
         </span>
         {lockedLabel
@@ -250,7 +250,7 @@ export const StyleScenePoseRow: React.FC<StyleScenePoseRowProps> = ({
   onPoseChange,
   lockedByReference,
 }) => (
-  <div className="flex flex-wrap items-center gap-2">
+  <div className="contents">
     <VisualTagPicker
       kind="style"
       label="风格"

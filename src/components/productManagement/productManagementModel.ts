@@ -3,6 +3,7 @@ import type {
   ProductDTO,
   ProductStatus,
 } from '../../api/modules/productInfo';
+import type { ProductLibraryProduct } from '../../api/modules/productLibrary';
 
 export type ProductSource = 'MANUAL' | 'ERP';
 
@@ -143,6 +144,34 @@ export function toProductSpu(product: ProductManagementRecord): ProductSpuView {
     skus,
     raw: product,
   };
+}
+
+export function toProductLibrarySpu(product: ProductLibraryProduct): ProductSpuView {
+  const status = product.productStatus ?? 'ON_SHELF';
+  return toProductSpu({
+    id: product.id,
+    name: product.name,
+    category: product.category,
+    color: product.color,
+    patternMaterial: product.material,
+    sellingPoints: product.sellingPoints,
+    silhouetteStructure: product.silhouetteStructure,
+    imageUrl: product.imageUrl,
+    status,
+    statusDesc: status === 'ON_SHELF' ? '上架' : '下架',
+    createTime: product.createTime,
+    skuList: [{
+      id: product.id,
+      skuCode: `SKU-${product.id}`,
+      specName: product.color || '默认规格',
+      imageUrl: product.imageUrl,
+      color: product.color,
+      patternMaterial: product.material,
+      silhouetteStructure: product.silhouetteStructure,
+      status,
+      materialCount: product.inputAssetCount + product.imageCount + product.videoCount,
+    }],
+  });
 }
 
 export const productSourceLabel = (source: ProductSource) =>

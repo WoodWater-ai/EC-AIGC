@@ -1,0 +1,415 @@
+- generic [ref=e2]:
+  - generic [ref=e55]:
+    - complementary [ref=e56]:
+      - generic [ref=e57]:
+        - generic [ref=e59]:
+          - generic [ref=e60]: blur_on
+          - generic [ref=e62]:
+            - heading "达芬奇密码 AI" [level=1] [ref=e63]
+            - text: WORKBENCH
+        - button "add_circle 新建创作 keyboard_arrow_down" [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: add_circle
+          - text: 新建创作
+          - generic [ref=e67]: keyboard_arrow_down
+        - navigation [ref=e68]:
+          - generic [ref=e69]: 主模块
+          - button "dashboard 工作台首页" [ref=e70] [cursor=pointer]:
+            - generic [ref=e71]:
+              - generic [ref=e72]: dashboard
+              - generic [ref=e73]: 工作台首页
+          - button "auto_awesome 创作助手" [ref=e75] [cursor=pointer]:
+            - generic [ref=e76]:
+              - generic [ref=e77]: auto_awesome
+              - generic [ref=e78]: 创作助手
+          - button "auto_schedule 任务列表" [ref=e79] [cursor=pointer]:
+            - generic [ref=e80]:
+              - generic [ref=e81]: auto_schedule
+              - generic [ref=e82]: 任务列表
+          - button "dashboard_customize 智能模板中心" [ref=e83] [cursor=pointer]:
+            - generic [ref=e84]:
+              - generic [ref=e85]: dashboard_customize
+              - generic [ref=e86]: 智能模板中心
+          - button "inventory_2 商品素材库" [ref=e87] [cursor=pointer]:
+            - generic [ref=e88]:
+              - generic [ref=e89]: inventory_2
+              - generic [ref=e90]: 商品素材库
+          - button "insights 数据效能复盘" [ref=e91] [cursor=pointer]:
+            - generic [ref=e92]:
+              - generic [ref=e93]: insights
+              - generic [ref=e94]: 数据效能复盘
+          - button "settings_applications 系统配置模块" [ref=e95] [cursor=pointer]:
+            - generic [ref=e96]:
+              - generic [ref=e97]: settings_applications
+              - generic [ref=e98]: 系统配置模块
+          - button "sync_alt 通道异步任务" [ref=e99] [cursor=pointer]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: sync_alt
+              - generic [ref=e102]: 通道异步任务
+          - button "account_tree 资源分类" [ref=e103] [cursor=pointer]:
+            - generic [ref=e104]:
+              - generic [ref=e105]: account_tree
+              - generic [ref=e106]: 资源分类
+          - button "category 商品分类" [ref=e107] [cursor=pointer]:
+            - generic [ref=e108]:
+              - generic [ref=e109]: category
+              - generic [ref=e110]: 商品分类
+          - button "inventory_2 产品管理" [ref=e111] [cursor=pointer]:
+            - generic [ref=e112]:
+              - generic [ref=e113]: inventory_2
+              - generic [ref=e114]: 产品管理
+          - button "dataset 字典分类管理" [ref=e115] [cursor=pointer]:
+            - generic [ref=e116]:
+              - generic [ref=e117]: dataset
+              - generic [ref=e118]: 字典分类管理
+          - button "menu_book 字典管理" [active] [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]:
+              - generic [ref=e121]: menu_book
+              - generic [ref=e122]: 字典管理
+        - generic [ref=e123]:
+          - generic [ref=e124]: 快捷工具
+          - button "grid_view 资源中心" [ref=e125] [cursor=pointer]:
+            - generic [ref=e126]: grid_view
+            - text: 资源中心
+          - button "face_3 模特资源库" [ref=e127] [cursor=pointer]:
+            - generic [ref=e128]:
+              - generic [ref=e129]: face_3
+              - text: 模特资源库
+      - generic [ref=e131]:
+        - img "管理员" [ref=e133]
+        - generic [ref=e135]:
+          - paragraph [ref=e136]: 管理员
+          - paragraph [ref=e137]: 管理员
+    - generic [ref=e138]:
+      - banner [ref=e139]:
+        - generic [ref=e140]:
+          - generic [ref=e141] [cursor=pointer]: 基础数据
+          - generic [ref=e142]: chevron_right
+          - generic [ref=e143]: 字典管理
+        - generic [ref=e145]:
+          - button "add 新建任务 keyboard_arrow_down" [ref=e147] [cursor=pointer]:
+            - generic [ref=e148]: add
+            - generic [ref=e149]: 新建任务
+            - generic [ref=e150]: keyboard_arrow_down
+          - button "notifications 2" [ref=e153] [cursor=pointer]:
+            - generic [ref=e154]: notifications
+            - generic [ref=e155]: "2"
+          - button "help" [ref=e156] [cursor=pointer]
+          - button "logout 退出" [ref=e158] [cursor=pointer]:
+            - generic [ref=e159]: logout
+            - generic [ref=e160]: 退出
+      - main [ref=e161]:
+        - generic [ref=e502]:
+          - generic [ref=e503]:
+            - generic [ref=e504]:
+              - generic [ref=e505]: menu_book
+              - generic [ref=e507]:
+                - heading "字典管理" [level=2] [ref=e508]
+                - paragraph [ref=e509]: 管理任务类型、风格、场景等字典项
+            - generic [ref=e510]: 共 73 个字典项
+          - generic [ref=e511]:
+            - combobox [ref=e512]:
+              - option "全部分类" [selected]
+              - option "姿势"
+              - option "任务类型"
+              - option "风格"
+              - option "场景"
+              - option "比例"
+              - option "问题标签"
+              - option "优点标签"
+              - option "能力编码"
+              - option "图片任务类型"
+              - option "风格维度"
+              - option "视频生成模式"
+              - option "视频时长"
+              - option "视频运动幅度"
+              - option "平台规格格式"
+              - option "负面约束素材范围"
+              - option "负面约束严重度"
+              - option "负面约束分类"
+              - option "模板任务类型"
+            - combobox [ref=e513]:
+              - option "全部状态" [selected]
+              - option "启用"
+              - option "已停用"
+            - textbox "搜索字典项编码或名称..." [ref=e518]
+            - button "查询" [ref=e519]
+            - button "重置" [ref=e520]
+            - button "新建字典项" [ref=e524]
+          - table [ref=e527]:
+            - rowgroup [ref=e528]:
+              - row [ref=e529]:
+                - columnheader "ID" [ref=e530]
+                - columnheader "参考图" [ref=e531]
+                - columnheader "分类" [ref=e532]
+                - columnheader "字典项编码" [ref=e533]
+                - columnheader "字典项名称" [ref=e534]
+                - columnheader "描述" [ref=e535]
+                - columnheader "排序" [ref=e536]
+                - columnheader "状态" [ref=e537]
+                - columnheader "操作" [ref=e538]
+            - rowgroup [ref=e539]:
+              - row [ref=e540]:
+                - cell "2078757082379304961" [ref=e541]
+                - cell [ref=e542]
+                - cell "姿势" [ref=e543]
+                - cell "NATURE_STANCE" [ref=e544]
+                - cell "自然站姿" [ref=e545]
+                - cell "-" [ref=e546]
+                - cell "0" [ref=e547]
+                - cell "启用" [ref=e548]
+                - cell [ref=e550]:
+                  - generic [ref=e551]:
+                    - button "编辑" [ref=e552]
+                    - button "停用" [ref=e556]
+              - row [ref=e557]:
+                - cell "44" [ref=e558]
+                - cell [ref=e559]
+                - cell "风格维度" [ref=e565]
+                - cell "STYLE" [ref=e566]
+                - cell "风格" [ref=e567]
+                - cell "-" [ref=e568]
+                - cell "1" [ref=e569]
+                - cell "启用" [ref=e570]
+                - cell [ref=e572]:
+                  - generic [ref=e573]:
+                    - button "编辑" [ref=e574]
+                    - button "停用" [ref=e578]
+              - row [ref=e579]:
+                - cell "67" [ref=e580]
+                - cell [ref=e581]
+                - cell "负面约束分类" [ref=e587]
+                - cell "PRODUCT_FIDELITY" [ref=e588]
+                - cell "商品保真 (材质/Logo细节保留)" [ref=e589]
+                - cell "-" [ref=e590]
+                - cell "1" [ref=e591]
+                - cell "启用" [ref=e592]
+                - cell [ref=e594]:
+                  - generic [ref=e595]:
+                    - button "编辑" [ref=e596]
+                    - button "停用" [ref=e600]
+              - row [ref=e601]:
+                - cell "15" [ref=e602]
+                - cell [ref=e603]
+                - cell "场景" [ref=e609]
+                - cell "STUDIO" [ref=e610]
+                - cell "影棚" [ref=e611]
+                - cell "-" [ref=e612]
+                - cell "1" [ref=e613]
+                - cell "启用" [ref=e614]
+                - cell [ref=e616]:
+                  - generic [ref=e617]:
+                    - button "编辑" [ref=e618]
+                    - button "停用" [ref=e622]
+              - row [ref=e623]:
+                - cell "8" [ref=e624]
+                - cell [ref=e625]
+                - cell "风格" [ref=e631]
+                - cell "CHINESE" [ref=e632]
+                - cell "国风" [ref=e633]
+                - cell "-" [ref=e634]
+                - cell "1" [ref=e635]
+                - cell "启用" [ref=e636]
+                - cell [ref=e638]:
+                  - generic [ref=e639]:
+                    - button "编辑" [ref=e640]
+                    - button "停用" [ref=e644]
+              - row [ref=e645]:
+                - cell "2078757213686185986" [ref=e646]
+                - cell [ref=e647]
+                - cell "姿势" [ref=e648]
+                - cell "FRONT_STANDING_POSTURE" [ref=e649]
+                - cell "正面站姿" [ref=e650]
+                - cell "-" [ref=e651]
+                - cell "1" [ref=e652]
+                - cell "启用" [ref=e653]
+                - cell [ref=e655]:
+                  - generic [ref=e656]:
+                    - button "编辑" [ref=e657]
+                    - button "停用" [ref=e661]
+              - row [ref=e662]:
+                - cell "1" [ref=e663]
+                - cell [ref=e664]
+                - cell "任务类型" [ref=e670]
+                - cell "PRODUCT_MAIN" [ref=e671]
+                - cell "商品主图" [ref=e672]
+                - cell "-" [ref=e673]
+                - cell "1" [ref=e674]
+                - cell "启用" [ref=e675]
+                - cell [ref=e677]:
+                  - generic [ref=e678]:
+                    - button "编辑" [ref=e679]
+                    - button "停用" [ref=e683]
+              - row [ref=e684]:
+                - cell "71" [ref=e685]
+                - cell [ref=e686]
+                - cell "模板任务类型" [ref=e692]
+                - cell "PRODUCT_IMAGE" [ref=e693]
+                - cell "商品生图" [ref=e694]
+                - cell "-" [ref=e695]
+                - cell "1" [ref=e696]
+                - cell "启用" [ref=e697]
+                - cell [ref=e699]:
+                  - generic [ref=e700]:
+                    - button "编辑" [ref=e701]
+                    - button "停用" [ref=e705]
+              - row [ref=e706]:
+                - cell "64" [ref=e707]
+                - cell [ref=e708]
+                - cell "负面约束严重度" [ref=e714]
+                - cell "P0" [ref=e715]
+                - cell "P0 强力阻断 (任何时候都将注入底层约束)" [ref=e716]
+                - cell "-" [ref=e717]
+                - cell "1" [ref=e718]
+                - cell "启用" [ref=e719]
+                - cell [ref=e721]:
+                  - generic [ref=e722]:
+                    - button "编辑" [ref=e723]
+                    - button "停用" [ref=e727]
+              - row [ref=e728]:
+                - cell "22" [ref=e729]
+                - cell [ref=e730]
+                - cell "比例" [ref=e736]
+                - cell "1:1" [ref=e737]
+                - cell "正方形" [ref=e738]
+                - cell "-" [ref=e739]
+                - cell "1" [ref=e740]
+                - cell "启用" [ref=e741]
+                - cell [ref=e743]:
+                  - generic [ref=e744]:
+                    - button "编辑" [ref=e745]
+                    - button "停用" [ref=e749]
+              - row [ref=e750]:
+                - cell "56" [ref=e751]
+                - cell [ref=e752]
+                - cell "平台规格格式" [ref=e758]
+                - cell "JPG" [ref=e759]
+                - cell "JPG" [ref=e760]
+                - cell "-" [ref=e761]
+                - cell "1" [ref=e762]
+                - cell "启用" [ref=e763]
+                - cell [ref=e765]:
+                  - generic [ref=e766]:
+                    - button "编辑" [ref=e767]
+                    - button "停用" [ref=e771]
+              - row [ref=e772]:
+                - cell "53" [ref=e773]
+                - cell [ref=e774]
+                - cell "视频运动幅度" [ref=e780]
+                - cell "SMALL" [ref=e781]
+                - cell "小幅度 (高保真防抖)" [ref=e782]
+                - cell "-" [ref=e783]
+                - cell "1" [ref=e784]
+                - cell "启用" [ref=e785]
+                - cell [ref=e787]:
+                  - generic [ref=e788]:
+                    - button "编辑" [ref=e789]
+                    - button "停用" [ref=e793]
+              - row [ref=e794]:
+                - cell "29" [ref=e795]
+                - cell [ref=e796]
+                - cell "能力编码" [ref=e802]
+                - cell "MAIN_IMAGE" [ref=e803]
+                - cell "主图生成" [ref=e804]
+                - cell "-" [ref=e805]
+                - cell "1" [ref=e806]
+                - cell "启用" [ref=e807]
+                - cell [ref=e809]:
+                  - generic [ref=e810]:
+                    - button "编辑" [ref=e811]
+                    - button "停用" [ref=e815]
+              - row [ref=e816]:
+                - cell "50" [ref=e817]
+                - cell [ref=e818]
+                - cell "视频时长" [ref=e824]
+                - cell "DURATION_5" [ref=e825]
+                - cell "5 秒 (快速渲染)" [ref=e826]
+                - cell "-" [ref=e827]
+                - cell "1" [ref=e828]
+                - cell "启用" [ref=e829]
+                - cell [ref=e831]:
+                  - generic [ref=e832]:
+                    - button "编辑" [ref=e833]
+                    - button "停用" [ref=e837]
+              - row [ref=e838]:
+                - cell "48" [ref=e839]
+                - cell [ref=e840]
+                - cell "视频生成模式" [ref=e846]
+                - cell "IMG2VIDEO" [ref=e847]
+                - cell "图生视频 (img2video)" [ref=e848]
+                - cell "-" [ref=e849]
+                - cell "1" [ref=e850]
+                - cell "启用" [ref=e851]
+                - cell [ref=e853]:
+                  - generic [ref=e854]:
+                    - button "编辑" [ref=e855]
+                    - button "停用" [ref=e859]
+              - row [ref=e860]:
+                - cell "39" [ref=e861]
+                - cell [ref=e862]
+                - cell "图片任务类型" [ref=e868]
+                - cell "MAIN" [ref=e869]
+                - cell "主图" [ref=e870]
+                - cell "-" [ref=e871]
+                - cell "1" [ref=e872]
+                - cell "启用" [ref=e873]
+                - cell [ref=e875]:
+                  - generic [ref=e876]:
+                    - button "编辑" [ref=e877]
+                    - button "停用" [ref=e881]
+              - row [ref=e882]:
+                - cell "61" [ref=e883]
+                - cell [ref=e884]
+                - cell "负面约束素材范围" [ref=e890]
+                - cell "GENERAL" [ref=e891]
+                - cell "通用" [ref=e892]
+                - cell "-" [ref=e893]
+                - cell "1" [ref=e894]
+                - cell "启用" [ref=e895]
+                - cell [ref=e897]:
+                  - generic [ref=e898]:
+                    - button "编辑" [ref=e899]
+                    - button "停用" [ref=e903]
+              - row [ref=e904]:
+                - cell "62" [ref=e905]
+                - cell [ref=e906]
+                - cell "负面约束素材范围" [ref=e912]
+                - cell "IMAGE" [ref=e913]
+                - cell "图片" [ref=e914]
+                - cell "-" [ref=e915]
+                - cell "2" [ref=e916]
+                - cell "启用" [ref=e917]
+                - cell [ref=e919]:
+                  - generic [ref=e920]:
+                    - button "编辑" [ref=e921]
+                    - button "停用" [ref=e925]
+              - row [ref=e926]:
+                - cell "51" [ref=e927]
+                - cell [ref=e928]
+                - cell "视频时长" [ref=e934]
+                - cell "DURATION_8" [ref=e935]
+                - cell "8 秒 (标准渲染)" [ref=e936]
+                - cell "-" [ref=e937]
+                - cell "2" [ref=e938]
+                - cell "启用" [ref=e939]
+                - cell [ref=e941]:
+                  - generic [ref=e942]:
+                    - button "编辑" [ref=e943]
+                    - button "停用" [ref=e947]
+              - row [ref=e948]:
+                - cell "49" [ref=e949]
+                - cell [ref=e950]
+                - cell "视频生成模式" [ref=e956]
+                - cell "REFERENCE2VIDEO" [ref=e957]
+                - cell "参考生视频 (reference2video)" [ref=e958]
+                - cell "-" [ref=e959]
+                - cell "2" [ref=e960]
+                - cell "启用" [ref=e961]
+                - cell [ref=e963]:
+                  - generic [ref=e964]:
+                    - button "编辑" [ref=e965]
+                    - button "停用" [ref=e969]
+          - generic [ref=e970]:
+            - generic [ref=e971]: 共 73 条 / 第 1 / 4 页
+            - button "上一页" [disabled] [ref=e972]
+            - button "下一页" [ref=e973]
+  - region "Notifications alt+T"

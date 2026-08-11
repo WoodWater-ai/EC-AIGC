@@ -1,0 +1,146 @@
+- generic [ref=e2]:
+  - generic [ref=e598]:
+    - banner [ref=e599]:
+      - generic [ref=e600]:
+        - button "返回任务列表" [ref=e601]:
+          - generic [ref=e602]: arrow_back
+        - generic [ref=e603]:
+          - heading "新建图片任务" [level=1] [ref=e604]
+          - paragraph [ref=e605]: 配置、生成与结果在同一页面完成
+    - main [ref=e606]:
+      - generic [ref=e607]:
+        - generic [ref=e608]:
+          - generic [ref=e609]:
+            - generic [ref=e610]:
+              - paragraph [ref=e611]: 创作商品
+              - heading "主体素材" [level=2] [ref=e612]
+            - button "资源中心" [ref=e613]
+          - button "添加主体素材" [ref=e615]:
+            - generic [ref=e616]: add
+        - generic [ref=e618]:
+          - generic [ref=e619]:
+            - generic [ref=e620]:
+              - paragraph [ref=e621]: 补充依据
+              - heading "参考图" [level=2] [ref=e622]
+            - generic [ref=e623]: 0 / 5
+          - generic [ref=e624]:
+            - button "face_3 添加模特参考" [ref=e625]:
+              - generic [ref=e626]: face_3
+              - generic [ref=e627]: 添加模特参考
+            - button "zoom_in 添加细节参考" [ref=e628]:
+              - generic [ref=e629]: zoom_in
+              - generic [ref=e630]: 添加细节参考
+            - button "zoom_in 添加风格参考" [ref=e631]:
+              - generic [ref=e632]: zoom_in
+              - generic [ref=e633]: 添加风格参考
+          - paragraph [ref=e634]: 每张图片可多选标签；同一标签仅归属一张图，重复选择会自动转移。
+        - generic [ref=e635]:
+          - generic [ref=e636]:
+            - generic [ref=e637]:
+              - paragraph [ref=e638]: ERP 商品事实
+              - heading "待匹配 ERP 商品" [level=2] [ref=e639]
+              - paragraph [ref=e640]: 未获取 ERP 分类
+            - button "复制商品事实" [disabled] [ref=e641]
+          - generic [ref=e646]:
+            - text: SEO 优化商品名称
+            - textbox "SEO 优化商品名称" [disabled] [ref=e647]:
+              - /placeholder: 用于生成 Prompt，不回写 ERP
+          - generic [ref=e648]:
+            - paragraph [ref=e649]: 图片理解提取
+            - generic [ref=e650]:
+              - generic [ref=e651]:
+                - generic [ref=e652]: 颜色
+                - textbox "颜色" [disabled] [ref=e653]
+              - generic [ref=e654]:
+                - generic [ref=e655]: 图案 / 材质
+                - textbox "图案 / 材质" [disabled] [ref=e656]
+              - generic [ref=e657]:
+                - generic [ref=e658]: 版型 / 结构
+                - textbox "版型 / 结构" [disabled] [ref=e659]
+            - generic [ref=e660]:
+              - text: 核心卖点
+              - textbox "核心卖点" [disabled] [ref=e661]
+      - generic [ref=e663]:
+        - generic [ref=e664]:
+          - generic [ref=e665]:
+            - generic [ref=e666]:
+              - paragraph [ref=e667]: 输出内容
+              - heading "选择图片类型" [level=2] [ref=e668]
+            - generic [ref=e669]: 共 1 张
+          - generic [ref=e672]:
+            - generic [ref=e673]:
+              - button "取消选择商品主图" [pressed] [ref=e674]:
+                - generic [ref=e675]: check_circle
+                - generic [ref=e676]: 商品主图
+              - group "商品主图张数" [ref=e677]:
+                - button "减少一张" [disabled] [ref=e678]: −
+                - generic [ref=e679]: "1"
+                - button "增加一张" [ref=e680]: +
+            - button "选择场景图" [ref=e682]:
+              - generic [ref=e683]: landscape
+              - generic [ref=e684]: 场景图
+            - button "选择细节图" [ref=e686]:
+              - generic [ref=e687]: zoom_in
+              - generic [ref=e688]: 细节图
+            - button "选择三视图" [ref=e690]:
+              - generic [ref=e691]: accessibility_new
+              - generic [ref=e692]: 三视图
+        - generic [ref=e693]:
+          - generic [ref=e695]:
+            - paragraph [ref=e696]: 内容表达
+            - heading "本次图片 Prompt" [level=2] [ref=e697]
+            - paragraph [ref=e698]: 像对话输入框一样编辑文字，并在底部直接调整创作标签
+          - generic [ref=e699]: 请先在左侧选择已绑定商品的素材,商品事实与 Prompt 才能解析。
+          - generic [ref=e700]:
+            - generic [ref=e701]:
+              - paragraph [ref=e702]: 已选 1 个图片类型 · 共 1 张
+              - button "按表单重算" [disabled] [ref=e704]
+            - generic [ref=e706]:
+              - generic [ref=e708]:
+                - generic [ref=e709]: inventory_2
+                - generic [ref=e710]: 商品主图
+                - generic [ref=e711]: 默认模板 · 1 张
+              - textbox "商品主图 Prompt" [disabled] [ref=e712]:
+                - /placeholder: 选择主体素材后，可编辑最终 Prompt
+          - generic [ref=e713]:
+            - generic [ref=e715]:
+              - paragraph [ref=e716]: 创作标签
+              - paragraph [ref=e717]: 已引用参考图的标签自动锁定
+            - generic [ref=e718]:
+              - generic [ref=e719]:
+                - button "风格奶油甜妹卧室" [ref=e721]
+                - button "场景奶油柔光卧室" [ref=e726]
+                - button "姿势自然站姿" [ref=e731]
+              - generic [ref=e735]:
+                - paragraph [ref=e736]: 参考图编辑尚未配置系统默认通道和模型
+                - button "模型暂无可用项" [disabled] [ref=e738]
+      - complementary [ref=e746]:
+        - generic [ref=e747]:
+          - generic [ref=e748]:
+            - heading "本次生成结果" [level=2] [ref=e749]
+            - generic [ref=e750]: 待生成 · 1 张
+          - generic [ref=e751]:
+            - paragraph [ref=e758]: 结果将在这里显示
+            - paragraph [ref=e759]: 提交后可离开页面，任务会在后台继续；任务列表会自动恢复进度与最终结果。
+            - generic [ref=e760]:
+              - generic [ref=e761]:
+                - term [ref=e762]: 图片类型
+                - definition [ref=e763]: 1 类
+              - generic [ref=e764]:
+                - term [ref=e765]: 生成数量
+                - definition [ref=e766]: 1 张
+              - generic [ref=e767]:
+                - term [ref=e768]: 模型
+                - definition [ref=e769]: 等待默认路由
+              - generic [ref=e770]:
+                - term [ref=e771]: 输出规格
+                - definition [ref=e772]: 等待模型参数
+          - generic [ref=e773]:
+            - button "检查并生成 1 张" [ref=e774]
+            - paragraph [ref=e778]: 提交前会展示完整校验、耗时与失败处理策略。
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=e779]:
+        - generic [ref=e783]: 参考图编辑尚未配置系统默认通道和模型
+      - listitem [ref=e785]:
+        - generic [ref=e789]: 参考图编辑尚未配置系统默认通道和模型

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ProductDTO } from '../../api/modules/productInfo';
-import { toProductSpu } from './productManagementModel';
+import type { ProductLibraryProduct } from '../../api/modules/productLibrary';
+import { toProductLibrarySpu, toProductSpu } from './productManagementModel';
 
 const currentProduct: ProductDTO = {
   id: '100',
@@ -64,4 +65,31 @@ test('maps optional future ERP SKU payload without changing ProductDTO API', () 
   assert.equal(spu.skus.length, 2);
   assert.equal(spu.skus[0].canCreate, true);
   assert.equal(spu.skus[1].unavailableReason, 'SKU 已停用');
+});
+
+test('maps an existing product-library product with its real material count', () => {
+  const libraryProduct: ProductLibraryProduct = {
+    id: '200',
+    name: '手动创建家居服',
+    category: '睡衣',
+    color: '绿色',
+    material: '棉',
+    imageUrl: '/pajama.jpg',
+    productStatus: 'OFF_SHELF',
+    inputAssetCount: 2,
+    imageCount: 6,
+    videoCount: 1,
+    pendingReviewCount: 0,
+    passedCount: 4,
+    rejectedCount: 0,
+    totalCost: 12.5,
+    latestStatus: 'ARCHIVED',
+  };
+
+  const spu = toProductLibrarySpu(libraryProduct);
+
+  assert.equal(spu.id, '200');
+  assert.equal(spu.status, 'OFF_SHELF');
+  assert.equal(spu.skus[0].materialCount, 9);
+  assert.equal(spu.skus[0].patternMaterial, '棉');
 });

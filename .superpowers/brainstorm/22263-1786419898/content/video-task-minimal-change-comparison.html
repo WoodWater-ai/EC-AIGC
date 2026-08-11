@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root { --ink:#172033; --muted:#677085; --line:#dfe4ec; --blue:#3264d9; --blue-soft:#eef4ff; --green:#178766; --surface:#f6f8fb; --card:#fff; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--surface); color:var(--ink); font-family:Inter,"Noto Sans SC",system-ui,sans-serif; }
+    .page { max-width:1500px; margin:0 auto; padding:34px 26px 48px; }
+    h1 { margin:0; font-size:26px; letter-spacing:0; }
+    .intro { margin:8px 0 28px; color:var(--muted); font-size:14px; line-height:1.6; }
+    .legend { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 20px; }
+    .legend span { display:inline-flex; align-items:center; padding:6px 10px; border:1px solid var(--line); background:#fff; border-radius:6px; color:#465067; font-size:12px; }
+    .comparison { display:grid; grid-template-columns:1fr 1.15fr; gap:20px; align-items:start; }
+    .panel { overflow:hidden; border:1px solid var(--line); border-radius:8px; background:var(--card); box-shadow:0 4px 18px rgba(24,38,67,.04); }
+    .panel-head { display:flex; justify-content:space-between; gap:16px; padding:18px 20px; border-bottom:1px solid var(--line); }
+    .panel-head h2 { margin:0; font-size:16px; }
+    .panel-head p { margin:4px 0 0; color:var(--muted); font-size:12px; line-height:1.5; }
+    .pill { height:max-content; padding:5px 8px; border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+    .old { background:#f5f6f8; color:#687186; }
+    .new { background:#eaf7f2; color:#167157; }
+    .canvas { min-height:630px; background:#f7f8fb; }
+    .old-nav { display:flex; gap:18px; padding:14px 20px; background:#fff; border-bottom:1px solid var(--line); color:#606b7e; font-size:11px; font-weight:700; }
+    .old-nav b { color:var(--blue); border-bottom:2px solid var(--blue); padding-bottom:12px; margin-bottom:-14px; }
+    .old-grid { display:grid; grid-template-columns:27% 39% 34%; gap:10px; padding:12px; }
+    .col { display:flex; flex-direction:column; gap:10px; }
+    .box { padding:12px; border:1px solid #e4e8ef; border-radius:6px; background:#fff; }
+    .eyebrow { margin-bottom:5px; color:#6a7487; font-size:10px; font-weight:700; }
+    .title { font-size:12px; font-weight:800; }
+    .tiny { margin-top:7px; color:#8b94a5; font-size:10px; line-height:1.5; }
+    .empty { display:grid; place-items:center; min-height:80px; margin-top:9px; border:1px dashed #cbd3df; border-radius:5px; color:#8490a2; font-size:10px; }
+    .lines { margin-top:9px; }
+    .lines i { display:block; height:7px; margin-top:7px; border-radius:3px; background:#eef1f6; }
+    .lines i:nth-child(2){ width:85%; }.lines i:nth-child(3){ width:66%; }
+    .issues { margin:12px; padding:13px 14px; border-left:3px solid #c87c24; background:#fff8ee; color:#6d522b; font-size:11px; line-height:1.65; }
+    .issues strong { color:#5a3e15; }
+    .app-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; background:#fff; border-bottom:1px solid var(--line); }
+    .app-title { display:flex; align-items:center; gap:10px; font-size:14px; font-weight:800; }
+    .back { display:grid; place-items:center; width:26px; height:26px; border:1px solid var(--line); border-radius:5px; color:#657088; }
+    .mode-tabs { display:flex; gap:4px; padding:10px 20px; background:#fff; border-bottom:1px solid var(--line); overflow:auto; }
+    .mode-tabs span { flex:none; padding:8px 12px; border-radius:5px; color:#6b7485; font-size:11px; font-weight:700; }
+    .mode-tabs .active { color:var(--blue); background:var(--blue-soft); }
+    .mode-note { padding:7px 20px; background:#fbfcff; color:#66748b; border-bottom:1px solid #e8edf6; font-size:10px; }
+    .new-grid { display:grid; grid-template-columns:255px minmax(310px,1fr) 250px; gap:12px; padding:14px; }
+    .fact { border:1px solid #dfe6f2; }
+    .fact .head { display:flex; align-items:center; gap:8px; padding-bottom:10px; border-bottom:1px solid #edf0f4; }
+    .thumb { width:32px; height:42px; border-radius:4px; background:linear-gradient(135deg,#eadfdb,#bf9b88); }
+    .fact dl { margin:10px 0 0; font-size:10px; }
+    .fact dl div { display:flex; gap:8px; margin-top:7px; }
+    .fact dt { flex:none; color:#8a94a4; }.fact dd { margin:0; color:#4d576a; }
+    .input-card { padding:12px; border:1px solid #dfe6f2; border-radius:6px; background:#fff; }
+    .input-card + .input-card { margin-top:10px; }
+    .source { display:flex; align-items:center; gap:8px; margin-top:8px; padding:8px; border:1px dashed #b9c7df; border-radius:5px; background:#fbfdff; color:#526277; font-size:10px; }
+    .source b { color:var(--blue); }.media { width:36px; height:26px; border-radius:3px; background:#dce7fd; }
+    .composer { display:flex; flex-direction:column; min-height:450px; border:1px solid #ccd8ee; border-radius:7px; background:#fff; overflow:hidden; }
+    .composer-top { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #e9eef7; font-size:12px; font-weight:800; }.counter{color:#8993a3;font-size:10px;font-weight:500;}
+    .prompt-space { flex:1; padding:14px; color:#8892a3; font-size:11px; line-height:1.75; }
+    .prompt-space b { color:#47536a; }.prompt-space p { margin:0 0 9px; }
+    .tags { display:flex; flex-wrap:wrap; gap:6px; padding:10px 12px; border-top:1px solid #e9eef7; background:#fbfcfe; }
+    .tag { padding:5px 7px; border:1px solid #d8e2f4; border-radius:4px; color:#48607f; background:#fff; font-size:10px; }.tag.lock { border-color:#aad9c5; background:#edfaf4; color:#177555; }.tag.lock:before{content:"参考图 · "; color:#5b997d;}
+    .composer-foot { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-top:1px solid #e9eef7; }.ghost { color:#71809a; font-size:10px; }.generate { padding:9px 12px; border-radius:5px; background:var(--blue); color:#fff; font-size:11px; font-weight:800; }
+    .setting { font-size:10px; }.setting + .setting { margin-top:9px; }.setting b{display:block;font-size:11px;margin-bottom:7px;}.select{display:flex;align-items:center;justify-content:space-between;padding:8px;border:1px solid #dfe5ee;border-radius:5px;color:#596579;background:#fff;}.readiness{margin-top:14px;padding:10px;border-radius:5px;background:#f4f8ff;color:#526787;line-height:1.6;}
+    .rules { margin:18px 0 0; padding:20px; border:1px solid #cae6db; border-radius:8px; background:#f5fcf8; }
+    .rules h2 { margin:0; font-size:15px; }.rule-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; }.rule { padding:12px; border:1px solid #d8eee4; border-radius:6px; background:#fff; }.rule b { display:block; font-size:12px; }.rule p { margin:6px 0 0; color:#647384; font-size:11px; line-height:1.55; }
+    .choice { margin-top:20px; padding:16px; border:1px solid #ccd8ee; border-radius:8px; background:#fff; cursor:pointer; }.choice:hover { border-color:#3264d9; }.choice h3 { margin:0; font-size:14px; }.choice p { margin:6px 0 0; color:#657185; font-size:12px; line-height:1.55; }
+    @media (max-width:1000px) { .comparison { grid-template-columns:1fr; }.new-grid{grid-template-columns:1fr;}.rule-grid{grid-template-columns:1fr 1fr;} }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>新建视频任务：最小改动对比</h1>
+    <p class="intro">保留现有 4 种视频能力、现有资源中心、TaskParamsPanel 与提交参数。只将输入、参考规则和 Prompt 区收敛为与图片任务一致的使用方式。</p>
+    <div class="legend"><span>保留：首帧图生视频</span><span>保留：爆款复刻</span><span>保留：电商复刻</span><span>保留：智能多帧</span><span>不新增：参考图生视频</span></div>
+
+    <section class="comparison">
+      <article class="panel">
+        <div class="panel-head"><div><h2>当前页</h2><p>模式切换后，左侧素材、中心任务配置、Prompt 与右侧模型参数分散。</p></div><span class="pill old">现状</span></div>
+        <div class="canvas">
+          <div class="old-nav"><b>首帧图生视频</b><span>爆款复刻</span><span>电商复刻</span><span>智能多帧</span></div>
+          <div class="old-grid">
+            <div class="col"><div class="box"><div class="eyebrow">输入素材</div><div class="title">视频首帧</div><div class="empty">+ 从资源中心选择</div></div><div class="box"><div class="eyebrow">输入依据</div><div class="title">商品事实</div><div class="lines"><i></i><i></i><i></i></div></div></div>
+            <div class="col"><div class="box"><div class="eyebrow">任务配置</div><div class="title">首帧图生视频</div><div class="tiny">模式说明 / 分镜提示 / 用户创意补充</div><div class="lines"><i></i><i></i></div></div><div class="box"><div class="eyebrow">内容</div><div class="title">本次视频 Prompt</div><div class="empty">大文本输入区</div><div class="tiny">负面约束 · 分镜展开 · 生成提示词</div></div></div>
+            <div class="col"><div class="box"><div class="eyebrow">模型通道与模型能力</div><div class="title">可用视频规格</div><div class="lines"><i></i><i></i><i></i></div></div><div class="box"><div class="eyebrow">生成准备度</div><div class="title">检查并生成</div></div></div>
+          </div>
+          <div class="issues"><strong>主要问题</strong><br>1. Prompt、分镜和标签没有一个明确的工作区。<br>2. 复刻模式的“用户创意补充”和“最终 Prompt”重复。<br>3. 参考图用途在左栏，无法让用户直观看到它会覆盖哪些标签。<br>4. 首帧模式仍沿用“参考素材”的心智，实际只需要一个首帧。</div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><div><h2>推荐：统一创作画布</h2><p>只调整布局和交互文案；四种模式仍走原能力与原接口。</p></div><span class="pill new">推荐</span></div>
+        <div class="canvas">
+          <div class="app-head"><div class="app-title"><span class="back">←</span> 新建视频任务</div><span class="ghost">保存草稿</span></div>
+          <div class="mode-tabs"><span class="active">首帧图生视频</span><span>爆款复刻</span><span>电商复刻</span><span>智能多帧</span></div>
+          <div class="mode-note">模式只切换“输入区规则”；商品事实、Prompt 工作区与生成规格保持位置不变。</div>
+          <div class="new-grid">
+            <aside>
+              <div class="box fact"><div class="head"><div class="thumb"></div><div><div class="eyebrow">商品事实</div><div class="title">ERP 商品名称</div><div class="tiny">ERP 一级 / 二级分类</div></div></div><dl><div><dt>卖点</dt><dd>轻盈、亲肤、垂坠</dd></div><div><dt>材质</dt><dd>仿羊绒混纺</dd></div><div><dt>颜色</dt><dd>格纹·暖棕</dd></div></dl></div>
+              <div class="input-card"><div class="eyebrow">本模式输入</div><div class="title">视频首帧</div><div class="source"><div class="media"></div><span><b>选择图片</b><br>作为严格首帧</span></div><div class="tiny">只有这一张输入图，不展示“参考图”区。</div></div>
+              <div class="input-card"><div class="eyebrow">切到复刻模式时</div><div class="title">源视频 + 替换素材</div><div class="tiny">源视频决定镜头与节奏；替换图按模特、风格、场景、姿势标明用途。</div></div>
+            </aside>
+            <section class="composer">
+              <div class="composer-top"><span>视频 Prompt</span><span class="counter">268 / 5,000</span></div>
+              <div class="prompt-space"><p><b>自然语言指令</b></p><p>保持商品主体与首帧构图，镜头缓慢推进，突出材质细节与穿着氛围。</p><p class="tiny">首帧模式：直接描述镜头、动作和画面目标。复刻模式：源视频已提供分镜与节奏，这里只补充品牌调性或禁忌。</p></div>
+              <div class="tags"><span class="tag">风格：轻法式</span><span class="tag">场景：自然光卧室</span><span class="tag lock">场景：参考图 2</span><span class="tag">姿势：侧身回望</span><span class="tag">镜头：缓慢推近</span></div>
+              <div class="composer-foot"><span class="ghost">场景已由参考图 2 约束，直接参数不可再选</span><span class="generate">检查并生成</span></div>
+            </section>
+            <aside><div class="box setting"><b>视频规格</b><div class="select">模型 <span>Vidu Q2 Pro ▾</span></div></div><div class="box setting"><b>输出设置</b><div class="select">时长 <span>5 秒 ▾</span></div><div class="select" style="margin-top:7px">数量 <span>1 条 ▾</span></div></div><div class="box setting"><b>生成准备度</b><div class="readiness">已选商品<br>已选首帧<br>已填写 Prompt<br>规格可执行</div></div></aside>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="rules">
+      <h2>模式规则：保留能力差异，不制造额外流程</h2>
+      <div class="rule-grid">
+        <div class="rule"><b>首帧图生视频</b><p>仅选 1 张首帧图。没有“参考图”概念，不引入额外图片槽位；标签均为 Prompt 内直接参数。</p></div>
+        <div class="rule"><b>爆款复刻</b><p>源视频是唯一的分镜、动作和节奏依据。商品主图固定为主体；替换图可多选并标注用途。</p></div>
+        <div class="rule"><b>电商复刻</b><p>同样以源视频驱动复刻。保留当前时长映射与产品图绑定，不新增 AI 设计分镜步骤。</p></div>
+        <div class="rule"><b>智能多帧</b><p>保留首帧 + 关键帧时间轴。Prompt 工作区仍统一放在中央，关键帧只描述段落变化。</p></div>
+      </div>
+    </section>
+
+    <div class="choice" data-choice="unified-video-canvas" onclick="toggleSelect(this)"><h3>确认此方向：统一 Prompt 工作区，输入规则随模式变化</h3><p>这会移除重复的“用户创意补充”输入，保留“最终 Prompt”作为单一编辑点；参考图承担标签时，底部对应标签只读且注明来源。</p></div>
+  </main>
+</body>
+</html>

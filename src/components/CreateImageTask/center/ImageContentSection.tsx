@@ -32,11 +32,26 @@ export const ImageContentSection: React.FC<ImageContentSectionProps> = (props) =
   } = props;
 
   return (
-    <div id="image-content-section" className="border border-slate-200 bg-white p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+    <div id="image-content-section" className="space-y-3">
+      <section className="border border-[#dfe3e8] bg-white p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[9px] font-bold text-[#df5b43]">输出内容</p>
+            <h2 className="mt-0.5 text-xs font-black">选择图片类型</h2>
+          </div>
+          <span className="bg-slate-100 px-1.5 py-1 text-[9px] font-bold text-slate-500">
+            共 {selectedTypes.reduce((sum, type) => sum + typeCounts[type], 0)} 张
+          </span>
+        </div>
+        <div className="mt-3">{typeSelector}</div>
+      </section>
+
+      <section className="border border-[#dfe3e8] bg-white p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
         <div>
-          <p className="text-[11px] font-bold text-primary">内容</p>
-          <h2 className="mt-0.5 text-sm font-black">最终 Prompt</h2>
+          <p className="text-[9px] font-bold text-[#df5b43]">内容表达</p>
+          <h2 className="mt-0.5 text-xs font-black">本次图片 Prompt</h2>
+          <p className="mt-1 text-[10px] text-slate-400">像对话输入框一样编辑文字，并在底部直接调整创作标签</p>
         </div>
         {/* AI 助手按钮暂时隐藏，后续按需解除注释。
         <button
@@ -53,7 +68,7 @@ export const ImageContentSection: React.FC<ImageContentSectionProps> = (props) =
           {assistantState === 'processing' ? messages.assistant.processing : assistantState === 'complete' ? messages.assistant.retry : messages.assistant.idle}
         </button>
         */}
-      </div>
+        </div>
 
       {!isProductBound && (
         <div className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-700">
@@ -68,8 +83,6 @@ export const ImageContentSection: React.FC<ImageContentSectionProps> = (props) =
         </div>
       )}
 
-      <div className="mt-3">{typeSelector}</div>
-
       <PerTypePromptEditor
         selectedTypes={selectedTypes}
         typeCounts={typeCounts}
@@ -81,17 +94,20 @@ export const ImageContentSection: React.FC<ImageContentSectionProps> = (props) =
         onRegenerateAll={onRegenerateAll}
         onAiOptimizeSelected={onAiOptimizeSelected}
       />
-      <p className="mt-2 text-[10px] leading-4 text-slate-400">
-        参考图标签会自动写入 Prompt，并锁定下方重复枚举。
-      </p>
       <div className="mt-3 border-t border-slate-100 pt-3">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[10px] font-bold text-slate-500">创作标签与输出参数</p>
+          <div>
+            <p className="text-[10px] font-bold text-slate-600">创作标签</p>
+            <p className="mt-0.5 text-[9px] text-slate-400">已引用参考图的标签自动锁定</p>
+          </div>
           {templateSelector}
         </div>
-        {tagSelector}
-        <div className="mt-3">{executionSettings}</div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {tagSelector}
+          {executionSettings}
+        </div>
       </div>
+      </section>
     </div>
   );
 };

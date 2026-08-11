@@ -1,0 +1,157 @@
+- generic [ref=e2]:
+  - generic [ref=e501]:
+    - banner [ref=e502]:
+      - generic [ref=e503]:
+        - button "返回任务列表" [ref=e504]:
+          - generic [ref=e505]: arrow_back
+        - generic [ref=e506]:
+          - heading "新建图片任务" [level=1] [ref=e507]
+          - paragraph [ref=e508]: 配置、生成与结果在同一页面完成
+    - main [ref=e509]:
+      - generic [ref=e510]:
+        - generic [ref=e511]:
+          - generic [ref=e512]:
+            - generic [ref=e513]:
+              - paragraph [ref=e514]: 创作商品
+              - heading "主体素材" [level=2] [ref=e515]
+            - button "资源中心" [ref=e516]
+          - button "添加主体素材" [ref=e518]:
+            - generic [ref=e519]: add
+        - generic [ref=e521]:
+          - generic [ref=e522]:
+            - generic [ref=e523]:
+              - paragraph [ref=e524]: 补充依据
+              - heading "参考图" [level=2] [ref=e525]
+            - generic [ref=e526]: 0 / 5
+          - generic [ref=e527]:
+            - button "face_3 添加模特参考" [ref=e528]:
+              - generic [ref=e529]: face_3
+              - generic [ref=e530]: 添加模特参考
+            - button "zoom_in 添加细节参考" [ref=e531]:
+              - generic [ref=e532]: zoom_in
+              - generic [ref=e533]: 添加细节参考
+            - button "zoom_in 添加风格参考" [ref=e534]:
+              - generic [ref=e535]: zoom_in
+              - generic [ref=e536]: 添加风格参考
+          - paragraph [ref=e537]: 每张图片可多选标签；同一标签仅归属一张图，重复选择会自动转移。
+        - generic [ref=e538]:
+          - generic [ref=e539]:
+            - generic [ref=e540]:
+              - paragraph [ref=e541]: ERP 商品事实
+              - heading "待匹配 ERP 商品" [level=2] [ref=e542]
+              - paragraph [ref=e543]: 未获取 ERP 分类
+            - button "复制商品事实" [disabled] [ref=e544]
+          - generic [ref=e549]:
+            - text: SEO 优化商品名称
+            - textbox "SEO 优化商品名称" [disabled] [ref=e550]:
+              - /placeholder: 用于生成 Prompt，不回写 ERP
+          - generic [ref=e551]:
+            - paragraph [ref=e552]: 图片理解提取
+            - generic [ref=e553]:
+              - generic [ref=e554]:
+                - generic [ref=e555]: 颜色
+                - textbox "颜色" [disabled] [ref=e556]
+              - generic [ref=e557]:
+                - generic [ref=e558]: 图案 / 材质
+                - textbox "图案 / 材质" [disabled] [ref=e559]
+              - generic [ref=e560]:
+                - generic [ref=e561]: 版型 / 结构
+                - textbox "版型 / 结构" [disabled] [ref=e562]
+            - generic [ref=e563]:
+              - text: 核心卖点
+              - textbox "核心卖点" [disabled] [ref=e564]
+      - generic [ref=e566]:
+        - generic [ref=e567]:
+          - generic [ref=e568]:
+            - generic [ref=e569]:
+              - paragraph [ref=e570]: 输出内容
+              - heading "选择图片类型" [level=2] [ref=e571]
+            - generic [ref=e572]: 共 5 张
+          - generic [ref=e575]:
+            - generic [ref=e576]:
+              - button "取消选择商品主图" [pressed] [ref=e577]:
+                - generic [ref=e578]: check_circle
+                - generic [ref=e579]: 商品主图
+              - group "商品主图张数" [ref=e580]:
+                - button "减少一张" [disabled] [ref=e581]: −
+                - generic [ref=e582]: "1"
+                - button "增加一张" [ref=e583]: +
+            - generic [ref=e584]:
+              - button "取消选择场景图" [pressed] [ref=e694]:
+                - generic [ref=e586]: check_circle
+                - generic [ref=e587]: 场景图
+              - group "场景图张数" [ref=e695]:
+                - button "减少一张" [ref=e696]: −
+                - generic [ref=e697]: "2"
+                - button "增加一张" [ref=e698]: +
+            - generic [ref=e588]:
+              - button "取消选择细节图" [pressed] [ref=e699]:
+                - generic [ref=e590]: check_circle
+                - generic [ref=e591]: 细节图
+              - group "细节图张数" [ref=e700]:
+                - button "减少一张" [disabled] [ref=e701]: −
+                - generic [ref=e702]: "1"
+                - button "增加一张" [ref=e703]: +
+            - generic [ref=e592]:
+              - button "取消选择三视图" [pressed] [ref=e704]:
+                - generic [ref=e594]: check_circle
+                - generic [ref=e595]: 三视图
+              - group "三视图张数" [ref=e705]:
+                - button "减少一张" [disabled] [ref=e706]: −
+                - generic [ref=e707]: "1"
+                - button "增加一张" [ref=e708]: +
+        - generic [ref=e596]:
+          - generic [ref=e598]:
+            - paragraph [ref=e599]: 内容表达
+            - heading "本次图片 Prompt" [level=2] [ref=e600]
+            - paragraph [ref=e601]: 像对话输入框一样编辑文字，并在底部直接调整创作标签
+          - generic [ref=e602]: 请先在左侧选择已绑定商品的素材,商品事实与 Prompt 才能解析。
+          - generic [ref=e603]:
+            - generic [ref=e604]:
+              - paragraph [ref=e605]: 将应用到 4 个图片类型 · 共 5 张
+              - button "按表单重算" [disabled] [ref=e607]
+            - textbox "本次图片 Prompt" [disabled] [ref=e608]:
+              - /placeholder: 选择主体素材后，可编辑本次图片 Prompt
+          - generic [ref=e609]:
+            - generic [ref=e611]:
+              - paragraph [ref=e612]: 创作标签
+              - paragraph [ref=e613]: 已引用参考图的标签自动锁定
+            - generic [ref=e614]:
+              - generic [ref=e615]:
+                - button "风格奶油甜妹卧室" [ref=e617]
+                - button "场景奶油柔光卧室" [ref=e622]
+                - button "姿势自然站姿" [ref=e627]
+              - generic [ref=e631]:
+                - button "模型q3-lite" [ref=e780]
+                - button "比例1:1" [ref=e838]
+                - button "分辨率1K" [ref=e650]
+                - group [ref=e658]:
+                  - generic "高级执行设置" [ref=e659] [cursor=pointer]
+                  - option "vidu-正式" [selected]
+                  - option "vidu-测试"
+                  - option "vidu-正式-nano2"
+      - complementary [ref=e661]:
+        - generic [ref=e662]:
+          - generic [ref=e663]:
+            - heading "本次生成结果" [level=2] [ref=e664]
+            - generic [ref=e665]: 待生成 · 5 张
+          - generic [ref=e666]:
+            - paragraph [ref=e673]: 结果将在这里显示
+            - paragraph [ref=e674]: 提交后可离开页面，任务会在后台继续；任务列表会自动恢复进度与最终结果。
+            - generic [ref=e675]:
+              - generic [ref=e676]:
+                - term [ref=e677]: 图片类型
+                - definition [ref=e678]: 4 类
+              - generic [ref=e679]:
+                - term [ref=e680]: 生成数量
+                - definition [ref=e681]: 5 张
+              - generic [ref=e682]:
+                - term [ref=e683]: 模型
+                - definition [ref=e684]: q3-lite
+              - generic [ref=e685]:
+                - term [ref=e686]: 输出规格
+                - definition [ref=e687]: 1:1 · 1K
+          - generic [ref=e688]:
+            - button "检查并生成 5 张" [ref=e709]
+            - paragraph [ref=e693]: 提交前会展示完整校验、耗时与失败处理策略。
+  - region "Notifications alt+T"
