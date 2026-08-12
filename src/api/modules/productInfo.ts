@@ -48,6 +48,33 @@ export interface ProductDTO {
   categories?: ProductCategoryRef[];
   createTime?: string;
   updateTime?: string;
+  skuCode?: string;
+  specName?: string;
+  barcode?: string;
+  sourceType?: 'MANUAL' | 'ERP' | 'COMBINATION';
+  sourceChannel?: string;
+  externalSkuId?: string;
+  spuCode?: string;
+  brand?: string;
+  lastSyncTime?: string;
+  canCreate?: boolean;
+  unavailableReason?: string;
+  skuList?: ProductSkuDTO[];
+}
+
+export interface ProductSkuDTO {
+  id: string;
+  skuCode?: string;
+  specName?: string;
+  barcode?: string;
+  imageId?: string;
+  imageUrl?: string;
+  color?: string;
+  patternMaterial?: string;
+  silhouetteStructure?: string;
+  status?: ProductStatus;
+  canCreate?: boolean;
+  unavailableReason?: string;
 }
 
 export interface ProductQueryReq {
@@ -57,6 +84,7 @@ export interface ProductQueryReq {
   status?: ProductStatus;
   /** 产品分类 ID 筛选(雪花 ID 字符串;后端 EXISTS 子查询生效) */
   categoryId?: string;
+  sourceType?: 'MANUAL' | 'ERP';
 }
 
 export interface ProductAddReq {
@@ -118,6 +146,9 @@ export interface ProductIdReq {
 export const productInfoApi = {
   list: (req: ProductQueryReq) =>
     http.post<PageInfo<ProductDTO>>('/v1/admin/product-info/list', req),
+
+  managementList: (req: ProductQueryReq) =>
+    http.post<PageInfo<ProductDTO>>('/v1/admin/product-info/management-list', req),
 
   add: (req: ProductAddReq) =>
     http.post<string>('/v1/admin/product-info/add', req),

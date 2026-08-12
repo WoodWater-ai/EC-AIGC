@@ -29,6 +29,11 @@ export interface ProductCategoryNode {
   description?: string;
   /** 排序 */
   sort?: number;
+  sourceType?: 'MANUAL' | 'ERP';
+  sourceChannel?: string;
+  externalCategoryId?: string;
+  status?: 'ENABLED' | 'DISABLED';
+  editable?: boolean;
   /** 子节点(嵌套结构) */
   children?: ProductCategoryNode[];
 }

@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import type { ProductDTO, ProductQueryReq, ProductStatus } from '../api/modules/productInfo';
 import { productInfoApi } from '../api/modules/productInfo';
 import { productLibraryApi } from '../api/modules/productLibrary';
+import { wdgjSyncApi } from '../api/modules/wdgjSync';
 import type { PageInfo } from '../api/service-result';
 import { productCategoryApi, type ProductCategoryNode } from '../api/modules/productCategory';
 import { useAuth } from '../auth/AuthContext';
@@ -44,6 +45,7 @@ interface ProductLoadOverrides {
   keyword?: string | null;
   status?: ProductStatus | null;
   categoryId?: string | null;
+  sourceType?: ProductSource | null;
 }
 
 export default function ProductManagePage({ onCreateSku }: ProductManagePageProps) {
@@ -66,6 +68,7 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
   const [detailProduct, setDetailProduct] = useState<ProductSpuView | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ProductDTO | null>(null);
+  const [erpSyncing, setErpSyncing] = useState(false);
 
   async function load(overrides?: ProductLoadOverrides) {
     setLoading(true);
@@ -76,8 +79,9 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
         keyword: overrides?.keyword === null ? undefined : overrides?.keyword ?? (keyword || undefined),
         status: overrides?.status === null ? undefined : overrides?.status ?? (statusFilter || undefined),
         categoryId: overrides?.categoryId === null ? undefined : overrides?.categoryId ?? (categoryIdFilter || undefined),
+        sourceType: overrides?.sourceType === null ? undefined : overrides?.sourceType ?? (sourceFilter || undefined),
       };
-      const data = await productInfoApi.list(req);
+      const data = await productInfoApi.managementList(req);
       setPageInfo(data);
     } finally {
       setLoading(false);
@@ -109,10 +113,7 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
     () => (pageInfo?.list ?? []).map((item) => toProductSpu(item as ProductManagementRecord)),
     [pageInfo],
   );
-  const visibleProducts = useMemo(
-    () => sourceFilter ? products.filter((product) => product.source === sourceFilter) : products,
-    [products, sourceFilter],
-  );
+  const visibleProducts = products;
   const visibleSkuCount = visibleProducts.reduce((count, product) => count + product.skus.length, 0);
   const total = pageInfo?.total ?? 0;
   const hasAnyFilter = Boolean(keyword.trim() || statusFilter || sourceFilter || categoryIdFilter);
@@ -216,6 +217,38 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
     await load({ pageNum: 1, keyword: null, status: null, categoryId: null });
   }
 
+  async function waitForSyncTask(taskId: string) {
+    for (let attempt = 0; attempt < 180; attempt += 1) {
+      const task = await wdgjSyncApi.detail(taskId);
+      if (task.status === 'SUCCESS') return task;
+      if (task.status === 'FAILED') {
+        throw new Error(task.failReason || 'ERP 同步失败');
+      }
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 2000));
+    }
+    throw new Error('ERP 同步仍在后台执行，请稍后刷新查看');
+  }
+
+  async function handleSyncErpProducts() {
+    if (erpSyncing) return;
+    setErpSyncing(true);
+    try {
+      const categoryTaskId = await wdgjSyncApi.trigger('CATEGORY', 'FULL');
+      await waitForSyncTask(categoryTaskId);
+      const productTaskId = await wdgjSyncApi.trigger('PRODUCT', 'INCREMENTAL');
+      const productTask = await waitForSyncTask(productTaskId);
+      const freshCategories = await productCategoryApi.tree();
+      setCategoryTree(freshCategories);
+      setPageNum(1);
+      await load({ pageNum: 1 });
+      toast.success(`商品信息同步完成，共处理 ${productTask.successCount ?? 0} 个商品`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '商品信息同步失败');
+    } finally {
+      setErpSyncing(false);
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-4 flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center">
@@ -230,6 +263,16 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
             当前页 <span className="font-bold text-slate-700">{visibleSkuCount}</span> 个 SKU
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => void handleSyncErpProducts()}
+          disabled={erpSyncing}
+          className="flex h-9 items-center justify-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-4 text-xs font-bold text-primary hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60"
+          title="从 ERP 同步分类、SPU、SKU 及商品图片"
+        >
+          <RefreshCw className={`h-4 w-4 ${erpSyncing ? 'animate-spin' : ''}`} />
+          {erpSyncing ? '同步中...' : '同步商品信息'}
+        </button>
         {canCreate && (
           <button
             type="button"
@@ -341,7 +384,7 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
                 <EmptyTableRow label="加载中..." />
               )}
               {!loading && visibleProducts.length === 0 && (
-                <EmptyTableRow label={sourceFilter === 'ERP' ? 'ERP 接口尚未接入，暂无同步商品' : '暂无符合条件的产品'} />
+                <EmptyTableRow label="暂无符合条件的产品" />
               )}
               {visibleProducts.map((product) => {
                 const expanded = expandedIds.has(product.id);

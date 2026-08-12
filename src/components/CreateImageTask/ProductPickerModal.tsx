@@ -196,9 +196,10 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({ open, on
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => { onPick(p); onClose(); }}
-                      className="group text-left bg-white border border-slate-200 rounded-lg overflow-hidden hover:border-primary hover:shadow-sm transition-all"
-                      title={`选择 ${p.name}`}
+                      onClick={() => { if (p.canCreate !== false) { onPick(p); onClose(); } }}
+                      disabled={p.canCreate === false}
+                      className="group text-left bg-white border border-slate-200 rounded-lg overflow-hidden hover:border-primary hover:shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-55"
+                      title={p.canCreate === false ? (p.unavailableReason || '当前产品暂不可创作') : `选择 ${p.name}`}
                     >
                       <div className="aspect-square relative bg-slate-100 overflow-hidden">
                         <AssetImage

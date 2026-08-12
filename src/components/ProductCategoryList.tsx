@@ -97,6 +97,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
     const isExpanded = expandedIds.has(node.id);
     const isSelected = selectedId === node.id;
     const hasChildren = !!(node.children && node.children.length > 0);
+    const isEditable = node.editable !== false && node.sourceType !== 'ERP';
 
     return (
       <div>
@@ -136,10 +137,15 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
           <span className={`text-sm truncate ${isSelected ? 'font-semibold' : ''}`}>
             {node.categoryName}
           </span>
+          {node.sourceType === 'ERP' && (
+            <span className="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600">
+              ERP
+            </span>
+          )}
 
           {/* hover 行内操作 */}
           <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-            {canCreate && <button
+            {canCreate && isEditable && <button
               title="添加子分类"
               onClick={(e) => {
                 e.stopPropagation();
@@ -153,7 +159,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
             >
               <span className="material-symbols-outlined text-base">add</span>
             </button>}
-            {canEdit && <button
+            {canEdit && isEditable && <button
               title="编辑"
               onClick={(e) => {
                 e.stopPropagation();
@@ -166,7 +172,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
             >
               <span className="material-symbols-outlined text-base">edit</span>
             </button>}
-            {canDelete && <button
+            {canDelete && isEditable && <button
               title="删除"
               onClick={(e) => {
                 e.stopPropagation();
@@ -229,10 +235,12 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="text-xl font-bold text-slate-800">{selectedNode.categoryName}</h2>
-              <p className="text-xs text-slate-400 mt-1">商品分类详情</p>
+              <p className="text-xs text-slate-400 mt-1">
+                {selectedNode.sourceType === 'ERP' ? 'ERP 同步分类 · 只读' : '手动创建分类'}
+              </p>
             </div>
             <div className="flex items-center gap-2">
-              {canEdit && <button
+              {canEdit && selectedNode.editable !== false && selectedNode.sourceType !== 'ERP' && <button
                 onClick={() => {
                   setDrawerMode('edit');
                   setDrawerEditingNode(selectedNode);
@@ -244,7 +252,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
                 <span className="material-symbols-outlined text-sm">edit</span>
                 编辑
               </button>}
-              {canCreate && <button
+              {canCreate && selectedNode.editable !== false && selectedNode.sourceType !== 'ERP' && <button
                 onClick={() => {
                   setDrawerMode('create');
                   setDrawerDefaultParentId(selectedNode.id);
@@ -257,7 +265,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
                 <span className="material-symbols-outlined text-sm">add</span>
                 添加子分类
               </button>}
-              {canDelete && <button
+              {canDelete && selectedNode.editable !== false && selectedNode.sourceType !== 'ERP' && <button
                 onClick={() => {
                   if (window.confirm(`确认删除「${selectedNode.categoryName}」?`)) {
                     void productCategoryApi.delete(selectedNode.id).then(() => {
@@ -282,6 +290,20 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
             <div>
               <dt className="text-xs text-slate-400 mb-1">排序</dt>
               <dd className="text-slate-700">{selectedNode.sort ?? 0}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-400 mb-1">数据来源</dt>
+              <dd className="text-slate-700">
+                {selectedNode.sourceType === 'ERP'
+                  ? `ERP 同步${selectedNode.sourceChannel ? `（${selectedNode.sourceChannel}）` : ''}`
+                  : '手动创建'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-400 mb-1">可操作性</dt>
+              <dd className={selectedNode.sourceType === 'ERP' ? 'text-amber-600' : 'text-emerald-600'}>
+                {selectedNode.sourceType === 'ERP' ? '只读，不允许修改或删除' : '允许修改和删除'}
+              </dd>
             </div>
             <div className="col-span-2">
               <dt className="text-xs text-slate-400 mb-1">分类描述</dt>
@@ -318,6 +340,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
   }) => {
     if (drawerMode === 'create' && !canCreate) return;
     if (drawerMode === 'edit' && !canEdit) return;
+    if (drawerMode === 'edit' && (drawerEditingNode?.editable === false || drawerEditingNode?.sourceType === 'ERP')) return;
     if (!form.categoryName.trim()) return;
     setDrawerSubmitting(true);
     try {
@@ -365,7 +388,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
         {canCreate && <button
           onClick={() => {
             setDrawerMode('create');
-            setDrawerDefaultParentId(0);
+            setDrawerDefaultParentId('0');
             setDrawerEditingNode(null);
             setDrawerDirty(false);
             setDrawerOpen(true);
@@ -392,7 +415,7 @@ export const ProductCategoryList: React.FC<ProductCategoryListProps> = () => {
             {canCreate && <button
               onClick={() => {
                 setDrawerMode('create');
-                setDrawerDefaultParentId(0);
+                setDrawerDefaultParentId('0');
                 setDrawerEditingNode(null);
                 setDrawerDirty(false);
                 setDrawerOpen(true);

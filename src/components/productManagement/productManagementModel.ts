@@ -19,14 +19,17 @@ export interface ProductSkuInput {
   keyDetails?: string;
   status?: ProductStatus;
   materialCount?: number;
+  canCreate?: boolean;
+  unavailableReason?: string;
 }
 
-export type ProductManagementRecord = ProductDTO & {
-  sourceType?: ProductSource | 'ERP_SYNC';
+export type ProductManagementRecord = Omit<ProductDTO, 'sourceType' | 'skuList'> & {
+  sourceType?: ProductSource | 'ERP_SYNC' | 'COMBINATION';
   spuCode?: string;
   brand?: string;
   skuList?: ProductSkuInput[];
   lastSyncAt?: string;
+  lastSyncTime?: string;
 };
 
 export interface ProductSkuView {
@@ -68,12 +71,17 @@ export interface ProductSpuView {
 }
 
 const sourceFromRecord = (product: ProductManagementRecord): ProductSource =>
-  product.sourceType === 'ERP' || product.sourceType === 'ERP_SYNC' ? 'ERP' : 'MANUAL';
+  product.sourceType === 'ERP' || (product.sourceType as string | undefined) === 'ERP_SYNC' ? 'ERP' : 'MANUAL';
 
 const skuAvailability = (
   status: ProductStatus,
   imageUrl?: string,
+  canCreate?: boolean,
+  unavailableReason?: string,
 ): Pick<ProductSkuView, 'canCreate' | 'unavailableReason'> => {
+  if (canCreate === false) {
+    return { canCreate: false, unavailableReason: unavailableReason || '当前 SKU 暂不可创作' };
+  }
   if (status !== 'ON_SHELF') {
     return { canCreate: false, unavailableReason: 'SKU 已停用' };
   }
@@ -93,7 +101,7 @@ const toSkuView = (
   const name = sku.specName?.trim() || sku.color?.trim() || `默认规格 ${index + 1}`;
   return {
     id: sku.id,
-    productId: product.id,
+    productId: sku.id,
     name,
     code: sku.skuCode?.trim() || `SKU-${sku.id}`,
     imageId: sku.imageId ?? product.imageId,
@@ -104,7 +112,7 @@ const toSkuView = (
     keyDetails: sku.keyDetails,
     status,
     materialCount: sku.materialCount ?? (imageUrl ? 1 : 0),
-    ...skuAvailability(status, imageUrl),
+    ...skuAvailability(status, imageUrl, sku.canCreate, sku.unavailableReason),
   };
 };
 
@@ -140,9 +148,13 @@ export function toProductSpu(product: ProductManagementRecord): ProductSpuView {
     status: product.status,
     statusDesc: product.statusDesc,
     createTime: product.createTime,
-    lastSyncAt: product.lastSyncAt,
+    lastSyncAt: product.lastSyncAt ?? product.lastSyncTime,
     skus,
-    raw: product,
+    raw: {
+      ...product,
+      sourceType: product.sourceType === 'ERP_SYNC' ? 'ERP' : product.sourceType,
+      skuList: product.skuList,
+    },
   };
 }
 
