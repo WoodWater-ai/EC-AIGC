@@ -37,6 +37,7 @@ export interface ProductSkuView {
   productId: string;
   name: string;
   code: string;
+  specName?: string;
   imageId?: string;
   imageUrl?: string;
   color?: string;
@@ -104,6 +105,7 @@ const toSkuView = (
     productId: sku.id,
     name,
     code: sku.skuCode?.trim() || `SKU-${sku.id}`,
+    specName: sku.specName?.trim() || undefined,
     imageId: sku.imageId ?? product.imageId,
     imageUrl,
     color: sku.color ?? product.color,
@@ -189,11 +191,21 @@ export function toProductLibrarySpu(product: ProductLibraryProduct): ProductSpuV
 export const productSourceLabel = (source: ProductSource) =>
   source === 'ERP' ? 'ERP 同步' : '手动创建';
 
+export const formatProductParameters = (values: {
+  color?: string;
+  patternMaterial?: string;
+  silhouetteStructure?: string;
+}) => [
+  ['颜色/款式', values.color],
+  ['图案/材质', values.patternMaterial],
+  ['版型/结构', values.silhouetteStructure],
+]
+  .filter((item): item is [string, string] => Boolean(item[1]?.trim()))
+  .map(([label, value]) => `${label}：${value.trim()}`)
+  .join('；') || '待补充创作参数';
+
 export const productParameterSummary = (product: ProductSpuView) =>
-  [product.brand, product.patternMaterial, product.silhouetteStructure]
-    .map((value) => value?.trim())
-    .filter(Boolean)
-    .join(' · ') || '待补充创作参数';
+  formatProductParameters(product);
 
 export const formatProductTime = (value?: string) => {
   if (!value) return '—';

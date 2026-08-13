@@ -397,7 +397,7 @@ const OverviewTab: React.FC<{
         </InfoCard>
         <InfoCard label="生成进度" value={`${task.progressPercent}%`} />
         <InfoCard label="模型通道" value={task.modelChannelName || task.modelChannelId || '未记录'} />
-        <InfoCard label="模型名称" value={task.modelCode || '未记录'} />
+        <InfoCard label="模型名称" value={task.modelDisplayName || task.modelCode || '未记录'} />
         <InfoCard label="产物数量" value={`${task.resultPreviews.length} / ${task.count ?? 0}`} />
       </div>
 

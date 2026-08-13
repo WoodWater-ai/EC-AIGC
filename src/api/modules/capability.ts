@@ -77,6 +77,19 @@ export interface SupportedCapabilitiesResponse {
   supportedCapabilities: string[];
 }
 
+export interface CapabilityModelOption {
+  /** 供应商真实模型编码；提交和落库统一使用该值。 */
+  modelCode: string;
+  /** 仅用于前端展示。 */
+  displayName: string;
+  isDefault: boolean;
+}
+
+export interface CapabilityModelListResponse {
+  defaultModelCode: string | null;
+  models: CapabilityModelOption[];
+}
+
 // ===== API 函数 =====
 
 export async function fetchCapabilityMatrix(): Promise<MatrixResponse> {
@@ -105,9 +118,20 @@ export async function fetchCapabilitySchema(
 export async function validateTaskParams(req: {
   channelType: string;
   capability: string;
+  modelCode?: string | null;
   taskParamsJson: string;
 }): Promise<ValidateResponse> {
   return http.post<ValidateResponse>('/v1/task/capability-params/validate', req);
+}
+
+export async function fetchCapabilityModels(
+  channelInstanceId: string,
+  capability: string,
+): Promise<CapabilityModelListResponse> {
+  return http.post<CapabilityModelListResponse>('/v1/task/capability-models/list', {
+    channelInstanceId,
+    capability,
+  });
 }
 
 export async function fetchSupportedCapabilities(

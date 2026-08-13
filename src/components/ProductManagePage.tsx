@@ -26,6 +26,7 @@ import { ProductDetailDrawer } from './productManagement/ProductDetailDrawer';
 import { ProductSpuFormDrawer } from './productManagement/ProductSpuFormDrawer';
 import {
   formatProductTime,
+  formatProductParameters,
   productParameterSummary,
   productSourceLabel,
   toProductSpu,
@@ -64,6 +65,7 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
   const [pageSize, setPageSize] = useState(10);
   const [pageInfo, setPageInfo] = useState<PageInfo<ProductDTO> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [detailProduct, setDetailProduct] = useState<ProductSpuView | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -72,6 +74,7 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
 
   async function load(overrides?: ProductLoadOverrides) {
     setLoading(true);
+    setLoadError(null);
     try {
       const req: ProductQueryReq = {
         pageNum: overrides?.pageNum ?? pageNum,
@@ -83,6 +86,8 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
       };
       const data = await productInfoApi.managementList(req);
       setPageInfo(data);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : '产品列表加载失败');
     } finally {
       setLoading(false);
     }
@@ -148,11 +153,15 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
   async function openDetails(product: ProductSpuView) {
     setDetailProduct(product);
     try {
-      const detail = await productInfoApi.detail({ id: product.id });
+      const detail = await productInfoApi.managementDetail({
+        id: product.id,
+        sourceType: product.source,
+      });
       const nextProduct = toProductSpu(detail as ProductManagementRecord);
       setDetailProduct(nextProduct);
       // 产品库记录的是输入素材和全部生成产物；详情抽屉在此补真实数量，
       // 不改变列表分页接口，也避免为每一行发 N+1 请求。
+      if (product.source !== 'MANUAL') return;
       void productLibraryApi.productDetail(product.id).then((libraryDetail) => {
         const materialCount = libraryDetail.inputAssets.length
           + libraryDetail.generatedImages.length
@@ -246,6 +255,24 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
       toast.error(error instanceof Error ? error.message : '商品信息同步失败');
     } finally {
       setErpSyncing(false);
+    }
+  }
+
+  async function openEditSku(product: ProductSpuView, sku: ProductSkuView) {
+    if (!canEdit) return;
+    try {
+      const detail = await productInfoApi.detail({ id: sku.productId });
+      setDetailProduct(null);
+      setEditing({
+        ...detail,
+        name: product.name,
+        categories: product.categories,
+        category: product.category,
+        sourceType: product.source,
+      });
+      setFormOpen(true);
+    } catch {
+      // 全局 HTTP 拦截器负责错误提示。
     }
   }
 
@@ -383,7 +410,10 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
               {loading && visibleProducts.length === 0 && (
                 <EmptyTableRow label="加载中..." />
               )}
-              {!loading && visibleProducts.length === 0 && (
+              {!loading && loadError && visibleProducts.length === 0 && (
+                <EmptyTableRow label={`加载失败：${loadError}`} />
+              )}
+              {!loading && !loadError && visibleProducts.length === 0 && (
                 <EmptyTableRow label="暂无符合条件的产品" />
               )}
               {visibleProducts.map((product) => {
@@ -403,7 +433,9 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
                     canDelete={canDelete}
                     onToggle={() => toggleExpanded(product.id)}
                     onDetails={() => void openDetails(product)}
-                    onEdit={() => void openEdit(product.raw)}
+                    onEdit={(sku) => void (product.source === 'ERP'
+                      ? openEditSku(product, sku)
+                      : openEdit(product.raw))}
                     onDelete={() => void handleDelete(product)}
                     onCreate={handleCreate}
                   />
@@ -462,7 +494,9 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
         product={detailProduct}
         canEdit={canEdit}
         onClose={() => setDetailProduct(null)}
-        onEdit={(product) => void openEdit(product)}
+        onEdit={(product, sku) => void (product.source === 'ERP'
+          ? openEditSku(product, sku)
+          : openEdit(product.raw))}
         onCreate={handleCreate}
       />
       <ProductSpuFormDrawer
@@ -485,7 +519,7 @@ interface ProductRowsProps {
   canDelete: boolean;
   onToggle: () => void;
   onDetails: () => void;
-  onEdit: () => void;
+  onEdit: (sku: ProductSkuView) => void;
   onDelete: () => void;
   onCreate: (sku: ProductSkuView) => void;
 }
@@ -551,8 +585,8 @@ function ProductRows({
         <td className="px-3 py-2">
           <div className="flex items-center gap-1">
             <IconButton title="查看详情" onClick={onDetails}><Eye className="h-3.5 w-3.5" /></IconButton>
-            {canEdit && product.source === 'MANUAL' && (
-              <IconButton title="编辑" onClick={onEdit}><Pencil className="h-3.5 w-3.5" /></IconButton>
+            {canEdit && onlySku && (
+              <IconButton title={product.source === 'ERP' ? '补录 ERP 商品信息' : '编辑'} onClick={() => onEdit(onlySku)}><Pencil className="h-3.5 w-3.5" /></IconButton>
             )}
             {canDelete && product.source === 'MANUAL' && (
               <IconButton title="删除" danger onClick={onDelete}><Trash2 className="h-3.5 w-3.5" /></IconButton>
@@ -579,9 +613,11 @@ function ProductRows({
             <strong className="block truncate text-[11px] text-slate-800">{sku.name}</strong>
             <span className="mt-0.5 block truncate font-mono text-[9px] text-slate-400">{sku.code}</span>
           </td>
-          <td className="px-3 py-2 text-[11px] text-slate-500">{sku.color || '默认规格'}</td>
-          <td className="px-3 py-2 text-[11px] text-slate-500">
-            {[sku.patternMaterial, sku.silhouetteStructure].filter(Boolean).join(' · ') || '待补充创作参数'}
+          <td className="px-3 py-2 text-[11px] text-slate-500" title={sku.specName || sku.color || '默认规格'}>
+            {sku.specName || sku.color || '默认规格'}
+          </td>
+          <td className="px-3 py-2 text-[11px] text-slate-500" title={formatProductParameters(sku)}>
+            <span className="block truncate">{formatProductParameters(sku)}</span>
           </td>
           <td className="px-3 py-2 text-[10px] text-slate-400">继承 {productSourceLabel(product.source)}</td>
           <td className="px-3 py-2 text-[10px]">
@@ -590,7 +626,14 @@ function ProductRows({
             </span>
           </td>
           <td className="px-3 py-2 text-[10px] text-slate-400">{formatProductTime(product.createTime)}</td>
-          <td className="px-3 py-2"><CreateButton sku={sku} onCreate={onCreate} /></td>
+          <td className="px-3 py-2">
+            <div className="flex items-center gap-1">
+              {canEdit && product.source === 'ERP' && (
+                <IconButton title="补录 ERP 商品信息" onClick={() => onEdit(sku)}><Pencil className="h-3.5 w-3.5" /></IconButton>
+              )}
+              <CreateButton sku={sku} onCreate={onCreate} />
+            </div>
+          </td>
         </tr>
       ))}
     </>

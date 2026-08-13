@@ -7,8 +7,10 @@ import {
 } from '../../api/modules/capabilityDefaultRoute';
 import {
   fetchCapabilitySchema,
+  fetchCapabilityModels,
   fetchSupportedCapabilities,
   type CapabilityDefinition,
+  type CapabilityModelOption,
 } from '../../api/modules/capability';
 import {
   channelApi,
@@ -229,18 +231,50 @@ export function useTaskParams(
     () => (models ?? []).filter((item) => item.group === group),
     [models, group],
   );
-  const defaultModelCode = modelsInGroup[0]?.model?.trim() || null;
+  const { data: capabilityModelsRaw } = useServiceQuery(
+    () => channelId && capability
+      ? fetchCapabilityModels(channelId, capability)
+      : Promise.resolve(null),
+    [channelId, capability],
+  );
+  const defaultModelCode = capabilityModelsRaw?.defaultModelCode?.trim()
+    || modelsInGroup[0]?.model?.trim()
+    || null;
   const isMultiframeCapability = capability === 'MULTIFRAME';
-  const modelOptionsInGroup = useMemo(() => {
-    const catalog = matrix?.channels.find((item) => item.channelType === channelType)
+  const modelOptions = useMemo<CapabilityModelOption[]>(() => {
+    const apiOptions = capabilityModelsRaw?.models ?? [];
+    const legacyCatalog = matrix?.channels.find((item) => item.channelType === channelType)
       ?.modelOptions?.[group] ?? [];
-    const deduped = [...new Set(catalog.map((value) => value.trim()).filter(Boolean))]
-      .filter((value) => value !== defaultModelCode);
-    return isMultiframeCapability
-      ? deduped.filter((value) =>
-        (MULTIFRAME_ALLOWED_MODELS as readonly string[]).includes(value))
-      : deduped;
-  }, [channelType, defaultModelCode, group, matrix, isMultiframeCapability, MULTIFRAME_ALLOWED_MODELS]);
+    const source = apiOptions.length > 0
+      ? apiOptions
+      : legacyCatalog.map((modelCode) => ({
+          modelCode,
+          displayName: modelCode,
+          isDefault: modelCode === defaultModelCode,
+        }));
+    const byCode = new Map<string, CapabilityModelOption>();
+    source.forEach((option) => {
+      const modelCode = option.modelCode.trim();
+      if (!modelCode) return;
+      if (isMultiframeCapability
+          && !(MULTIFRAME_ALLOWED_MODELS as readonly string[]).includes(modelCode)) return;
+      byCode.set(modelCode, { ...option, modelCode });
+    });
+    if (defaultModelCode && !byCode.has(defaultModelCode)) {
+      byCode.set(defaultModelCode, {
+        modelCode: defaultModelCode,
+        displayName: defaultModelCode,
+        isDefault: true,
+      });
+    }
+    return [...byCode.values()];
+  }, [capabilityModelsRaw, channelType, defaultModelCode, group, matrix, isMultiframeCapability]);
+  const modelOptionsInGroup = useMemo(
+    () => modelOptions
+      .map((option) => option.modelCode)
+      .filter((modelCode) => modelCode !== defaultModelCode),
+    [defaultModelCode, modelOptions],
+  );
   const effectiveModelCode = modelId ?? defaultModelCode;
 
   const paramsFingerprint = useMemo(
@@ -301,7 +335,16 @@ export function useTaskParams(
         value = Number.isFinite(numericValue) ? numericValue : field.defaultValue;
       } else if (field.type === 'SELECT' && field.options?.length) {
         const valid = field.options.some((option) => option.value === String(value));
-        if (!valid) value = field.defaultValue ?? field.options[0].value;
+        if (!valid) {
+          if (field.defaultValue !== undefined
+              && field.defaultValue !== null
+              && field.defaultValue !== '') {
+            value = field.defaultValue;
+          } else {
+            // 供应商以“字段不传”表达跟随输入图等默认策略时，不应擅自选第一个枚举值。
+            continue;
+          }
+        }
       }
       next[field.key] = value;
     }
@@ -323,7 +366,6 @@ export function useTaskParams(
     if (locked) return;
     markUserSelection();
     setModelIdRaw(id);
-    setSchemaParamsRaw({});
   }, [locked, markUserSelection]);
 
   const setSchemaParams = useCallback((params: Record<string, any>) => {
@@ -348,6 +390,7 @@ export function useTaskParams(
     capabilitiesInChannel,
     modelsInGroup,
     defaultModelCode,
+    modelOptions,
     modelOptionsInGroup,
     setChannelId: locked ? () => {} : setChannelId,
     setCapability,

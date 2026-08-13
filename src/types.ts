@@ -592,6 +592,7 @@ export interface TaskGroupItemResponse {
   modelChannelId?: string | null;
   modelChannelName?: string | null;
   modelCode?: string | null;
+  modelDisplayName?: string | null;
   templateId?: string | null;
   templateName?: string | null;
   taskPrompt?: string | null;

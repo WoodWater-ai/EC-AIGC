@@ -73,11 +73,14 @@ export function ProductSpuFormDrawer({
   const [silhouetteStructure, setSilhouetteStructure] = useState('');
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiSnapshot, setAiSnapshot] = useState<{
+    sellingPoints: string;
+    category: string;
     color: string;
     patternMaterial: string;
     silhouetteStructure: string;
   } | null>(null);
   const [saving, setSaving] = useState(false);
+  const isErpEdit = initial?.sourceType === 'ERP';
 
   const categoryOptions = useMemo(() => flattenCategories(categoryTree), [categoryTree]);
   const selectedCategories = categoryOptions.filter((option) => selectedCategoryIds.includes(option.id));
@@ -116,7 +119,7 @@ export function ProductSpuFormDrawer({
     name !== (initial?.name ?? '')
     || sellingPoints !== (initial?.sellingPoints ?? '')
     || category !== (initial?.category ?? '')
-    || currentCategoryIds !== initialCategoryIds
+    || (!isErpEdit && currentCategoryIds !== initialCategoryIds)
     || status !== (initial?.status ?? 'ON_SHELF')
     || color !== (initial?.color ?? '')
     || patternMaterial !== (initial?.patternMaterial ?? '')
@@ -144,7 +147,9 @@ export function ProductSpuFormDrawer({
     if (!item) return;
     setImageRef({
       id: String(item.id),
-      thumbnailUrl: item.thumbnailUrl ?? item.originalUrl,
+      thumbnailUrl: withCosThumbnail(item.originalUrl ?? item.thumbnailUrl, 360)
+        ?? item.thumbnailUrl
+        ?? item.originalUrl,
       originalUrl: item.originalUrl,
       name: item.name,
     });
@@ -162,10 +167,12 @@ export function ProductSpuFormDrawer({
       toast.error('请先选择 SKU 图片');
       return;
     }
-    setAiSnapshot({ color, patternMaterial, silhouetteStructure });
+    setAiSnapshot({ sellingPoints, category, color, patternMaterial, silhouetteStructure });
     setAiAnalyzing(true);
     try {
       const result = await productInfoApi.aiAnalyze({ imageId: imageRef.id });
+      if (result.sellingPoints !== undefined) setSellingPoints(result.sellingPoints ?? '');
+      if (result.category !== undefined) setCategory(result.category ?? '');
       if (result.color !== undefined) setColor(result.color ?? '');
       if (result.patternMaterial !== undefined) setPatternMaterial(result.patternMaterial ?? '');
       if (result.silhouetteStructure !== undefined) setSilhouetteStructure(result.silhouetteStructure ?? '');
@@ -179,6 +186,8 @@ export function ProductSpuFormDrawer({
 
   function restoreAiSnapshot() {
     if (!aiSnapshot) return;
+    setSellingPoints(aiSnapshot.sellingPoints);
+    setCategory(aiSnapshot.category);
     setColor(aiSnapshot.color);
     setPatternMaterial(aiSnapshot.patternMaterial);
     setSilhouetteStructure(aiSnapshot.silhouetteStructure);
@@ -204,7 +213,7 @@ export function ProductSpuFormDrawer({
         silhouetteStructure: silhouetteStructure || undefined,
         category: category || undefined,
         imageId: String(imageRef.id),
-        categoryIds: selectedCategoryIds,
+        categoryIds: isErpEdit ? undefined : selectedCategoryIds,
         status,
       };
       if (initial?.id) {
@@ -236,10 +245,14 @@ export function ProductSpuFormDrawer({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-black text-slate-900">{initial?.id ? '编辑产品' : '新建产品'}</h2>
-              <span className="rounded border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">手动创建</span>
+              <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${isErpEdit ? 'border-blue-100 bg-blue-50 text-blue-700' : 'border-violet-100 bg-violet-50 text-violet-700'}`}>
+                {isErpEdit ? 'ERP 商品补录' : '手动创建'}
+              </span>
             </div>
             <p className="mt-1 text-[10px] text-slate-400">
-              {initial?.id ? `SPU-${initial.id}` : '保存后生成 SPU'} · 当前接口保存 1 个默认 SKU
+              {isErpEdit
+                ? `SKU-${initial?.id} · 商品名称和结构化分类由 ERP 维护，其余信息可补录`
+                : `${initial?.id ? `SPU-${initial.id}` : '保存后生成 SPU'} · 当前接口保存 1 个默认 SKU`}
             </p>
           </div>
           <button
@@ -258,7 +271,8 @@ export function ProductSpuFormDrawer({
             <SectionTitle index="1" title="SPU 共享信息" caption="商品公共事实" />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="商品名称" required className="sm:col-span-2">
-                <input value={name} onChange={(event) => setName(event.target.value)} maxLength={128} className={inputClassName} placeholder="例如：法式方领连衣裙" />
+                <input value={name} onChange={(event) => setName(event.target.value)} readOnly={isErpEdit} maxLength={128} className={`${inputClassName} ${isErpEdit ? 'cursor-not-allowed bg-slate-100 text-slate-500' : ''}`} placeholder="例如：法式方领连衣裙" />
+                {isErpEdit && <span className="mt-1 block text-[9px] text-slate-400">ERP 商品名称由同步数据维护，不允许手动修改</span>}
               </Field>
               <Field label="商品分类" className="sm:col-span-2">
                 <div className="relative">
@@ -267,16 +281,16 @@ export function ProductSpuFormDrawer({
                       {selectedCategories.map((item) => (
                         <span key={item.id} className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-[10px] font-bold text-primary">
                           {item.name}
-                          <button type="button" onClick={() => toggleCategory(item.id)} className="text-primary/60 hover:text-rose-600" aria-label={`移除${item.name}`}><X className="h-3 w-3" /></button>
+                          {!isErpEdit && <button type="button" onClick={() => toggleCategory(item.id)} className="text-primary/60 hover:text-rose-600" aria-label={`移除${item.name}`}><X className="h-3 w-3" /></button>}
                         </span>
                       ))}
                     </div>
                   )}
-                  <button type="button" onClick={() => setCategoryOpen((value) => !value)} className="flex h-9 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 text-left text-xs text-slate-600 hover:border-primary">
-                    {categoryOptions.length === 0 ? '加载分类中...' : '选择商品分类'}
+                  <button type="button" disabled={isErpEdit} onClick={() => setCategoryOpen((value) => !value)} className="flex h-9 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 text-left text-xs text-slate-600 hover:border-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
+                    {isErpEdit ? 'ERP 分类由同步数据维护' : categoryOptions.length === 0 ? '加载分类中...' : '选择商品分类'}
                     <ChevronDown className={`h-4 w-4 transition-transform ${categoryOpen ? 'rotate-180' : ''}`} />
                   </button>
-                  {categoryOpen && (
+                  {categoryOpen && !isErpEdit && (
                     <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-xl">
                       {categoryOptions.map((option) => (
                         <label key={option.id} className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50">
@@ -319,9 +333,11 @@ export function ProductSpuFormDrawer({
 
             <div className="overflow-hidden rounded-md border border-blue-100 bg-blue-50/25">
               <div className="flex items-center border-b border-blue-100 bg-blue-50/70 px-3 py-2.5">
-                <strong className="text-xs text-slate-800">SKU 1 · {color || '默认规格'}</strong>
+                <strong className="text-xs text-slate-800">SKU 1 · {initial?.specName || color || '默认规格'}</strong>
                 <span className="ml-2 rounded bg-white px-1.5 py-0.5 text-[9px] font-bold text-primary">SPU 封面</span>
-                <span className="ml-auto font-mono text-[9px] text-slate-400">{initial?.id ? `SKU-${initial.id}` : '保存后生成'}</span>
+                <span className="ml-auto font-mono text-[9px] text-slate-400">
+                  {initial?.id ? initial.skuCode || '暂无规格编码' : '保存后生成'}
+                </span>
               </div>
               <div className="grid gap-5 p-4 sm:grid-cols-[190px_minmax(0,1fr)]">
                 <div>
@@ -332,7 +348,13 @@ export function ProductSpuFormDrawer({
                     className="group relative grid aspect-[4/5] w-full place-items-center overflow-hidden rounded-md border border-dashed border-slate-300 bg-white hover:border-primary"
                   >
                     {imageRef ? (
-                      <img src={imageRef.thumbnailUrl ?? imageRef.originalUrl} alt={imageRef.name ?? 'SKU 图片'} className="h-full w-full object-contain p-3" />
+                      <img
+                        src={withCosThumbnail(imageRef.originalUrl ?? imageRef.thumbnailUrl, 360)
+                          ?? imageRef.thumbnailUrl
+                          ?? imageRef.originalUrl}
+                        alt={imageRef.name ?? 'SKU 图片'}
+                        className="h-full w-full object-contain p-3"
+                      />
                     ) : (
                       <span className="text-center text-slate-400">
                         <ImageIcon className="mx-auto h-6 w-6" />
@@ -356,7 +378,7 @@ export function ProductSpuFormDrawer({
                     <input value={color} onChange={(event) => setColor(event.target.value)} maxLength={500} className={inputClassName} placeholder="例如：酒红" />
                   </Field>
                   <Field label="规格">
-                    <input value={color || '默认规格'} readOnly className={`${inputClassName} bg-slate-50 text-slate-500`} title="当前接口尚无独立尺码字段" />
+                    <input value={initial?.specName || color || '默认规格'} readOnly className={`${inputClassName} bg-slate-50 text-slate-500`} title="ERP 规格名称为只读字段" />
                   </Field>
                   <Field label="图案 / 材质" className="sm:col-span-2">
                     <input value={patternMaterial} onChange={(event) => setPatternMaterial(event.target.value)} maxLength={500} className={inputClassName} placeholder="例如：纯色 · 醋酸混纺" />
@@ -371,7 +393,9 @@ export function ProductSpuFormDrawer({
         </main>
 
         <footer className="flex items-center gap-3 border-t border-slate-200 px-5 py-3">
-          <p className="min-w-0 flex-1 text-[10px] text-slate-400">1 个 SKU · 首个 SKU 图片自动作为 SPU 封面</p>
+          <p className="min-w-0 flex-1 text-[10px] text-slate-400">
+            {isErpEdit ? '保存到当前 ERP SKU · 不修改 ERP 商品名称与结构化分类' : '1 个 SKU · 首个 SKU 图片自动作为 SPU 封面'}
+          </p>
           <button type="button" onClick={() => void handleClose()} disabled={saving} className="h-9 rounded-md border border-slate-300 px-4 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40">取消</button>
           <button type="button" onClick={() => void handleSave()} disabled={saving} className="h-9 rounded-md bg-slate-900 px-4 text-xs font-bold text-white hover:bg-primary disabled:opacity-40">{saving ? '保存中...' : '保存产品'}</button>
         </footer>

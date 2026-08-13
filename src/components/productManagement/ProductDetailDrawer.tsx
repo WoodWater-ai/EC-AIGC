@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ChevronDown, Image as ImageIcon, Pencil, X } from 'lucide-react';
-import type { ProductDTO } from '../../api/modules/productInfo';
 import { withCosThumbnail } from '../../utils/cosImage';
 import {
   formatProductTime,
+  formatProductParameters,
   productSourceLabel,
   type ProductSkuView,
   type ProductSpuView,
@@ -13,7 +13,7 @@ interface ProductDetailDrawerProps {
   product: ProductSpuView | null;
   canEdit: boolean;
   onClose: () => void;
-  onEdit: (product: ProductDTO) => void;
+  onEdit: (product: ProductSpuView, sku: ProductSkuView) => void;
   onCreate: (sku: ProductSkuView) => void;
 }
 
@@ -90,13 +90,14 @@ export function ProductDetailDrawer({
               {product.code} · {categoryLabel} · {product.skus.length} 个 SKU
             </p>
           </div>
-          {canEdit && product.source === 'MANUAL' && (
+          {canEdit && (product.source === 'MANUAL' || selectedSku) && (
             <button
               type="button"
-              onClick={() => onEdit(product.raw)}
+              onClick={() => selectedSku && onEdit(product, selectedSku)}
+              disabled={!selectedSku}
               className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-600 hover:border-primary/30 hover:bg-blue-50 hover:text-primary"
-              title="编辑手动商品"
-              aria-label="编辑手动商品"
+              title={product.source === 'ERP' ? '补录当前 ERP SKU 信息' : '编辑手动商品'}
+              aria-label={product.source === 'ERP' ? '补录当前 ERP SKU 信息' : '编辑手动商品'}
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -164,8 +165,8 @@ export function ProductDetailDrawer({
                       <strong className="block truncate text-slate-800">{sku.name}</strong>
                       <span className="mt-0.5 block truncate font-mono text-[9px] text-slate-400">{sku.code}</span>
                     </span>
-                    <span className="min-w-0 truncate text-slate-500">
-                      {[sku.color, sku.patternMaterial].filter(Boolean).join(' · ') || '待补充'}
+                    <span className="min-w-0 truncate text-slate-500" title={formatProductParameters(sku)}>
+                      {formatProductParameters(sku)}
                     </span>
                     <span className={sku.materialCount > 0 ? 'text-emerald-700' : 'text-amber-700'}>
                       {sku.materialCount > 0 ? `${sku.materialCount} 张可用图` : '暂无图片'}

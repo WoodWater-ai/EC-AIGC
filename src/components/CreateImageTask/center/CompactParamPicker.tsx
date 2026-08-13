@@ -80,7 +80,7 @@ export const CompactParamPicker: React.FC<CompactParamPickerProps> = ({
         <div
           role="listbox"
           aria-label={label}
-          className="absolute left-0 z-40 mt-2 max-h-80 w-[240px] max-w-[min(240px,calc(100vw-32px))] overflow-y-auto rounded-md border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10"
+          className="absolute left-0 z-40 mt-2 max-h-80 w-[300px] max-w-[min(300px,calc(100vw-32px))] overflow-y-auto rounded-md border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10"
         >
           {options.map((option) => {
             const active = option.value === value;
@@ -102,11 +102,11 @@ export const CompactParamPicker: React.FC<CompactParamPickerProps> = ({
                   {icon}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-semibold text-slate-800">
+                  <span className="block whitespace-normal break-words text-xs font-semibold text-slate-800">
                     {option.label}
                   </span>
                   {option.description && (
-                    <span className="mt-0.5 block truncate text-[11px] text-slate-400">
+                    <span className="mt-0.5 block whitespace-normal break-all text-[11px] text-slate-400">
                       {option.description}
                     </span>
                   )}

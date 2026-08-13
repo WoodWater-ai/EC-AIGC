@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Globe, Lock, ChevronRight, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProductAsset } from '../types';
 import { assetApi, type AssetResourceItem, type AssetResourceQueryRequest } from '../api/modules/asset';
 import { ApiError } from '../api/error';
 import { productLibraryApi } from '../api/modules/productLibrary';
+import { productCategoryApi, type ProductCategoryNode } from '../api/modules/productCategory';
 import { assetCategoryApi, type AssetCategoryNode } from '../api/modules/assetCategory';
 import { modelProfileApi, type ModelProfileDTO } from '../api/modules/modelProfile';
 import {
@@ -163,14 +164,46 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [productSpus, setProductSpus] = useState<ProductSpuView[]>([]);
   const [productLoading, setProductLoading] = useState(false);
+  /**
+   * [v1.x 2026-08-13] 追加加载状态 —— 与 productLoading 分开
+   * 首次加载(pageNum=1)用 productLoading(覆盖整片 loading);
+   * 追加加载(pageNum>1)用 productAppending(只在底部显示,不破坏已渲染的列表)
+   * —— 否则追加时整片列表会因 productLoading=true 被"正在加载产品..."覆盖,视觉上"整个区域刷新"
+   */
+  const [productAppending, setProductAppending] = useState(false);
   const [productError, setProductError] = useState<Error | null>(null);
+  const [productAppendError, setProductAppendError] = useState<Error | null>(null);
+  /**
+   * [v1.x 2026-08-13] 产品素材 tab 无限滚动分页
+   * - productHasMore: 后端是否还有下一页(根据 total / pageSize 推算)
+   * - productTotal: 后端总产品数(用于「已加载 X / Y」展示)
+   * - productPageSize: 写死 50,5 列 × 10 行,滚一次 fetch 一次不至于太频繁
+   */
+  const [productHasMore, setProductHasMore] = useState(true);
+  const [productTotal, setProductTotal] = useState(0);
+  const productPageSize = 50;
+  /** 弹窗内滚动容器 ref(scroll event listener 挂在这里) */
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  /**
+   * 无限滚动同步状态。React state 更新存在一个渲染窗口，不能单独作为请求锁：
+   * - loadingVersion:同一查询版本只允许一个分页请求在途
+   * - queryVersion:筛选变化/进入详情时使旧请求结果立即失效
+   * - nextPage / hasMore:滚动事件同步读取，不依赖闭包中的旧 state
+   */
+  const productLoadingVersionRef = useRef<number | null>(null);
+  const productQueryVersionRef = useRef(0);
+  const productNextPageRef = useRef(1);
+  const productHasMoreRef = useRef(true);
   const [focusedProduct, setFocusedProduct] = useState<{
     spuName: string;
     productId: string;
     sku: ProductSkuView;
   } | null>(null);
   const [selectedProductSkuIds, setSelectedProductSkuIds] = useState<string[]>([]);
-  const [selectedProductCategory, setSelectedProductCategory] = useState<string | null>(null);
+  const [selectedProductCategoryId, setSelectedProductCategoryId] = useState<string | null>(null);
+  const [productCategoryTree, setProductCategoryTree] = useState<ProductCategoryNode[]>([]);
+  const [productCategoryTreeError, setProductCategoryTreeError] = useState<string | null>(null);
+  const [collapsedProductCategoryIds, setCollapsedProductCategoryIds] = useState<Set<string>>(new Set());
   const [primaryFilter, setPrimaryFilter] = useState<'all' | 'recent'>('all');
   const [openTagDimension, setOpenTagDimension] = useState<ResourceTagDimension | null>(null);
   const [selectedTagFilters, setSelectedTagFilters] = useState<Record<ResourceTagDimension, string[]>>({
@@ -295,32 +328,96 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, currentUserId, productId, selectedCategoryId, activeSource, mediaFilter, primaryFilter, focusedProduct]);
 
-  useEffect(() => {
-    if (activeSource !== 'PRODUCT' || focusedProduct) return;
-    let cancelled = false;
-    setProductLoading(true);
-    setProductError(null);
-    productLibraryApi.productPage({
-      pageNum: 1,
-      pageSize: 100,
-      keyword: searchQuery || undefined,
-      sortBy: 'latest',
-    }).then((page) => {
-      if (!cancelled) {
-        setProductSpus(page.list.map(toProductLibrarySpu));
-      }
-    }).catch((error: Error) => {
-      if (!cancelled) {
-        setProductError(error);
+  const loadProductPage = useCallback(async (pageNum: number, version: number) => {
+    if (productLoadingVersionRef.current !== null || !productHasMoreRef.current) return;
+    productLoadingVersionRef.current = version;
+    if (pageNum === 1) setProductLoading(true);
+    else setProductAppending(true);
+    setProductAppendError(null);
+    if (pageNum === 1) setProductError(null);
+    try {
+      const page = await productLibraryApi.productPage({
+        pageNum,
+        pageSize: productPageSize,
+        keyword: searchQuery || undefined,
+        productCategoryId: selectedProductCategoryId || undefined,
+        sortBy: 'latest',
+      });
+      if (version !== productQueryVersionRef.current) return;
+      const mapped = page.list.map(toProductLibrarySpu);
+      setProductSpus((current) => pageNum === 1 ? mapped : [
+        ...current,
+        ...mapped.filter((next) => !current.some((existing) => existing.id === next.id)),
+      ]);
+      const hasMore = pageNum < page.pages;
+      productHasMoreRef.current = hasMore;
+      productNextPageRef.current = pageNum + 1;
+      setProductHasMore(hasMore);
+      setProductTotal(page.total);
+    } catch (error) {
+      if (version !== productQueryVersionRef.current) return;
+      if (pageNum === 1) {
+        setProductError(error as Error);
         setProductSpus([]);
+      } else {
+        setProductAppendError(error as Error);
       }
-    }).finally(() => {
-      if (!cancelled) setProductLoading(false);
-    });
-    return () => {
-      cancelled = true;
+    } finally {
+      if (version === productQueryVersionRef.current) {
+        productLoadingVersionRef.current = null;
+        setProductLoading(false);
+        setProductAppending(false);
+      }
+    }
+  }, [searchQuery, selectedProductCategoryId]);
+
+  // 筛选变化时创建新的查询版本，清空旧列表并只请求第一页。
+  useEffect(() => {
+    productQueryVersionRef.current += 1;
+    const version = productQueryVersionRef.current;
+    productLoadingVersionRef.current = null;
+    productNextPageRef.current = 1;
+    productHasMoreRef.current = true;
+    setProductSpus([]);
+    setProductHasMore(true);
+    setProductTotal(0);
+    setProductError(null);
+    setProductAppendError(null);
+    setProductLoading(false);
+    setProductAppending(false);
+    if (activeSource !== 'PRODUCT' || focusedProduct) return;
+    scrollContainerRef.current?.scrollTo({ top: 0 });
+    void loadProductPage(1, version);
+  }, [activeSource, focusedProduct, loadProductPage]);
+
+  // 3. 无限滚动:scroll event 替代 IntersectionObserver
+  // 原因:sticky + IntersectionObserver 在 React 18 + 嵌套 overflow 链下不稳定,
+  //     哨兵被内容追加推到 viewport 外时 observer 不触发,死锁。
+  //     改用 scroll event 手动判断"距离底部 < 200px",完全绕开 sticky / observer。
+  // - passive: true 提升滚动性能
+  // - requestAnimationFrame 节流,每秒最多 60 次
+  // - 不在 mount 时立即调 handleScroll():productSpus 还在空,会立即误触 setPageNum
+  // - 标准无限滚动语义:user 滚一次 → 加载 1 页 → user 再滚 → 再加载 1 页
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    let ticking = false;
+    const handleScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        if (activeSource !== 'PRODUCT' || focusedProduct) return;
+        if (productLoadingVersionRef.current !== null || !productHasMoreRef.current) return;
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        if (scrollHeight - scrollTop - clientHeight < 200) {
+          void loadProductPage(productNextPageRef.current, productQueryVersionRef.current);
+        }
+      });
     };
-  }, [activeSource, focusedProduct, searchQuery]);
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [activeSource, focusedProduct, loadProductPage]);
 
   const handleSourceChange = (source: ResourceCenterSource) => {
     if (!allowedSources.includes(source)
@@ -332,6 +429,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setMergeDrawerItems(null);
     setSelectedCategoryId(null);
     setSelectedProductSkuIds([]);
+    setSelectedProductCategoryId(null);
     setFocusedProduct(null);
     setPrimaryFilter('all');
     setOpenTagDimension(null);
@@ -358,6 +456,24 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
         }
       }
     })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    productCategoryApi.tree()
+      .then((tree) => {
+        if (cancelled) return;
+        setProductCategoryTree(tree ?? []);
+        setProductCategoryTreeError(null);
+      })
+      .catch((error: Error) => {
+        if (cancelled) return;
+        setProductCategoryTree([]);
+        setProductCategoryTreeError(error.message);
+      });
     return () => {
       cancelled = true;
     };
@@ -392,14 +508,6 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
       .filter((sku) => selectedProductSkuIds.includes(sku.id))
       .map((sku) => ({ spu, sku })),
   );
-  const productCategories = Array.from(new Set(productSpus
-    .map((spu) => spu.category ?? spu.categories[0]?.categoryName)
-    .filter((value): value is string => Boolean(value))));
-  const visibleProductSpus = selectedProductCategory == null
-    ? productSpus
-    : productSpus.filter((spu) =>
-        (spu.category ?? spu.categories[0]?.categoryName) === selectedProductCategory,
-      );
   const selectedUploadProductId = selectedProductSkus.length === 1
     ? selectedProductSkus[0].sku.productId
     : undefined;
@@ -474,7 +582,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const handleClearSelection = () => {
     setSelectedAssetIds([]);
     setSelectedProductSkuIds([]);
-    setSelectedProductCategory(null);
+    setSelectedProductCategoryId(null);
     setMergeDrawerItems(null);
   };
 
@@ -1350,33 +1458,76 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             {activeSource === 'PRODUCT' && (
               <div className="flex flex-col gap-2">
                 <p className="text-[10px] font-extrabold text-slate-400 px-3 uppercase tracking-wider">
-                  产品素材
+                  产品分类
                 </p>
                 <button
                   type="button"
-                  onClick={() => setSelectedProductCategory(null)}
+                  onClick={() => setSelectedProductCategoryId(null)}
+                  disabled={focusedProduct !== null}
                   className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold ${
-                    selectedProductCategory == null ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-white'
-                  }`}
+                    selectedProductCategoryId == null ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-white'
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   <span className="material-symbols-outlined text-base">photo_library</span>
                   <span>全部产品</span>
                 </button>
-                {productCategories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => setSelectedProductCategory(category)}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[11px] font-bold ${
-                      selectedProductCategory === category ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-white'
-                    }`}
-                  >
-                    <span className="truncate">{category}</span>
-                    <span className="text-[9px] text-slate-400">{productSpus.filter((spu) => (spu.category ?? spu.categories[0]?.categoryName) === category).length}</span>
-                  </button>
-                ))}
+                {productCategoryTreeError && (
+                  <p className="px-3 text-[10px] leading-5 text-red-400">产品分类加载失败：{productCategoryTreeError}</p>
+                )}
+                {(() => {
+                  const renderProductCategory = (node: ProductCategoryNode, depth: number): React.ReactNode => {
+                    const nodeId = String(node.id);
+                    const selected = selectedProductCategoryId === nodeId;
+                    const hasChildren = Boolean(node.children?.length);
+                    const collapsed = collapsedProductCategoryIds.has(nodeId);
+                    return (
+                      <React.Fragment key={nodeId}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProductCategoryId(selected ? null : nodeId)}
+                          disabled={focusedProduct !== null}
+                          className={`flex w-full items-center gap-1 rounded-lg py-2 pr-3 text-left text-[11px] font-bold ${
+                            selected ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-white'
+                          } disabled:cursor-not-allowed disabled:opacity-50`}
+                          style={{ paddingLeft: `${12 + depth * 12}px` }}
+                        >
+                          {hasChildren ? (
+                            <span
+                              role="button"
+                              tabIndex={focusedProduct ? -1 : 0}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (focusedProduct) return;
+                                setCollapsedProductCategoryIds((current) => {
+                                  const next = new Set(current);
+                                  if (next.has(nodeId)) next.delete(nodeId);
+                                  else next.add(nodeId);
+                                  return next;
+                                });
+                              }}
+                              className="flex h-4 w-4 shrink-0 items-center justify-center text-slate-400"
+                              title={collapsed ? '展开' : '折叠'}
+                            >
+                              {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                            </span>
+                          ) : (
+                            <span className="h-4 w-4 shrink-0" />
+                          )}
+                          <span className="material-symbols-outlined shrink-0 text-sm">
+                            {depth === 0 ? 'folder' : 'subdirectory_arrow_right'}
+                          </span>
+                          <span className="truncate">{node.categoryName}</span>
+                        </button>
+                        {!collapsed && node.children?.map((child) => renderProductCategory(child, depth + 1))}
+                      </React.Fragment>
+                    );
+                  };
+                  return productCategoryTree.map((node) => renderProductCategory(node, 0));
+                })()}
                 <p className="px-3 pt-2 text-[10px] leading-5 text-slate-400">
-                  先按 SKU 选择产品，再查看其图片或视频素材。
+                  {focusedProduct
+                    ? '当前正在查看 SKU 素材，产品分类筛选暂不生效。'
+                    : '按产品分类筛选产品，再选择 SKU 查看其图片或视频素材。'}
                 </p>
               </div>
             )}
@@ -1629,7 +1780,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
             )}
 
             {/* Scrollable grid area */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6">
               {activeSource === 'PRODUCT' && !focusedProduct ? (
                 <div className="space-y-6">
                   {productLoading && (
@@ -1692,8 +1843,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                         </article>
                       );
                     };
-                    const multiSpec = visibleProductSpus.filter((spu) => spu.skus.length > 1);
-                    const singleSpec = visibleProductSpus.filter((spu) => spu.skus.length === 1);
+                    const multiSpec = productSpus.filter((spu) => spu.skus.length > 1);
+                    const singleSpec = productSpus.filter((spu) => spu.skus.length === 1);
                     return (
                       <>
                         {multiSpec.map((spu) => (
@@ -1718,8 +1869,38 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                             </div>
                           </section>
                         )}
-                        {visibleProductSpus.length === 0 && (
+                        {productSpus.length === 0 && (
                           <div className="py-16 text-center text-xs font-bold text-slate-400">暂无符合条件的产品</div>
+                        )}
+                        {productSpus.length > 0 && (
+                          <>
+                            {productAppending && (
+                              <div className="flex items-center justify-center border-t border-slate-100 bg-white py-3 text-xs font-bold text-slate-400">
+                                <span className="material-symbols-outlined mr-2 animate-spin text-base">progress_activity</span>
+                                正在加载更多产品...
+                              </div>
+                            )}
+                            {!productAppending && productAppendError && productHasMore && (
+                              <div className="flex items-center justify-center gap-3 border-t border-red-100 bg-red-50/70 py-3 text-xs font-bold text-red-500">
+                                <span>加载更多失败：{productAppendError.message}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => void loadProductPage(
+                                    productNextPageRef.current,
+                                    productQueryVersionRef.current,
+                                  )}
+                                  className="rounded-md border border-red-200 bg-white px-3 py-1 text-[11px] text-red-600 hover:bg-red-50"
+                                >
+                                  重试
+                                </button>
+                              </div>
+                            )}
+                            {!productAppending && !productHasMore && (
+                              <div className="border-t border-slate-100 bg-white py-3 text-center text-xs font-bold text-slate-400">
+                                — 已经到底了 —(共 {productTotal} 个产品)
+                              </div>
+                            )}
+                          </>
                         )}
                       </>
                     );

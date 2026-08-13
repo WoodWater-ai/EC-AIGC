@@ -126,6 +126,8 @@ export interface ProductLibraryProductQuery {
   pageSize: number;
   keyword?: string;
   category?: string;
+  /** 结构化产品分类 ID；仅作用于产品列表。 */
+  productCategoryId?: string;
   status?: string;
   sortBy?: 'latest' | 'score' | 'cost';
 }

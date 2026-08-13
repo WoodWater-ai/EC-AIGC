@@ -143,12 +143,19 @@ export interface ProductIdReq {
   id: string;
 }
 
+export interface ProductManagementDetailReq extends ProductIdReq {
+  sourceType: 'MANUAL' | 'ERP';
+}
+
 export const productInfoApi = {
   list: (req: ProductQueryReq) =>
     http.post<PageInfo<ProductDTO>>('/v1/admin/product-info/list', req),
 
   managementList: (req: ProductQueryReq) =>
     http.post<PageInfo<ProductDTO>>('/v1/admin/product-info/management-list', req),
+
+  managementDetail: (req: ProductManagementDetailReq) =>
+    http.post<ProductDTO>('/v1/admin/product-info/management-detail', req),
 
   add: (req: ProductAddReq) =>
     http.post<string>('/v1/admin/product-info/add', req),

@@ -289,7 +289,6 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
   // Checkbox states for batch operations in Table View
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [onlyShowPending, setOnlyShowPending] = useState(false);
-
   const apiStatus: ProductLibraryDisplayStatus | undefined = onlyShowPending
     ? 'PENDING_REVIEW_SCORE'
     : selectedStatus === '生成中' ? 'GENERATING'
@@ -325,7 +324,6 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
       pageNum: assetPageNum,
       pageSize: assetPageSize,
       keyword: searchQuery || undefined,
-      category: selectedCategory === '全部品类' ? undefined : selectedCategory,
       mediaType: selectedAssetType === '图片' ? 'IMAGE' : selectedAssetType === '视频' ? 'VIDEO' : undefined,
       archivedOnly: selectedAssetType === '废弃' || undefined,
       taskType: selectedTaskType === '全部任务' ? undefined : selectedTaskType,
@@ -340,7 +338,6 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
       searchQuery,
       assetPageNum,
       assetPageSize,
-      selectedCategory,
       selectedAssetType,
       selectedTaskType,
       selectedStyle,
@@ -361,8 +358,8 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
     () => new Map((productPageQuery.data?.list ?? []).map((product) => [product.id, product])),
     [productPageQuery.data],
   );
-  const categoryOptions = useMemo(
-    () => Array.from(new Set(products.map((product) => product.category).filter(Boolean))),
+  const categories = useMemo(
+    () => ['全部品类', ...Array.from(new Set(products.map((product) => product.category).filter(Boolean)))],
     [products],
   );
 
@@ -371,13 +368,13 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
     setProductPageNum(1);
   }, [
     searchQuery,
-    selectedCategory,
     selectedAssetType,
     selectedTaskType,
     selectedStyle,
     selectedScene,
     selectedChannel,
     selectedStatus,
+    selectedCategory,
     onlyShowPending,
     sortBy,
   ]);
@@ -502,12 +499,9 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
         if (!matchesName && !matchesSku) return false;
       }
 
-      // 2. Category Filter
-      if (selectedCategory !== '全部品类') {
-        if (asset.category !== selectedCategory) return false;
-      }
+      if (selectedCategory !== '全部品类' && asset.category !== selectedCategory) return false;
 
-      // 3. Asset Type Filter (from subtabs & segmented controls)
+      // 2. Asset Type Filter (from subtabs & segmented controls)
       if (selectedAssetType === '图片' && asset.type !== '图片') return false;
       if (selectedAssetType === '视频' && asset.type !== '视频') return false;
       if (selectedAssetType === '废弃' && !isDiscardedAsset(asset)) return false;
@@ -733,8 +727,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 text-xs px-3 py-2 rounded-lg text-slate-700"
             >
-              <option value="全部品类">全部品类</option>
-              {categoryOptions.map((category) => (
+              {categories.map((category) => (
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>

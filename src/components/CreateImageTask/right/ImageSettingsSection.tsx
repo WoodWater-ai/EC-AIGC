@@ -88,15 +88,14 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
     };
   }, [inlineFields, tp.schema]);
   const modelOptions = useMemo(() => {
-    const options = [tp.effectiveModelCode, tp.defaultModelCode, ...tp.modelOptionsInGroup]
-      .map((value) => value?.trim())
-      .filter((value): value is string => Boolean(value));
-    return [...new Set(options)].map((value) => ({
-      value,
-      label: value,
-      description: value === tp.defaultModelCode ? '当前通道默认模型' : '可用供应商模型',
+    return tp.modelOptions.map((option) => ({
+      value: option.modelCode,
+      label: option.displayName,
+      description: option.isDefault
+        ? `当前通道默认模型 · ${option.modelCode}`
+        : option.modelCode,
     }));
-  }, [tp.defaultModelCode, tp.effectiveModelCode, tp.modelOptionsInGroup]);
+  }, [tp.modelOptions]);
   const hasAdvancedSettings = viduInstances.length > 1 || Boolean(advancedSchema?.fields.length);
 
   return (
@@ -121,7 +120,7 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
         options={modelOptions}
         disabled={tp.locked || !tp.capability}
         placeholder="未配置模型"
-        widthClassName="w-[152px]"
+        widthClassName="w-[220px] max-w-full flex-none"
         icon={<Box className="h-4 w-4" />}
         onChange={(value) => tp.setModelId(value === tp.defaultModelCode ? null : value)}
       />
@@ -140,7 +139,9 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
             value={String(tp.schemaParams[field.key] ?? '')}
             options={options}
             disabled={tp.locked}
-            widthClassName={field.key === 'aspect_ratio' ? 'w-[132px]' : 'w-[148px]'}
+            widthClassName={field.key === 'aspect_ratio'
+              ? 'w-[150px] max-w-full flex-none'
+              : 'w-[168px] max-w-full flex-none'}
             icon={fieldIcon(field)}
             onChange={(value) => tp.setSchemaParams({ ...tp.schemaParams, [field.key]: value })}
           />
@@ -170,7 +171,7 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
               </select>
             </label>
             {advancedSchema && advancedSchema.fields.length > 0 && (
-              <div className="[&_.param-schema-form]:grid [&_.param-schema-form]:grid-cols-2 [&_.param-schema-form]:gap-2 [&_.param-field]:min-w-0 [&_.param-field_label]:mb-1 [&_.param-field_label]:block [&_.param-field_label]:text-[9px] [&_.param-field_label]:font-bold [&_.param-field_label]:text-slate-400 [&_.param-field_select]:h-8 [&_.param-field_select]:rounded-md [&_.param-field_select]:text-[10px]">
+              <div className="[&_.param-schema-form]:grid [&_.param-schema-form]:grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] [&_.param-schema-form]:gap-2 [&_.param-field]:min-w-0 [&_.param-field_label]:mb-1 [&_.param-field_label]:block [&_.param-field_label]:text-[9px] [&_.param-field_label]:font-bold [&_.param-field_label]:text-slate-400 [&_.param-field_select]:h-8 [&_.param-field_select]:rounded-md [&_.param-field_select]:text-[10px]">
                 <ParamSchemaForm
                   schema={advancedSchema}
                   value={tp.schemaParams}

@@ -1,8 +1,14 @@
 import http from '../client';
 import type { PageInfo } from '../service-result';
 
-export type WdgjSyncTaskType = 'CATEGORY' | 'PRODUCT';
-export type WdgjSyncMode = 'FULL' | 'INCREMENTAL';
+export type WdgjSyncTaskType =
+  | 'CATEGORY'
+  | 'PRODUCT'
+  | 'PRODUCT_CATEGORY_MIGRATION'
+  | 'PRODUCT_SNAPSHOT_MIGRATION';
+export type WdgjSyncMode = 'FULL' | 'INCREMENTAL' | 'LOCAL';
+export type WdgjSyncTriggerTaskType = 'CATEGORY' | 'PRODUCT';
+export type WdgjSyncTriggerMode = 'FULL' | 'INCREMENTAL';
 export type WdgjSyncStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
 
 export interface WdgjSyncTaskDTO {
@@ -19,6 +25,7 @@ export interface WdgjSyncTaskDTO {
   startedTime?: string;
   finishedTime?: string;
   failReason?: string;
+  taskContextText?: string;
   createTime?: string;
 }
 
@@ -50,8 +57,12 @@ export interface WdgjImageTransferTaskDTO {
 }
 
 export const wdgjSyncApi = {
-  trigger: (taskType: WdgjSyncTaskType, syncMode?: WdgjSyncMode) =>
+  trigger: (taskType: WdgjSyncTriggerTaskType, syncMode?: WdgjSyncTriggerMode) =>
     http.post<string>('/v1/admin/wdgj/sync/trigger', { taskType, syncMode }),
+  migrateProductCategories: () =>
+    http.post<string>('/v1/admin/wdgj/sync/product-category-migrate'),
+  migrateProductSnapshots: () =>
+    http.post<string>('/v1/admin/wdgj/sync/product-snapshot-migrate'),
   status: (request: WdgjSyncStatusRequest) =>
     http.post<PageInfo<WdgjSyncTaskDTO>>('/v1/admin/wdgj/sync/status', request),
   detail: (id: string) =>

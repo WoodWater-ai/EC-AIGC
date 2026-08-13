@@ -247,14 +247,19 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
             >
               <option value="">
                 {tp.defaultModelCode
-                  ? `默认模型 (${tp.defaultModelCode})`
+                  ? `默认模型 (${tp.modelOptions.find((option) =>
+                    option.modelCode === tp.defaultModelCode)?.displayName ?? tp.defaultModelCode})`
                   : '未配置默认模型，请选择'}
               </option>
-              {tp.modelOptionsInGroup.map((modelCode) => (
-                <option key={modelCode} value={modelCode}>{modelCode}</option>
-              ))}
+              {tp.modelOptions
+                .filter((option) => option.modelCode !== tp.defaultModelCode)
+                .map((option) => (
+                  <option key={option.modelCode} value={option.modelCode}>
+                    {option.displayName}
+                  </option>
+                ))}
             </select>
-            {tp.modelOptionsInGroup.length > 0 && (
+            {tp.modelOptions.length > 0 && (
               <p className="mt-1 text-[10px] text-slate-400">
                 默认值来自系统配置，也可切换为该能力目录中的其他模型。
               </p>
@@ -285,7 +290,7 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
       {/* ③ schema 差异区 */}
       {tp.schema && (
         <div className={presentation === 'videoDemo'
-          ? '[&_.param-schema-form]:grid [&_.param-schema-form]:grid-cols-2 [&_.param-schema-form]:gap-x-3 [&_.param-schema-form]:gap-y-3 [&_.param-field]:min-w-0 [&_.param-field_label]:mb-1.5 [&_.param-field_label]:block [&_.param-field_label]:text-xs [&_.param-field_label]:font-bold [&_.param-field_label]:text-slate-700'
+          ? '[&_.param-schema-form]:grid [&_.param-schema-form]:grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] [&_.param-schema-form]:gap-x-3 [&_.param-schema-form]:gap-y-3 [&_.param-field]:min-w-0 [&_.param-field_label]:mb-1.5 [&_.param-field_label]:block [&_.param-field_label]:text-xs [&_.param-field_label]:font-bold [&_.param-field_label]:text-slate-700'
           : ''}>
           <label className="block text-xs font-bold text-slate-700 mb-2">能力参数</label>
           {presentation === 'videoDemo' && basicSchema ? (
@@ -297,7 +302,7 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
                 recommendValues={tp.recommendValues}
               />
               {advancedSchema && advancedSchema.fields.length > 0 && (
-                <details className="col-span-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                <details className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
                   <summary className="cursor-pointer text-xs font-bold text-slate-700">
                     高级参数
                   </summary>
