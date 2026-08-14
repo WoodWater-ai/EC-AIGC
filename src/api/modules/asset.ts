@@ -73,6 +73,8 @@ export interface AssetResourceCreateRequest {
   assetKind?: 'IMAGE' | 'VIDEO';
   assetType?: string;
   productId?: string | number;  // accepts snowflake ID as string (precision-safe) OR legacy number
+  /** 一份素材同时加入多个 SKU；后端以关联表保存，不重复上传 COS 文件。 */
+  productIds?: string[];
   recognitionId?: string;
   description?: string;
   tags?: string;

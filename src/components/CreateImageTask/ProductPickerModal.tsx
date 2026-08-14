@@ -14,12 +14,14 @@ export interface ProductPickerModalProps {
   onClose: () => void;
   onPick: (product: ProductDTO) => void;
   onCreate?: () => void;
+  /** 创建任务时要求 SKU 可创作；关联素材时可关闭，允许选择暂无素材的 SKU。 */
+  requireCreatable?: boolean;
 }
 
 const PAGE_SIZE = 20;
 
 /**
- * 选择产品 modal — 从产品管理表里选一条,回调 onPick(product) 给父容器
+ * 选择 SKU modal — product 表一行对应一个 SKU,回调 onPick(product) 给父容器
  *
  * 设计要点:
  * - 复用 productInfoApi.list,简化版表格(缩略图 + name + 品类 + status)
@@ -27,7 +29,13 @@ const PAGE_SIZE = 20;
  * - 单页 20 条,翻页器用 button 简单 prev/next
  * - 选中行后调 onPick(product) 并自动 onClose
  */
-export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({ open, onClose, onPick, onCreate }) => {
+export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({
+  open,
+  onClose,
+  onPick,
+  onCreate,
+  requireCreatable = true,
+}) => {
   // 搜索栏:输入态(draftKeyword)与触发态(appliedKeyword)分离,只有点"搜索"
   // 或回车 Enter 才提交到 appliedKeyword 触发 fetch;重置按钮清空两个 + 触发 fetch。
   const [draftKeyword, setDraftKeyword] = useState('');
@@ -114,8 +122,8 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({ open, on
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
               <div>
-                <p className="text-[11px] font-bold text-primary">产品库</p>
-                <h2 className="text-base font-black text-slate-800">选择产品</h2>
+                <p className="text-[11px] font-bold text-primary">产品库 · SKU</p>
+                <h2 className="text-base font-black text-slate-800">选择 SKU</h2>
               </div>
               <button
                 type="button"
@@ -133,7 +141,7 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({ open, on
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
                 <input
                   type="text"
-                  placeholder="搜索产品名称"
+                  placeholder="搜索商品名称、规格或 SKU 编码"
                   value={draftKeyword}
                   onChange={(e) => setDraftKeyword(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -174,7 +182,7 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({ open, on
                 </button>
               )}
               <span className="text-xs text-slate-500">
-                共 {pageInfo?.total ?? 0} 个
+                共 {pageInfo?.total ?? 0} 个 SKU
               </span>
             </div>
 
@@ -196,10 +204,17 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({ open, on
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => { if (p.canCreate !== false) { onPick(p); onClose(); } }}
-                      disabled={p.canCreate === false}
+                      onClick={() => {
+                        if (!requireCreatable || p.canCreate !== false) {
+                          onPick(p);
+                          onClose();
+                        }
+                      }}
+                      disabled={requireCreatable && p.canCreate === false}
                       className="group text-left bg-white border border-slate-200 rounded-lg overflow-hidden hover:border-primary hover:shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-55"
-                      title={p.canCreate === false ? (p.unavailableReason || '当前产品暂不可创作') : `选择 ${p.name}`}
+                      title={requireCreatable && p.canCreate === false
+                        ? (p.unavailableReason || '当前 SKU 暂不可创作')
+                        : `选择 ${p.name}`}
                     >
                       <div className="aspect-square relative bg-slate-100 overflow-hidden">
                         <AssetImage
@@ -211,6 +226,12 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({ open, on
                       </div>
                       <div className="p-3">
                         <p className="text-xs font-bold text-slate-800 truncate" title={p.name}>{p.name}</p>
+                        <p
+                          className="mt-1 truncate text-[10px] font-medium text-slate-500"
+                          title={[p.specName, p.skuCode].filter(Boolean).join(' · ')}
+                        >
+                          {[p.specName, p.skuCode].filter(Boolean).join(' · ') || '默认规格'}
+                        </p>
                         <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
                           <span className="truncate">{p.category ?? '未分类'}</span>
                           <span className={

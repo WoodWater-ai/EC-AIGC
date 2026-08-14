@@ -16,8 +16,8 @@ interface CompositePreview {
 interface ResourceMergeDrawerProps {
   items: AssetResourceItem[];
   categoryId?: number;
-  /** 合成素材只归属一个目标 SKU，避免一条资源被多头关联。 */
-  productId?: string;
+  /** 合成素材可同时加入多个目标 SKU，共享同一份 COS 文件。 */
+  productIds?: string[];
   onClose: () => void;
   onUploaded: () => void | Promise<void>;
 }
@@ -31,10 +31,15 @@ const defaultResourceName = () => {
 export function ResourceMergeDrawer({
   items,
   categoryId,
-  productId,
+  productIds = [],
   onClose,
   onUploaded,
 }: ResourceMergeDrawerProps) {
+  const targetProductIds = useMemo(
+    () => Array.from(new Set(productIds.filter(Boolean))),
+    [productIds],
+  );
+  const primaryProductId = targetProductIds[0];
   const [orderedItems, setOrderedItems] = useState(items);
   const [direction, setDirection] = useState<MergeDirection>('HORIZONTAL');
   const [resourceName, setResourceName] = useState(defaultResourceName);
@@ -43,8 +48,8 @@ export function ResourceMergeDrawer({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { upload, progress, error: uploadError, reset: resetUpload } = useFileUpload({
-    purpose: productId ? 'PRODUCT' : 'UP_DOWN_MERGE',
-    productId,
+    purpose: primaryProductId ? 'PRODUCT' : 'UP_DOWN_MERGE',
+    productId: primaryProductId,
   });
 
   const usableUrls = useMemo(
@@ -127,13 +132,16 @@ export function ResourceMergeDrawer({
         fileMd5,
         name,
         assetKind: 'IMAGE',
-        assetType: 'PRODUCT_ORIGINAL',
+        assetType: targetProductIds.length > 1 ? 'ITEM' : 'PRODUCT_ORIGINAL',
         description: `${orderedItems.length} 张图片${direction === 'VERTICAL' ? '上下' : '左右'}合成`,
         tags: `合并套图,${direction === 'VERTICAL' ? '上下合成' : '左右合成'}`,
-        productId,
+        productId: primaryProductId,
+        productIds: targetProductIds.length > 1 ? targetProductIds : undefined,
         categoryIds: categoryId == null ? undefined : [String(categoryId)],
       });
-      toast.success('合并套图已上传到资源中心');
+      toast.success(targetProductIds.length > 1
+        ? `合并套图已分别加入 ${targetProductIds.length} 个 SKU 素材`
+        : '合并套图已上传到资源中心');
       await onUploaded();
     } catch (err) {
       setError(`上传失败：${(err as Error).message ?? '未知错误'}`);
@@ -158,7 +166,10 @@ export function ResourceMergeDrawer({
           <div>
             <h2 id="resource-merge-title" className="text-base font-extrabold text-slate-800">合并图片</h2>
             <p className="mt-1 text-[11px] leading-5 text-slate-500">
-              按编号顺序拼接 {orderedItems.length} 张图片，生成预览后上传到资源中心。
+              按编号顺序拼接 {orderedItems.length} 张图片，生成预览后
+              {targetProductIds.length > 1
+                ? `分别加入 ${targetProductIds.length} 个 SKU 素材。`
+                : '上传到资源中心。'}
             </p>
           </div>
           <button
@@ -303,7 +314,11 @@ export function ResourceMergeDrawer({
               disabled={!preview || !resourceName.trim() || busy}
               className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {isUploading ? `上传中 ${progress}%` : '上传到资源中心'}
+              {isUploading
+                ? `上传中 ${progress}%`
+                : targetProductIds.length > 1
+                  ? `合并并加入 ${targetProductIds.length} 个 SKU`
+                  : '上传到资源中心'}
             </button>
           </div>
         </footer>
