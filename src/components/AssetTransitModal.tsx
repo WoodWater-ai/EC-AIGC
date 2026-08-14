@@ -251,10 +251,11 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   // 视图分类 → 后端 query 参数映射
   // 仅由 selectedCategoryId 决定:无选中 = 全部,选中 = 后端 categoryId 过滤
   // manager mode(资源中心全局)不过滤 kind,显示所有;picker mode 按 assetKind 过滤
-  const buildQuery = (): AssetResourceQueryRequest => {
+  const assetPageSize = 50;
+  const buildQuery = useCallback((pageNum: number): AssetResourceQueryRequest => {
     const base: AssetResourceQueryRequest = {
-      pageNum: 1,
-      pageSize: 100,
+      pageNum,
+      pageSize: assetPageSize,
     };
     if (mediaFilter !== 'ALL') {
       base.assetKind = mediaFilter;
@@ -268,65 +269,142 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
       return { ...base, categoryId: selectedCategoryId };
     }
     return base;
-  };
+  }, [mediaFilter, primaryFilter, selectedCategoryId]);
 
   // 当前页数据 + 刷新方法
   const [assets, setAssets] = useState<TransitAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [queryError, setQueryError] = useState<Error | null>(null);
+  const [assetAppending, setAssetAppending] = useState(false);
+  const [assetHasMore, setAssetHasMore] = useState(true);
+  const [assetTotal, setAssetTotal] = useState(0);
+  const [assetAppendError, setAssetAppendError] = useState<Error | null>(null);
+  const assetLoadingVersionRef = useRef<number | null>(null);
+  const assetQueryVersionRef = useRef(0);
+  const assetNextPageRef = useRef(1);
+  const assetHasMoreRef = useRef(true);
 
-  const refetch = async () => {
-    setLoading(true);
-    setQueryError(null);
+  const loadPagedAssets = useCallback(async (pageNum: number, version: number) => {
+    if (!['UPLOAD', 'MODEL'].includes(activeSource)) return;
+    if (assetLoadingVersionRef.current !== null || !assetHasMoreRef.current) return;
+    assetLoadingVersionRef.current = version;
+    if (pageNum === 1) setLoading(true);
+    else setAssetAppending(true);
+    setAssetAppendError(null);
+    if (pageNum === 1) setQueryError(null);
     try {
+      let pageCount = 0;
+      let reportedTotal = 0;
       if (activeSource === 'MODEL') {
         const page = await modelProfileApi.page({
-          pageNum: 1,
-          pageSize: 100,
+          pageNum,
+          pageSize: assetPageSize,
           keyword: searchQuery || undefined,
           status: 'active',
         });
-        setAssets(page.list
+        const mapped = page.list
           .filter((profile) => Boolean(profile.assetResourceId && profile.image))
-          .map(modelProfileToTransitAsset));
-      } else if (activeSource === 'PRODUCT') {
-        if (!focusedProduct) {
-          setAssets([]);
-          return;
-        }
-        const detail = await productLibraryApi.productDetail(focusedProduct.productId);
-        const recentThreshold = primaryFilter === 'recent'
-          ? Date.now() - 30 * 24 * 60 * 60 * 1000
-          : null;
-        const keyword = searchQuery.trim().toLowerCase();
-        setAssets(buildProductDetailAssets(detail, mediaFilter).filter((asset) => {
-          if (recentThreshold !== null) {
-            const createdAt = asset.createTime ? new Date(asset.createTime).getTime() : 0;
-            if (!createdAt || createdAt < recentThreshold) return false;
-          }
-          if (!keyword) return true;
-          return [asset.name, asset.description, asset.tags]
-            .filter(Boolean)
-            .some((value) => value!.toLowerCase().includes(keyword));
-        }));
+          .map(modelProfileToTransitAsset);
+        if (version !== assetQueryVersionRef.current) return;
+        setAssets((current) => pageNum === 1 ? mapped : [
+          ...current,
+          ...mapped.filter((next) => !current.some((existing) => existing.id === next.id)),
+        ]);
+        pageCount = page.pages;
+        reportedTotal = page.total;
       } else {
-        const query = { ...buildQuery(), keyword: searchQuery || undefined };
-        const page = await assetApi.page(query);
-        setAssets(page.list);
+        const page = await assetApi.page({
+          ...buildQuery(pageNum),
+          keyword: searchQuery || undefined,
+        });
+        if (version !== assetQueryVersionRef.current) return;
+        setAssets((current) => pageNum === 1 ? page.list : [
+          ...current,
+          ...page.list.filter((next) => !current.some((existing) => existing.id === next.id)),
+        ]);
+        pageCount = page.pages;
+        reportedTotal = page.total;
       }
-    } catch (err) {
-      setQueryError(err as Error);
-      setAssets([]);
+      if (version !== assetQueryVersionRef.current) return;
+      const hasMore = pageNum < pageCount;
+      assetHasMoreRef.current = hasMore;
+      assetNextPageRef.current = pageNum + 1;
+      setAssetHasMore(hasMore);
+      setAssetTotal(reportedTotal);
+    } catch (error) {
+      if (version !== assetQueryVersionRef.current) return;
+      if (pageNum === 1) {
+        setQueryError(error as Error);
+        setAssets([]);
+      } else {
+        setAssetAppendError(error as Error);
+      }
     } finally {
-      setLoading(false);
+      if (version === assetQueryVersionRef.current) {
+        assetLoadingVersionRef.current = null;
+        setLoading(false);
+        setAssetAppending(false);
+      }
     }
-  };
+  }, [activeSource, buildQuery, searchQuery]);
 
-  // 触发刷新:searchQuery / currentUserId / productId / selectedCategoryId 任一变化都重发请求
+  const refetch = useCallback(async () => {
+    assetQueryVersionRef.current += 1;
+    const version = assetQueryVersionRef.current;
+    assetLoadingVersionRef.current = null;
+    assetNextPageRef.current = 1;
+    assetHasMoreRef.current = true;
+    setAssets([]);
+    setLoading(false);
+    setAssetAppending(false);
+    setAssetHasMore(true);
+    setAssetTotal(0);
+    setQueryError(null);
+    setAssetAppendError(null);
+
+    if (activeSource === 'UPLOAD' || activeSource === 'MODEL') {
+      await loadPagedAssets(1, version);
+      return;
+    }
+    assetHasMoreRef.current = false;
+    setAssetHasMore(false);
+    if (!focusedProduct) return;
+
+    assetLoadingVersionRef.current = version;
+    setLoading(true);
+    try {
+      const detail = await productLibraryApi.productDetail(focusedProduct.productId);
+      if (version !== assetQueryVersionRef.current) return;
+      const recentThreshold = primaryFilter === 'recent'
+        ? Date.now() - 30 * 24 * 60 * 60 * 1000
+        : null;
+      const keyword = searchQuery.trim().toLowerCase();
+      const nextAssets = buildProductDetailAssets(detail, mediaFilter).filter((asset) => {
+        if (recentThreshold !== null) {
+          const createdAt = asset.createTime ? new Date(asset.createTime).getTime() : 0;
+          if (!createdAt || createdAt < recentThreshold) return false;
+        }
+        if (!keyword) return true;
+        return [asset.name, asset.description, asset.tags]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(keyword));
+      });
+      setAssets(nextAssets);
+      setAssetTotal(nextAssets.length);
+    } catch (error) {
+      if (version !== assetQueryVersionRef.current) return;
+      setQueryError(error as Error);
+    } finally {
+      if (version === assetQueryVersionRef.current) {
+        assetLoadingVersionRef.current = null;
+        setLoading(false);
+      }
+    }
+  }, [activeSource, focusedProduct, loadPagedAssets, mediaFilter, primaryFilter, searchQuery]);
+
   useEffect(() => {
-    refetch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, currentUserId, productId, selectedCategoryId, activeSource, mediaFilter, primaryFilter, focusedProduct]);
+    void refetch();
+  }, [refetch]);
 
   const loadProductPage = useCallback(async (pageNum: number, version: number) => {
     if (productLoadingVersionRef.current !== null || !productHasMoreRef.current) return;
@@ -390,7 +468,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     void loadProductPage(1, version);
   }, [activeSource, focusedProduct, loadProductPage]);
 
-  // 3. 无限滚动:scroll event 替代 IntersectionObserver
+  // 资源中心三个列表共用同一个滚动容器，按当前 tab 分发下一页请求。
   // 原因:sticky + IntersectionObserver 在 React 18 + 嵌套 overflow 链下不稳定,
   //     哨兵被内容追加推到 viewport 外时 observer 不触发,死锁。
   //     改用 scroll event 手动判断"距离底部 < 200px",完全绕开 sticky / observer。
@@ -407,17 +485,22 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
-        if (activeSource !== 'PRODUCT' || focusedProduct) return;
-        if (productLoadingVersionRef.current !== null || !productHasMoreRef.current) return;
         const { scrollTop, scrollHeight, clientHeight } = container;
-        if (scrollHeight - scrollTop - clientHeight < 200) {
+        if (scrollHeight - scrollTop - clientHeight >= 200) return;
+        if (activeSource === 'PRODUCT' && !focusedProduct) {
+          if (productLoadingVersionRef.current !== null || !productHasMoreRef.current) return;
           void loadProductPage(productNextPageRef.current, productQueryVersionRef.current);
+          return;
+        }
+        if (activeSource === 'UPLOAD' || activeSource === 'MODEL') {
+          if (assetLoadingVersionRef.current !== null || !assetHasMoreRef.current) return;
+          void loadPagedAssets(assetNextPageRef.current, assetQueryVersionRef.current);
         }
       });
     };
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [activeSource, focusedProduct, loadProductPage]);
+  }, [activeSource, focusedProduct, loadPagedAssets, loadProductPage]);
 
   const handleSourceChange = (source: ResourceCenterSource) => {
     if (!allowedSources.includes(source)
@@ -503,6 +586,26 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
       return selected.length === 0 || selected.some((tag) => assetTags.includes(tag));
     });
   });
+  // 通用素材存在“本人且未关联”等前端二次过滤；若一页过滤后不足一屏，自动补下一页。
+  useEffect(() => {
+    if (!['UPLOAD', 'MODEL'].includes(activeSource)
+      || loading
+      || assetAppending
+      || queryError
+      || !assetHasMore) return;
+    const container = scrollContainerRef.current;
+    if (!container || container.scrollHeight > container.clientHeight + 1) return;
+    void loadPagedAssets(assetNextPageRef.current, assetQueryVersionRef.current);
+  }, [
+    activeSource,
+    assetAppending,
+    assetHasMore,
+    assets.length,
+    filteredAssets.length,
+    loadPagedAssets,
+    loading,
+    queryError,
+  ]);
   const selectedProductSkus = productSpus.flatMap((spu) =>
     spu.skus
       .filter((sku) => selectedProductSkuIds.includes(sku.id))
@@ -2029,6 +2132,37 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                     );
                   });
                 })()}
+
+                {!loading && !queryError && (activeSource === 'UPLOAD' || activeSource === 'MODEL') && (
+                  <div className="col-span-full">
+                    {assetAppending && (
+                      <div className="flex items-center justify-center border-t border-slate-100 bg-white py-3 text-xs font-bold text-slate-400">
+                        <span className="material-symbols-outlined mr-2 animate-spin text-base">progress_activity</span>
+                        正在加载更多{activeSource === 'MODEL' ? '模特' : '素材'}...
+                      </div>
+                    )}
+                    {!assetAppending && assetAppendError && assetHasMore && (
+                      <div className="flex items-center justify-center gap-3 border-t border-red-100 bg-red-50/70 py-3 text-xs font-bold text-red-500">
+                        <span>加载更多失败：{assetAppendError.message}</span>
+                        <button
+                          type="button"
+                          onClick={() => void loadPagedAssets(
+                            assetNextPageRef.current,
+                            assetQueryVersionRef.current,
+                          )}
+                          className="rounded-md border border-red-200 bg-white px-3 py-1 text-[11px] text-red-600 hover:bg-red-50"
+                        >
+                          重试
+                        </button>
+                      </div>
+                    )}
+                    {!assetAppending && !assetHasMore && assets.length > 0 && (
+                      <div className="border-t border-slate-100 bg-white py-3 text-center text-xs font-bold text-slate-400">
+                        — 已经到底了 —(共 {assetTotal} 个{activeSource === 'MODEL' ? '模特' : '素材'})
+                      </div>
+                    )}
+                  </div>
+                )}
 
               </div>
               </>
