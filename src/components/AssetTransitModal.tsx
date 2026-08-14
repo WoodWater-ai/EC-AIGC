@@ -2203,7 +2203,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                           onClick={handleMoveClick}
                           className="text-xs text-blue-600 hover:underline font-bold bg-transparent border-none cursor-pointer"
                         >
-                          移动
+                          设置分类
                         </button>}
                         {canMergeSelected && (
                           <button
