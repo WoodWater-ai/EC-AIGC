@@ -685,11 +685,13 @@ export interface ImageTypeEntry {
   count?: number;
 }
 
-/** 任务资产引用(槽位绑定,Long → string 避免 JS 精度丢失) */
+/** 任务资产引用(一个素材一条;Long → string 避免 JS 精度丢失) */
 export interface TaskAssetRef {
   /** Long 雪花 ID,前端用 string 避免 JS 精度丢失 */
   assetId: string;
-  slotRole: TaskAssetSlot;
+  /** [2026-08-15] 多槽位角色(同一素材可对应多个参考角色;主图/视频位置类为单元素) */
+  slotRoles: TaskAssetSlot[];
+  /** 素材在 Vidu images[] 中的位置(素材分组顺序,同素材多角色共享同一值) */
   sortOrder: number;
   originalUrl: string;
   thumbnailUrl?: string;
@@ -778,12 +780,14 @@ export interface VideoTaskSubmitPayload {
   inputImageUrls?: string;
   assets: Array<{
     assetId: string;
-    slotRole:
+    /** [2026-08-15] 多槽位角色(视频位置类角色为单元素数组) */
+    slotRoles: Array<
       | 'FIRST_FRAME'
       | 'SOURCE_VIDEO'
       | 'PRODUCT_REFERENCE'
       | 'REPLACEMENT_REFERENCE'
-      | 'KEY_FRAME';
+      | 'KEY_FRAME'
+    >;
     sortOrder: number;
     originalUrl?: string;
     thumbnailUrl?: string;

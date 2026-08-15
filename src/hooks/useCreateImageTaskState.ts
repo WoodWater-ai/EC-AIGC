@@ -570,7 +570,7 @@ export function useCreateImageTaskState(
       if (mainAssetId) {
         assets.push({
           assetId: mainAssetId,
-          slotRole: 'MAIN',
+          slotRoles: ['MAIN'],
           sortOrder: 0,
           originalUrl: opts.mainImage?.originalUrl ?? '',
           thumbnailUrl: opts.mainImage?.thumbnailUrl,
@@ -578,21 +578,40 @@ export function useCreateImageTaskState(
         });
       }
 
+      // [2026-08-15] 参考图按素材去重:同一素材选多个槽位合并为一条,
+      // slotRoles 携带全量角色,sortOrder 取该素材各槽位中的最小位置(与 Prompt 分组顺序一致)。
+      const refByAssetId = new Map<string, {
+        roles: TaskAssetSlot[];
+        sortOrder: number;
+        ref: { fileResourceId?: string | number; id?: string | number; originalUrl?: string; thumbnailUrl?: string; name?: string } | undefined;
+      }>();
       (['detail', 'style', 'scene', 'pose', 'model'] as ReferenceSlot[]).forEach((slot) => {
         const ref = references[slot] as
           | { fileResourceId?: string | number; id?: string | number; originalUrl?: string; thumbnailUrl?: string; name?: string }
           | undefined;
         const refAssetId = extractAssetId(ref);
-        if (refAssetId) {
-          assets.push({
-            assetId: refAssetId,
-            slotRole: REFERENCE_SLOT_MAP[slot],
-            sortOrder: referenceOrder[slot] ?? 0,
-            originalUrl: ref?.originalUrl ?? '',
-            thumbnailUrl: ref?.thumbnailUrl,
-            name: ref?.name,
-          });
+        if (!refAssetId) return;
+        const existing = refByAssetId.get(refAssetId);
+        if (existing) {
+          existing.roles.push(REFERENCE_SLOT_MAP[slot]);
+          existing.sortOrder = Math.min(existing.sortOrder, referenceOrder[slot] ?? 0);
+          return;
         }
+        refByAssetId.set(refAssetId, {
+          roles: [REFERENCE_SLOT_MAP[slot]],
+          sortOrder: referenceOrder[slot] ?? 0,
+          ref,
+        });
+      });
+      refByAssetId.forEach(({ roles, sortOrder, ref }) => {
+        assets.push({
+          assetId: extractAssetId(ref),
+          slotRoles: roles,
+          sortOrder,
+          originalUrl: ref?.originalUrl ?? '',
+          thumbnailUrl: ref?.thumbnailUrl,
+          name: ref?.name,
+        });
       });
 
       // 拼 imageTypes[]:每种 imageType 配 prompt/negativePrompt/count

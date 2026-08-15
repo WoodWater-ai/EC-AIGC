@@ -178,21 +178,21 @@ export function buildMultiFrameSubmitData(
   assets: VideoTaskSubmitPayload['assets'];
   multiFrameSegments: VideoTaskSubmitPayload['multiFrameSegments'];
 } {
-  const firstFrameAsset = {
+  const firstFrameAsset: VideoTaskSubmitPayload['assets'][number] = {
     assetId: startFrame.assetId,
-    slotRole: 'FIRST_FRAME' as const,
+    slotRoles: ['FIRST_FRAME'],
     sortOrder: 0,
     originalUrl: startFrame.originalUrl,
     thumbnailUrl: startFrame.thumbnailUrl,
     name: startFrame.name,
   };
 
-  const keyFrameAssets = segments.map((seg, index) => {
+  const keyFrameAssets: VideoTaskSubmitPayload['assets'] = segments.map((seg, index) => {
     // 段 index == 后端 sortOrder;keyFrame 非 null 时才有意义
     const keyFrame = seg.keyFrame;
     return {
       assetId: keyFrame?.assetId ?? '',
-      slotRole: 'KEY_FRAME' as const,
+      slotRoles: ['KEY_FRAME'],
       sortOrder: index,
       originalUrl: keyFrame?.originalUrl,
       thumbnailUrl: keyFrame?.thumbnailUrl,

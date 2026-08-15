@@ -818,7 +818,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       return [
         {
           assetId: firstFrame.assetId,
-          slotRole: 'FIRST_FRAME',
+          slotRoles: ['FIRST_FRAME'],
           sortOrder: 0,
           originalUrl: firstFrame.originalUrl,
           thumbnailUrl: firstFrame.thumbnailUrl,
@@ -830,7 +830,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       const productReference = selectedProductInfo?.imageId
         ? {
             assetId: selectedProductInfo.imageId,
-            slotRole: 'PRODUCT_REFERENCE' as const,
+            slotRoles: ['PRODUCT_REFERENCE'],
             sortOrder: 0,
             originalUrl: selectedProductInfo.imageUrl,
             thumbnailUrl: selectedProductInfo.imageUrl,
@@ -845,7 +845,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       return [
         {
           assetId: sourceVideo.assetId,
-          slotRole: 'SOURCE_VIDEO',
+          slotRoles: ['SOURCE_VIDEO'],
           sortOrder: 0,
           originalUrl: sourceVideo.originalUrl,
           thumbnailUrl: sourceVideo.thumbnailUrl,
@@ -854,7 +854,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
         ...(productReference ? [productReference] : []),
         ...references.map((asset, index) => ({
           assetId: asset.assetId,
-          slotRole: 'REPLACEMENT_REFERENCE' as const,
+          slotRoles: ['REPLACEMENT_REFERENCE'],
           sortOrder: index + (productReference ? 1 : 0),
           originalUrl: asset.originalUrl,
           thumbnailUrl: asset.thumbnailUrl,
