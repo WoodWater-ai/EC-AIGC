@@ -41,6 +41,7 @@ import {
   getLinkedSceneOptions,
   groupReferenceSlots,
   optionCodeFromValue,
+  referenceKey,
   sameReferenceAsset,
   type TaggedReference,
 } from '../../lib/createImageTask/imageCreationUi';
@@ -184,6 +185,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const [pendingSlot, setPendingSlot] = useState<PendingSlot>(null);
   const isTransitOpen = pendingSlot !== null;
 
+  // 新图入场联动:picker 选完图后,把 ref 的 key 写入这里,ReferenceGrid 匹配后
+  // 强制打开该图 RolePicker 让用户选 slot;RolePicker 关闭后清掉
+  const [forceOpenRoleKey, setForceOpenRoleKey] = useState<string | null>(null);
+
   // ---- hook ----
   // 通道/能力/模型 真实值由 ImageSettingsSection 内部 useTaskParams 装载(从
   // /v1/admin/capability/supported-list 等接口拉取);子组件通过 onParamsChange
@@ -291,7 +296,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     const result: Partial<Record<'style' | 'scene' | 'pose', string>> = {};
     (['style', 'scene', 'pose'] as const).forEach((role) => {
       const index = groupedReferences.findIndex((reference) => reference.roles.includes(role));
-      if (index >= 0) result[role] = `参考图 ${index + 1}`;
+      if (index >= 0) result[role] = `图 ${index + 2}`;
     });
     return result;
   }, [groupedReferences]);
@@ -452,7 +457,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     REFERENCE_SLOTS_INTERNAL.forEach((slot) => {
       if (sameReferenceAsset(references[slot], reference.ref)) selectReference(slot, undefined);
     });
-  }, [references, selectReference]);
+    // 防御:被移除的图正是 forceOpen 指向的图 → 清 key 避免悬挂
+    if (reference.key === forceOpenRoleKey) setForceOpenRoleKey(null);
+  }, [forceOpenRoleKey, references, selectReference]);
 
   const handleProductFactChange = <K extends keyof ProductFactsInput,>(
     key: K,
@@ -538,6 +545,11 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
 
   // ---- 参考图 5 slot 点击 → 打开 picker,target=对应 slot ----
   const openSlotPicker = useCallback((slot: ReferenceSlot) => {
+    // 5 slot 满防御:slot 为空 / 未被计算 → 提示并返回, 不打开 modal
+    if (!slot) {
+      toast.info('5 个参考槽位已全部使用');
+      return;
+    }
     setPendingSlot(slot);
   }, []);
 
@@ -599,6 +611,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         if (pendingSlot === 'style') setStyle('');
         if (pendingSlot === 'scene') setScene('');
         if (pendingSlot === 'pose') setPose('');
+        // 新图入场联动:把刚写入的 ref 的 key 写入,触发该图 RolePicker 首次自动打开
+        setForceOpenRoleKey(referenceKey(slotRef));
       }
       setPendingSlot(null);
     },
@@ -688,6 +702,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
               openSlotPicker={openSlotPicker}
               onRolesChange={handleReferenceRolesChange}
               onRemove={handleRemoveReference}
+              forceOpenRoleKey={forceOpenRoleKey}
+              onForceOpenConsumed={() => setForceOpenRoleKey(null)}
             />
             <ProductFactsEditor
               value={productFacts}

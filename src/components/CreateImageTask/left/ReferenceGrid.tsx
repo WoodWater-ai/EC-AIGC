@@ -16,6 +16,10 @@ export interface ReferenceGridProps {
   openSlotPicker: (slot: ReferenceSlot) => void;
   onRolesChange: (reference: TaggedReference, roles: ReferenceSlot[]) => void;
   onRemove: (reference: TaggedReference) => void;
+  /** 新图入场关联 key;匹配时该图 RolePicker 首次强制打开 */
+  forceOpenRoleKey?: string | null;
+  /** RolePicker 自行关闭后通知父组件清 key */
+  onForceOpenConsumed?: () => void;
 }
 
 const ROLE_OPTIONS: Array<{ id: ReferenceSlot; label: string; icon: string }> = [
@@ -30,23 +34,37 @@ const roleLabel = (role: ReferenceSlot) =>
   ROLE_OPTIONS.find((item) => item.id === role)?.label ?? role;
 
 interface RolePickerProps {
+  /** 内部索引(1 起),用于槽位互斥 owner 比较;与 `referenceNumber` 对应统一为 1 起 */
   referenceNumber: number;
   value: ReferenceSlot[];
   roleOwners: Partial<Record<ReferenceSlot, number>>;
   onChange: (roles: ReferenceSlot[]) => void;
+  /** 首次渲染时是否强制打开(用于新图入场联动);只生效一次 */
+  defaultOpen?: boolean;
+  /** open 状态变化回调;父组件用于消费 forceOpen 完毕后清 key */
+  onOpenChange?: (open: boolean) => void;
 }
 
-const RolePicker: React.FC<RolePickerProps> = ({ referenceNumber, value, roleOwners, onChange }) => {
-  const [open, setOpen] = useState(false);
+export const RolePicker: React.FC<RolePickerProps> = ({
+  referenceNumber,
+  value,
+  roleOwners,
+  onChange,
+  defaultOpen = false,
+  onOpenChange,
+}) => {
+  const [open, setOpen] = useState<boolean>(defaultOpen);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      if (rootRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+      onOpenChange?.(false);
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
-  }, []);
+  }, [onOpenChange]);
 
   const toggleRole = (role: ReferenceSlot) => {
     const next = value.includes(role)
@@ -60,7 +78,11 @@ const RolePicker: React.FC<RolePickerProps> = ({ referenceNumber, value, roleOwn
       <button
         type="button"
         aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => setOpen((current) => {
+          const next = !current;
+          onOpenChange?.(next);
+          return next;
+        })}
         className={`flex h-7 w-full items-center justify-between gap-1 border px-2 text-[10px] font-bold ${
           open ? 'border-primary bg-blue-50 text-primary' : 'border-slate-200 bg-white text-slate-600 hover:border-primary/60'
         }`}
@@ -71,21 +93,30 @@ const RolePicker: React.FC<RolePickerProps> = ({ referenceNumber, value, roleOwn
       {open && (
         <div
           role="listbox"
-          aria-label={`参考图 ${referenceNumber} 标签`}
+          aria-label={`图 ${referenceNumber + 1} 标签`}
           className="absolute left-0 z-40 mt-1 w-36 border border-slate-200 bg-white p-1 shadow-xl"
         >
           {ROLE_OPTIONS.map((role) => {
             const active = value.includes(role.id);
             const owner = roleOwners[role.id];
             const occupiedByAnother = !active && owner !== undefined && owner !== referenceNumber;
+            const displayOwner = owner !== undefined ? owner + 1 : undefined;
             return (
               <button
                 type="button"
                 key={role.id}
+                disabled={occupiedByAnother}
+                aria-disabled={occupiedByAnother}
                 onClick={() => toggleRole(role.id)}
-                title={occupiedByAnother ? `当前属于参考图 ${owner}，选择后将自动转移` : undefined}
+                title={occupiedByAnother
+                  ? `已被图 ${displayOwner} 占用,如需换归属请先到该图取消勾选`
+                  : undefined}
                 className={`flex h-8 w-full items-center gap-2 px-2 text-left text-[11px] ${
-                  active ? 'bg-orange-50 font-bold text-[#c84d38]' : 'text-slate-600 hover:bg-slate-50'
+                  active
+                    ? 'bg-orange-50 font-bold text-[#c84d38]'
+                    : occupiedByAnother
+                      ? 'cursor-not-allowed text-slate-300'
+                      : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <span className={`grid h-4 w-4 place-items-center border ${active ? 'border-[#df5b43] bg-[#df5b43] text-white' : 'border-slate-300'}`}>
@@ -93,8 +124,8 @@ const RolePicker: React.FC<RolePickerProps> = ({ referenceNumber, value, roleOwn
                 </span>
                 <span className="material-symbols-outlined text-sm">{role.icon}</span>
                 <span className="min-w-0 flex-1">{role.label}</span>
-                {occupiedByAnother && (
-                  <span className="shrink-0 text-[9px] font-medium text-slate-400">图 {owner}</span>
+                {occupiedByAnother && displayOwner !== undefined && (
+                  <span className="shrink-0 text-[9px] font-medium text-slate-400">图 {displayOwner}</span>
                 )}
               </button>
             );
@@ -110,9 +141,12 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
   openSlotPicker,
   onRolesChange,
   onRemove,
+  forceOpenRoleKey,
+  onForceOpenConsumed,
 }) => {
   const groupedReferences = groupReferenceSlots(orderedRefs);
   const usedRoles = new Set(groupedReferences.flatMap((reference) => reference.roles));
+  // 内部索引:第 1 张参考图 = 1;用于 RolePicker 槽位互斥 owner 比较(留给 RolePicker 内部继续 +1)
   const roleOwners = groupedReferences.reduce<Partial<Record<ReferenceSlot, number>>>(
     (owners, reference, index) => {
       reference.roles.forEach((role) => { owners[role] = index + 1; });
@@ -137,44 +171,40 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
 
       {groupedReferences.length === 0 ? (
         <div className="mt-3 grid grid-cols-3 gap-2">
-          {(['model', 'detail', 'style'] as ReferenceSlot[]).map((slot) => (
-            <button
-              key={slot}
-              type="button"
-              onClick={() => openSlotPicker(slot)}
-              className="flex aspect-[4/3] flex-col items-center justify-center gap-1 border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-primary hover:text-primary"
-            >
-              <span className="material-symbols-outlined text-xl">
-                {slot === 'model' ? 'face_3' : 'zoom_in'}
-              </span>
-              <span className="text-[10px] font-bold">添加{roleLabel(slot)}参考</span>
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={() => openSlotPicker(nextRole ?? 'detail')}
+            disabled={!nextRole}
+            className="flex aspect-[4/3] flex-col items-center justify-center gap-1 border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="h-5 w-5" />
+            <span className="text-[10px] font-bold">添加参考</span>
+          </button>
         </div>
       ) : (
         <div className="mt-3 grid grid-cols-3 gap-2">
           {groupedReferences.map((reference, index) => (
             <div key={reference.key} className="group min-w-0">
-              <div className="relative aspect-[4/3] overflow-hidden border border-slate-200 bg-slate-50">
+              <div className="relative aspect-[4/3] flex items-center justify-center overflow-hidden border border-slate-200 bg-slate-50">
                 {reference.ref.thumbnailUrl || reference.ref.originalUrl ? (
                   <img
                     src={reference.ref.thumbnailUrl ?? reference.ref.originalUrl}
-                    alt={reference.ref.name ?? `参考图 ${index + 1}`}
-                    className="h-full w-full object-cover"
+                    alt={reference.ref.name ?? `图 ${index + 2}`}
+                    className="max-h-full max-w-full object-contain"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
                   <span className="material-symbols-outlined grid h-full place-items-center text-slate-400">image</span>
                 )}
                 <span className="absolute left-1 top-1 bg-slate-900/75 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                  参考图 {index + 1}
+                  图 {index + 2}
                 </span>
                 <button
                   type="button"
                   onClick={() => onRemove(reference)}
                   className="absolute right-1 top-1 grid h-5 w-5 place-items-center bg-slate-900/75 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                  title={`移除参考图 ${index + 1}`}
-                  aria-label={`移除参考图 ${index + 1}`}
+                  title={`移除图 ${index + 2}`}
+                  aria-label={`移除图 ${index + 2}`}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -185,6 +215,10 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({
                   value={reference.roles}
                   roleOwners={roleOwners}
                   onChange={(roles) => onRolesChange(reference, roles)}
+                  defaultOpen={reference.key === forceOpenRoleKey}
+                  onOpenChange={(open) => {
+                    if (!open && reference.key === forceOpenRoleKey) onForceOpenConsumed?.();
+                  }}
                 />
               </div>
             </div>

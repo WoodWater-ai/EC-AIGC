@@ -101,7 +101,7 @@ export interface TaggedReference {
 
 const ROLE_ORDER: ReferenceSlot[] = ['model', 'detail', 'style', 'scene', 'pose'];
 
-const referenceKey = (ref: ReferenceAsset) => String(
+export const referenceKey = (ref: ReferenceAsset) => String(
   ref.id ?? ref.fileResourceId ?? ref.originalUrl ?? ref.thumbnailUrl ?? ref.name ?? '',
 );
 

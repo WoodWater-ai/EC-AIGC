@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppScreen, GenerationTask, ProductAsset, SystemUser, SystemNotification } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -31,7 +31,7 @@ import { setLoginRequiredHandler } from './api/error';
 import { useServiceQuery } from './api/hooks/useServiceQuery';
 import { userApi, type UserDTO } from './api/modules/user';
 import { taskApi } from './api/modules/task';
-import { modelProfileApi } from './api/modules/modelProfile';
+import { modelProfileApi, type ModelProfileDTO } from './api/modules/modelProfile';
 import { assetApi, type AssetResourceItem } from './api/modules/asset';
 import type { ProductSkuView } from './components/productManagement/productManagementModel';
 import { toUIGenerationTask } from './components/createTask/taskAdapter';
@@ -88,6 +88,9 @@ function adaptAuthUser(authUser: ReturnType<typeof useAuth>['user']): SystemUser
     joinedDate: '',
   };
 }
+
+/** 模特资源库分页 pageSize:5 列 × 10 行,与 AssetTransitModal 产品 tab 一致 */
+const profilePageSize = 50;
 
 export default function App() {
   const {
@@ -237,11 +240,104 @@ export default function App() {
   const [modelCreatorOpen, setModelCreatorOpen] = useState(false);
   const [modelAssetTarget, setModelAssetTarget] = useState<ModelCreatorAssetTarget>();
   const [modelAssetConsumer, setModelAssetConsumer] = useState<((assets: ModelCreatorAsset[]) => void)>();
+  // ========== 模特资源库分页 state ==========
+  const [profileList, setProfileList] = useState<ModelProfileDTO[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [profileTotal, setProfileTotal] = useState(0);
+  const [profileAppendError, setProfileAppendError] = useState<Error | null>(null);
+  const profileNextPageRef = useRef(2);
+  const profileLoadingVersionRef = useRef<number | null>(null);
+  const profileQueryVersionRef = useRef(0);
+  const profileHasMoreRef = useRef(true);
+  const [selectedStyleTag, setSelectedStyleTag] = useState<string | null>(null);
+
   const modelProfilesQuery = useServiceQuery(
-    () => modelProfileApi.page({ pageNum: 1, pageSize: 100, status: 'active' }),
-    [],
+    () => modelProfileApi.page({
+      pageNum: 1,
+      pageSize: profilePageSize,
+      status: 'active',
+      styleTag: selectedStyleTag ?? undefined,
+    }),
+    [selectedStyleTag],
     isAuthenticated,
   );
+
+  // 首屏 useServiceQuery 完成 → 同步到本地 list
+  useEffect(() => {
+    const data = modelProfilesQuery.data;
+    if (!data) return;
+    setProfileList(data.list);
+    setProfileTotal(data.total);
+    const nextHasMore = 1 < data.pages;
+    setHasMore(nextHasMore);
+    profileHasMoreRef.current = nextHasMore;
+    profileNextPageRef.current = 2;
+  }, [modelProfilesQuery.data]);
+
+  // 追加下一页
+  const loadNextProfilePage = useCallback(async () => {
+    if (profileLoadingVersionRef.current !== null || !profileHasMoreRef.current) return;
+    const version = profileQueryVersionRef.current;
+    profileLoadingVersionRef.current = version;
+    setLoadingMore(true);
+    setProfileAppendError(null);
+    const pageNum = profileNextPageRef.current;
+    try {
+      const page = await modelProfileApi.page({
+        pageNum,
+        pageSize: profilePageSize,
+        status: 'active',
+        styleTag: selectedStyleTag ?? undefined,
+      });
+      if (version !== profileQueryVersionRef.current) return;
+      setProfileList((current) => [
+        ...current,
+        ...page.list.filter((next) => !current.some((existing) => existing.id === next.id)),
+      ]);
+      const nextHasMore = pageNum < page.pages;
+      profileHasMoreRef.current = nextHasMore;
+      profileNextPageRef.current = pageNum + 1;
+      setHasMore(nextHasMore);
+      setProfileTotal(page.total);
+    } catch (error) {
+      if (version !== profileQueryVersionRef.current) return;
+      setProfileAppendError(error as Error);
+    } finally {
+      if (version === profileQueryVersionRef.current) {
+        profileLoadingVersionRef.current = null;
+        setLoadingMore(false);
+      }
+    }
+  }, [selectedStyleTag]);
+
+  const handleProfileFilterChange = useCallback((tag: string) => {
+    // 把 FILTERS 文案映射到后端 styleTag:目前 tag 与后端一致,直接传;
+    // 后续若不一致在此处加映射表
+    const next = tag === '全部' ? null : tag;
+    profileQueryVersionRef.current += 1;
+    profileLoadingVersionRef.current = null;
+    profileNextPageRef.current = 2;
+    profileHasMoreRef.current = true;
+    setProfileAppendError(null);
+    setLoadingMore(false);
+    setSelectedStyleTag(next);
+    // selectedStyleTag 变化触发 useServiceQuery 重跑
+  }, []);
+
+  // 模特导入/发布后:重置分页 state + 触发首屏重拉
+  const refetchProfileList = useCallback(() => {
+    profileQueryVersionRef.current += 1;
+    profileLoadingVersionRef.current = null;
+    profileNextPageRef.current = 2;
+    profileHasMoreRef.current = true;
+    setProfileList([]);
+    setProfileAppendError(null);
+    setLoadingMore(false);
+    setHasMore(true);
+    setProfileTotal(0);
+    modelProfilesQuery.refetch();
+  }, [modelProfilesQuery]);
 
   const requestModelAsset = (
     target: ModelCreatorAssetTarget,
@@ -336,9 +432,15 @@ export default function App() {
       case AppScreen.MODEL_LIBRARY:
         return (
           <ModelLibrary
-            profiles={modelProfilesQuery.data?.list ?? []}
+            profiles={profileList}
             loading={modelProfilesQuery.loading}
             error={modelProfilesQuery.error?.message}
+            loadingMore={loadingMore}
+            hasMore={hasMore}
+            total={profileTotal}
+            appendError={profileAppendError}
+            onLoadMore={loadNextProfilePage}
+            onFilterChange={handleProfileFilterChange}
             onCreateProfile={() => setModelCreatorOpen(true)}
           />
         );
@@ -417,7 +519,7 @@ export default function App() {
             purpose="OTHER"
             mode={modelAssetConsumer ? 'picker' : 'manager'}
             multiSelect={modelAssetTarget === 'face_merge'}
-            onModelImported={modelProfilesQuery.refetch}
+            onModelImported={refetchProfileList}
             targetSlot={modelAssetTarget ? `model-profile-${modelAssetTarget}` : 'main'}
             onConfirmSelection={(items) => {
               if (modelAssetConsumer && items.length > 0) {
@@ -441,7 +543,7 @@ export default function App() {
         <ModelProfileCreator
           open={modelCreatorOpen}
           onClose={() => setModelCreatorOpen(false)}
-          onPublished={modelProfilesQuery.refetch}
+          onPublished={refetchProfileList}
           onRequestAsset={requestModelAsset}
         />
       </div>
@@ -467,7 +569,7 @@ export default function App() {
           <AssetTransitModal
             purpose="OTHER"
             mode="manager"
-            onModelImported={modelProfilesQuery.refetch}
+            onModelImported={refetchProfileList}
             onConfirmSelection={(fileResIds) => {
               // App.tsx 全局兜底:无业务上下文,仅打日志
               console.log('[Transit] App 全局选中(未消费):', fileResIds);
@@ -532,7 +634,7 @@ export default function App() {
           purpose="OTHER"
           mode={modelAssetConsumer ? 'picker' : 'manager'}
           multiSelect={modelAssetTarget === 'face_merge'}
-          onModelImported={modelProfilesQuery.refetch}
+          onModelImported={refetchProfileList}
           targetSlot={modelAssetTarget ? `model-profile-${modelAssetTarget}` : 'main'}
           onConfirmSelection={(items) => {
             if (modelAssetConsumer && items.length > 0) {
@@ -559,7 +661,7 @@ export default function App() {
       <ModelProfileCreator
         open={modelCreatorOpen}
         onClose={() => setModelCreatorOpen(false)}
-        onPublished={modelProfilesQuery.refetch}
+        onPublished={refetchProfileList}
         onRequestAsset={requestModelAsset}
       />
 
