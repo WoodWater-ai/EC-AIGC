@@ -1334,7 +1334,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                               : 'text-slate-500 hover:text-slate-800'
                           }`}
                         >
-                          {MODE_CONFIG[item].label.replace('视频', '')}
+                          {/* [2026-08-15] 显示完整模式名(首帧图生视频),不再去掉「视频」 */}
+                          {MODE_CONFIG[item].label}
                         </button>
                       ))}
                     </div>
@@ -1494,7 +1495,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                         </div>
                       )}
                     </label>
-                    {mode === 'FIRST_FRAME' && (
+                    {/* [2026-08-15] 生成提示词按钮暂注释(后续可能恢复) */}
+                    {/* {mode === 'FIRST_FRAME' && (
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-[10px] text-slate-400">
                         {storyboardGenerated
@@ -1512,7 +1514,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                         {storyboardGenerated ? '重新生成提示词' : '生成提示词'}
                       </button>
                     </div>
-                    )}
+                    )} */}
                     {storyboardGenerated && (
                       <details open className="mt-4 border border-slate-200">
                         <summary className="cursor-pointer bg-slate-50 px-3 py-2 text-xs font-black">
