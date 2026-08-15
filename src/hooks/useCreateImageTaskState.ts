@@ -192,7 +192,13 @@ export interface UseCreateImageTaskStateReturn {
   /** 当前已选参考图的有序列表(按 referenceOrder 排序) */
   orderedRefs: { slot: ReferenceSlot; ref: any }[];
   checkAndGenerate(): void;
-  submitTasks(): Promise<void>;
+  /**
+   * 提交任务。
+   * - 'navigate'(默认):提交后通知 App 并跳转任务列表
+   * - 'stay':仅提交并关闭确认弹框,不跳转(右侧结果面板轮询展示)
+   * 返回提交结果(groupId + taskIds),失败返回 null。
+   */
+  submitTasks(mode?: 'navigate' | 'stay'): Promise<{ groupId: string; taskIds: string[] } | null>;
   // dialog setters
   setConflictOpen(v: boolean): void;
   setTemplateOverwriteOpen(v: boolean): void;
@@ -546,8 +552,8 @@ export function useCreateImageTaskState(
     setExecutionConfirmOpen(true);
   }, [readinessChecks]);
 
-  const submitTasks = useCallback(async () => {
-    if (isSubmitting) return;
+  const submitTasks = useCallback(async (mode: 'navigate' | 'stay' = 'navigate') => {
+    if (isSubmitting) return null;
     setIsSubmitting(true);
     try {
       // ==================== [2026-07-24 Task 13] 真实后端提交 ====================
@@ -657,13 +663,18 @@ export function useCreateImageTaskState(
       // 提交到后端
       const resp = await taskApi.submitImageTask(payload);
 
-      // 跳转:通知 App 高亮本次提交的 group,并切到任务列表。
-      opts.onAddTask?.({ groupId: resp.groupId, taskIds: resp.taskIds, taskKind: 'IMAGE' });
-      opts.setScreen(AppScreen.TASKS, { highlightGroupId: resp.groupId });
+      if (mode === 'navigate') {
+        // 跳转:通知 App 高亮本次提交的 group,并切到任务列表。
+        opts.onAddTask?.({ groupId: resp.groupId, taskIds: resp.taskIds, taskKind: 'IMAGE' });
+        opts.setScreen(AppScreen.TASKS, { highlightGroupId: resp.groupId });
+      }
+      // stay 模式:不跳转,由调用方拿到 groupId/taskIds 后自行轮询结果。
 
       setExecutionConfirmOpen(false);
+      return resp;
     } catch {
       // 请求层已经直接展示服务端返回的 errMessage，这里只终止提交流程，避免重复提示。
+      return null;
     } finally {
       setIsSubmitting(false);
     }

@@ -17,12 +17,15 @@ export interface ExecutionConfirmDialogProps {
     ratio: string;
     resolution: string;
   };
+  /** 提交并跳转任务列表 */
   onSubmit: () => void;
+  /** [2026-08-15] 仅提交:关闭弹框但不跳转,右侧结果面板轮询展示 */
+  onSubmitOnly?: () => void;
   onCancel: () => void;
 }
 
 export const ExecutionConfirmDialog: React.FC<ExecutionConfirmDialogProps> = ({
-  open, isSubmitting, summary, onSubmit, onCancel,
+  open, isSubmitting, summary, onSubmit, onSubmitOnly, onCancel,
 }) => {
   return (
     <DialogFrame
@@ -39,12 +42,21 @@ export const ExecutionConfirmDialog: React.FC<ExecutionConfirmDialogProps> = ({
           >
             {messages.executeConfirm.cancel}
           </button>
+          {onSubmitOnly && (
+            <button
+              onClick={onSubmitOnly}
+              disabled={isSubmitting}
+              className="px-3 py-1.5 text-xs font-bold text-primary border border-primary/40 rounded hover:bg-primary/5 disabled:opacity-50"
+            >
+              {isSubmitting ? '提交中…' : '仅提交'}
+            </button>
+          )}
           <button
             onClick={onSubmit}
             disabled={isSubmitting}
             className="px-3 py-1.5 text-xs font-bold text-white bg-primary rounded disabled:opacity-50"
           >
-            {isSubmitting ? '提交中…' : messages.executeConfirm.submit}
+            {isSubmitting ? '提交中…' : '提交并跳转'}
           </button>
         </>
       }

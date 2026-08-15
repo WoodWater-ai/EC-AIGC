@@ -3,6 +3,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner';
 import { AppScreen } from '../../types';
 import type { ProductAsset } from '../../types';
+import type { TaskResultPreviewResponse, TaskStatus } from '../../types';
+import { taskApi } from '../../api/modules/task';
 import { productInfoApi, type ProductDTO } from '../../api/modules/productInfo';
 import type { AssetResourceItem } from '../../api/modules/asset';
 import type { ImageGenerationType } from '../../lib/createImageTask/readinessChecks';
@@ -269,6 +271,65 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   } = state;
   const appliedCreationTemplateRef = useRef<string | null>(null);
   const appliedAssistantPrefillRef = useRef<string | null>(null);
+
+  // ---- [2026-08-15] 仅提交模式:右侧「本次生成结果」轮询展示 ----
+  // submitStatus: idle=未提交 / loading=提交后轮询中 / done=全部任务结束
+  const [submittedGroup, setSubmittedGroup] = useState<{ groupId: string } | null>(null);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+  // [2026-08-15] 结果按图片类型分组:每个任务一行(imageType + taskStatus + 该任务的产物)
+  const [submitGroups, setSubmitGroups] = useState<Array<{
+    imageType: string;
+    taskStatus: TaskStatus;
+    count: number;
+    previews: TaskResultPreviewResponse[];
+  }>>([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const ACTIVE_TASK_STATUSES: TaskStatus[] = ['DRAFT', 'PENDING', 'GENERATING'];
+
+  useEffect(() => {
+    if (!submittedGroup) return;
+    let cancelled = false;
+    let timer = 0;
+    const tick = async () => {
+      try {
+        const group = await taskApi.groupDetail(submittedGroup.groupId);
+        if (cancelled) return;
+        const tasks = group.tasks ?? [];
+        const groups = tasks.map((task) => ({
+          imageType: task.imageType ?? 'UNKNOWN',
+          taskStatus: task.status,
+          count: task.count ?? 1,
+          previews: task.resultPreviews ?? [],
+        }));
+        setSubmitGroups(groups);
+        const allDone = tasks.length > 0
+          && tasks.every((task) => !ACTIVE_TASK_STATUSES.includes(task.status));
+        if (allDone) {
+          setSubmitStatus('done');
+          setSubmitError(null);
+          window.clearInterval(timer);
+        } else {
+          setSubmitStatus('loading');
+        }
+      } catch (err) {
+        if (!cancelled) setSubmitError((err as Error).message);
+      }
+    };
+    void tick();
+    timer = window.setInterval(() => void tick(), 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [submittedGroup]);
+
+  /** 仅提交:提交后不跳转,右侧结果面板进入轮询 */
+  const handleSubmitOnly = async () => {
+    const resp = await submitTasks('stay');
+    if (resp) {
+      setSubmittedGroup({ groupId: resp.groupId });
+      setSubmitStatus('loading');
+      setSubmitGroups([]);
+      setSubmitError(null);
+    }
+  };
 
   // [2026-08-15] 风格/场景/姿势完全以字典为准、三者独立:
   // 去掉 CANONICAL_STYLES 硬编码清单,也不再按风格联动收窄场景/姿势选项;
@@ -576,6 +637,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         // 关键:必须携带 fileResourceId(实际是 asset_resource.id)和 id,否则后端
         //      收到的 assetId 是空串。
         const compressedThumb = withCosThumbnail(slotRef.thumbnailUrl, 64) ?? slotRef.thumbnailUrl ?? slotRef.originalUrl;
+        // [2026-08-15] 第一张参考图不自动弹槽位选择(已在资源中心点选具体槽位,再弹冗余)
+        const isFirstReference = !Object.values(references).some(Boolean);
         selectReference(pendingSlot, {
           slot: pendingSlot,
           id: item.id,
@@ -587,8 +650,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         if (pendingSlot === 'style') setStyle('');
         if (pendingSlot === 'scene') setScene('');
         if (pendingSlot === 'pose') setPose('');
-        // 新图入场联动:把刚写入的 ref 的 key 写入,触发该图 RolePicker 首次自动打开
-        setForceOpenRoleKey(referenceKey(slotRef));
+        // 新图入场联动:非首张时把刚写入的 ref 的 key 写入,触发该图 RolePicker 自动打开
+        if (!isFirstReference) setForceOpenRoleKey(referenceKey(slotRef));
       }
       setPendingSlot(null);
     },
@@ -596,6 +659,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       applyMatchedProduct,
       clearMainSelection,
       pendingSlot,
+      references,
       resetProductContext,
       selectReference,
       setPose,
@@ -753,9 +817,13 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         right={
           <ImageResultPanel
             selectedTypes={selectedTypes}
+            typeCounts={typeCounts}
             totalCount={totalCount}
             params={paramsSnapshot}
             onGenerate={checkAndGenerate}
+            submitStatus={submitStatus}
+            submitGroups={submitGroups}
+            submitError={submitError}
           />
         }
       />
@@ -791,7 +859,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       />
       <ExecutionConfirmDialog
         open={executionConfirmOpen}
-        onSubmit={submitTasks}
+        isSubmitting={isSubmitting}
+        onSubmit={() => void submitTasks('navigate')}
+        onSubmitOnly={() => void handleSubmitOnly()}
         onCancel={() => setExecutionConfirmOpen(false)}
         summary={{
           productName: productFacts.name,

@@ -54,24 +54,8 @@ interface ScannedFile {
 /** TransitAsset 直接 alias 到后端 AssetResourceItem —— 单一数据源 */
 type TransitAsset = AssetResourceItem;
 export type ResourceCenterSource = 'UPLOAD' | 'PRODUCT' | 'MODEL';
-type ResourceTagDimension = 'style' | 'scene' | 'detail' | 'pose';
-
-const RESOURCE_TAG_FILTERS: Record<ResourceTagDimension, Array<{ group?: string; values: string[] }>> = {
-  style: [
-    { group: '甜美', values: ['奶油甜妹卧室', '法式轻奢裙装'] },
-    { group: '质感', values: ['静奢深睡品质感', '复古田园居家', '东方雅致轻熟'] },
-    { group: '个性', values: ['甜酷美式街头', '甜酷暗黑辣妹', '多巴胺元气居家', '新中式雅致'] },
-  ],
-  scene: [
-    { group: '室内', values: ['奶油柔光卧室', '窗边安静居家', '浅色质感家居', '暗调缎面居家'] },
-    { group: '室外', values: ['留白新中式', '旧木田园空间'] },
-  ],
-  detail: [{ values: ['领口', '袖口', '面料', '图案', '纽扣'] }],
-  pose: [
-    { group: '站姿', values: ['自然站姿', '45 度微侧身', '窗边缓步'] },
-    { group: '坐姿与动作', values: ['床边自然坐姿', '侧身回望', '轻整理袖口'] },
-  ],
-};
+// [2026-08-15] 通用素材「槽位」筛选:图片任务提交时会给原始素材打槽位标记(见后端 appendTags)
+const SLOT_TAGS = ['风格参考', '场景参考', '细节参考', '姿势参考', '模特参考'];
 
 const modelProfileToTransitAsset = (profile: ModelProfileDTO): TransitAsset => ({
   id: profile.assetResourceId,
@@ -207,13 +191,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const [productCategoryTreeError, setProductCategoryTreeError] = useState<string | null>(null);
   const [collapsedProductCategoryIds, setCollapsedProductCategoryIds] = useState<Set<string>>(new Set());
   const [primaryFilter, setPrimaryFilter] = useState<'all' | 'recent'>('all');
-  const [openTagDimension, setOpenTagDimension] = useState<ResourceTagDimension | null>(null);
-  const [selectedTagFilters, setSelectedTagFilters] = useState<Record<ResourceTagDimension, string[]>>({
-    style: [],
-    scene: [],
-    detail: [],
-    pose: [],
-  });
+  // [2026-08-15] 槽位筛选(多选;空数组 = 不过滤;点选切换,再点取消)
+  const [slotTagFilter, setSlotTagFilter] = useState<string[]>([]);
   /** 分类树折叠状态 —— 存被折叠的节点 id,默认空 = 全部展开 */
   const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
   const toggleCollapse = (id: number) => {
@@ -272,11 +251,15 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
       since.setDate(since.getDate() - 30);
       base.startTime = since.toISOString();
     }
+    // [2026-08-15] 槽位筛选走后端(tags 过滤,任一命中);前端不再二次过滤
+    if (slotTagFilter.length > 0) {
+      base.tags = slotTagFilter;
+    }
     if (selectedCategoryId !== null) {
       return { ...base, categoryId: selectedCategoryId };
     }
     return base;
-  }, [mediaFilter, primaryFilter, selectedCategoryId]);
+  }, [mediaFilter, primaryFilter, selectedCategoryId, slotTagFilter]);
 
   // 当前页数据 + 刷新方法
   const [assets, setAssets] = useState<TransitAsset[]>([]);
@@ -523,7 +506,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setSelectedProductCategoryId(null);
     setFocusedProduct(null);
     setPrimaryFilter('all');
-    setOpenTagDimension(null);
+    setSlotTagFilter([]);
     // picker 模式按 assetKind 锁死,不允许回到 'ALL';manager 模式仍允许 'ALL'。
     setMediaFilter(
       source === 'MODEL'
@@ -595,11 +578,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     if (asset.productId) return false;
     if (asset.inModelLibrary) return false;
     if (currentUserId && String(asset.uploadUserId) !== currentUserId) return false;
-    const assetTags = asset.tags ?? '';
-    return (Object.keys(selectedTagFilters) as ResourceTagDimension[]).every((dimension) => {
-      const selected = selectedTagFilters[dimension];
-      return selected.length === 0 || selected.some((tag) => assetTags.includes(tag));
-    });
+    // [2026-08-15] 槽位筛选已改为后端 tags 过滤,前端不再二次过滤
+    return true;
   });
   // 通用素材存在“本人且未关联”等前端二次过滤；若一页过滤后不足一屏，自动补下一页。
   useEffect(() => {
@@ -1847,57 +1827,25 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   </button>
                 ))}
                 {activeSource === 'UPLOAD' && (
-                  <div className="relative ml-2 flex items-center gap-2">
-                    {(Object.keys(RESOURCE_TAG_FILTERS) as ResourceTagDimension[]).map((dimension) => {
-                      const label = { style: '风格', scene: '场景', detail: '细节', pose: '姿势' }[dimension];
-                      const selectedCount = selectedTagFilters[dimension].length;
-                      return (
-                        <button
-                          key={dimension}
-                          type="button"
-                          onClick={() => setOpenTagDimension((current) => current === dimension ? null : dimension)}
-                          className={`flex h-8 items-center gap-1 rounded-md border px-3 text-[11px] font-bold ${
-                            openTagDimension === dimension || selectedCount > 0
-                              ? 'border-blue-200 bg-blue-50 text-blue-700'
-                              : 'border-slate-200 bg-white text-slate-500'
-                          }`}
-                        >
-                          {label}
-                          {selectedCount > 0 && <span className="text-[9px]">已选 {selectedCount}</span>}
-                          <span className="material-symbols-outlined text-sm">expand_more</span>
-                        </button>
-                      );
-                    })}
-                    {openTagDimension && (
-                      <div className="absolute left-0 top-10 z-30 max-h-80 w-80 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 shadow-xl">
-                        {RESOURCE_TAG_FILTERS[openTagDimension].map((group, index) => (
-                          <div key={group.group ?? index} className={index > 0 ? 'mt-3 border-t border-slate-100 pt-3' : ''}>
-                            {group.group && <p className="mb-2 text-[10px] font-extrabold text-slate-700">{group.group}</p>}
-                            <div className="space-y-1">
-                              {group.values.map((value) => {
-                                const checked = selectedTagFilters[openTagDimension].includes(value);
-                                return (
-                                  <label key={value} className="flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-[11px] text-slate-600 hover:bg-slate-50">
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={() => setSelectedTagFilters((current) => ({
-                                        ...current,
-                                        [openTagDimension]: checked
-                                          ? current[openTagDimension].filter((item) => item !== value)
-                                          : [...current[openTagDimension], value],
-                                      }))}
-                                      className="h-4 w-4 accent-blue-600"
-                                    />
-                                    {value}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  <div className="ml-2 flex flex-wrap items-center gap-1.5">
+                    {SLOT_TAGS.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setSlotTagFilter((current) =>
+                          current.includes(tag)
+                            ? current.filter((item) => item !== tag)
+                            : [...current, tag],
+                        )}
+                        className={`h-8 rounded-md border px-3 text-[11px] font-bold ${
+                          slotTagFilter.includes(tag)
+                            ? 'border-blue-200 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                        }`}
+                      >
+                        {tag.replace(/参考$/, '')}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -2079,6 +2027,11 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                     const resourceLabel = asset.inModelLibrary
                       ? '模特素材'
                       : asset.tags?.split(',')[0] ?? '';
+                    // [2026-08-15] 槽位标签(图片任务参考图标记)
+                    const slotTags = (asset.tags ?? '')
+                      .split(',')
+                      .map((tag) => tag.trim())
+                      .filter((tag) => SLOT_TAGS.includes(tag));
                     return (
                       <div
                         key={asset.id}
@@ -2136,6 +2089,16 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                                   ? '商品主图'
                                   : '封面图'}
                             </span>
+                          )}
+                          {/* [2026-08-15] 图片底部槽位标签(中文,去掉"参考"后缀) */}
+                          {slotTags.length > 0 && (
+                            <div className="absolute bottom-1.5 left-1.5 right-1.5 flex flex-wrap gap-1 pointer-events-none">
+                              {slotTags.map((tag) => (
+                                <span key={tag} className="rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                                  {tag.replace(/参考$/, '')}
+                                </span>
+                              ))}
+                            </div>
                           )}
                         </div>
                         <div className="p-3">
