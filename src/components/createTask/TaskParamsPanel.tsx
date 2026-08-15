@@ -312,7 +312,10 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
         <div className={presentation === 'videoDemo'
           ? '[&_.param-schema-form]:grid [&_.param-schema-form]:grid-cols-1 [&_.param-schema-form]:gap-3 sm:[&_.param-schema-form]:grid-cols-2 lg:[&_.param-schema-form]:grid-cols-3'
           : ''}>
-          <label className="block text-xs font-bold text-slate-700 mb-2">能力参数</label>
+          {/* [2026-08-15] 视频任务(videoDemo)的模型配置卡片已有标题,去掉冗余的「能力参数」分组标签 */}
+          {presentation !== 'videoDemo' && (
+            <label className="block text-xs font-bold text-slate-700 mb-2">能力参数</label>
+          )}
           {presentation === 'videoDemo' && basicSchema ? (
             <>
               <ParamSchemaForm
