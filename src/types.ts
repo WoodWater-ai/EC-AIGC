@@ -593,6 +593,10 @@ export interface TaskGroupItemResponse {
   modelChannelName?: string | null;
   modelCode?: string | null;
   modelDisplayName?: string | null;
+  /** [2026-08-15] 任务使用的能力编码(对齐后端 EnumCapability;老任务可能为空) */
+  capability?: string | null;
+  /** 能力中文名(后端 EnumCapability.label;未知编码回退为编码) */
+  capabilityName?: string | null;
   templateId?: string | null;
   templateName?: string | null;
   taskPrompt?: string | null;

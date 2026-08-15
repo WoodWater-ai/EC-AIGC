@@ -1,13 +1,14 @@
 // src/components/CreateImageTask/ProductPickerModal.tsx
 // 轻量版"选择产品"picker —— 复用 productInfoApi.list,不依赖完整 ProductManagePage
-import React, { useEffect, useState } from 'react';
+// [2026-08-15] 改为无限滚动加载,隐藏上一页/下一页
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import type { ProductDTO, ProductQueryReq, ProductStatus } from '../../api/modules/productInfo';
 import { productInfoApi } from '../../api/modules/productInfo';
-import { withCosThumbnail } from '../../utils/cosImage';
 import { AssetImage } from '../AssetImage';
-import type { PageInfo } from '../../api/service-result';
+import { productCategoryApi, type ProductCategoryNode } from '../../api/modules/productCategory';
+import type { ProductSource } from '../productManagement/productManagementModel';
 
 export interface ProductPickerModalProps {
   open: boolean;
@@ -18,16 +19,16 @@ export interface ProductPickerModalProps {
   requireCreatable?: boolean;
 }
 
-const PAGE_SIZE = 20;
+// [2026-08-15] 每页条数按产品要求设为 21
+const PAGE_SIZE = 21;
 
 /**
  * 选择 SKU modal — product 表一行对应一个 SKU,回调 onPick(product) 给父容器
  *
- * 设计要点:
- * - 复用 productInfoApi.list,简化版表格(缩略图 + name + 品类 + status)
- * - 不分产品分类(精简为搜索框 + 全表)
- * - 单页 20 条,翻页器用 button 简单 prev/next
- * - 选中行后调 onPick(product) 并自动 onClose
+ * [2026-08-15] 无限滚动:
+ * - 复用 productInfoApi.list,滚动到底部自动加载下一页,列表累积
+ * - 名称/来源/状态/分类筛选全部收口到「搜索」按钮(草稿值 vs 已应用值)
+ * - 已隐藏上一页/下一页,底部展示「已加载 X / 共 Y」
  */
 export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({
   open,
@@ -40,54 +41,150 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({
   // 或回车 Enter 才提交到 appliedKeyword 触发 fetch;重置按钮清空两个 + 触发 fetch。
   const [draftKeyword, setDraftKeyword] = useState('');
   const [appliedKeyword, setAppliedKeyword] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ProductStatus | ''>('ON_SHELF');
-  const [pageNum, setPageNum] = useState(1);
-  const [pageInfo, setPageInfo] = useState<PageInfo<ProductDTO> | null>(null);
-  const [loading, setLoading] = useState(false);
+  // [2026-08-15] 与产品管理筛选对齐:默认全部状态,新增来源 + 分类筛选。
+  // 来源/状态/分类与名称一样拆「草稿值(界面)」与「已应用值(查询)」,统一由点「搜索」提交。
+  const [statusFilter, setStatusFilter] = useState<ProductStatus | ''>('');
+  const [appliedStatus, setAppliedStatus] = useState<ProductStatus | ''>('');
+  const [sourceFilter, setSourceFilter] = useState<ProductSource | ''>('');
+  const [appliedSource, setAppliedSource] = useState<ProductSource | ''>('');
+  const [categoryIdFilter, setCategoryIdFilter] = useState('');
+  const [appliedCategoryId, setAppliedCategoryId] = useState('');
+  const [categoryOptions, setCategoryOptions] = useState<Array<{ id: string; label: string }>>([]);
+  // [2026-08-15] 查询触发号:点「搜索」必 +1,保证每次点击都重新拉取(即使关键字没变化)
+  const [queryNonce, setQueryNonce] = useState(0);
 
+  // ---- [2026-08-15] 无限滚动:累积列表 + hasMore + 加载态 ----
+  const [products, setProducts] = useState<ProductDTO[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false); // 首页/搜索加载
+  const [loadingMore, setLoadingMore] = useState(false); // 滚动追加
+  const [loadMoreError, setLoadMoreError] = useState<Error | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const nextPageRef = useRef(1);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const queryVersionRef = useRef(0);
+
+  const loadPage = useCallback(async (pageNum: number, version: number) => {
+    if (loadingRef.current || !hasMoreRef.current) return;
+    loadingRef.current = true;
+    if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
+    setLoadMoreError(null);
+    try {
+      const req: ProductQueryReq = {
+        pageNum,
+        pageSize: PAGE_SIZE,
+        keyword: appliedKeyword.trim() || undefined,
+        status: (appliedStatus || undefined) as ProductStatus | undefined,
+        sourceType: (appliedSource || undefined) as 'MANUAL' | 'ERP' | undefined,
+        categoryId: appliedCategoryId || undefined,
+      };
+      const page = await productInfoApi.list(req);
+      if (version !== queryVersionRef.current) return;
+      setProducts((current) => pageNum === 1
+        ? page.list
+        : [...current, ...page.list.filter((next) => !current.some((existing) => existing.id === next.id))]);
+      setTotal(page.total);
+      hasMoreRef.current = pageNum < page.pages;
+      setHasMore(hasMoreRef.current);
+      nextPageRef.current = pageNum + 1;
+    } catch (err) {
+      if (version !== queryVersionRef.current) return;
+      if (pageNum === 1) {
+        toast.error(`加载产品失败: ${(err as Error).message}`);
+        setProducts([]);
+      } else {
+        setLoadMoreError(err as Error);
+      }
+    } finally {
+      if (version === queryVersionRef.current) {
+        loadingRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    }
+  }, [appliedKeyword, appliedStatus, appliedSource, appliedCategoryId]);
+
+  // 查询触发:open / 已应用筛选 / queryNonce 变化 → 重置到第一页
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const req: ProductQueryReq = {
-          pageNum,
-          pageSize: PAGE_SIZE,
-          keyword: appliedKeyword.trim() || undefined,
-          status: (statusFilter || undefined) as ProductStatus | undefined,
-        };
-        const page = await productInfoApi.list(req);
-        if (!cancelled) setPageInfo(page);
-      } catch (err) {
-        toast.error(`加载产品失败: ${(err as Error).message}`);
-        if (!cancelled) setPageInfo(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [open, pageNum, appliedKeyword, statusFilter]);
+    queryVersionRef.current += 1;
+    const version = queryVersionRef.current;
+    loadingRef.current = false;
+    hasMoreRef.current = true;
+    nextPageRef.current = 1;
+    setProducts([]);
+    scrollRef.current?.scrollTo({ top: 0 });
+    void loadPage(1, version);
+  }, [open, appliedKeyword, appliedStatus, appliedSource, appliedCategoryId, queryNonce, loadPage]);
 
-  // 打开时重置输入 + 应用 + 页码
+  // 滚动到底部附近 → 加载下一页
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 160) {
+      if (hasMoreRef.current && !loadingRef.current) {
+        void loadPage(nextPageRef.current, queryVersionRef.current);
+      }
+    }
+  };
+
+  // 打开时重置全部筛选(草稿 + 已应用)
   useEffect(() => {
     if (open) {
-      setPageNum(1);
       setDraftKeyword('');
       setAppliedKeyword('');
+      setSourceFilter('');
+      setAppliedSource('');
+      setStatusFilter('');
+      setAppliedStatus('');
+      setCategoryIdFilter('');
+      setAppliedCategoryId('');
     }
   }, [open]);
 
+  // [2026-08-15] 加载产品分类树,展平成下拉选项(与产品管理一致;失败不阻塞弹框)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const tree = await productCategoryApi.tree();
+        if (cancelled) return;
+        const flat: Array<{ id: string; label: string }> = [];
+        const walk = (nodes: ProductCategoryNode[], depth: number) => {
+          nodes.forEach((node) => {
+            flat.push({ id: node.id, label: `${'　'.repeat(depth)}${node.categoryName}` });
+            if (node.children?.length) walk(node.children, depth + 1);
+          });
+        };
+        walk(tree, 0);
+        setCategoryOptions(flat);
+      } catch (err) {
+        if (!cancelled) toast.error(`商品分类加载失败: ${(err as Error).message}`);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const handleSearch = () => {
-    setPageNum(1);
     setAppliedKeyword(draftKeyword);
+    setAppliedStatus(statusFilter);
+    setAppliedSource(sourceFilter);
+    setAppliedCategoryId(categoryIdFilter);
+    setQueryNonce((n) => n + 1);
   };
 
   const handleReset = () => {
-    setPageNum(1);
     setDraftKeyword('');
     setAppliedKeyword('');
-    setStatusFilter('ON_SHELF');
+    setSourceFilter('');
+    setAppliedSource('');
+    setStatusFilter('');
+    setAppliedStatus('');
+    setCategoryIdFilter('');
+    setAppliedCategoryId('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -96,8 +193,6 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({
       handleSearch();
     }
   };
-
-  const products = pageInfo?.list ?? [];
 
   return (
     <AnimatePresence>
@@ -135,9 +230,9 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({
               </button>
             </div>
 
-            {/* Toolbar */}
-            <div className="px-6 py-3 border-b border-slate-200 flex items-center gap-3 shrink-0">
-              <div className="relative flex-1 max-w-md">
+            {/* Toolbar —— [2026-08-15] 与产品管理筛选项对齐:来源 / 状态 / 分类 */}
+            <div className="px-6 py-3 border-b border-slate-200 flex flex-wrap items-center gap-2 shrink-0">
+              <div className="relative min-w-[180px] flex-1 max-w-md">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
                 <input
                   type="text"
@@ -149,13 +244,38 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({
                 />
               </div>
               <select
+                value={sourceFilter}
+                onChange={(e) => { setSourceFilter(e.target.value as ProductSource | ''); }}
+                className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-bold"
+                aria-label="按来源筛选"
+              >
+                <option value="">全部来源</option>
+                <option value="MANUAL">手动创建</option>
+                <option value="ERP">ERP 同步</option>
+              </select>
+              <select
                 value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value as ProductStatus | ''); setPageNum(1); }}
-                className="h-9 px-2 rounded-md border border-slate-200 text-xs font-bold bg-white"
+                onChange={(e) => { setStatusFilter(e.target.value as ProductStatus | ''); }}
+                className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-bold"
+                aria-label="按状态筛选"
               >
                 <option value="">全部状态</option>
-                <option value="ON_SHELF">已上架</option>
-                <option value="OFF_SHELF">已下架</option>
+                <option value="ON_SHELF">上架</option>
+                <option value="OFF_SHELF">下架</option>
+              </select>
+              <select
+                value={categoryIdFilter}
+                onChange={(e) => { setCategoryIdFilter(e.target.value); }}
+                className="h-9 max-w-[190px] rounded-md border border-slate-200 bg-white px-2 text-xs font-bold"
+                aria-label="按商品分类筛选"
+                title={categoryIdFilter
+                  ? (categoryOptions.find((option) => option.id === categoryIdFilter)?.label ?? '按商品分类筛选')
+                  : '按商品分类筛选'}
+              >
+                <option value="">全部分类</option>
+                {categoryOptions.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
               </select>
               <button
                 type="button"
@@ -182,12 +302,16 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({
                 </button>
               )}
               <span className="text-xs text-slate-500">
-                共 {pageInfo?.total ?? 0} 个 SKU
+                共 {total} 个 SKU
               </span>
             </div>
 
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
+            {/* Body —— [2026-08-15] 固定高度 764px(两行),无限滚动加载 */}
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="min-h-[764px] max-h-[764px] overflow-y-auto p-4 bg-slate-50"
+            >
               {loading ? (
                 <div className="flex items-center justify-center py-12 text-slate-500 text-xs">
                   <span className="material-symbols-outlined mr-2 animate-spin">progress_activity</span>
@@ -199,83 +323,88 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({
                   暂无产品
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {products.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        if (!requireCreatable || p.canCreate !== false) {
-                          onPick(p);
-                          onClose();
-                        }
-                      }}
-                      disabled={requireCreatable && p.canCreate === false}
-                      className="group text-left bg-white border border-slate-200 rounded-lg overflow-hidden hover:border-primary hover:shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-55"
-                      title={requireCreatable && p.canCreate === false
-                        ? (p.unavailableReason || '当前 SKU 暂不可创作')
-                        : `选择 ${p.name}`}
-                    >
-                      <div className="aspect-square relative bg-slate-100 overflow-hidden">
-                        <AssetImage
-                          urls={[p.imageUrl]}
-                          alt={p.name}
-                          className="w-full h-full"
-                          aspectRatio="auto"
-                        />
-                      </div>
-                      <div className="p-3">
-                        <p className="text-xs font-bold text-slate-800 truncate" title={p.name}>{p.name}</p>
-                        <p
-                          className="mt-1 truncate text-[10px] font-medium text-slate-500"
-                          title={[p.specName, p.skuCode].filter(Boolean).join(' · ')}
-                        >
-                          {[p.specName, p.skuCode].filter(Boolean).join(' · ') || '默认规格'}
-                        </p>
-                        <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
-                          <span className="truncate">{p.category ?? '未分类'}</span>
-                          <span className={
-                            'px-1.5 py-0.5 rounded font-bold ' +
-                            (p.status === 'ON_SHELF' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500')
-                          }>{p.statusDesc}</span>
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {products.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          if (!requireCreatable || p.canCreate !== false) {
+                            onPick(p);
+                            onClose();
+                          }
+                        }}
+                        disabled={requireCreatable && p.canCreate === false}
+                        className="group text-left bg-white border border-slate-200 rounded-lg overflow-hidden hover:border-primary hover:shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-55"
+                        title={requireCreatable && p.canCreate === false
+                          ? (p.unavailableReason || '当前 SKU 暂不可创作')
+                          : `选择 ${p.name}`}
+                      >
+                        <div className="aspect-square relative bg-slate-100 overflow-hidden">
+                          <AssetImage
+                            urls={[p.imageUrl]}
+                            alt={p.name}
+                            className="w-full h-full"
+                            aspectRatio="auto"
+                          />
                         </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                        <div className="p-3">
+                          <p className="text-xs font-bold text-slate-800 truncate" title={p.name}>{p.name}</p>
+                          <p
+                            className="mt-1 truncate text-[10px] font-medium text-slate-500"
+                            title={[p.specName, p.skuCode].filter(Boolean).join(' · ')}
+                          >
+                            {[p.specName, p.skuCode].filter(Boolean).join(' · ') || '默认规格'}
+                          </p>
+                          <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
+                            <span className="truncate">{p.category ?? '未分类'}</span>
+                            <span className={
+                              'px-1.5 py-0.5 rounded font-bold ' +
+                              (p.status === 'ON_SHELF' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500')
+                            }>{p.statusDesc}</span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {loadingMore && (
+                    <div className="flex items-center justify-center py-4 text-slate-400 text-xs">
+                      <span className="material-symbols-outlined mr-2 animate-spin">progress_activity</span>
+                      加载中…
+                    </div>
+                  )}
+                  {!loadingMore && loadMoreError && (
+                    <div className="py-4 text-center text-xs font-bold text-red-500">
+                      加载更多失败:{loadMoreError.message}
+                      <button
+                        type="button"
+                        onClick={() => void loadPage(nextPageRef.current, queryVersionRef.current)}
+                        className="ml-2 text-primary underline"
+                      >
+                        重试
+                      </button>
+                    </div>
+                  )}
+                  {!hasMore && !loadingMore && (
+                    <div className="py-4 text-center text-[10px] text-slate-300">已加载全部</div>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Footer */}
+            {/* Footer —— [2026-08-15] 已隐藏上一页/下一页,展示已加载数量 */}
             <div className="px-6 py-3 border-t border-slate-200 flex items-center justify-between shrink-0 bg-white">
               <div className="text-[10px] text-slate-400">
-                第 {(pageInfo?.pageNum ?? 1)} 页 · 共 {pageInfo?.pages ?? 1} 页
+                已加载 {products.length} 个 · 共 {total} 个 SKU
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPageNum((p) => Math.max(1, p - 1))}
-                  disabled={pageNum <= 1}
-                  className="h-8 px-3 text-xs font-bold border border-slate-200 rounded disabled:opacity-40"
-                >
-                  上一页
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPageNum((p) => (pageInfo && p < pageInfo.pages ? p + 1 : p))}
-                  disabled={!pageInfo || pageNum >= pageInfo.pages}
-                  className="h-8 px-3 text-xs font-bold border border-slate-200 rounded disabled:opacity-40"
-                >
-                  下一页
-                </button>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="h-8 px-3 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded ml-2"
-                >
-                  取消
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-8 px-3 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded border border-slate-200"
+              >
+                取消
+              </button>
             </div>
           </motion.div>
         </motion.div>

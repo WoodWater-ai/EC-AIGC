@@ -406,6 +406,7 @@ const OverviewTab: React.FC<{
           <h3 className="text-sm font-black text-slate-800">任务配置</h3>
           <dl className="mt-4 grid gap-4 text-xs sm:grid-cols-2">
             <InfoRow label="业务类型" value={taskLabel(task)} />
+            <InfoRow label="使用的能力" value={task.capabilityName || task.capability || '未记录'} />
             <InfoRow label="生成比例" value={task.aspectRatio || String(params.aspect_ratio ?? '—')} />
             <InfoRow label="模板" value={task.templateName || group.templateName || '未使用模板'} />
             <InfoRow label="提交时间" value={formatDateTime(task.createTime)} />
