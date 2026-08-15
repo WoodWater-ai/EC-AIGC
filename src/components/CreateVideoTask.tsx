@@ -980,74 +980,40 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     }
   };
 
-  const renderVideoModelConfig = (showModelSelector: boolean) => {
-    const schemaValue = (key: string, fallback: string) => {
-      const value = params.schemaParams[key];
-      if (value === undefined || value === null || value === '') return fallback;
-      if (typeof value === 'boolean') return value ? '开启' : '关闭';
-      return String(value);
-    };
-    const chips = [
-      ['deployed_code', '模型', params.modelId ?? '默认模型'],
-      ['timer', '时长', schemaValue('duration', '自动')],
-      ['monitor', '分辨率', schemaValue('resolution', '自动')],
-      ['crop_portrait', '比例', schemaValue('aspect_ratio', outputRatio || '跟随首帧')],
-      ['volume_up', '音频', schemaValue('audio', '按模型')],
-    ];
+  const renderVideoModelCard = (showModelSelector: boolean) => {
     return (
-      <details className="group mt-4 border-t border-slate-100 pt-4">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
-          <div>
-            <p className="text-[11px] font-bold text-slate-600">模型配置</p>
-            <p className="mt-1 text-[10px] text-slate-400">点击标签可展开并调整当前模型能力参数</p>
-          </div>
-          <span className="flex items-center gap-1 text-[11px] font-bold text-primary">
-            配置
-            <span className="material-symbols-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
-          </span>
-        </summary>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {chips.map(([icon, label, value]) => (
-            <span
-              key={label}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-600"
-            >
-              <span className="material-symbols-outlined text-[15px] text-slate-400">{icon}</span>
-              {label}
-              <strong className="font-bold text-slate-800">{value}</strong>
-              <span className="material-symbols-outlined text-[14px] text-slate-400">expand_more</span>
-            </span>
-          ))}
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <p className="text-[11px] font-bold text-primary">模型配置</p>
+        <h2 className="mt-1 font-black">本次任务通道与模型</h2>
+        <div className="mt-3">
+          <TaskParamsPanel
+            key={mode}
+            group={config.group}
+            prefill={activeVideoParamsPrefill}
+            prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
+            unified={{ productName: productFacts.name ?? '', sellingPoints: productFacts.sellingPoints }}
+            aspectRatio=""
+            count={count}
+            onAspectRatioChange={() => undefined}
+            onCountChange={setCount}
+            prompt={effectivePrompt}
+            onPromptChange={setPrompt}
+            negativePrompt={negativePrompt}
+            onNegativePromptChange={setNegativePrompt}
+            onParamsChange={setParams}
+            fixedChannelType="VIDU"
+            fixedCapability={config.capability}
+            schemaParamsPatch={isEcommerceReplicate ? sourceDurationPatch : null}
+            showAspectRatio={false}
+            showPromptEditor={false}
+            showNegativePrompt={false}
+            showModelSelector={showModelSelector}
+            showCapabilitySummary={true}
+            showCount={false}
+            presentation="videoDemo"
+          />
         </div>
-        <div className="mt-4 border-t border-slate-100 pt-4">
-        <TaskParamsPanel
-          key={mode}
-          group={config.group}
-          prefill={activeVideoParamsPrefill}
-          prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
-          unified={{ productName: productFacts.name ?? '', sellingPoints: productFacts.sellingPoints }}
-          aspectRatio=""
-          count={count}
-          onAspectRatioChange={() => undefined}
-          onCountChange={setCount}
-          prompt={effectivePrompt}
-          onPromptChange={setPrompt}
-          negativePrompt={negativePrompt}
-          onNegativePromptChange={setNegativePrompt}
-          onParamsChange={setParams}
-          fixedChannelType="VIDU"
-          fixedCapability={config.capability}
-          schemaParamsPatch={isEcommerceReplicate ? sourceDurationPatch : null}
-          showAspectRatio={false}
-          showPromptEditor={false}
-          showNegativePrompt={false}
-          showModelSelector={showModelSelector}
-          showCapabilitySummary={false}
-          showCount={false}
-          presentation="videoDemo"
-        />
-        </div>
-      </details>
+      </div>
     );
   };
 
@@ -1126,7 +1092,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       </header>
 
       <main className="flex-1 overflow-y-auto p-5">
-        <div className="mx-auto grid w-full max-w-[1440px] grid-cols-1 items-start gap-5 xl:grid-cols-[300px_minmax(0,1fr)_380px]">
+        <div className="mx-auto grid w-full max-w-[1680px] grid-cols-1 items-start gap-5 xl:grid-cols-[300px_minmax(720px,1fr)_380px]">
           <section className="space-y-4">
             <ProductPickerCard
               selectedProduct={selectedProductInfo}
@@ -1304,7 +1270,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                       accent="emerald"
                     />
                   </button>
-                  {multiFrameSegments.slice(0, 2).map((segment, index) => (
+                  {multiFrameSegments.map((segment, index) => (
                     <button
                       key={segment.id}
                       type="button"
@@ -1320,11 +1286,6 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                     </button>
                   ))}
                 </div>
-                {multiFrameSegments.length > 2 && (
-                  <p className="mt-2 text-[10px] text-slate-400">
-                    还有 {multiFrameSegments.length - 2} 段关键帧，请在时间轴中编辑。
-                  </p>
-                )}
                 <div className="mt-3 flex gap-2 rounded-md border border-blue-100 bg-blue-50 p-2 text-[10px] leading-4 text-blue-700">
                   <span className="material-symbols-outlined text-sm">route</span>
                   每段只描述与上一帧的变化；画面事实由已选图片决定。
@@ -1422,8 +1383,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                       </p>
                     </div>
                   </details>
-                  {renderVideoModelConfig(true)}
                 </div>
+                {renderVideoModelCard(true)}
                 <MultiFrameTimeline
                   startFrame={multiFrameStart}
                   segments={multiFrameSegments}
@@ -1476,6 +1437,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
               </>
             ) : (
               <>
+                {renderVideoModelCard(mode === 'FIRST_FRAME')}
                 <div className="rounded-lg border border-slate-200 bg-white p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -1601,7 +1563,6 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
                       </span>
                     </div>
                   </div>
-                {renderVideoModelConfig(mode === 'FIRST_FRAME')}
               </>
             )}
           </section>
@@ -1759,7 +1720,7 @@ const AssetThumb: React.FC<{
   badge?: string;
 }> = ({ asset, onRemove, large, badge }) => (
   <div
-    className={`group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 ${
+    className={`group relative flex items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 ${
       large ? 'h-44 w-full' : 'aspect-square w-full'
     }`}
   >
@@ -1774,13 +1735,13 @@ const AssetThumb: React.FC<{
         poster={asset.thumbnailUrl}
         controls
         preload="metadata"
-        className="h-full w-full object-contain"
+        className="max-h-full max-w-full object-contain"
       />
     ) : (
       <img
         src={asset.originalUrl}
         alt={asset.name}
-        className="h-full w-full object-contain"
+        className="max-h-full max-w-full object-contain"
         referrerPolicy="no-referrer"
       />
     )}
@@ -1805,7 +1766,7 @@ const MultiFrameAssetPreview: React.FC<{
 }> = ({ asset, label, accent }) => (
   <div className="min-w-0">
     <div
-      className={`grid aspect-[3/4] place-items-center overflow-hidden rounded-md border bg-slate-50 ${
+      className={`flex aspect-[3/4] items-center justify-center overflow-hidden rounded-md border bg-slate-50 ${
         accent === 'emerald' ? 'border-emerald-200' : 'border-slate-200'
       }`}
     >
@@ -1813,7 +1774,7 @@ const MultiFrameAssetPreview: React.FC<{
         <img
           src={asset.thumbnailUrl ?? asset.originalUrl}
           alt={asset.name ?? label}
-          className="h-full w-full object-cover"
+          className="max-h-full max-w-full object-contain"
           referrerPolicy="no-referrer"
         />
       ) : (

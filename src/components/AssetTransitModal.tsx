@@ -158,8 +158,10 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
         ? 'PRODUCT'
         : 'UPLOAD',
   );
+  // picker 模式按 assetKind 锁死 mediaFilter:从源头杜绝"图片 picker 混入视频" / "视频 picker 混入图片"。
+  // manager 模式(资源中心全局)仍显示全部。
   const [mediaFilter, setMediaFilter] = useState<ResourceMediaFilter>(
-    assetKind === 'AUDIO' ? 'AUDIO' : 'ALL',
+    mode === 'manager' && assetKind !== 'AUDIO' ? 'ALL' : assetKind,
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [productSpus, setProductSpus] = useState<ProductSpuView[]>([]);
@@ -522,7 +524,14 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setFocusedProduct(null);
     setPrimaryFilter('all');
     setOpenTagDimension(null);
-    setMediaFilter(source === 'MODEL' ? 'IMAGE' : assetKind === 'AUDIO' ? 'AUDIO' : 'ALL');
+    // picker 模式按 assetKind 锁死,不允许回到 'ALL';manager 模式仍允许 'ALL'。
+    setMediaFilter(
+      source === 'MODEL'
+        ? 'IMAGE'
+        : mode === 'picker'
+          ? assetKind
+          : 'ALL',
+    );
   };
 
   /**
@@ -1438,11 +1447,18 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
           {/* Left Navigation (分类导航) */}
           <aside className="w-[210px] shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50 p-4 flex flex-col gap-4">
 
-            {activeSource !== 'MODEL' && assetKind !== 'AUDIO' && (
+            {activeSource !== 'MODEL' && assetKind !== 'AUDIO' && (() => {
+              // picker 模式按 assetKind 锁定 tab,只显示对应 kind 的单个 tab;
+              // manager 模式仍显示 IMAGE + VIDEO 两个 tab。
+              const visibleKinds: Array<'IMAGE' | 'VIDEO'> =
+                mode === 'picker'
+                  ? [assetKind as 'IMAGE' | 'VIDEO']
+                  : (['IMAGE', 'VIDEO'] as const);
+              return (
               <div>
                 <p className="mb-2 px-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">素材类型</p>
                 <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
-                  {(['IMAGE', 'VIDEO'] as const).map((kind) => (
+                  {visibleKinds.map((kind) => (
                     <button
                       key={kind}
                       type="button"
@@ -1462,7 +1478,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   ))}
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* 我的分类 —— 真实分类树(从 assetCategoryApi.tree 加载) */}
             <div className={`flex flex-col gap-2 ${activeSource !== 'UPLOAD' ? 'hidden' : ''}`}>

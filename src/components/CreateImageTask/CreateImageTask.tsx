@@ -35,12 +35,7 @@ import { useServiceQuery } from '../../api/hooks/useServiceQuery';
 import type { PrefillState } from '../createTask/useTaskParams';
 import type { AssistantTaskPrefill } from '../../api/modules/assistant';
 import {
-  CANONICAL_STYLES,
-  getCanonicalStyleOptions,
-  getLinkedPoseOptions,
-  getLinkedSceneOptions,
   groupReferenceSlots,
-  optionCodeFromValue,
   referenceKey,
   sameReferenceAsset,
   type TaggedReference,
@@ -275,19 +270,12 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const appliedCreationTemplateRef = useRef<string | null>(null);
   const appliedAssistantPrefillRef = useRef<string | null>(null);
 
-  const styleOptions = useMemo(
-    () => getCanonicalStyleOptions(styleDictOptions),
-    [styleDictOptions],
-  );
-  const selectedStyleCode = optionCodeFromValue(styleOptions, style);
-  const sceneOptions = useMemo(
-    () => getLinkedSceneOptions(selectedStyleCode, sceneDictOptions),
-    [sceneDictOptions, selectedStyleCode],
-  );
-  const poseOptions = useMemo(
-    () => getLinkedPoseOptions(selectedStyleCode, poseDictOptions),
-    [poseDictOptions, selectedStyleCode],
-  );
+  // [2026-08-15] 风格/场景/姿势完全以字典为准、三者独立:
+  // 去掉 CANONICAL_STYLES 硬编码清单,也不再按风格联动收窄场景/姿势选项;
+  // 选项(名称/描述/图片/id)全部来自后端字典,选择互不影响。
+  const styleOptions = styleDictOptions;
+  const sceneOptions = sceneDictOptions;
+  const poseOptions = poseDictOptions;
   const groupedReferences = useMemo(
     () => groupReferenceSlots(state.orderedRefs),
     [state.orderedRefs],
@@ -301,22 +289,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     return result;
   }, [groupedReferences]);
 
+  // [2026-08-15] 风格选择不再联动场景/姿势 —— 三者独立,各自以字典为准。
   const handleStyleChange = useCallback((value: string) => {
     setStyle(value);
-    const styleCode = optionCodeFromValue(styleOptions, value);
-    const definition = CANONICAL_STYLES.find((item) => item.code === styleCode);
-    if (!definition) return;
-    const nextScenes = getLinkedSceneOptions(styleCode, sceneDictOptions);
-    const nextPoses = getLinkedPoseOptions(styleCode, poseDictOptions);
-    const currentSceneCode = optionCodeFromValue(getLinkedSceneOptions('', sceneDictOptions), scene);
-    const currentPoseCode = optionCodeFromValue(getLinkedPoseOptions('', poseDictOptions), pose);
-    if (!definition.sceneCodes.includes(currentSceneCode)) {
-      setScene(nextScenes.find((item) => item.value === definition.defaultSceneCode)?.label ?? '');
-    }
-    if (!definition.poseCodes.includes(currentPoseCode)) {
-      setPose(nextPoses.find((item) => item.value === definition.defaultPoseCode)?.label ?? '');
-    }
-  }, [pose, poseDictOptions, scene, sceneDictOptions, setPose, setScene, setStyle, styleOptions]);
+  }, [setStyle]);
 
   useEffect(() => {
     if (!assistantPrefill || assistantPrefill.targetScreen !== 'CREATE_IMAGE_TASK') return;
@@ -750,7 +726,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
                   scene={scene}
                   pose={pose}
                   lockedByReference={lockedByReference}
-                  onStyleChange={handleStyleChange}
+                  onStyleChange={handleStyleChange} // 已简化为仅 setStyle,不联动场景/姿势
                   onSceneChange={setScene}
                   onPoseChange={setPose}
                 />

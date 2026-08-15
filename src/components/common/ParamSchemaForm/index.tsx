@@ -1,5 +1,6 @@
 // [新增 2026-07-12 P0/M2 前端] ParamSchemaForm 主组件
 // [v2.0 2026-07-13 F1 补强] +IMAGES_URL 多图 / +DICT 字典引用
+// [v2.1 2026-08-15] +presentation='videoDemo' 走 CompactParamPicker 视觉
 import React, { useMemo } from 'react';
 import type { CapabilityDefinition } from '../../../api/modules/capability';
 import { localValidate } from './utils/validate';
@@ -17,19 +18,22 @@ import { DictField } from './fields/DictField';
 import VideoPickerField from './fields/VideoPickerField';
 import AudioPickerField from './fields/AudioPickerField';
 import LipRefPickerField from './fields/LipRefPickerField';
+import { VideoDemoField } from './VideoDemoField';
 
 export interface ParamSchemaFormProps {
   schema: CapabilityDefinition;
   value: Record<string, any>;
   onChange: (values: Record<string, any>) => void;
   /** 推荐值(模板用),匹配上时蓝底灰显 */
-  recommendValues?: Record<string, any>;
+  recommendValues?: Record<string, unknown>;
   /** 只读模式(TaskDetailsDrawer 用) */
   readOnly?: boolean;
+  /** 视觉风格。videoDemo 下基础字段(SELECT / NUMBER / TEXT)用 CompactParamPicker 风格 */
+  presentation?: 'default' | 'videoDemo';
 }
 
 export function ParamSchemaForm({
-  schema, value, onChange, recommendValues = {}, readOnly = false,
+  schema, value, onChange, recommendValues = {}, readOnly = false, presentation = 'default',
 }: ParamSchemaFormProps) {
   const errors = useMemo(
     () => localValidate(value || {}, schema.fields || []),
@@ -62,6 +66,10 @@ export function ParamSchemaForm({
           onChange: (v: any) => setValue(field.key, v),
           error, readOnly, isRecommended,
         };
+
+        if (presentation === 'videoDemo') {
+          return <VideoDemoField key={field.key} {...commonProps} />;
+        }
 
         switch (field.type) {
           case 'INT':

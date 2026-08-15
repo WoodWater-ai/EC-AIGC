@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef } from 'react';
+import { Cpu, Route } from 'lucide-react';
 import { useTaskParams, type PrefillState } from './useTaskParams';
 import { ParamSchemaForm } from '../common/ParamSchemaForm';
 import { assembleTaskPrompt, applyAiOptimize } from './assembleTaskPrompt';
+import { CompactParamPicker, type CompactParamOption } from '../common/CompactParamPicker';
 
 export interface TaskParamsPanelProps {
   group: 'IMAGE' | 'VIDEO' | 'SOLUTION';
@@ -141,39 +143,42 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
       )}
 
       {/* ① 三级选择器 */}
-      <div className="space-y-3">
+      <div className={presentation === 'videoDemo' ? 'flex flex-wrap items-start gap-3' : 'space-y-3'}>
         {tp.initializing && (
-          <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+          <div className={presentation === 'videoDemo' ? 'basis-full rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700' : 'rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700'}>
             正在解析默认通道和模型…
           </div>
         )}
         {tp.fallbackReason && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className={presentation === 'videoDemo' ? 'basis-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800' : 'rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800'}>
             模板原执行参数已失效,将使用默认配置,你可手动调整。
           </div>
         )}
         {tp.unavailableReason && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className={presentation === 'videoDemo' ? 'basis-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700' : 'rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700'}>
             {tp.unavailableReason}
           </div>
         )}
-        <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">
-            {presentation === 'videoDemo' ? '模型通道' : '通道实例'}
-            {tp.locked && ' 🔒'}
-          </label>
+        <div className={presentation === 'videoDemo' ? 'min-w-[160px] flex-1' : ''}>
           {presentation === 'videoDemo' ? (
-            <select
+            <CompactParamPicker
+              label="模型通道"
+              icon={<Route className="h-4 w-4" />}
               value={tp.channelId ?? ''}
+              options={visibleInstances.map<CompactParamOption>((inst) => ({
+                value: inst.id,
+                label: inst.channelName,
+              }))}
               disabled={tp.locked}
-              onChange={(event) => tp.setChannelId(event.target.value)}
-              className="h-9 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-800 outline-none focus:border-primary"
-            >
-              {visibleInstances.map((inst) => (
-                <option key={inst.id} value={inst.id}>{inst.channelName}</option>
-              ))}
-            </select>
+              placeholder="暂无可用通道"
+              widthClassName="w-full"
+              onChange={(next) => tp.setChannelId(next)}
+            />
           ) : (
+            <>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              通道实例{tp.locked && ' 🔒'}
+            </label>
             <div className="flex flex-wrap gap-2">
               {visibleInstances.map((inst) => (
                 <button
@@ -194,6 +199,7 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
                 </button>
               ))}
             </div>
+            </>
           )}
         </div>
 
@@ -227,45 +233,59 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
         )}
 
         {tp.channelType && fixedCapability && showCapabilitySummary && (
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">生成能力</label>
-            <div className="px-3 py-2 rounded-md border border-blue-200 bg-blue-50 text-xs font-bold text-blue-700">
-              {tp.capabilitiesInChannel.find((item) => item.code === fixedCapability)?.label
-                ?? fixedCapability}
-            </div>
-          </div>
-        )}
-
-        {tp.capability && showModelSelector && (
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">模型</label>
-            <select
-              value={tp.modelId === tp.defaultModelCode ? '' : (tp.modelId ?? '')}
-              disabled={tp.locked}
-              onChange={(e) => tp.setModelId(e.target.value || null)}
-              className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md bg-white"
-            >
-              <option value="">
-                {tp.defaultModelCode
-                  ? `默认模型 (${tp.modelOptions.find((option) =>
-                    option.modelCode === tp.defaultModelCode)?.displayName ?? tp.defaultModelCode})`
-                  : '未配置默认模型，请选择'}
-              </option>
-              {tp.modelOptions
-                .filter((option) => option.modelCode !== tp.defaultModelCode)
-                .map((option) => (
-                  <option key={option.modelCode} value={option.modelCode}>
-                    {option.displayName}
-                  </option>
-                ))}
-            </select>
-            {tp.modelOptions.length > 0 && (
-              <p className="mt-1 text-[10px] text-slate-400">
-                默认值来自系统配置，也可切换为该能力目录中的其他模型。
-              </p>
+          <div className={presentation === 'videoDemo' ? 'min-w-[160px] flex-1' : ''}>
+            {presentation === 'videoDemo' ? (
+              <div className="flex h-9 items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2 text-xs font-bold text-blue-700">
+                <span className="shrink-0 whitespace-normal break-words text-[10px] font-bold text-slate-400">生成能力</span>
+                <span className="min-w-0 flex-1 whitespace-normal break-words">
+                  {tp.capabilitiesInChannel.find((item) => item.code === fixedCapability)?.label
+                    ?? fixedCapability}
+                </span>
+              </div>
+            ) : (
+              <>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">生成能力</label>
+                <div className="px-3 py-2 rounded-md border border-blue-200 bg-blue-50 text-xs font-bold text-blue-700">
+                  {tp.capabilitiesInChannel.find((item) => item.code === fixedCapability)?.label
+                    ?? fixedCapability}
+                </div>
+              </>
             )}
           </div>
         )}
+
+        {tp.capability && showModelSelector && (() => {
+          const defaultOpt = tp.modelOptions.find((option) => option.modelCode === tp.defaultModelCode);
+          const isDefaultSelected = tp.modelId === tp.defaultModelCode || tp.modelId === null;
+          const modelOptionsList: CompactParamOption[] = [];
+          if (defaultOpt) {
+            modelOptionsList.push({ value: '', label: `默认模型 (${defaultOpt.displayName})` });
+          }
+          tp.modelOptions
+            .filter((option) => option.modelCode !== tp.defaultModelCode)
+            .forEach((option) => {
+              modelOptionsList.push({ value: option.modelCode, label: option.displayName });
+            });
+          return (
+            <div className={presentation === 'videoDemo' ? 'min-w-[160px] flex-1' : ''}>
+              <CompactParamPicker
+                label="模型"
+                icon={<Cpu className="h-4 w-4" />}
+                value={isDefaultSelected ? '' : (tp.modelId ?? '')}
+                options={modelOptionsList}
+                disabled={tp.locked}
+                placeholder="未配置默认模型，请选择"
+                widthClassName="w-full"
+                onChange={(next) => tp.setModelId(next || null)}
+              />
+              {tp.modelOptions.length > 0 && (
+                <p className="mt-1 text-[10px] text-slate-400">
+                  默认值来自系统配置，也可切换为该能力目录中的其他模型。
+                </p>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* ② 固定通用:比例 & 张数 */}
@@ -290,7 +310,7 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
       {/* ③ schema 差异区 */}
       {tp.schema && (
         <div className={presentation === 'videoDemo'
-          ? '[&_.param-schema-form]:grid [&_.param-schema-form]:grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] [&_.param-schema-form]:gap-x-3 [&_.param-schema-form]:gap-y-3 [&_.param-field]:min-w-0 [&_.param-field_label]:mb-1.5 [&_.param-field_label]:block [&_.param-field_label]:text-xs [&_.param-field_label]:font-bold [&_.param-field_label]:text-slate-700'
+          ? '[&_.param-schema-form]:grid [&_.param-schema-form]:grid-cols-1 [&_.param-schema-form]:gap-3 sm:[&_.param-schema-form]:grid-cols-2 lg:[&_.param-schema-form]:grid-cols-3'
           : ''}>
           <label className="block text-xs font-bold text-slate-700 mb-2">能力参数</label>
           {presentation === 'videoDemo' && basicSchema ? (
@@ -300,6 +320,7 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
                 value={tp.schemaParams}
                 onChange={tp.setSchemaParams}
                 recommendValues={tp.recommendValues}
+                presentation="videoDemo"
               />
               {advancedSchema && advancedSchema.fields.length > 0 && (
                 <details className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
@@ -312,6 +333,7 @@ export const TaskParamsPanel: React.FC<TaskParamsPanelProps> = (props) => {
                       value={tp.schemaParams}
                       onChange={tp.setSchemaParams}
                       recommendValues={tp.recommendValues}
+                      presentation="videoDemo"
                     />
                   </div>
                 </details>

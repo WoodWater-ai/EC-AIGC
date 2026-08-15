@@ -50,7 +50,7 @@ export const CompactParamPicker: React.FC<CompactParamPickerProps> = ({
   }, []);
 
   return (
-    <div ref={rootRef} className={`relative min-w-0 max-w-full ${widthClassName}`}>
+    <div ref={rootRef} className={`relative min-w-[160px] max-w-full ${widthClassName ?? ''}`.trim()}>
       <button
         type="button"
         disabled={pickerDisabled}
@@ -67,9 +67,11 @@ export const CompactParamPicker: React.FC<CompactParamPickerProps> = ({
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-slate-100 bg-slate-50 text-slate-500">
           {icon}
         </span>
-        <span className="min-w-0 flex-1 truncate">
-          <span className="mr-1 text-[10px] font-bold text-slate-400">{label}</span>
-          <span className="text-[11px] font-bold text-slate-700">
+        <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+          <span className="shrink-0 truncate text-[10px] font-bold leading-tight text-slate-400">
+            {label}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[11px] font-bold leading-tight text-slate-700">
             {(selected?.label ?? value) || (unavailable ? '暂无可用项' : placeholder)}
           </span>
         </span>
@@ -106,7 +108,7 @@ export const CompactParamPicker: React.FC<CompactParamPickerProps> = ({
                     {option.label}
                   </span>
                   {option.description && (
-                    <span className="mt-0.5 block whitespace-normal break-all text-[11px] text-slate-400">
+                    <span className="mt-0.5 block whitespace-normal break-words text-[11px] text-slate-400">
                       {option.description}
                     </span>
                   )}

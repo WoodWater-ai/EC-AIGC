@@ -4,7 +4,7 @@ import { useTaskParams } from '../../createTask/useTaskParams';
 import { ParamSchemaForm } from '../../common/ParamSchemaForm';
 import { localValidate } from '../../common/ParamSchemaForm/utils/validate';
 import { UnsupportedNotice } from './UnsupportedNotice';
-import { CompactParamPicker } from '../center/CompactParamPicker';
+import { CompactParamPicker } from '../../common/CompactParamPicker';
 import type { PrefillState } from '../../createTask/useTaskParams';
 import type { FieldDef } from '../../../api/modules/capability';
 
