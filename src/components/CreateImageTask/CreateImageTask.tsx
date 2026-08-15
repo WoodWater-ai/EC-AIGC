@@ -290,7 +290,16 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     if (!submittedGroup) return;
     let cancelled = false;
     let timer = 0;
+    // [2026-08-15] 轮询兜底:最长 15 分钟,超时按当前结果展示,避免异常场景无限轮询
+    const startedAt = Date.now();
+    const MAX_POLL_MS = 15 * 60 * 1000;
     const tick = async () => {
+      if (Date.now() - startedAt > MAX_POLL_MS) {
+        setSubmitStatus('done');
+        setSubmitError(null);
+        window.clearInterval(timer);
+        return;
+      }
       try {
         const group = await taskApi.groupDetail(submittedGroup.groupId);
         if (cancelled) return;

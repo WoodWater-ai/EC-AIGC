@@ -5,6 +5,7 @@ import type { ProductAsset } from '../types';
 import { assetApi, type AssetResourceItem, type AssetResourceQueryRequest } from '../api/modules/asset';
 import { ApiError } from '../api/error';
 import { productLibraryApi } from '../api/modules/productLibrary';
+import { productInfoApi } from '../api/modules/productInfo';
 import { productCategoryApi, type ProductCategoryNode } from '../api/modules/productCategory';
 import { assetCategoryApi, type AssetCategoryNode } from '../api/modules/assetCategory';
 import { modelProfileApi, type ModelProfileDTO } from '../api/modules/modelProfile';
@@ -661,6 +662,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   // mode='manager' 强制多选;picker 模式尊重调用方的 multiSelect
   const effectiveMultiSelect = mode === 'manager' ? true : multiSelect;
 
+  // [2026-08-15] 任务选素材(picker):产品素材 tab 选中 SKU 后可直接确认,SKU 主图作为素材
+  const canConfirmProductSku = mode !== 'manager'
+    && activeSource === 'PRODUCT'
+    && !focusedProduct
+    && selectedProductSkuIds.length === 1;
+
   const handleCardClick = (id: string) => {
     if (mode === 'manager' && activeSource !== 'UPLOAD' && !(activeSource === 'PRODUCT' && focusedProduct)) return;
     if (effectiveMultiSelect) {
@@ -936,7 +943,42 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
 
   const [confirmingSelection, setConfirmingSelection] = useState(false);
 
+  /**
+   * [2026-08-15] 任务选素材:产品素材 tab 选中 SKU 直接确认 ——
+   * 通过 productInfoApi.detail 拿 SKU 主图 assetId,再取完整 AssetResourceItem 作为素材。
+   */
+  const confirmSelectedSkuAsAsset = async () => {
+    const skuId = selectedProductSkuIds[0];
+    const sku = productSpus
+      .flatMap((spu) => spu.skus)
+      .find((item) => item.id === skuId);
+    if (!sku) {
+      toast.error('所选 SKU 不存在，请重新选择');
+      return;
+    }
+    setConfirmingSelection(true);
+    try {
+      const detail = await productInfoApi.detail({ id: sku.productId });
+      if (!detail || !detail.imageId) {
+        toast.warning('该 SKU 暂无可用主图素材，请通过「查看素材」选择具体图片');
+        return;
+      }
+      const asset = await assetApi.get(String(detail.imageId));
+      onConfirmSelection?.([asset]);
+      onClose();
+    } catch (err) {
+      toast.error('素材获取失败：' + (err as Error).message);
+    } finally {
+      setConfirmingSelection(false);
+    }
+  };
+
   const handleConfirmSelection = async () => {
+    // [2026-08-15] 产品素材 tab 选中 SKU 未聚焦:直接把 SKU 主图作为素材确认
+    if (canConfirmProductSku) {
+      await confirmSelectedSkuAsAsset();
+      return;
+    }
     if (selectedAssetIds.length === 0) {
       toast.warning('请至少选择一个资源');
       return;
@@ -1870,11 +1912,19 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                       return (
                         <article
                           key={sku.id}
-                          onClick={() => setSelectedProductSkuIds((current) =>
-                            current.includes(sku.id)
-                              ? current.filter((id) => id !== sku.id)
-                              : [...current, sku.id],
-                          )}
+                          onClick={() => {
+                            // [2026-08-15] 任务选素材(picker):SKU 单选,再点取消;管理端保持多选
+                            if (mode === 'picker') {
+                              setSelectedProductSkuIds((current) =>
+                                current.includes(sku.id) ? [] : [sku.id]);
+                            } else {
+                              setSelectedProductSkuIds((current) =>
+                                current.includes(sku.id)
+                                  ? current.filter((id) => id !== sku.id)
+                                  : [...current, sku.id],
+                              );
+                            }
+                          }}
                           className={`group relative min-w-0 cursor-pointer overflow-hidden rounded-lg border bg-white transition-all hover:shadow-md ${
                             selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'
                           }`}
@@ -2262,16 +2312,18 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   onClick={handleConfirmSelection}
                   disabled={
                     mode === 'manager'
-                    || (activeSource === 'PRODUCT' && !focusedProduct)
-                    || selectedAssetIds.length === 0
                     || confirmingSelection
+                    || (!canConfirmProductSku && selectedAssetIds.length === 0)
+                    || (!canConfirmProductSku && activeSource === 'PRODUCT' && !focusedProduct)
                   }
                   title={
                     mode === 'manager'
                       ? '管理型入口,不需要选择资源'
-                      : selectedAssetIds.length === 0
-                        ? '请先选择资源'
-                        : undefined
+                      : canConfirmProductSku
+                        ? undefined
+                        : selectedAssetIds.length === 0
+                          ? '请先选择资源'
+                          : undefined
                   }
                   className="px-8 py-2 bg-blue-600 text-white rounded-lg text-xs font-extrabold hover:bg-blue-700 hover:shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
