@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ImageOff } from 'lucide-react';
 import { withCosThumbnail } from '../utils/cosImage';
 
@@ -20,6 +20,8 @@ interface AssetImageProps {
    * 默认 400。传 0 或负数禁用(不添加参数)。
    */
   maxWidth?: number;
+  /** 仅 VIDEO:鼠标悬停时自动播放,移出后停止。默认 true。 */
+  hoverPlay?: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export const AssetImage: React.FC<AssetImageProps> = ({
   fallback,
   assetKind,
   maxWidth = 400,
+  hoverPlay = true,
 }) => {
   // 过滤掉空值,记录当前尝试到第几个
   const validUrls = urls.filter((u): u is string => !!u);
@@ -57,6 +60,11 @@ export const AssetImage: React.FC<AssetImageProps> = ({
       ? validUrls.map((u) => withCosThumbnail(u, maxWidth) ?? u)
       : validUrls;
   const [urlIndex, setUrlIndex] = useState(0);
+  // [2026-08-17] hover play hooks:必须在组件顶层调用(React Hooks 规则),
+  // 不能放进 if 分支,否则切换 assetKind 时 hooks 顺序不一致会报错。
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isHovering, setIsHovering] = useState(false);
 
   const aspectClass =
     aspectRatio === 'square'
@@ -68,6 +76,35 @@ export const AssetImage: React.FC<AssetImageProps> = ({
   const handleError = () => {
     setUrlIndex((prev) => prev + 1);
   };
+
+  // hover 自动播放/暂停 —— 用 useEffect + native event listener
+  // (比 React 合成事件更稳,避免 props 变化导致 handler 闭包陈旧)
+  useEffect(() => {
+    if (assetKind !== 'VIDEO' || !hoverPlay) return;
+    const container = containerRef.current;
+    const video = videoRef.current;
+    if (!container || !video) return;
+    const onEnter = () => {
+      setIsHovering(true);
+      const p = video.play();
+      if (p && typeof p.catch === 'function') {
+        p.catch((err) => {
+          // 静默失败:URL 未加载完成 / autoplay 被浏览器拦截 / src 失效
+          console.warn('[AssetImage] video play() rejected:', err?.message);
+        });
+      }
+    };
+    const onLeave = () => {
+      setIsHovering(false);
+      video.pause();
+    };
+    container.addEventListener('mouseenter', onEnter);
+    container.addEventListener('mouseleave', onLeave);
+    return () => {
+      container.removeEventListener('mouseenter', onEnter);
+      container.removeEventListener('mouseleave', onLeave);
+    };
+  }, [assetKind, hoverPlay, urlIndex]);
 
   // 全部失败:显示 fallback 或默认缺损图
   if (urlIndex >= processedUrls.length) {
@@ -93,9 +130,11 @@ export const AssetImage: React.FC<AssetImageProps> = ({
       : undefined;
     return (
       <div
-        className={`relative overflow-hidden bg-slate-900 ${aspectClass} ${className ?? ''}`}
+        ref={containerRef}
+        className={`relative cursor-pointer overflow-hidden bg-slate-900 ${aspectClass} ${className ?? ''}`}
       >
         <video
+          ref={videoRef}
           src={validUrls[urlIndex]}
           // 第二个 URL(thumbnailUrl)作为 poster 海报
           poster={processedPoster}
@@ -103,19 +142,21 @@ export const AssetImage: React.FC<AssetImageProps> = ({
           muted
           playsInline
           onError={handleError}
-          className={`w-full h-full ${objectFit === 'contain' ? 'object-contain' : 'object-cover'}`}
+          className={`pointer-events-none h-full w-full ${objectFit === 'contain' ? 'object-contain' : 'object-cover'}`}
         />
-        {/* 中心 play 图标(指示这是视频) */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-            <span
-              className="material-symbols-outlined text-white text-2xl"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              play_arrow
-            </span>
+        {/* 中心 play 图标(指示这是视频);hover 播放时隐藏 */}
+        {!isHovering && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm">
+              <span
+                className="material-symbols-outlined text-2xl text-white"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                play_arrow
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }

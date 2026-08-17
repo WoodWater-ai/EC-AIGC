@@ -2099,7 +2099,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                             className="w-full h-full"
                           />
                           {/* Selected Index circular badge top-left */}
-                          <div className={`absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shadow-sm transition-all ${
+                          <div className={`pointer-events-none absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shadow-sm transition-all ${
                             isSelected ? 'bg-blue-600 text-white' : 'border-2 border-white bg-black/20 text-transparent'
                           }`}>
                             {isSelected ? selectIndex : ''}
@@ -2126,9 +2126,10 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                               </span>
                             </div>
                           )}
-                          <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          {/* 纯视觉蒙层必须允许鼠标事件穿透，否则会挡住 AssetImage 的视频 hover 播放监听。 */}
+                          <div className="pointer-events-none absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                           {(asset.isProductMainImage || (activeSource === 'PRODUCT' && focusedProduct && asset.isProductCover)) && (
-                            <span className={`absolute bottom-2 left-2 rounded px-2 py-1 text-[9px] font-bold ${
+                            <span className={`pointer-events-none absolute bottom-2 left-2 rounded px-2 py-1 text-[9px] font-bold ${
                               asset.isProductCover
                                 ? 'border border-blue-200 bg-blue-50/95 text-blue-700'
                                 : 'border border-slate-200 bg-white/95 text-slate-600'
