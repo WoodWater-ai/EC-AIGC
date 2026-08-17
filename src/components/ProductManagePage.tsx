@@ -8,6 +8,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  ScanSearch,
   Search,
   Sparkles,
   Trash2,
@@ -22,7 +23,9 @@ import { productCategoryApi, type ProductCategoryNode } from '../api/modules/pro
 import { useAuth } from '../auth/AuthContext';
 import { withCosThumbnail } from '../utils/cosImage';
 import { useConfirm } from './common/ConfirmProvider';
+import { ScanAddProductImageDialog } from './ScanAddProductImageDialog';
 import { ProductDetailDrawer } from './productManagement/ProductDetailDrawer';
+import { ImagePreviewModal, type PreviewImage } from './ImagePreviewModal';
 import { ProductSpuFormDrawer } from './productManagement/ProductSpuFormDrawer';
 import {
   formatProductTime,
@@ -71,6 +74,15 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ProductDTO | null>(null);
   const [erpSyncing, setErpSyncing] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  /** 商品图大图预览(主表/子表缩略图点击) */
+  const [productPreview, setProductPreview] = useState<{
+    images: PreviewImage[];
+    initialIndex: number;
+  } | null>(null);
+  function openProductPreview(url: string, alt: string) {
+    setProductPreview({ images: [{ url, label: alt }], initialIndex: 0 });
+  }
 
   async function load(overrides?: ProductLoadOverrides) {
     setLoading(true);
@@ -118,6 +130,8 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
     () => (pageInfo?.list ?? []).map((item) => toProductSpu(item as ProductManagementRecord)),
     [pageInfo],
   );
+  // 排序由后端 SQL 决定(ManagementGroupedSource.ORDER BY has_image DESC, sort_time DESC),
+  // 这里不再做前端排序,避免分页错位。
   const visibleProducts = products;
   const visibleSkuCount = visibleProducts.reduce((count, product) => count + product.skus.length, 0);
   const total = pageInfo?.total ?? 0;
@@ -290,6 +304,17 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
             当前页 <span className="font-bold text-slate-700">{visibleSkuCount}</span> 个 SKU
           </p>
         </div>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => setScanOpen(true)}
+            className="flex h-9 items-center justify-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-4 text-xs font-bold text-primary hover:bg-primary/10"
+            title="扫描本地文件夹,按文件名匹配商品并批量设置主图"
+          >
+            <ScanSearch className="h-4 w-4" />
+            扫描添加商品主图
+          </button>
+        )}
         <button
           type="button"
           onClick={() => void handleSyncErpProducts()}
@@ -438,6 +463,7 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
                       : openEdit(product.raw))}
                     onDelete={() => void handleDelete(product)}
                     onCreate={handleCreate}
+                    onPreview={openProductPreview}
                   />
                 );
               })}
@@ -505,6 +531,18 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
         onClose={() => setFormOpen(false)}
         onSaved={() => void load()}
       />
+      <ScanAddProductImageDialog
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onDone={() => void load()}
+      />
+      {productPreview && (
+        <ImagePreviewModal
+          images={productPreview.images}
+          initialIndex={productPreview.initialIndex}
+          onClose={() => setProductPreview(null)}
+        />
+      )}
     </div>
   );
 }
@@ -522,6 +560,8 @@ interface ProductRowsProps {
   onEdit: (sku: ProductSkuView) => void;
   onDelete: () => void;
   onCreate: (sku: ProductSkuView) => void;
+  /** 点击商品图缩略图时触发(打开大图预览) */
+  onPreview?: (url: string, alt: string) => void;
 }
 
 function ProductRows({
@@ -536,6 +576,7 @@ function ProductRows({
   onEdit,
   onDelete,
   onCreate,
+  onPreview,
 }: ProductRowsProps) {
   const sourceClass = product.source === 'ERP'
     ? 'border-blue-100 bg-blue-50 text-blue-700'
@@ -555,7 +596,7 @@ function ProductRows({
           </button>
         </td>
         <td className="px-2 py-2">
-          <ProductImage url={product.imageUrl} alt={product.name} size="lg" />
+          <ProductImage url={product.imageUrl} alt={product.name} size="lg" onPreview={onPreview} />
         </td>
         <td className="px-3 py-2">
           <button type="button" onClick={onDetails} className="block max-w-full text-left">
@@ -608,7 +649,7 @@ function ProductRows({
       {expanded && product.skus.map((sku) => (
         <tr key={sku.id} className="border-t border-blue-50 bg-blue-50/35 hover:bg-blue-50/70">
           <td className="px-2 py-2 text-center text-slate-300">└</td>
-          <td className="px-2 py-2"><ProductImage url={sku.imageUrl} alt={sku.name} size="sm" /></td>
+          <td className="px-2 py-2"><ProductImage url={sku.imageUrl} alt={sku.name} size="sm" onPreview={onPreview} /></td>
           <td className="px-3 py-2 pl-6">
             <strong className="block truncate text-[11px] text-slate-800">{sku.name}</strong>
             <span className="mt-0.5 block truncate font-mono text-[9px] text-slate-400">{sku.code}</span>
@@ -640,16 +681,52 @@ function ProductRows({
   );
 }
 
-function ProductImage({ url, alt, size }: { url?: string; alt: string; size: 'sm' | 'lg' }) {
+function ProductImage({
+  url,
+  alt,
+  size,
+  onPreview,
+}: {
+  url?: string;
+  alt: string;
+  size: 'sm' | 'lg';
+  onPreview?: (url: string, alt: string) => void;
+}) {
   const classes = size === 'lg' ? 'h-11 w-11' : 'h-9 w-9';
+  const content = url ? (
+    <img
+      src={withCosThumbnail(url, 96) ?? url}
+      alt={alt}
+      className="min-h-0 min-w-0 max-h-full max-w-full object-contain transition group-hover:scale-[1.02]"
+      loading="lazy"
+    />
+  ) : (
+    <ImageIcon className="h-4 w-4 text-slate-300" />
+  );
+  // 没有 url 或没有预览回调时,降级为 <span>(不弹大图)
+  if (!url || !onPreview) {
+    return (
+      <span className={`grid place-items-center overflow-hidden rounded border border-slate-200 bg-slate-50 ${classes}`}>
+        {content}
+      </span>
+    );
+  }
   return (
-    <span className={`grid place-items-center overflow-hidden rounded border border-slate-200 bg-slate-50 ${classes}`}>
-      {url ? (
-        <img src={withCosThumbnail(url, 96) ?? url} alt={alt} className="h-full w-full object-contain p-0.5" />
-      ) : (
-        <ImageIcon className="h-4 w-4 text-slate-300" />
-      )}
-    </span>
+    <button
+      type="button"
+      onClick={(e) => {
+        // 阻止冒泡:外层 <tr> 有 onToggle(展开/收起行),点击缩略图不应触发行展开
+        e.preventDefault();
+        e.stopPropagation();
+        onPreview(url, alt);
+      }}
+      title="点击查看大图"
+      // 参考 ImageResultPanel 方案:aspect-square + min-w-0 + overflow-hidden,
+      // img min-0/max-full/object-contain —— 不论横长/竖长图都完整显示不变形
+      className={`group relative flex aspect-square ${classes} min-w-0 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-slate-50 hover:border-primary/60 hover:bg-slate-100`}
+    >
+      {content}
+    </button>
   );
 }
 

@@ -147,6 +147,25 @@ export interface ProductManagementDetailReq extends ProductIdReq {
   sourceType: 'MANUAL' | 'ERP';
 }
 
+/** 扫描添加商品主图 - 匹配模式 */
+export type ProductScanMatchMode = 'NAME' | 'CODE';
+
+/** 扫描添加商品主图 - 匹配请求(按文件名精确匹配商品) */
+export interface ProductScanMatchRequest {
+  /** NAME: 按商品名称(name)匹配;CODE: 按 SKU 编码(sku_code)匹配 */
+  matchMode: ProductScanMatchMode;
+  /** 扫描到的图片文件名(不含扩展名)列表 */
+  fileNames: string[];
+}
+
+/** 扫描添加商品主图 - 单个文件匹配结果 */
+export interface ProductScanMatchItem {
+  /** 图片文件名(不含扩展名) */
+  fileName: string;
+  /** 匹配到的商品列表(可能为空,可能多个) */
+  matches: ProductDTO[];
+}
+
 export const productInfoApi = {
   list: (req: ProductQueryReq) =>
     http.post<PageInfo<ProductDTO>>('/v1/admin/product-info/list', req),
@@ -162,6 +181,10 @@ export const productInfoApi = {
 
   update: (req: ProductUpdateReq) =>
     http.post<void>('/v1/admin/product-info/update', req),
+
+  /** 扫描添加商品主图 - 按文件名匹配商品(POST /v1/admin/product-info/scan-match) */
+  scanMatch: (req: ProductScanMatchRequest) =>
+    http.post<ProductScanMatchItem[]>('/v1/admin/product-info/scan-match', req),
 
   delete: (req: ProductIdReq) =>
     http.post<void>('/v1/admin/product-info/delete', req),

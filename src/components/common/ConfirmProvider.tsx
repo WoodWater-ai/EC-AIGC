@@ -67,7 +67,7 @@ const ConfirmDialog: React.FC<ConfirmOptions & { onConfirm: () => void; onCancel
   onCancel,
 }) => {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center">
       <div
         className="absolute inset-0 bg-[#0B1C30]/40 backdrop-blur-xs"
         onClick={onCancel}

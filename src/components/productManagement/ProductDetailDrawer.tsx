@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ChevronDown, Image as ImageIcon, Pencil, X } from 'lucide-react';
 import { withCosThumbnail } from '../../utils/cosImage';
+import { ImagePreviewModal, type PreviewImage } from '../ImagePreviewModal';
 import {
   formatProductTime,
   formatProductParameters,
@@ -35,6 +36,14 @@ export function ProductDetailDrawer({
   onCreate,
 }: ProductDetailDrawerProps) {
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
+  /** 商品图大图预览(详情抽屉内任意位置点击图片触发) */
+  const [previewState, setPreviewState] = useState<{
+    images: PreviewImage[];
+    initialIndex: number;
+  } | null>(null);
+  function openProductPreview(url: string, alt: string) {
+    setPreviewState({ images: [{ url, label: alt }], initialIndex: 0 });
+  }
 
   useEffect(() => {
     setSelectedSkuId(product?.skus.length === 1 ? product.skus[0].id : null);
@@ -65,17 +74,24 @@ export function ProductDetailDrawer({
       />
       <aside className="relative flex h-full w-full max-w-[720px] flex-col border-l border-slate-200 bg-white shadow-2xl">
         <header className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
-          <div className="grid h-13 w-13 shrink-0 place-items-center overflow-hidden rounded-md border border-slate-200 bg-slate-50">
-            {product.imageUrl ? (
+          {product.imageUrl ? (
+            <button
+              type="button"
+              onClick={() => openProductPreview(product.imageUrl!, product.name)}
+              title="点击查看大图"
+              className="group relative grid h-13 w-13 shrink-0 place-items-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 hover:border-primary/60"
+            >
               <img
                 src={withCosThumbnail(product.imageUrl, 120) ?? product.imageUrl}
                 alt={product.name}
-                className="h-full w-full object-contain p-1"
+                className="h-full w-full object-contain p-1 transition group-hover:scale-[1.02]"
               />
-            ) : (
+            </button>
+          ) : (
+            <div className="grid h-13 w-13 shrink-0 place-items-center rounded-md border border-slate-200 bg-slate-50">
               <ImageIcon className="h-5 w-5 text-slate-300" />
-            )}
-          </div>
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="truncate text-base font-black text-slate-900">{product.name}</h2>
@@ -150,17 +166,30 @@ export function ProductDetailDrawer({
                     className={`grid w-full grid-cols-[28px_48px_minmax(150px,1.5fr)_1fr_90px_84px] items-center gap-2 border-t border-slate-100 px-3 py-2.5 text-left text-[11px] transition-colors ${selected ? 'bg-blue-50/80' : 'bg-white hover:bg-slate-50'}`}
                   >
                     <span className={`h-4 w-4 rounded-full border ${selected ? 'border-[4px] border-primary bg-white' : 'border-slate-300 bg-white'}`} />
-                    <span className="grid h-10 w-10 place-items-center overflow-hidden rounded border border-slate-200 bg-slate-50">
-                      {sku.imageUrl ? (
+                    {sku.imageUrl ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          // 阻止冒泡到外层 <button>(切换 SKU 选中)
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openProductPreview(sku.imageUrl!, sku.name);
+                        }}
+                        title="点击查看大图"
+                        className="group relative grid h-10 w-10 min-w-0 shrink-0 place-items-center overflow-hidden rounded border border-slate-200 bg-slate-50 hover:border-primary/60"
+                      >
                         <img
                           src={withCosThumbnail(sku.imageUrl, 96) ?? sku.imageUrl}
                           alt={sku.name}
-                          className="h-full w-full object-contain p-0.5"
+                          className="min-h-0 min-w-0 max-h-full max-w-full object-contain p-0.5 transition group-hover:scale-[1.02]"
+                          loading="lazy"
                         />
-                      ) : (
+                      </button>
+                    ) : (
+                      <span className="grid h-10 w-10 place-items-center rounded border border-slate-200 bg-slate-50">
                         <ImageIcon className="h-4 w-4 text-slate-300" />
-                      )}
-                    </span>
+                      </span>
+                    )}
                     <span className="min-w-0">
                       <strong className="block truncate text-slate-800">{sku.name}</strong>
                       <span className="mt-0.5 block truncate font-mono text-[9px] text-slate-400">{sku.code}</span>
@@ -186,20 +215,28 @@ export function ProductDetailDrawer({
                 <h3 className="text-xs font-black text-slate-800">SKU 素材</h3>
                 <span className="text-[10px] font-bold text-primary">{selectedSku?.materialCount ?? 0} 张</span>
               </div>
-              <div className="grid aspect-[4/5] place-items-center overflow-hidden rounded-md border border-slate-200 bg-slate-50">
-                {displayImage ? (
+              {displayImage ? (
+                <button
+                  type="button"
+                  onClick={() => openProductPreview(displayImage, selectedSku?.name ?? product.name)}
+                  title="点击查看大图"
+                  className="group relative grid aspect-[4/5] min-w-0 place-items-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 hover:border-primary/60"
+                >
                   <img
                     src={withCosThumbnail(displayImage, 480) ?? displayImage}
                     alt={selectedSku?.name ?? product.name}
-                    className="h-full w-full object-contain p-3"
+                    className="min-h-0 min-w-0 max-h-full max-w-full object-contain p-3 transition group-hover:scale-[1.02]"
+                    loading="lazy"
                   />
-                ) : (
+                </button>
+              ) : (
+                <div className="grid aspect-[4/5] place-items-center rounded-md border border-slate-200 bg-slate-50">
                   <div className="text-center text-slate-300">
                     <ImageIcon className="mx-auto h-7 w-7" />
                     <p className="mt-2 text-[10px] font-bold">暂无可用素材</p>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             <div>
@@ -236,6 +273,14 @@ export function ProductDetailDrawer({
           </section>
         </div>
       </aside>
+
+      {previewState && (
+        <ImagePreviewModal
+          images={previewState.images}
+          initialIndex={previewState.initialIndex}
+          onClose={() => setPreviewState(null)}
+        />
+      )}
     </div>
   );
 }
