@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppScreen, GenerationTask, ProductAsset, SystemUser, SystemNotification } from './types';
+import {
+  AppScreen,
+  GenerationTask,
+  ProductAsset,
+  SystemUser,
+  SystemNotification,
+  type TaskGroupItemResponse,
+  type TaskGroupResponse,
+  type TaskResultPreviewResponse,
+} from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -35,6 +44,8 @@ import { modelProfileApi, type ModelProfileDTO } from './api/modules/modelProfil
 import { assetApi, type AssetResourceItem } from './api/modules/asset';
 import type { ProductSkuView } from './components/productManagement/productManagementModel';
 import { toUIGenerationTask } from './components/createTask/taskAdapter';
+import { type TaskReusePrefill } from './lib/task/taskReuse';
+import { toast } from 'sonner';
 
 import {
   mockProducts,
@@ -113,6 +124,7 @@ export default function App() {
   const [assistantTaskPrefill, setAssistantTaskPrefill] = useState<AssistantTaskPrefill | null>(null);
   // 从任务结果或产品 SKU 进入创作时，只保留本次临时上下文，不写入草稿。
   const [creationAssetPrefill, setCreationAssetPrefill] = useState<AssetResourceItem | null>(null);
+  const [taskReusePrefill, setTaskReusePrefill] = useState<TaskReusePrefill | null>(null);
 
   const setScreen = (
     screen: AppScreen,
@@ -126,6 +138,7 @@ export default function App() {
     }
     setAssistantTaskPrefill(null);
     setCreationAssetPrefill(null);
+    setTaskReusePrefill(null);
     setCurrentScreen(screen);
     if (payload?.highlightGroupId) {
       setHighlightGroupId(payload.highlightGroupId);
@@ -156,6 +169,7 @@ export default function App() {
   const handleBack = () => {
     setAssistantTaskPrefill(null);
     setCreationAssetPrefill(null);
+    setTaskReusePrefill(null);
     setCurrentScreen(previousScreenRef.current);
   };
 
@@ -167,7 +181,50 @@ export default function App() {
     setAssistantTaskPrefill(null);
     setCreationTemplateId(null);
     setCreationAssetPrefill(asset);
+    setTaskReusePrefill(null);
     setCurrentScreen(screen);
+  };
+
+  const reuseTask = async (group: TaskGroupResponse, task: TaskGroupItemResponse) => {
+    const context = await taskApi.reuseContext(task.id);
+    if (context.assets.length === 0) {
+      toast.error('该历史任务未记录可复用的原始素材');
+      return;
+    }
+
+    setAssistantTaskPrefill(null);
+    setCreationAssetPrefill(null);
+    setCreationTemplateId(null);
+    setTaskReusePrefill({
+      group: {
+        groupId: group.groupId,
+        productId: context.productId ?? group.productId,
+        productName: group.productName,
+      },
+      task: context,
+      imageAssets: context.assets.filter((asset) => asset.assetKind === 'IMAGE'),
+      videoAssets: context.assets.filter((asset) => asset.assetKind === 'VIDEO'),
+    });
+    setCurrentScreen(context.taskKind === 'VIDEO'
+      ? AppScreen.CREATE_VIDEO_TASK
+      : AppScreen.CREATE_IMAGE_TASK);
+  };
+
+  const createVideoFromTaskResult = async (result: TaskResultPreviewResponse) => {
+    const [asset] = await assetApi.resolveGenerated([{
+      mediaType: result.mediaType,
+      sourceId: result.id,
+    }]);
+    if (!asset) {
+      toast.error('未能将该图片成果转换为视频首帧素材');
+      return;
+    }
+    if (!canAccessScreen(AppScreen.CREATE_VIDEO_TASK)) return;
+    setAssistantTaskPrefill(null);
+    setCreationTemplateId(null);
+    setTaskReusePrefill(null);
+    setCreationAssetPrefill(asset);
+    setCurrentScreen(AppScreen.CREATE_VIDEO_TASK);
   };
 
   const createFromProductSku = async (sku: ProductSkuView) => {
@@ -417,6 +474,8 @@ export default function App() {
             highlightTaskKind={highlightTaskKind}
             setScreen={setScreen}
             onContinueWithResult={continueWithResult}
+            onRecreateTask={reuseTask}
+            onCreateVideoFromResult={createVideoFromTaskResult}
           />
         );
       case AppScreen.CREATE_IMAGE_TASK:
@@ -512,6 +571,7 @@ export default function App() {
           creationTemplateId={creationTemplateId}
           assistantPrefill={assistantTaskPrefill}
           resultAssetPrefill={creationAssetPrefill}
+          taskReusePrefill={taskReusePrefill}
           onBack={handleBack}
         />
         {isTransitOpen && (
@@ -563,6 +623,7 @@ export default function App() {
           creationTemplateId={creationTemplateId}
           assistantPrefill={assistantTaskPrefill}
           resultAssetPrefill={creationAssetPrefill}
+          taskReusePrefill={taskReusePrefill}
           goBack={handleBack}
         />
         {isTransitOpen && (

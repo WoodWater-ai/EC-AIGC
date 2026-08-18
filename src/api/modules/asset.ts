@@ -17,7 +17,7 @@ export interface AssetResourceQueryRequest {
   pageSize?: number;
   assetKind?: 'IMAGE' | 'VIDEO' | 'AUDIO';
   assetType?: string;
-  productId?: number;
+  productId?: string | number;
   categoryId?: number;
   keyword?: string;
   /** 创建时间起点(包含,ISO 字符串) */

@@ -36,6 +36,7 @@ import { creationTemplateApi } from '../../api/modules/creationTemplate';
 import { useServiceQuery } from '../../api/hooks/useServiceQuery';
 import type { PrefillState } from '../createTask/useTaskParams';
 import type { AssistantTaskPrefill } from '../../api/modules/assistant';
+import type { TaskReusePrefill } from '../../lib/task/taskReuse';
 import {
   groupReferenceSlots,
   referenceKey,
@@ -58,6 +59,8 @@ interface CreateImageTaskProps {
   assistantPrefill?: AssistantTaskPrefill | null;
   /** 从任务结果继续创作时带入的、已保存的业务素材。 */
   resultAssetPrefill?: AssetResourceItem | null;
+  /** 从任务列表重新制作时带入的原始任务上下文。 */
+  taskReusePrefill?: TaskReusePrefill | null;
   /** 返回按钮回调;不传则 fallback 到跳工作台首页(原行为) */
   onBack?: () => void;
 }
@@ -88,6 +91,18 @@ const EMPTY_PRODUCT_FACTS: ProductFactsInput = {
   fitStructure: '',
 };
 
+const parseTaskParams = (value?: string | null): Record<string, unknown> => {
+  if (!value) return {};
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+};
+
 // 模板选择入口暂时隐藏；后续需要时改为 true 即可恢复。
 const SHOW_TEMPLATE_PICKER = false;
 
@@ -114,6 +129,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     creationTemplateId,
     assistantPrefill,
     resultAssetPrefill,
+    taskReusePrefill,
     onBack,
   } = props;
   const creationPrefillQuery = useServiceQuery(
@@ -124,6 +140,16 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   );
   const creationPrefill = creationPrefillQuery.data;
   const imageParamsPrefill = useMemo<PrefillState | null>(() => {
+    if (taskReusePrefill?.task.taskKind === 'IMAGE') {
+      return {
+        channelInstanceId: taskReusePrefill.task.modelChannelId ?? null,
+        channelType: null,
+        capability: taskReusePrefill.task.capability ?? 'REF_IMG_EDIT',
+        model: taskReusePrefill.task.modelCode ?? null,
+        schemaParams: parseTaskParams(taskReusePrefill.task.taskParamsJson),
+        lockExecution: false,
+      };
+    }
     if (assistantPrefill && assistantPrefill.targetScreen === 'CREATE_IMAGE_TASK') {
       return {
         channelInstanceId: assistantPrefill.execution.channelInstanceId,
@@ -155,7 +181,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       fallbackReason: route?.fallbackReason ?? null,
       unavailableReason: creationPrefill.executionUnavailableReason ?? null,
     };
-  }, [assistantPrefill, creationPrefill]);
+  }, [assistantPrefill, creationPrefill, taskReusePrefill]);
 
   // ---- local form state ----
   const [productFacts, setProductFacts] = useState<ProductFactsInput>(EMPTY_PRODUCT_FACTS);
@@ -271,6 +297,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   } = state;
   const appliedCreationTemplateRef = useRef<string | null>(null);
   const appliedAssistantPrefillRef = useRef<string | null>(null);
+  const appliedTaskReuseRef = useRef<string | null>(null);
 
   // ---- [2026-08-15] 仅提交模式:右侧「本次生成结果」轮询展示 ----
   // submitStatus: idle=未提交 / loading=提交后轮询中 / done=全部任务结束
@@ -577,6 +604,130 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     resetProductContext();
     if (showToast) toast.info('已取消主体素材选择');
   }, [resetProductContext]);
+
+  useEffect(() => {
+    if (!taskReusePrefill || taskReusePrefill.task.taskKind !== 'IMAGE') return;
+    const { group, imageAssets, task } = taskReusePrefill;
+    if (appliedTaskReuseRef.current === task.taskId || imageAssets.length === 0) return;
+    const orderedAssets = [...imageAssets].sort((left, right) =>
+      (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
+    const mainAsset = orderedAssets.find((asset) => asset.slotRoles.includes('MAIN'));
+    if (!mainAsset) {
+      toast.error('该历史图片任务缺少主体素材，无法完整还原');
+      return;
+    }
+    appliedTaskReuseRef.current = task.taskId;
+
+    selectedMainResourceIdRef.current = mainAsset.assetId;
+    setSelectedFromLibrary(null);
+    setUnboundMainAsset(null);
+    setMatchingProduct(false);
+    setMainValue({
+      id: mainAsset.assetId,
+      fileResourceId: mainAsset.assetId,
+      originalUrl: mainAsset.originalUrl,
+      thumbnailUrl: mainAsset.thumbnailUrl ?? mainAsset.originalUrl,
+      name: mainAsset.name,
+    });
+    setProductFacts(EMPTY_PRODUCT_FACTS);
+    setSeoName('');
+    setFormFactsExternal(EMPTY_PRODUCT_FACTS);
+    setStyle(task.style ?? '');
+    setScene(task.scene ?? '');
+    setPose(task.action ?? '');
+    REFERENCE_SLOTS_INTERNAL.forEach((slot) => selectReference(slot, undefined));
+    const referenceSlotMap: Record<string, ReferenceSlot> = {
+      REFERENCE_DETAIL: 'detail',
+      REFERENCE_STYLE: 'style',
+      REFERENCE_SCENE: 'scene',
+      REFERENCE_POSE: 'pose',
+      REFERENCE_MODEL: 'model',
+    };
+    orderedAssets.forEach((asset) => {
+      asset.slotRoles.forEach((role) => {
+        const slot = referenceSlotMap[role];
+        if (!slot) return;
+        selectReference(slot, {
+          slot,
+          id: asset.assetId,
+          fileResourceId: asset.assetId,
+          originalUrl: asset.originalUrl,
+          thumbnailUrl: asset.thumbnailUrl ?? asset.originalUrl,
+          name: asset.name,
+        });
+      });
+    });
+
+    const targetType = task.imageType
+      ? IMAGE_TYPE_PREFILL_MAP[task.imageType]
+      : undefined;
+    if (targetType) {
+      if (!selectedTypes.includes(targetType)) toggleType(targetType);
+      selectedTypes.filter((type) => type !== targetType).forEach(toggleType);
+      const currentCount = typeCounts[targetType] ?? 1;
+      const targetCount = Math.max(1, Math.min(5, task.count ?? 1));
+      for (let index = currentCount; index < targetCount; index += 1) {
+        changeTypeCount(targetType, 1);
+      }
+      for (let index = currentCount; index > targetCount; index -= 1) {
+        changeTypeCount(targetType, -1);
+      }
+      if (task.taskPrompt) setPromptOverride(targetType, task.taskPrompt);
+    }
+    setNegativePrompt(task.negativePrompt ?? '');
+
+    const productId = group.productId;
+    if (!productId) {
+      setUnboundMainAsset({
+        id: mainAsset.assetId,
+        name: mainAsset.name,
+        assetKind: mainAsset.assetKind,
+        originalUrl: mainAsset.originalUrl,
+        thumbnailUrl: mainAsset.thumbnailUrl ?? undefined,
+        uploadUserId: '',
+        status: 'NORMAL',
+        categoryIds: [],
+      });
+      toast.warning('已恢复任务素材与 Prompt，请补充关联商品后再生成');
+      return;
+    }
+    void productInfoApi.detail({ id: productId })
+      .then((product) => {
+        if (selectedMainResourceIdRef.current === mainAsset.assetId) {
+          applyMatchedProduct(product);
+          toast.success(`已恢复任务：${task.taskCode}`);
+        }
+      })
+      .catch(() => {
+        if (selectedMainResourceIdRef.current === mainAsset.assetId) {
+          setUnboundMainAsset({
+            id: mainAsset.assetId,
+            name: mainAsset.name,
+            assetKind: mainAsset.assetKind,
+            originalUrl: mainAsset.originalUrl,
+            thumbnailUrl: mainAsset.thumbnailUrl ?? undefined,
+            uploadUserId: '',
+            status: 'NORMAL',
+            categoryIds: [],
+          });
+          toast.warning('已恢复任务素材与 Prompt，但商品信息读取失败，请重新关联商品');
+        }
+      });
+  }, [
+    applyMatchedProduct,
+    changeTypeCount,
+    selectReference,
+    selectedTypes,
+    setFormFactsExternal,
+    setNegativePrompt,
+    setPose,
+    setPromptOverride,
+    setScene,
+    setStyle,
+    taskReusePrefill,
+    toggleType,
+    typeCounts,
+  ]);
 
   const handleProductCreated = useCallback((product: ProductDTO) => {
     if (!unboundMainAsset || selectedMainResourceIdRef.current !== unboundMainAsset.id) return;

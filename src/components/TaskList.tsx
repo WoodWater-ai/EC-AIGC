@@ -13,6 +13,7 @@ import { ImagePreviewModal, type PreviewImage } from './ImagePreviewModal';
 import { VideoPreviewModal, type PreviewVideo } from './VideoPreviewModal';
 import { TaskDetailsDrawer } from './TaskDetailsDrawer';
 import { useAuth } from '../auth/AuthContext';
+import { toast } from 'sonner';
 import type { AssetResourceItem } from '../api/modules/asset';
 
 interface TaskListProps {
@@ -20,6 +21,8 @@ interface TaskListProps {
   highlightTaskKind: MediaKind;
   setScreen: (screen: AppScreen, payload?: { highlightGroupId?: string }) => void;
   onContinueWithResult: (asset: AssetResourceItem) => void;
+  onRecreateTask: (group: TaskGroupResponse, task: TaskGroupItemResponse) => Promise<void>;
+  onCreateVideoFromResult: (result: TaskResultPreviewResponse) => Promise<void>;
 }
 
 type MediaKind = 'IMAGE' | 'VIDEO';
@@ -86,19 +89,22 @@ export const TaskList: React.FC<TaskListProps> = ({
   highlightTaskKind,
   setScreen,
   onContinueWithResult,
+  onRecreateTask,
+  onCreateVideoFromResult,
 }) => {
   const { hasPermission } = useAuth();
   const canCreateTask = hasPermission('task:create');
+  const canRetryTask = hasPermission('task:retry');
   const [kind, setKind] = useState<MediaKind>(highlightTaskKind);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [searchInput, setSearchInput] = useState('');
   const [keyword, setKeyword] = useState('');
   const [pageNum, setPageNum] = useState(1);
-  const [selectedGroup, setSelectedGroup] = useState<TaskGroupResponse | null>(null);
   const [userOverrides, setUserOverrides] = useState<Set<string>>(new Set());
-  const [selectedTaskId, setSelectedTaskId] = useState<string>();
+  const [actionTaskId, setActionTaskId] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<{ images: PreviewImage[]; initialIndex: number } | null>(null);
   const [videoPreview, setVideoPreview] = useState<{ videos: PreviewVideo[]; initialIndex: number } | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<TaskGroupResponse | null>(null);
 
   const activeFilter = STATUS_FILTERS.find((item) => item.id === statusFilter);
   const groupsQuery = useServiceQuery(
@@ -156,9 +162,48 @@ export const TaskList: React.FC<TaskListProps> = ({
     });
   };
 
-  const openDrawer = (group: TaskGroupResponse, taskId?: string) => {
-    setSelectedTaskId(taskId);
+  const openDrawer = (group: TaskGroupResponse) => {
     setSelectedGroup(group);
+  };
+
+  const handleRecreate = async (group: TaskGroupResponse, task: TaskGroupItemResponse) => {
+    setActionTaskId(task.id);
+    try {
+      await onRecreateTask(group, task);
+    } catch {
+      // 请求层展示具体错误，列表保持可继续操作。
+    } finally {
+      setActionTaskId(null);
+    }
+  };
+
+  const handleCreateVideo = async (task: TaskGroupItemResponse) => {
+    const result = task.resultPreviews
+      .filter((item) => item.mediaType === 'IMAGE')
+      .sort((left, right) => (left.revisionNo ?? 1) - (right.revisionNo ?? 1))
+      .at(-1);
+    if (!result) return;
+    setActionTaskId(task.id);
+    try {
+      await onCreateVideoFromResult(result);
+    } catch {
+      // 请求层展示具体错误，列表保持可继续操作。
+    } finally {
+      setActionTaskId(null);
+    }
+  };
+
+  const handleRetry = async (task: TaskGroupItemResponse) => {
+    setActionTaskId(task.id);
+    try {
+      await taskApi.retry(task.id);
+      toast.success('任务已重新提交');
+      await groupsQuery.refetch();
+    } catch {
+      // 请求层展示具体错误。
+    } finally {
+      setActionTaskId(null);
+    }
   };
 
   return (
@@ -342,9 +387,12 @@ export const TaskList: React.FC<TaskListProps> = ({
                       <td className="p-4">
                         <div className="flex justify-end">
                           <button
+                            type="button"
                             onClick={() => openDrawer(group)}
-                            className="h-8 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                            className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-700 hover:border-primary hover:text-primary"
+                            title="查看批次详情与结果操作"
                           >
+                            <span className="material-symbols-outlined text-sm">visibility</span>
                             详情
                           </button>
                         </div>
@@ -354,7 +402,12 @@ export const TaskList: React.FC<TaskListProps> = ({
                       <TaskChildRow
                         key={task.id}
                         task={task}
-                        onOpen={() => openDrawer(group, task.id)}
+                        canCreateTask={canCreateTask}
+                        canRetryTask={canRetryTask}
+                        actionLoading={actionTaskId === task.id}
+                        onRecreate={() => void handleRecreate(group, task)}
+                        onCreateVideo={() => void handleCreateVideo(task)}
+                        onRetry={() => void handleRetry(task)}
                         onPreviewImage={(results, index) => setImagePreview({
                           images: results.map((result, i) => ({
                             url: result.url,
@@ -414,15 +467,6 @@ export const TaskList: React.FC<TaskListProps> = ({
         </div>
       </div>
 
-      {selectedGroup && (
-        <TaskDetailsDrawer
-          group={selectedGroup}
-        initialTaskId={selectedTaskId}
-        onClose={() => setSelectedGroup(null)}
-        onChanged={() => groupsQuery.refetch()}
-        onContinueWithResult={onContinueWithResult}
-      />
-      )}
       {imagePreview && (
         <ImagePreviewModal
           images={imagePreview.images}
@@ -437,25 +481,46 @@ export const TaskList: React.FC<TaskListProps> = ({
           onClose={() => setVideoPreview(null)}
         />
       )}
+      {selectedGroup && (
+        <TaskDetailsDrawer
+          group={selectedGroup}
+          onClose={() => setSelectedGroup(null)}
+          onChanged={() => void groupsQuery.refetch()}
+          onContinueWithResult={onContinueWithResult}
+          onRecreateTask={onRecreateTask}
+          onCreateVideoFromResult={onCreateVideoFromResult}
+        />
+      )}
     </div>
   );
 };
 
 interface TaskChildRowProps {
   task: TaskGroupItemResponse;
-  onOpen: () => void;
+  canCreateTask: boolean;
+  canRetryTask: boolean;
+  actionLoading: boolean;
+  onRecreate: () => void;
+  onCreateVideo: () => void;
+  onRetry: () => void;
   onPreviewImage: (results: TaskResultPreviewResponse[], index: number) => void;
   onPreviewVideo: (result: TaskResultPreviewResponse) => void;
 }
 
 const TaskChildRow: React.FC<TaskChildRowProps> = ({
   task,
-  onOpen,
+  canCreateTask,
+  canRetryTask,
+  actionLoading,
+  onRecreate,
+  onCreateVideo,
+  onRetry,
   onPreviewImage,
   onPreviewVideo,
 }) => {
   const meta = STATUS_META[task.status];
   const imageResults = task.resultPreviews.filter((result) => result.mediaType === 'IMAGE');
+  const canCreateVideo = imageResults.length > 0;
   return (
     <tr className="bg-slate-50/70">
       <td className="py-3 pl-14 pr-4">
@@ -527,10 +592,40 @@ const TaskChildRow: React.FC<TaskChildRowProps> = ({
         </div>
       </td>
       <td className="px-4 py-3">
-        <div className="flex justify-end">
-          <button onClick={onOpen} className="h-7 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-bold">
-            详情
-          </button>
+        <div className="flex min-w-[220px] justify-end gap-1.5">
+          {canCreateTask && (
+            <button
+              onClick={onRecreate}
+              disabled={actionLoading}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-700 hover:border-primary hover:text-primary disabled:opacity-50"
+              title="恢复本次任务的 Prompt、参数和输入素材后重新制作"
+            >
+              <span className={`material-symbols-outlined text-sm ${actionLoading ? 'animate-spin' : ''}`}>refresh</span>
+              重新制作
+            </button>
+          )}
+          {canCreateTask && task.taskKind === 'IMAGE' && (
+            <button
+              onClick={onCreateVideo}
+              disabled={actionLoading || !canCreateVideo}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-primary/25 bg-blue-50 px-2.5 text-[11px] font-bold text-primary hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+              title={canCreateVideo ? '将最新图片成果带入视频制作' : '生成图片成果后可制作视频'}
+            >
+              <span className="material-symbols-outlined text-sm">movie</span>
+              制作视频
+            </button>
+          )}
+          {canRetryTask && task.status === 'FAILED' && (
+            <button
+              onClick={onRetry}
+              disabled={actionLoading}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 text-[11px] font-bold text-red-700 hover:border-red-400 disabled:opacity-50"
+              title="重试失败任务"
+            >
+              <span className="material-symbols-outlined text-sm">replay</span>
+              重试
+            </button>
+          )}
         </div>
       </td>
     </tr>

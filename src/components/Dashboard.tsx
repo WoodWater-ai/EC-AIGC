@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { PublishTemplateDialog } from './common/PublishTemplateDialog';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { VideoPreviewModal } from './VideoPreviewModal';
+import { getPublishTemplateDefaultName } from '../lib/creationTemplate/publishTemplateName';
 
 interface DashboardProps {
   tasks: GenerationTask[];
@@ -282,7 +283,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks, setScreen }) => {
       )}
       <PublishTemplateDialog
         open={publishTarget !== null}
-        defaultName={publishTarget?.title || '我的创作模板'}
+        defaultName={getPublishTemplateDefaultName(publishTarget?.title)}
         onClose={() => setPublishTarget(null)}
         onConfirm={async (templateName) => {
           if (!publishTarget) return;

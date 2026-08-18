@@ -15,6 +15,8 @@ import { creationTemplateApi } from '../api/modules/creationTemplate';
 import { useServiceQuery } from '../api/hooks/useServiceQuery';
 import type { PrefillState } from './createTask/useTaskParams';
 import type { AssistantTaskPrefill } from '../api/modules/assistant';
+import type { TaskReusePrefill } from '../lib/task/taskReuse';
+import type { TaskReuseAssetResponse } from '../api/modules/task';
 import {
   buildTrendingReplicatePrompt,
   extractTrendingUserInstruction,
@@ -80,6 +82,8 @@ interface CreateVideoTaskProps {
   assistantPrefill?: AssistantTaskPrefill | null;
   /** 从任务结果继续创作时带入的、已保存的业务素材。 */
   resultAssetPrefill?: AssetResourceItem | null;
+  /** 从任务列表重新制作时带入的原始任务上下文。 */
+  taskReusePrefill?: TaskReusePrefill | null;
   /** 返回按钮回调;不传则 fallback 到跳工作台首页(原行为) */
   goBack?: () => void;
 }
@@ -93,6 +97,18 @@ const EMPTY_PARAMS: ParamsSnapshot = {
   selectionSource: 'NONE',
   fallbackReason: null,
   executionReady: false,
+};
+
+const parseTaskParams = (value?: string | null): Record<string, unknown> => {
+  if (!value) return {};
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
 };
 
 // 顶部模板入口暂时隐藏；后续需要时改为 true 即可恢复。
@@ -159,6 +175,19 @@ const toSelectedAsset = (
   replacementRole,
 });
 
+const toReuseSelectedAsset = (
+  asset: TaskReuseAssetResponse,
+  replacementRole?: TrendingReplacementRole,
+): SelectedAsset => ({
+  assetId: asset.assetId,
+  name: asset.name,
+  assetKind: asset.assetKind,
+  originalUrl: asset.originalUrl,
+  thumbnailUrl: asset.thumbnailUrl ?? undefined,
+  durationSec: asset.durationSec ?? undefined,
+  replacementRole,
+});
+
 const cleanReusableVideoPrompt = (value: string): string => {
   let cleaned = value.replace(/\r\n/g, '\n').trim();
   while (true) {
@@ -203,6 +232,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   creationTemplateId,
   assistantPrefill,
   resultAssetPrefill,
+  taskReusePrefill,
   goBack,
 }) => {
   const creationPrefillQuery = useServiceQuery(
@@ -213,6 +243,16 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   );
   const creationPrefill = creationPrefillQuery.data;
   const videoParamsPrefill = useMemo<PrefillState | null>(() => {
+    if (taskReusePrefill?.task.taskKind === 'VIDEO') {
+      return {
+        channelInstanceId: taskReusePrefill.task.modelChannelId ?? null,
+        channelType: null,
+        capability: taskReusePrefill.task.capability ?? 'IMG2VIDEO',
+        model: taskReusePrefill.task.modelCode ?? null,
+        schemaParams: parseTaskParams(taskReusePrefill.task.taskParamsJson),
+        lockExecution: false,
+      };
+    }
     if (assistantPrefill && assistantPrefill.targetScreen === 'CREATE_VIDEO_TASK') {
       return {
         channelInstanceId: assistantPrefill.execution.channelInstanceId,
@@ -244,7 +284,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       fallbackReason: route?.fallbackReason ?? null,
       unavailableReason: creationPrefill.executionUnavailableReason ?? null,
     };
-  }, [assistantPrefill, creationPrefill]);
+  }, [assistantPrefill, creationPrefill, taskReusePrefill]);
   const [selectedProductInfo, setSelectedProductInfo] = useState<ProductDTO | null>(null);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [mode, setMode] = useState<VideoMode>('FIRST_FRAME');
@@ -253,6 +293,8 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   const [replacementReferences, setReplacementReferences] = useState<
     SelectedAsset[]
   >([]);
+  /** 重制视频时保留原 PRODUCT_REFERENCE，不因当前商品封面变化而替换。 */
+  const [reusedProductReference, setReusedProductReference] = useState<SelectedAsset | null>(null);
   /** [2026-08-08 智能多帧] MULTI_FRAME 模式的首帧(同时映射到 FIRST_FRAME 槽位) */
   const [multiFrameStart, setMultiFrameStart] =
     useState<SelectedMultiFrameAsset | null>(null);
@@ -296,6 +338,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   const appliedCreationTemplateRef = useRef<string | null>(null);
   const appliedAssistantPrefillRef = useRef<string | null>(null);
   const appliedResultAssetRef = useRef<string | null>(null);
+  const appliedTaskReuseRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!assistantPrefill || assistantPrefill.targetScreen !== 'CREATE_VIDEO_TASK') return;
@@ -316,6 +359,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       thumbnailUrl: reference.url,
     };
     setMode(nextMode);
+    setReusedProductReference(null);
     if (nextMode === 'FIRST_FRAME') {
       setFirstFrame(selected);
       setSourceVideo(null);
@@ -342,6 +386,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
           ? 'MULTI_FRAME'
           : 'FIRST_FRAME';
     setMode(nextMode);
+    setReusedProductReference(null);
     setSelectedProductInfo(null);
     setProductFacts({
       name: '',
@@ -578,6 +623,112 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
   };
 
   useEffect(() => {
+    if (!taskReusePrefill || taskReusePrefill.task.taskKind !== 'VIDEO') return;
+    const { group, imageAssets, task, videoAssets } = taskReusePrefill;
+    if (appliedTaskReuseRef.current === task.taskId) return;
+    appliedTaskReuseRef.current = task.taskId;
+
+    const nextMode: VideoMode = task.videoMode === 'TRENDING_REPLICATE'
+      || task.videoMode === 'ECOMMERCE_REPLICATE'
+      || task.videoMode === 'MULTI_FRAME'
+      || task.videoMode === 'FIRST_FRAME'
+      ? task.videoMode
+      : videoAssets.length > 0
+        ? 'TRENDING_REPLICATE'
+        : 'FIRST_FRAME';
+    const orderedImages = [...imageAssets].sort((left, right) =>
+      (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
+    const orderedVideos = [...videoAssets].sort((left, right) =>
+      (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
+    const firstFrameAsset = orderedImages.find((asset) => asset.slotRoles.includes('FIRST_FRAME'));
+    const sourceVideoAsset = orderedVideos.find((asset) => asset.slotRoles.includes('SOURCE_VIDEO'));
+    const productReferenceAsset = orderedImages.find((asset) =>
+      asset.slotRoles.includes('PRODUCT_REFERENCE'));
+    const replacementAssets = orderedImages.filter((asset) =>
+      asset.slotRoles.includes('REPLACEMENT_REFERENCE'));
+    const keyFrameAssets = orderedImages.filter((asset) => asset.slotRoles.includes('KEY_FRAME'));
+    const keyFrameById = new Map(keyFrameAssets.map((asset) => [asset.assetId, asset]));
+    const paramsJson = parseTaskParams(task.taskParamsJson);
+    const rawSegments = Array.isArray(paramsJson.multi_frame_segments)
+      ? paramsJson.multi_frame_segments
+      : [];
+    const restoredSegments = rawSegments
+      .filter((segment): segment is Record<string, unknown> =>
+        Boolean(segment) && typeof segment === 'object' && !Array.isArray(segment))
+      .sort((left, right) => Number(left.sortOrder ?? 0) - Number(right.sortOrder ?? 0))
+      .map((segment, index): MultiFrameSegment => {
+        const assetId = String(segment.keyFrameAssetId ?? '');
+        const asset = keyFrameById.get(assetId);
+        return {
+          id: `mf-seg-reuse-${task.taskId}-${index}-${assetId}`,
+          keyFrame: asset ? {
+            assetId: asset.assetId,
+            originalUrl: asset.originalUrl,
+            thumbnailUrl: asset.thumbnailUrl ?? undefined,
+            name: asset.name,
+          } : null,
+          prompt: typeof segment.prompt === 'string' ? segment.prompt : '',
+          duration: typeof segment.duration === 'number' && isDurationInBounds(segment.duration)
+            ? segment.duration
+            : MULTI_FRAME_DEFAULT_DURATION,
+        };
+      });
+    const fallbackSegments = keyFrameAssets.map((asset, index): MultiFrameSegment => ({
+      id: `mf-seg-reuse-${task.taskId}-${index}-${asset.assetId}`,
+      keyFrame: {
+        assetId: asset.assetId,
+        originalUrl: asset.originalUrl,
+        thumbnailUrl: asset.thumbnailUrl ?? undefined,
+        name: asset.name,
+      },
+      prompt: '',
+      duration: MULTI_FRAME_DEFAULT_DURATION,
+    }));
+
+    setMode(nextMode);
+    setFirstFrame(nextMode === 'FIRST_FRAME' && firstFrameAsset
+      ? toReuseSelectedAsset(firstFrameAsset)
+      : null);
+    setSourceVideo(sourceVideoAsset ? toReuseSelectedAsset(sourceVideoAsset) : null);
+    setReusedProductReference(productReferenceAsset
+      ? toReuseSelectedAsset(productReferenceAsset)
+      : null);
+    setReplacementReferences(
+      nextMode === 'TRENDING_REPLICATE' || nextMode === 'ECOMMERCE_REPLICATE'
+        ? replacementAssets.map((asset, index) =>
+          toReuseSelectedAsset(asset, inferTemplateReplacementRole(task.taskPrompt ?? '', index)))
+        : [],
+    );
+    setMultiFrameStart(nextMode === 'MULTI_FRAME' && firstFrameAsset ? {
+      assetId: firstFrameAsset.assetId,
+      originalUrl: firstFrameAsset.originalUrl,
+      thumbnailUrl: firstFrameAsset.thumbnailUrl ?? undefined,
+      name: firstFrameAsset.name,
+    } : null);
+    setMultiFrameSegments(nextMode === 'MULTI_FRAME'
+      ? (restoredSegments.length > 0 ? restoredSegments : fallbackSegments)
+      : [createMultiFrameSegment(), createMultiFrameSegment()]);
+    setPrompt(task.taskPrompt ?? '');
+    setManualTrendingPrompt(
+      nextMode === 'TRENDING_REPLICATE' || nextMode === 'ECOMMERCE_REPLICATE'
+        ? task.taskPrompt ?? ''
+        : null,
+    );
+    setNegativePrompt(task.negativePrompt ?? '');
+    setCount(Math.max(1, Math.min(8, task.count ?? 1)));
+    setShots(['', '', '']);
+    setStoryboardGenerated(false);
+
+    if (!group.productId) {
+      toast.warning('已恢复任务素材与 Prompt，请补充关联产品后再生成');
+      return;
+    }
+    void productInfoApi.detail({ id: group.productId })
+      .then((product) => handleProductPicked(product, `已恢复任务：${task.taskCode}`))
+      .catch(() => toast.warning('已恢复任务素材与 Prompt，但产品信息读取失败，请重新选择产品'));
+  }, [handleProductPicked, taskReusePrefill]);
+
+  useEffect(() => {
     if (!resultAssetPrefill || appliedResultAssetRef.current === resultAssetPrefill.id) return;
     appliedResultAssetRef.current = resultAssetPrefill.id;
     const asset: SelectedAsset = {
@@ -590,10 +741,12 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
     };
     if (resultAssetPrefill.assetKind === 'VIDEO') {
       setMode('TRENDING_REPLICATE');
+      setReusedProductReference(null);
       setSourceVideo(asset);
       setFirstFrame(null);
     } else {
       setMode('FIRST_FRAME');
+      setReusedProductReference(null);
       setFirstFrame(asset);
       setSourceVideo(null);
     }
@@ -827,7 +980,16 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
       ];
     }
     if (isReplicateMode && sourceVideo) {
-      const productReference = selectedProductInfo?.imageId
+      const productReference = reusedProductReference
+        ? {
+            assetId: reusedProductReference.assetId,
+            slotRoles: ['PRODUCT_REFERENCE'] as const,
+            sortOrder: 0,
+            originalUrl: reusedProductReference.originalUrl,
+            thumbnailUrl: reusedProductReference.thumbnailUrl,
+            name: reusedProductReference.name,
+          }
+        : (selectedProductInfo?.imageId
         ? {
             assetId: selectedProductInfo.imageId,
             slotRoles: ['PRODUCT_REFERENCE'],
@@ -836,7 +998,7 @@ export const CreateVideoTask: React.FC<CreateVideoTaskProps> = ({
             thumbnailUrl: selectedProductInfo.imageUrl,
             name: `${selectedProductInfo.name}（商品主图）`,
           }
-        : null;
+        : null);
       const references = replacementReferences
         .filter((asset) => asset.assetId !== productReference?.assetId)
         .slice(0, productReference

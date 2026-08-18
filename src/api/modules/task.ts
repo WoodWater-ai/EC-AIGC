@@ -62,6 +62,39 @@ export interface ImageRevisionSubmitResponse {
   revisionNo: number;
 }
 
+export interface TaskReuseAssetResponse {
+  assetId: string;
+  assetKind: 'IMAGE' | 'VIDEO' | 'AUDIO';
+  name: string;
+  originalUrl: string;
+  thumbnailUrl?: string | null;
+  durationSec?: number | null;
+  slotRoles: string[];
+  sortOrder?: number | null;
+}
+
+export interface TaskReuseContextResponse {
+  taskId: string;
+  taskCode: string;
+  taskKind: 'IMAGE' | 'VIDEO';
+  taskType: string;
+  imageType?: string | null;
+  videoMode?: 'FIRST_FRAME' | 'TRENDING_REPLICATE' | 'ECOMMERCE_REPLICATE' | 'MULTI_FRAME' | null;
+  productId?: string | null;
+  taskPrompt?: string | null;
+  negativePrompt?: string | null;
+  taskParamsJson?: string | null;
+  style?: string | null;
+  scene?: string | null;
+  action?: string | null;
+  count?: number | null;
+  modelChannelId?: string | null;
+  channelType?: string | null;
+  capability?: string | null;
+  modelCode?: string | null;
+  assets: TaskReuseAssetResponse[];
+}
+
 /** 提交任务,返回任务 id(后端 Long → string) */
 export async function submitTask(req: SubmitTaskRequest): Promise<string> {
   return http.post<string>('/v1/task/submit', req);
@@ -90,6 +123,13 @@ export const taskApi = {
   /** 任务详情(/v1/task/detail?id=) */
   detail(id: string): Promise<GenerationTaskResponse> {
     return http.post<GenerationTaskResponse>('/v1/task/detail', null, { params: { id } });
+  },
+
+  /** 获取本人原始任务的完整重制上下文，含可提交的 assetId、素材角色和顺序。 */
+  reuseContext(id: string): Promise<TaskReuseContextResponse> {
+    return http.post<TaskReuseContextResponse>('/v1/task/reuse-context', null, {
+      params: { id },
+    });
   },
 
   /** 取消任务(/v1/task/cancel?id=) —— 本期老版 UI 不接,只封装备用 */

@@ -18,6 +18,7 @@ import { PublishTemplateDialog } from './common/PublishTemplateDialog';
 import { ImageRevisionDialog } from './task/ImageRevisionDialog';
 import { useAuth } from '../auth/AuthContext';
 import { assetApi, type AssetResourceItem } from '../api/modules/asset';
+import { getPublishTemplateDefaultName } from '../lib/creationTemplate/publishTemplateName';
 
 interface TaskDetailsDrawerProps {
   group: TaskGroupResponse;
@@ -26,6 +27,10 @@ interface TaskDetailsDrawerProps {
   onChanged?: () => void;
   /** 将某个已生成结果转换为产品素材后，带入对应创作页。 */
   onContinueWithResult?: (asset: AssetResourceItem) => void;
+  /** 重新制作当前选中的原始子任务。 */
+  onRecreateTask?: (group: TaskGroupResponse, task: TaskGroupItemResponse) => Promise<void>;
+  /** 将指定图片成果作为首帧带入视频制作。 */
+  onCreateVideoFromResult?: (result: TaskResultPreviewResponse) => Promise<void>;
 }
 
 type DetailTab = 'details' | 'results' | 'diagnostics';
@@ -111,9 +116,12 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   onClose,
   onChanged,
   onContinueWithResult,
+  onRecreateTask,
+  onCreateVideoFromResult,
 }) => {
   const { hasPermission } = useAuth();
   const canAudit = hasPermission('task:audit');
+  const canCreateTask = hasPermission('task:create');
   const canRetryTask = hasPermission('task:retry');
   const canReviseTask = hasPermission('task:revise');
   const canManageTemplate = hasPermission('template:manage');
@@ -128,8 +136,9 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   const [templatePublishTarget, setTemplatePublishTarget] = useState<TemplatePublishTarget | null>(null);
   const [revisionTarget, setRevisionTarget] = useState<TaskResultPreviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [savedResultIds, setSavedResultIds] = useState<Set<string>>(new Set());
-  const [savingResultId, setSavingResultId] = useState<string | null>(null);
+  const [continuingResultId, setContinuingResultId] = useState<string | null>(null);
+  const [recreatingTaskId, setRecreatingTaskId] = useState<string | null>(null);
+  const [creatingVideoResultId, setCreatingVideoResultId] = useState<string | null>(null);
 
   const selectedTask = group.tasks.find((task) => task.id === selectedTaskId)
     ?? group.tasks[0];
@@ -147,18 +156,32 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
     }
   };
 
-  const resolveProductAsset = async (result: TaskResultPreviewResponse) => {
-    setSavingResultId(result.id);
+  const resolveGeneratedAsset = async (result: TaskResultPreviewResponse) => {
+    const [asset] = await assetApi.resolveGenerated([{
+      mediaType: result.mediaType,
+      sourceId: result.id,
+    }]);
+    if (!asset) throw new Error('未返回可用素材');
+    return asset;
+  };
+
+  const recreateSelectedTask = async () => {
+    if (!onRecreateTask || !selectedTask) return;
+    setRecreatingTaskId(selectedTask.id);
     try {
-      const [asset] = await assetApi.resolveGenerated([{
-        mediaType: result.mediaType,
-        sourceId: result.id,
-      }]);
-      if (!asset) throw new Error('未返回可用素材');
-      setSavedResultIds((current) => new Set(current).add(result.id));
-      return asset;
+      await onRecreateTask(group, selectedTask);
     } finally {
-      setSavingResultId(null);
+      setRecreatingTaskId(null);
+    }
+  };
+
+  const createVideoFromResult = async (result: TaskResultPreviewResponse) => {
+    if (!onCreateVideoFromResult) return;
+    setCreatingVideoResultId(result.id);
+    try {
+      await onCreateVideoFromResult(result);
+    } finally {
+      setCreatingVideoResultId(null);
     }
   };
 
@@ -236,24 +259,38 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
           </aside>
 
           <main className="flex min-h-0 flex-col">
-            <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-5 pt-3">
-              {([
-                ['details', '详情'],
-                ['results', `生成结果 (${selectedTask.resultPreviews.length})`],
-                ['diagnostics', '执行诊断'],
-              ] as Array<[DetailTab, string]>).map(([id, label]) => (
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5">
+              <div className="flex gap-1 overflow-x-auto pt-3">
+                {([
+                  ['details', '详情'],
+                  ['results', `生成结果 (${selectedTask.resultPreviews.length})`],
+                  ['diagnostics', '执行诊断'],
+                ] as Array<[DetailTab, string]>).map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setActiveTab(id)}
+                    className={`border-b-2 px-4 py-3 text-xs font-bold ${
+                      activeTab === id
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-slate-500'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {canCreateTask && onRecreateTask && (
                 <button
-                  key={id}
-                  onClick={() => setActiveTab(id)}
-                  className={`border-b-2 px-4 py-3 text-xs font-bold ${
-                    activeTab === id
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-slate-500'
-                  }`}
+                  type="button"
+                  onClick={() => void recreateSelectedTask()}
+                  disabled={recreatingTaskId === selectedTask.id}
+                  className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-700 hover:border-primary hover:text-primary disabled:opacity-50"
+                  title="恢复当前任务的 Prompt、参数和输入素材后重新制作"
                 >
-                  {label}
+                  <span className={`material-symbols-outlined text-sm ${recreatingTaskId === selectedTask.id ? 'animate-spin' : ''}`}>refresh</span>
+                  重新制作
                 </button>
-              ))}
+              )}
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5 lg:p-6">
@@ -279,7 +316,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                   onPublishTemplate={(result) => canManageTemplate && setTemplatePublishTarget({
                     result,
                     taskId: result.taskId,
-                    defaultName: `${taskLabel(selectedTask)}模板`,
+                    defaultName: getPublishTemplateDefaultName(selectedTask.title),
                   })}
                   onOfflineTemplate={async (result) => {
                     if (!canManageTemplate) return;
@@ -292,17 +329,19 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                       // 统一请求层展示具体错误。
                     }
                   }}
-                  onSaveToProduct={async (result) => {
-                    await resolveProductAsset(result);
-                    toast.success('已保存到产品素材');
-                  }}
                   onContinueWithResult={async (result) => {
-                    const asset = await resolveProductAsset(result);
-                    onContinueWithResult?.(asset);
+                    setContinuingResultId(result.id);
+                    try {
+                      const asset = await resolveGeneratedAsset(result);
+                      onContinueWithResult?.(asset);
+                    } finally {
+                      setContinuingResultId(null);
+                    }
                   }}
-                  canSaveToProduct={Boolean(group.productId)}
-                  savedResultIds={savedResultIds}
-                  savingResultId={savingResultId}
+                  continuingResultId={continuingResultId}
+                  onCreateVideoFromResult={createVideoFromResult}
+                  creatingVideoResultId={creatingVideoResultId}
+                  canCreateTask={canCreateTask}
                   canAudit={canAudit}
                   canRetry={canRetryTask}
                   canRevise={canReviseTask}
@@ -364,7 +403,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
       )}
       <PublishTemplateDialog
         open={templatePublishTarget !== null}
-        defaultName={templatePublishTarget?.defaultName ?? '我的创作模板'}
+        defaultName={getPublishTemplateDefaultName(templatePublishTarget?.defaultName)}
         onClose={() => setTemplatePublishTarget(null)}
         onConfirm={async (templateName) => {
           if (!templatePublishTarget) return;
@@ -457,11 +496,11 @@ const ResultsTab: React.FC<{
   onRevisionRetry: (taskId: string) => Promise<void>;
   onPublishTemplate: (result: TaskResultPreviewResponse) => void;
   onOfflineTemplate: (result: TaskResultPreviewResponse) => Promise<void>;
-  onSaveToProduct: (result: TaskResultPreviewResponse) => Promise<void>;
   onContinueWithResult: (result: TaskResultPreviewResponse) => Promise<void>;
-  canSaveToProduct: boolean;
-  savedResultIds: Set<string>;
-  savingResultId: string | null;
+  continuingResultId: string | null;
+  onCreateVideoFromResult: (result: TaskResultPreviewResponse) => Promise<void>;
+  creatingVideoResultId: string | null;
+  canCreateTask: boolean;
   canAudit: boolean;
   canRetry: boolean;
   canRevise: boolean;
@@ -475,11 +514,11 @@ const ResultsTab: React.FC<{
   onRevisionRetry,
   onPublishTemplate,
   onOfflineTemplate,
-  onSaveToProduct,
   onContinueWithResult,
-  canSaveToProduct,
-  savedResultIds,
-  savingResultId,
+  continuingResultId,
+  onCreateVideoFromResult,
+  creatingVideoResultId,
+  canCreateTask,
   canAudit,
   canRetry,
   canRevise,
@@ -548,26 +587,25 @@ const ResultsTab: React.FC<{
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-3">
-                {canSaveToProduct && (
-                  <>
-                    <button
-                      onClick={() => void onSaveToProduct(result)}
-                      disabled={savingResultId === result.id || savedResultIds.has(result.id)}
-                      className="inline-flex h-7 shrink-0 items-center gap-0.5 whitespace-nowrap rounded border border-emerald-200 bg-emerald-50 px-2 text-[10px] font-bold text-emerald-700 hover:border-emerald-400 disabled:cursor-default disabled:opacity-70"
-                    >
-                      <span className="material-symbols-outlined text-xs">{savedResultIds.has(result.id) ? 'check' : 'add_to_photos'}</span>
-                      {savedResultIds.has(result.id) ? '已入产品素材' : savingResultId === result.id ? '保存中…' : '保存到产品素材'}
-                    </button>
-                    <button
-                      onClick={() => void onContinueWithResult(result)}
-                      disabled={savingResultId === result.id}
-                      className="inline-flex h-7 shrink-0 items-center gap-0.5 whitespace-nowrap rounded border border-slate-200 px-2 text-[10px] font-bold text-slate-700 hover:border-primary hover:text-primary disabled:opacity-50"
-                    >
-                      <span className="material-symbols-outlined text-xs">auto_awesome</span>
-                      继续创作
-                    </button>
-                  </>
+                {canCreateTask && result.mediaType === 'IMAGE' && (
+                  <button
+                    onClick={() => void onCreateVideoFromResult(result)}
+                    disabled={creatingVideoResultId === result.id}
+                    className="inline-flex h-7 shrink-0 items-center gap-0.5 whitespace-nowrap rounded border border-primary/25 bg-blue-50 px-2 text-[10px] font-bold text-primary hover:border-primary disabled:opacity-50"
+                    title="将当前图片成果作为视频首帧"
+                  >
+                    <span className={`material-symbols-outlined text-xs ${creatingVideoResultId === result.id ? 'animate-spin' : ''}`}>movie</span>
+                    {creatingVideoResultId === result.id ? '处理中…' : '制作视频'}
+                  </button>
                 )}
+                <button
+                  onClick={() => void onContinueWithResult(result)}
+                  disabled={continuingResultId === result.id}
+                  className="inline-flex h-7 shrink-0 items-center gap-0.5 whitespace-nowrap rounded border border-slate-200 px-2 text-[10px] font-bold text-slate-700 hover:border-primary hover:text-primary disabled:opacity-50"
+                >
+                  <span className={`material-symbols-outlined text-xs ${continuingResultId === result.id ? 'animate-spin' : ''}`}>auto_awesome</span>
+                  {continuingResultId === result.id ? '处理中…' : '继续创作'}
+                </button>
                 {canRevise && result.mediaType === 'IMAGE' && (
                   <button
                     onClick={() => onRevise(result)}
