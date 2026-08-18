@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
 import type { AssetResourceItem } from '../../api/modules/asset';
 import {
@@ -15,6 +15,20 @@ import { AppScreen } from '../../types';
 import { AssetImage } from '../AssetImage';
 import { AssetTransitModal } from '../AssetTransitModal';
 import { ImagePreviewModal, type PreviewImage } from '../ImagePreviewModal';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import {
+  STORAGE_KEY,
+  DEFAULT_HEIGHT,
+  MIN_HEIGHT,
+  MAX_HEIGHT_DESKTOP,
+  MAX_HEIGHT_MOBILE,
+  BREAKPOINT_PX,
+  STEP_KEY_SMALL,
+  STEP_KEY_LARGE,
+  clampHeight,
+  parseStoredHeight,
+  computeNextHeight,
+} from './inputHeight';
 
 interface AssistantPageProps {
   onCreateTask: (screen: AppScreen, prefill: AssistantTaskPrefill) => void;
@@ -242,6 +256,17 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const promptOptimizationRequestRef = useRef(0);
 
+  // 创作助手输入框手动调整高度(spec §4.4 / §4.6)
+  const isDesktop = useMediaQuery(`(min-width: ${BREAKPOINT_PX}px)`);
+  const effectiveMax = isDesktop ? MAX_HEIGHT_DESKTOP : MAX_HEIGHT_MOBILE;
+
+  const [inputHeight, setInputHeight] = useState<number>(DEFAULT_HEIGHT);
+
+  // 拖拽过程中暂存 startY/startHeight/lastHeight,不进 React state(避免每像素 re-render)。
+  // lastHeight 关键:moveDrag 的 setInputHeight 是异步,endDrag 触发时(尤其是快速拖完立刻松手)
+  // React state 可能还没 flush,所以 endDrag 必须从 ref 取最终值(spec §4.6)。
+  const dragRef = useRef<{ startY: number; startHeight: number; lastHeight: number } | null>(null);
+
   const refreshSessions = useCallback(async () => {
     const page = await assistantApi.listSessions();
     setSessions(page.list ?? []);
@@ -319,6 +344,135 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
     }
     messageScrollRef.current?.scrollTo({ top: 0 });
   }, [messages, submitting]);
+
+  // 拖拽生命周期回调(spec §4.6)
+  const beginDrag = useCallback((clientY: number) => {
+    dragRef.current = { startY: clientY, startHeight: inputHeight, lastHeight: inputHeight };
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+    }
+  }, [inputHeight]);
+
+  const moveDrag = useCallback((clientY: number) => {
+    const state = dragRef.current;
+    if (!state) return;
+    // 拖动手柄位于输入框顶边。手柄往上拖(鼠标 clientY 减小)→ 输入框变高;往下拖→ 变矮。
+    // 与键盘 ↑/↓ 一致(ArrowUp = +STEP_SMALL = 变高)。
+    const delta = state.startY - clientY;
+    const next = computeNextHeight(state.startHeight, delta, MIN_HEIGHT, effectiveMax);
+    // 同步写 ref,供 endDrag 取真值;setInputHeight 异步
+    dragRef.current = { ...state, lastHeight: next };
+    setInputHeight(next);
+  }, [effectiveMax]);
+
+  const endDrag = useCallback(() => {
+    const state = dragRef.current;
+    if (!state) return;
+    dragRef.current = null;
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        // 从 ref 读,不依赖 React state(可能没 flush)
+        localStorage.setItem(STORAGE_KEY, String(state.lastHeight));
+      }
+    } catch {
+      /* localStorage 不可用,静默忽略 */
+    }
+  }, []);
+
+  // document 级鼠标/触摸事件监听(spec §4.7)
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => moveDrag(e.clientY);
+    const onMouseUp = () => endDrag();
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 0) return;
+      moveDrag(e.touches[0].clientY);
+    };
+    const onTouchEnd = () => endDrag();
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('touchmove', onTouchMove, { passive: true });
+    document.addEventListener('touchend', onTouchEnd);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [moveDrag, endDrag]);
+
+  // 启动恢复 + 窗口变窄钳制(spec §4.5 / §6)
+  useEffect(() => {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const raw = localStorage.getItem(STORAGE_KEY);
+      setInputHeight(parseStoredHeight(raw, MIN_HEIGHT, effectiveMax));
+    } catch {
+      /* fall back to default */
+    }
+  }, [effectiveMax]);
+
+  useEffect(() => {
+    if (inputHeight > effectiveMax) {
+      const next = clampHeight(inputHeight, MIN_HEIGHT, effectiveMax);
+      setInputHeight(next);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, String(next));
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [effectiveMax, inputHeight]);
+
+  // 手柄键盘事件(spec §4.9)
+  const onHandleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLDivElement>) => {
+      let next: number | null = null;
+      switch (e.key) {
+        case 'ArrowUp':
+          next = clampHeight(inputHeight + STEP_KEY_SMALL, MIN_HEIGHT, effectiveMax);
+          break;
+        case 'ArrowDown':
+          next = clampHeight(inputHeight - STEP_KEY_SMALL, MIN_HEIGHT, effectiveMax);
+          break;
+        case 'PageUp':
+          next = clampHeight(inputHeight + STEP_KEY_LARGE, MIN_HEIGHT, effectiveMax);
+          break;
+        case 'PageDown':
+          next = clampHeight(inputHeight - STEP_KEY_LARGE, MIN_HEIGHT, effectiveMax);
+          break;
+        case 'Home':
+          next = MIN_HEIGHT;
+          break;
+        case 'End':
+          next = effectiveMax;
+          break;
+        case 'Enter':
+        case ' ':
+          next = DEFAULT_HEIGHT;
+          break;
+        default:
+          return;
+      }
+      e.preventDefault();
+      setInputHeight(next);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, String(next));
+        }
+      } catch {
+        /* ignore */
+      }
+    },
+    [inputHeight, effectiveMax],
+  );
 
   const send = async (options: {
     skipRiskCheck?: boolean;
@@ -767,6 +921,30 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
 
         <footer className="shrink-0 border-t border-border-main bg-gradient-to-t from-white via-white to-white/80 px-3 pb-3 pt-3 sm:px-6 sm:pb-4 lg:px-10">
           <div className="mx-auto max-w-5xl">
+            <div
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="拖动调整输入框高度"
+              aria-valuenow={inputHeight}
+              aria-valuemin={MIN_HEIGHT}
+              aria-valuemax={effectiveMax}
+              tabIndex={0}
+              onKeyDown={onHandleKeyDown}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                beginDrag(e.clientY);
+              }}
+              onTouchStart={(e) => {
+                if (e.touches.length === 0) return;
+                beginDrag(e.touches[0].clientY);
+              }}
+              className="group flex h-1.5 cursor-ns-resize select-none items-center justify-center bg-[#f3f0ec] transition-colors hover:bg-primary-light focus:bg-primary-light focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <span
+                aria-hidden
+                className="block h-[3px] w-9 rounded-full bg-[#d6d1cb] transition-colors group-hover:bg-primary"
+              />
+            </div>
             <div className="overflow-hidden rounded-2xl border border-border-main bg-white shadow-[0_10px_32px_rgba(53,44,37,0.09)] transition focus-within:border-primary/45 focus-within:shadow-[0_12px_36px_rgba(216,92,66,0.11)]">
               {selectedResources.length > 0 && (
                 <div className="border-b border-[#eeeae6] bg-[#faf9f7] px-3 py-2.5">
@@ -810,6 +988,8 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
               <div className="px-3 pb-2 pt-2.5 sm:px-4">
               <textarea
                 ref={textareaRef}
+                rows={2}
+                maxLength={5000}
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
                 onKeyDown={(event) => {
@@ -818,10 +998,9 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
                     void send();
                   }
                 }}
-                rows={2}
-                maxLength={5000}
                 placeholder="描述你的创作需求，可以直接说要修改什么……"
-                className="min-h-[58px] max-h-36 w-full resize-none border-0 bg-transparent py-1.5 text-sm leading-6 text-text-main outline-none placeholder:text-[#aaa39c]"
+                style={{ height: `${inputHeight}px` }}
+                className="block w-full resize-none border-0 bg-transparent py-1.5 text-sm leading-6 text-text-main outline-none placeholder:text-[#aaa39c] will-change-[height]"
               />
               <div className="flex items-end justify-between gap-3 pt-1">
                 <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -869,8 +1048,8 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
               </div>
             </div>
             <p className="mt-2 flex items-center justify-center gap-1 text-center text-[9px] text-[#aaa39c]">
-              <span className="material-symbols-outlined text-xs">keyboard_return</span>
-              Enter 发送 · Shift + Enter 换行 · AI 生成内容请按业务需要复核
+              <span className="material-symbols-outlined text-xs">drag_handle</span>
+              上下拖动顶边调整输入框大小 · Enter 发送 · Shift + Enter 换行 · AI 生成内容请按业务需要复核
             </p>
           </div>
         </footer>
