@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import type { AssetResourceItem } from '../../api/modules/asset';
 import {
   assistantApi,
+  type AssistantAssetLibraryType,
   type AssistantAttachmentInput,
   type AssistantGenerationResult,
   type AssistantMessage,
@@ -11,9 +12,11 @@ import {
   type AssistantTaskTargetCapability,
   type AssistantTaskPrefill,
 } from '../../api/modules/assistant';
+import type { ProductDTO } from '../../api/modules/productInfo';
 import { AppScreen } from '../../types';
 import { AssetImage } from '../AssetImage';
 import { AssetTransitModal } from '../AssetTransitModal';
+import { ProductPickerModal } from '../CreateImageTask/ProductPickerModal';
 import { ImagePreviewModal, type PreviewImage } from '../ImagePreviewModal';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import {
@@ -43,6 +46,11 @@ interface SelectedResource {
 }
 
 interface TaskChoiceState {
+  message: AssistantMessage;
+  result: AssistantGenerationResult;
+}
+
+interface SaveAssetChoiceState {
   message: AssistantMessage;
   result: AssistantGenerationResult;
 }
@@ -249,6 +257,9 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
   const [editingTitle, setEditingTitle] = useState('');
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [taskChoice, setTaskChoice] = useState<TaskChoiceState | null>(null);
+  const [saveAssetChoice, setSaveAssetChoice] = useState<SaveAssetChoiceState | null>(null);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [savingAsset, setSavingAsset] = useState(false);
   const [creatingTaskCapability, setCreatingTaskCapability] = useState<AssistantTaskTargetCapability | null>(null);
   const [resourcePickerKind, setResourcePickerKind] = useState<'IMAGE' | 'VIDEO' | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -578,20 +589,49 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
     setMessages((current) => mergeMessage(current, response.assistantMessage));
   };
 
-  const saveResult = async (message: AssistantMessage, result: AssistantGenerationResult) => {
-    const saved = await assistantApi.saveToAsset(
-      message.id,
-      result.id,
-      `助手生成${result.resultKind === 'IMAGE' ? '图片' : '视频'}`,
-    );
+  const saveResult = async (
+    message: AssistantMessage,
+    result: AssistantGenerationResult,
+    libraryType: AssistantAssetLibraryType = 'GENERAL',
+    product?: Pick<ProductDTO, 'id' | 'name'>,
+  ) => {
+    const saved = await assistantApi.saveToAsset({
+      messageId: message.id,
+      resultId: result.id,
+      name: `助手生成${result.resultKind === 'IMAGE' ? '图片' : '视频'}`,
+      libraryType,
+      productId: product?.id,
+    });
     setMessages((current) => current.map((item) => item.id !== message.id ? item : {
       ...item,
       results: item.results?.map((entry) => entry.id === result.id
         ? { ...entry, savedAssetResourceId: saved.assetResourceId }
         : entry),
     }));
-    toast.success(saved.idempotentReplay ? '该结果已在资源中心' : '已保存到公共素材库');
+    const successMessage = libraryType === 'PRODUCT'
+      ? `已保存到产品素材并关联 SKU“${product?.name ?? ''}”`
+      : libraryType === 'MODEL'
+        ? '已保存到模特素材库'
+        : '已保存到通用素材库';
+    toast.success(saved.idempotentReplay && libraryType === 'GENERAL'
+      ? '该结果已在资源中心'
+      : successMessage);
     return saved.assetResourceId;
+  };
+
+  const saveToSelectedLibrary = async (
+    libraryType: AssistantAssetLibraryType,
+    product?: Pick<ProductDTO, 'id' | 'name'>,
+  ) => {
+    if (!saveAssetChoice || savingAsset) return;
+    setSavingAsset(true);
+    try {
+      await saveResult(saveAssetChoice.message, saveAssetChoice.result, libraryType, product);
+      setSaveAssetChoice(null);
+      setProductPickerOpen(false);
+    } finally {
+      setSavingAsset(false);
+    }
   };
 
   const createTask = async (
@@ -602,7 +642,7 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
     if (creatingTaskCapability) return;
     setCreatingTaskCapability(targetCapability);
     try {
-      await saveResult(message, result);
+      await saveResult(message, result, 'GENERAL');
       const prefill = await assistantApi.taskPrefill(message.id, result.id, targetCapability);
       const screen = prefill.targetScreen === 'CREATE_IMAGE_TASK'
         ? AppScreen.CREATE_IMAGE_TASK : AppScreen.CREATE_VIDEO_TASK;
@@ -909,7 +949,7 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
                   onCancel={cancel}
                   onRegenerate={regenerate}
                   onContinue={continueWith}
-                  onSave={saveResult}
+                  onSave={(message, result) => setSaveAssetChoice({ message, result })}
                   onApplyPrompt={applyOptimizedPrompt}
                   onCreateTask={(message, result) => setTaskChoice({ message, result })}
                 />
@@ -1080,6 +1120,34 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
           }}
         />
       )}
+      {saveAssetChoice && !productPickerOpen && (
+        <SaveAssetLibraryModal
+          result={saveAssetChoice.result}
+          saving={savingAsset}
+          onClose={() => {
+            if (!savingAsset) setSaveAssetChoice(null);
+          }}
+          onSelect={(libraryType) => {
+            if (libraryType === 'PRODUCT') {
+              setProductPickerOpen(true);
+              return;
+            }
+            void saveToSelectedLibrary(libraryType);
+          }}
+        />
+      )}
+      {saveAssetChoice && productPickerOpen && (
+        <ProductPickerModal
+          open
+          requireCreatable={false}
+          onClose={() => {
+            if (!savingAsset) setProductPickerOpen(false);
+          }}
+          onPick={(product) => {
+            void saveToSelectedLibrary('PRODUCT', product);
+          }}
+        />
+      )}
       {promptRiskReview && (
         <PromptRiskReviewModal
           review={promptRiskReview}
@@ -1110,6 +1178,98 @@ export function AssistantPage({ onCreateTask }: AssistantPageProps) {
   );
 }
 
+function SaveAssetLibraryModal({
+  result,
+  saving,
+  onClose,
+  onSelect,
+}: {
+  result: AssistantGenerationResult;
+  saving: boolean;
+  onClose: () => void;
+  onSelect: (libraryType: AssistantAssetLibraryType) => void;
+}) {
+  const options: Array<{
+    type: AssistantAssetLibraryType;
+    title: string;
+    description: string;
+    icon: string;
+    disabled?: boolean;
+    badge?: string;
+  }> = [
+    {
+      type: 'PRODUCT',
+      title: '产品素材',
+      description: '选择一个 SKU，保存后自动关联到该 SKU 的产品素材中。',
+      icon: 'inventory_2',
+      badge: '需选择 SKU',
+    },
+    {
+      type: 'GENERAL',
+      title: '通用素材',
+      description: '保存到资源中心的通用素材，可继续用于图片或视频创作。',
+      icon: 'folder_open',
+    },
+    {
+      type: 'MODEL',
+      title: '模特素材',
+      description: result.resultKind === 'IMAGE'
+        ? '保存到模特素材库，并自动建立可复用模特档案。'
+        : '模特素材库仅支持图片，视频不能保存为模特素材。',
+      icon: 'face',
+      disabled: result.resultKind !== 'IMAGE',
+      badge: result.resultKind !== 'IMAGE' ? '仅支持图片' : undefined,
+    },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="选择素材库类型">
+      <button type="button" aria-label="关闭" onClick={onClose} className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" />
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[#e7e0d9] bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-[#eee7df] px-5 py-4">
+          <div>
+            <p className="text-[10px] font-black tracking-[0.14em] text-primary">保存生成结果</p>
+            <h3 className="mt-1 text-base font-black text-text-main">选择素材库</h3>
+            <p className="mt-1 text-xs text-text-muted">分类与资源中心保持一致，保存后可在对应素材标签页查看。</p>
+          </div>
+          <button type="button" aria-label="关闭保存弹窗" disabled={saving} onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40">
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+        <div className="grid gap-3 p-5 sm:grid-cols-3">
+          {options.map((option) => (
+            <button
+              key={option.type}
+              type="button"
+              disabled={saving || option.disabled}
+              onClick={() => onSelect(option.type)}
+              className="group relative min-h-44 rounded-2xl border border-[#e6dfd8] bg-[#fcfbf9] p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary-light/30 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 disabled:hover:border-[#e6dfd8] disabled:hover:shadow-none"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-primary shadow-sm ring-1 ring-[#ebe4dd] transition group-hover:bg-primary group-hover:text-white">
+                <span className="material-symbols-outlined text-2xl">{option.icon}</span>
+              </span>
+              <span className="mt-4 flex items-center gap-2">
+                <span className="text-sm font-black text-text-main">{option.title}</span>
+                {option.badge && <span className="rounded-full bg-[#efeae5] px-2 py-0.5 text-[9px] font-bold text-text-muted">{option.badge}</span>}
+              </span>
+              <span className="mt-2 block text-[11px] leading-5 text-text-muted">{option.description}</span>
+              {!option.disabled && (
+                <span className="absolute bottom-3 right-3 material-symbols-outlined text-lg text-[#c2bbb4] transition group-hover:translate-x-0.5 group-hover:text-primary">arrow_forward</span>
+              )}
+            </button>
+          ))}
+        </div>
+        {saving && (
+          <div className="flex items-center justify-center gap-2 border-t border-[#eee7df] bg-[#fcfbf9] px-5 py-3 text-xs font-bold text-primary">
+            <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
+            正在保存并建立素材关联…
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MessageCard({
   message,
   onCancel,
@@ -1123,7 +1283,7 @@ function MessageCard({
   onCancel: (messageId: string) => Promise<void>;
   onRegenerate: (messageId: string) => Promise<void>;
   onContinue: (result: AssistantGenerationResult) => void;
-  onSave: (message: AssistantMessage, result: AssistantGenerationResult) => Promise<string>;
+  onSave: (message: AssistantMessage, result: AssistantGenerationResult) => void;
   onApplyPrompt: (message: AssistantMessage) => Promise<void>;
   onCreateTask: (message: AssistantMessage, result: AssistantGenerationResult) => void;
 }) {

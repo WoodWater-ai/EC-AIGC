@@ -2,6 +2,7 @@ import http from '../client';
 import type { PageInfo } from '../service-result';
 
 export type AssistantMediaType = 'IMAGE' | 'VIDEO';
+export type AssistantAssetLibraryType = 'GENERAL' | 'PRODUCT' | 'MODEL';
 export type AssistantTargetMedia = 'NONE' | AssistantMediaType;
 export type AssistantIntent =
   | 'CHITCHAT'
@@ -137,6 +138,15 @@ export interface AssistantTaskPrefill {
   };
 }
 
+export interface AssistantSaveAssetResponse {
+  assetResourceId: string;
+  fileResourceId: string;
+  libraryType: AssistantAssetLibraryType;
+  productId?: string | null;
+  modelProfileId?: string | null;
+  idempotentReplay: boolean;
+}
+
 export interface AssistantAttachmentInput {
   sourceType: 'ASSET_RESOURCE' | 'ASSISTANT_RESULT';
   sourceId: string;
@@ -195,12 +205,15 @@ export const assistantApi = {
       resultId,
       targetCapability,
     }),
-  saveToAsset: (
-    messageId: string,
-    resultId: string,
-    name?: string,
-  ) => http.post<{ assetResourceId: string; fileResourceId: string; idempotentReplay: boolean }>(
+  saveToAsset: (request: {
+    messageId: string;
+    resultId: string;
+    name?: string;
+    libraryType?: AssistantAssetLibraryType;
+    productId?: string;
+    tags?: string[];
+  }) => http.post<AssistantSaveAssetResponse>(
     '/v1/assistant/message/save-to-asset',
-    { messageId, resultId, name },
+    request,
   ),
 };
