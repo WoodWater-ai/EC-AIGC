@@ -182,6 +182,59 @@ const createRequestId = () => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
+const downloadFileName = (result: AssistantGenerationResult, mimeType?: string) => {
+  const mimeExtensions: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'video/quicktime': 'mov',
+  };
+  const pathExtension = (() => {
+    try {
+      return new URL(result.url).pathname.match(/\.([a-zA-Z0-9]{2,5})$/)?.[1]?.toLowerCase();
+    } catch {
+      return undefined;
+    }
+  })();
+  const extension = (mimeType && mimeExtensions[mimeType])
+    || pathExtension
+    || (result.resultKind === 'IMAGE' ? 'png' : 'mp4');
+  return `创作助手-${result.resultKind === 'IMAGE' ? '原图' : '视频'}-${result.id}.${extension}`;
+};
+
+const triggerBrowserDownload = (url: string, fileName: string, openInNewTab = false) => {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  if (openInNewTab) {
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+  }
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+const downloadOriginalResult = async (result: AssistantGenerationResult) => {
+  try {
+    const response = await fetch(result.url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    try {
+      triggerBrowserDownload(blobUrl, downloadFileName(result, blob.type));
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    }
+  } catch {
+    // COS 未开放跨域读取时，退回浏览器原始地址下载；始终使用 result.url，不使用封面或缩略图。
+    triggerBrowserDownload(result.url, downloadFileName(result), true);
+  }
+};
+
 const toDate = (time: unknown) => {
   if (Array.isArray(time) && time.length >= 3) {
     const [year, month, day, hour = 0, minute = 0, second = 0] = time.map(Number);
@@ -1293,6 +1346,17 @@ function MessageCard({
     images: PreviewImage[];
     initialIndex: number;
   } | null>(null);
+  const [downloadingResultId, setDownloadingResultId] = useState<string | null>(null);
+  const handleDownload = async (result: AssistantGenerationResult) => {
+    if (downloadingResultId) return;
+    setDownloadingResultId(result.id);
+    try {
+      await downloadOriginalResult(result);
+      toast.success(result.resultKind === 'IMAGE' ? '原图下载已开始' : '视频下载已开始');
+    } finally {
+      setDownloadingResultId(null);
+    }
+  };
   const attachmentPreviewImages = (message.attachments ?? []).flatMap((attachment): PreviewImage[] => (
     attachment.type === 'IMAGE' && attachment.url
       ? [{ url: attachment.url, label: assistant ? '助手引用素材' : '用户参考素材' }]
@@ -1391,6 +1455,17 @@ function MessageCard({
             <div className="flex flex-wrap items-center gap-2 border-t border-border-main p-3">
               <button type="button" onClick={() => onContinue(result)} className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm shadow-primary/15 transition hover:bg-primary-hover">
                 <span className="material-symbols-outlined text-base">edit_note</span>继续创作
+              </button>
+              <button
+                type="button"
+                disabled={downloadingResultId === result.id}
+                onClick={() => { void handleDownload(result); }}
+                className="flex items-center gap-1.5 rounded-lg border border-border-main px-3 py-2 text-xs font-semibold text-text-muted transition hover:bg-[#f7f5f2] hover:text-text-main disabled:cursor-wait disabled:opacity-50"
+              >
+                <span className={`material-symbols-outlined text-base ${downloadingResultId === result.id ? 'animate-spin' : ''}`}>
+                  {downloadingResultId === result.id ? 'progress_activity' : 'download'}
+                </span>
+                {result.resultKind === 'IMAGE' ? '下载原图' : '下载视频'}
               </button>
               <button type="button" onClick={() => { void onSave(message, result); }} className="flex items-center gap-1.5 rounded-lg border border-border-main px-3 py-2 text-xs font-semibold text-text-muted transition hover:bg-[#f7f5f2] hover:text-text-main">
                 <span className="material-symbols-outlined text-base">{result.savedAssetResourceId ? 'check_circle' : 'inventory_2'}</span>
