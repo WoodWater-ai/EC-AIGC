@@ -747,7 +747,7 @@ export function ScanAddProductImageDialog({
               <button
                 type="button"
                 disabled={uploading}
-                onClick={() => setMatchMode('NAME')}
+                onClick={() => setMatchMode('CODE')}
                 className={radioOptionClass(matchMode === 'CODE', uploading)}
               >
                 <span className="font-mono">#</span>
