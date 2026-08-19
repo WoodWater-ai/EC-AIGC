@@ -9,6 +9,8 @@ import type { PageInfo } from '../service-result';
 import type {
   GeneratedImageVO,
   GenerationTaskResponse,
+  ImageTaskPreflightRequest,
+  ImageTaskPreflightResponse,
   ImageTaskSubmitPayload,
   ImageTaskSubmitResponse,
   TaskGroupQueryRequest,
@@ -153,6 +155,19 @@ export const taskApi = {
     payload: ImageTaskSubmitPayload
   ): Promise<ImageTaskSubmitResponse> {
     return http.post<ImageTaskSubmitResponse>('/v1/task/submit', payload);
+  },
+
+  /**
+   * [2026-08-19] 图片任务提交前预检(/v1/admin/task/preflight) —— 仅返回预估消耗。
+   * 前端在用户点击"生成"前的确认弹窗中调用,以展示"预估消耗"。
+   */
+  preflightImageTask(
+    payload: ImageTaskPreflightRequest
+  ): Promise<ImageTaskPreflightResponse> {
+    return http.post<ImageTaskPreflightResponse>(
+      '/v1/admin/task/preflight',
+      payload
+    );
   },
 
   /** 基于已有图片成果创建隐藏的二次编辑执行任务。 */

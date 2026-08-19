@@ -303,6 +303,37 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   // submitStatus: idle=未提交 / loading=提交后轮询中 / done=全部任务结束
   const [submittedGroup, setSubmittedGroup] = useState<{ groupId: string } | null>(null);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+
+  // [2026-08-19] 图片任务预检状态:在确认弹窗打开时拉取预估消耗
+  const [preflightResult, setPreflightResult] = useState<{ estimatedCost?: number | null } | null>(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+
+  // [2026-08-19] 确认弹窗打开 → 触发 preflight
+  useEffect(() => {
+    if (!executionConfirmOpen) {
+      // 关闭时清理,避免下次打开残留
+      setPreflightResult(null);
+      setPreflightLoading(false);
+      return;
+    }
+    setPreflightLoading(true);
+    setPreflightResult(null);
+    const taskParamsJson = JSON.stringify(paramsSnapshot.schemaParams ?? {});
+    taskApi.preflightImageTask({
+      capability: 'REF_IMG_EDIT',
+      channelType: 'VIDU',
+      channelInstanceId: paramsSnapshot.channelId ?? '',
+      modelCode: paramsSnapshot.modelId ?? undefined,
+      taskParamsJson,
+    }).then((resp) => {
+      setPreflightResult({ estimatedCost: resp.estimatedCost });
+    }).catch(() => {
+      // 失败时降级:不展示预估消耗
+      setPreflightResult({ estimatedCost: null });
+    }).finally(() => {
+      setPreflightLoading(false);
+    });
+  }, [executionConfirmOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   // [2026-08-15] 结果按图片类型分组:每个任务一行(imageType + taskStatus + 该任务的产物)
   const [submitGroups, setSubmitGroups] = useState<Array<{
     imageType: string;
@@ -1020,6 +1051,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       <ExecutionConfirmDialog
         open={executionConfirmOpen}
         isSubmitting={isSubmitting}
+        // [2026-08-19] 预估消耗(后端 preflight 接口返回)
+        estimatedCost={preflightResult?.estimatedCost}
+        isPreflighting={preflightLoading}
         onSubmit={() => void submitTasks('navigate')}
         onSubmitOnly={() => void handleSubmitOnly()}
         onCancel={() => setExecutionConfirmOpen(false)}

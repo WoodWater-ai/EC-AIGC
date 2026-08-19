@@ -728,6 +728,31 @@ export interface ImageTaskSubmitResponse {
   taskIds: string[];
 }
 
+/**
+ * [2026-08-19] 图片任务提交前预检响应(对齐后端 ImageTaskPreflightResponse)。
+ * <p>前端在用户点击"生成"前的确认弹窗中调用,以展示"预估消耗"。
+ */
+export interface ImageTaskPreflightResponse {
+  ready?: boolean;
+  /** 预估消耗(CNY);null 表示当前渠道/模型不在本地定价表中 */
+  estimatedCost?: number | null;
+  currency?: string;
+  billingNote?: string;
+}
+
+/**
+ * [2026-08-19] 图片任务提交前预检请求(对齐后端 ImageTaskPreflightRequest)。
+ * 仅含估算消耗所需字段,避免 submit 的 @NotEmpty 校验。
+ */
+export interface ImageTaskPreflightRequest {
+  capability: string;
+  channelType: string;
+  channelInstanceId: string;
+  modelCode?: string | null;
+  modelId?: string | null;
+  taskParamsJson?: string;
+}
+
 /** 生成图片 VO(对齐后端 GeneratedImageVO) */
 export interface GeneratedImageVO {
   id: string;
