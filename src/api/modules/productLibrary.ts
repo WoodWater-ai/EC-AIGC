@@ -28,6 +28,7 @@ export interface ProductLibraryProduct {
   sellingPoints?: string;
   silhouetteStructure?: string;
   imageUrl?: string;
+  skuCode?: string;
   productStatus?: 'ON_SHELF' | 'OFF_SHELF';
   inputAssetCount: number;
   imageCount: number;

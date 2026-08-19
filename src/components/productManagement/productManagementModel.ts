@@ -176,7 +176,7 @@ export function toProductLibrarySpu(product: ProductLibraryProduct): ProductSpuV
     createTime: product.createTime,
     skuList: [{
       id: product.id,
-      skuCode: `SKU-${product.id}`,
+      skuCode: product.skuCode,
       specName: product.color || '默认规格',
       imageUrl: product.imageUrl,
       color: product.color,
