@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  FolderOpen,
   Image as ImageIcon,
   Pencil,
   Plus,
@@ -24,6 +25,7 @@ import { useAuth } from '../auth/AuthContext';
 import { withCosThumbnail } from '../utils/cosImage';
 import { useConfirm } from './common/ConfirmProvider';
 import { ScanAddProductImageDialog } from './ScanAddProductImageDialog';
+import { AssetTransitModal } from './AssetTransitModal';
 import { ProductDetailDrawer } from './productManagement/ProductDetailDrawer';
 import { ImagePreviewModal, type PreviewImage } from './ImagePreviewModal';
 import { ProductSpuFormDrawer } from './productManagement/ProductSpuFormDrawer';
@@ -75,6 +77,10 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
   const [editing, setEditing] = useState<ProductDTO | null>(null);
   const [erpSyncing, setErpSyncing] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [materialSku, setMaterialSku] = useState<{
+    spuName: string;
+    sku: ProductSkuView;
+  } | null>(null);
   /** 商品图大图预览(主表/子表缩略图点击) */
   const [productPreview, setProductPreview] = useState<{
     images: PreviewImage[];
@@ -463,6 +469,7 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
                       : openEdit(product.raw))}
                     onDelete={() => void handleDelete(product)}
                     onCreate={handleCreate}
+                    onOpenMaterials={(sku) => setMaterialSku({ spuName: product.name, sku })}
                     onPreview={openProductPreview}
                   />
                 );
@@ -536,6 +543,18 @@ export default function ProductManagePage({ onCreateSku }: ProductManagePageProp
         onClose={() => setScanOpen(false)}
         onDone={() => void load()}
       />
+      {materialSku && (
+        <AssetTransitModal
+          mode="manager"
+          initialSource="PRODUCT"
+          allowedSources={['PRODUCT']}
+          initialProduct={materialSku}
+          onClose={() => {
+            setMaterialSku(null);
+            void load();
+          }}
+        />
+      )}
       {productPreview && (
         <ImagePreviewModal
           images={productPreview.images}
@@ -560,6 +579,7 @@ interface ProductRowsProps {
   onEdit: (sku: ProductSkuView) => void;
   onDelete: () => void;
   onCreate: (sku: ProductSkuView) => void;
+  onOpenMaterials: (sku: ProductSkuView) => void;
   /** 点击商品图缩略图时触发(打开大图预览) */
   onPreview?: (url: string, alt: string) => void;
 }
@@ -576,6 +596,7 @@ function ProductRows({
   onEdit,
   onDelete,
   onCreate,
+  onOpenMaterials,
   onPreview,
 }: ProductRowsProps) {
   const sourceClass = product.source === 'ERP'
@@ -626,6 +647,9 @@ function ProductRows({
         <td className="px-3 py-2">
           <div className="flex items-center gap-1">
             <IconButton title="查看详情" onClick={onDetails}><Eye className="h-3.5 w-3.5" /></IconButton>
+            {onlySku && (
+              <IconButton title="打开产品素材库" onClick={() => onOpenMaterials(onlySku)}><FolderOpen className="h-3.5 w-3.5" /></IconButton>
+            )}
             {canEdit && onlySku && (
               <IconButton title={product.source === 'ERP' ? '补录 ERP 商品信息' : '编辑'} onClick={() => onEdit(onlySku)}><Pencil className="h-3.5 w-3.5" /></IconButton>
             )}
@@ -669,6 +693,7 @@ function ProductRows({
           <td className="px-3 py-2 text-[10px] text-slate-400">{formatProductTime(product.createTime)}</td>
           <td className="px-3 py-2">
             <div className="flex items-center gap-1">
+              <IconButton title="打开产品素材库" onClick={() => onOpenMaterials(sku)}><FolderOpen className="h-3.5 w-3.5" /></IconButton>
               {canEdit && product.source === 'ERP' && (
                 <IconButton title="补录 ERP 商品信息" onClick={() => onEdit(sku)}><Pencil className="h-3.5 w-3.5" /></IconButton>
               )}

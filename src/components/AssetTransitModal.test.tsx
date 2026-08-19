@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import React from 'react';
 import { AssetTransitModal } from './AssetTransitModal';
 import type { AssetResourceItem } from '../api/modules/asset';
+import type { ProductSkuView } from './productManagement/productManagementModel';
 
 // 类型层校验为主,运行时交互留给 Playwright/E2E(本计划不引入)
 
@@ -90,4 +91,25 @@ test('manager mode: 类型层校验(运行时由 IDE 视觉自检)', () => {
   );
   const _typeCheck = el;
   assert.ok(_typeCheck);
+});
+
+test('管理模式接受初始 SKU 上下文', () => {
+  const sku: ProductSkuView = {
+    id: 'sku-1',
+    productId: 'sku-1',
+    name: '黑色 M',
+    code: 'SKU-1',
+    status: 'ON_SHELF',
+    materialCount: 0,
+    canCreate: false,
+  };
+  const el = (
+    <AssetTransitModal
+      mode="manager"
+      initialSource="PRODUCT"
+      initialProduct={{ spuName: '测试商品', sku }}
+      onClose={() => {}}
+    />
+  );
+  assert.ok(el);
 });

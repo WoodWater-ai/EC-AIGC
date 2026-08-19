@@ -103,6 +103,11 @@ interface AssetTransitModalProps {
   assetKind?: 'IMAGE' | 'VIDEO' | 'AUDIO';
   /** 初始数据来源；音频选择器始终降级为上传资源。 */
   initialSource?: ResourceCenterSource;
+  /** 从产品管理进入时直接打开指定 SKU 的产品素材列表。 */
+  initialProduct?: {
+    spuName: string;
+    sku: ProductSkuView;
+  };
   /** 限定业务选择器可见的数据源；产品管理只开放上传资源。 */
   allowedSources?: ResourceCenterSource[];
   /** 从资源中心成功添加模特后通知上层刷新模特资源库。 */
@@ -129,6 +134,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   multiSelect = false,
   mode = 'picker',
   initialSource,
+  initialProduct,
   allowedSources = ['UPLOAD', 'PRODUCT', 'MODEL'],
   onModelImported,
   selectionOnly = false,
@@ -185,7 +191,11 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     spuName: string;
     productId: string;
     sku: ProductSkuView;
-  } | null>(null);
+  } | null>(() => initialProduct ? {
+    spuName: initialProduct.spuName,
+    productId: initialProduct.sku.productId,
+    sku: initialProduct.sku,
+  } : null);
   const [selectedProductSkuIds, setSelectedProductSkuIds] = useState<string[]>([]);
   const [selectedProductCategoryId, setSelectedProductCategoryId] = useState<string | null>(null);
   const [productCategoryTree, setProductCategoryTree] = useState<ProductCategoryNode[]>([]);
@@ -641,6 +651,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     && selectedItems.length >= 2
     && selectedItems.length === selectedAssetIds.length
     && selectedItems.every((item) => item.assetKind === 'IMAGE');
+  const canMergeFocusedProductAssets = canMergeProducts
+    && activeSource === 'PRODUCT'
+    && focusedProduct !== null
+    && selectedItems.length >= 2
+    && selectedItems.length === selectedAssetIds.length
+    && selectedItems.every((item) => item.assetKind === 'IMAGE');
   const showSetAsModel = canCreateModel
     && mode === 'manager'
     && activeSource === 'UPLOAD'
@@ -715,6 +731,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     } catch {
       toast.error('读取产品白底图失败，请稍后重试');
     }
+  };
+
+  const handleFocusedProductMerge = () => {
+    if (!focusedProduct || !canMergeFocusedProductAssets) return;
+    setMergeTargetProductIds([focusedProduct.productId]);
+    setMergeDrawerItems(selectedItems);
   };
 
   const handleSetAsModel = async () => {
@@ -1768,6 +1790,18 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                       返回产品列表
                     </button>
                   )}
+                  {focusedProduct && canMergeProducts && (
+                    <button
+                      type="button"
+                      onClick={handleFocusedProductMerge}
+                      disabled={!canMergeFocusedProductAssets}
+                      title={canMergeFocusedProductAssets ? '合并选中的产品素材' : '请先选择至少两张图片素材'}
+                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span className="material-symbols-outlined text-sm">view_quilt</span>
+                      合并图片
+                    </button>
+                  )}
                   {!focusedProduct && canMergeProducts && selectedProductIds.length >= 2 && (
                     <span>
                       <button
@@ -2273,6 +2307,16 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                           合并
                         </button>
                       )}
+                    {activeSource === 'PRODUCT' && focusedProduct && canMergeFocusedProductAssets && (
+                      <button
+                        type="button"
+                        onClick={handleFocusedProductMerge}
+                        className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline"
+                      >
+                        <span className="material-symbols-outlined text-sm">view_quilt</span>
+                        合并
+                      </button>
+                    )}
                     {canSetProductCover && (
                       <button
                         type="button"
@@ -2338,6 +2382,16 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                 items={mergeDrawerItems}
                 categoryId={selectedCategoryId ?? undefined}
                 productIds={mergeTargetProductIds}
+                defaultDirection={mergeTargetProductIds.length === 1 && focusedProduct
+                  && mergeTargetProductIds[0] === focusedProduct.productId
+                  ? 'VERTICAL'
+                  : undefined}
+                onAssetCreated={mergeTargetProductIds.length === 1 && focusedProduct
+                  && mergeTargetProductIds[0] === focusedProduct.productId
+                  ? async (assetId) => {
+                    await productLibraryApi.setInputAssetCover(focusedProduct.productId, assetId);
+                  }
+                  : undefined}
                 onClose={() => {
                   setMergeDrawerItems(null);
                   setMergeTargetProductIds([]);

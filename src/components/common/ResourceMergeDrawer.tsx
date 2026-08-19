@@ -18,6 +18,10 @@ interface ResourceMergeDrawerProps {
   categoryId?: number;
   /** 合成素材可同时加入多个目标 SKU，共享同一份 COS 文件。 */
   productIds?: string[];
+  /** 不传时保持一级素材库的横向合并默认值。 */
+  defaultDirection?: MergeDirection;
+  /** 创建成功后的业务回调，例如将当前 SKU 的合成素材设为封面。 */
+  onAssetCreated?: (assetId: string) => void | Promise<void>;
   onClose: () => void;
   onUploaded: () => void | Promise<void>;
 }
@@ -32,6 +36,8 @@ export function ResourceMergeDrawer({
   items,
   categoryId,
   productIds = [],
+  defaultDirection = 'HORIZONTAL',
+  onAssetCreated,
   onClose,
   onUploaded,
 }: ResourceMergeDrawerProps) {
@@ -41,7 +47,7 @@ export function ResourceMergeDrawer({
   );
   const primaryProductId = targetProductIds[0];
   const [orderedItems, setOrderedItems] = useState(items);
-  const [direction, setDirection] = useState<MergeDirection>('HORIZONTAL');
+  const [direction, setDirection] = useState<MergeDirection>(defaultDirection);
   const [resourceName, setResourceName] = useState(defaultResourceName);
   const [preview, setPreview] = useState<CompositePreview | null>(null);
   const [isComposing, setIsComposing] = useState(false);
@@ -127,7 +133,7 @@ export function ResourceMergeDrawer({
       const name = resourceName.trim();
       const file = new File([preview.blob], `${name}.png`, { type: 'image/png' });
       const { fileResourceId, fileMd5 } = await upload(file);
-      await assetApi.create({
+      const assetId = await assetApi.create({
         fileResourceId,
         fileMd5,
         name,
@@ -139,9 +145,18 @@ export function ResourceMergeDrawer({
         productIds: targetProductIds.length > 1 ? targetProductIds : undefined,
         categoryIds: categoryId == null ? undefined : [String(categoryId)],
       });
+      try {
+        await onAssetCreated?.(assetId);
+      } catch (callbackError) {
+        toast.error(`合并素材已加入当前 SKU，但设为封面失败：${(callbackError as Error).message}`);
+        await onUploaded();
+        return;
+      }
       toast.success(targetProductIds.length > 1
         ? `合并套图已分别加入 ${targetProductIds.length} 个 SKU 素材`
-        : '合并套图已上传到资源中心');
+        : primaryProductId
+          ? '合并套图已加入当前 SKU 素材'
+          : '合并套图已上传到资源中心');
       await onUploaded();
     } catch (err) {
       setError(`上传失败：${(err as Error).message ?? '未知错误'}`);
@@ -169,7 +184,9 @@ export function ResourceMergeDrawer({
               按编号顺序拼接 {orderedItems.length} 张图片，生成预览后
               {targetProductIds.length > 1
                 ? `分别加入 ${targetProductIds.length} 个 SKU 素材。`
-                : '上传到资源中心。'}
+                : primaryProductId
+                  ? '加入当前 SKU 素材。'
+                  : '上传到资源中心。'}
             </p>
           </div>
           <button
@@ -318,7 +335,9 @@ export function ResourceMergeDrawer({
                 ? `上传中 ${progress}%`
                 : targetProductIds.length > 1
                   ? `合并并加入 ${targetProductIds.length} 个 SKU`
-                  : '上传到资源中心'}
+                  : primaryProductId
+                    ? '合并并加入当前 SKU'
+                    : '上传到资源中心'}
             </button>
           </div>
         </footer>
