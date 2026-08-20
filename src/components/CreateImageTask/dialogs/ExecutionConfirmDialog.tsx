@@ -43,7 +43,7 @@ export const ExecutionConfirmDialog: React.FC<ExecutionConfirmDialogProps> = ({
     if (isPreflighting) return '加载中…';
     if (estimatedCost == null) return '以实际 credits 为准';
     if (estimatedCost === 0) return '免费';
-    return `CNY ${estimatedCost.toFixed(2)}`;
+    return `¥ ${estimatedCost.toFixed(2)}`;
   };
   return (
     <DialogFrame

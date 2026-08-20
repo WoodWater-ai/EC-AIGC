@@ -449,8 +449,8 @@ const OverviewTab: React.FC<{
             <InfoRow label="生成比例" value={task.aspectRatio || String(params.aspect_ratio ?? '—')} />
             <InfoRow label="模板" value={task.templateName || group.templateName || '未使用模板'} />
             <InfoRow label="提交时间" value={formatDateTime(task.createTime)} />
-            <InfoRow label="预估成本" value={task.estimatedCost == null ? '—' : `${task.estimatedCost} Pts`} />
-            <InfoRow label="实际成本" value={task.actualCost == null ? '—' : `${task.actualCost} Pts`} />
+            <InfoRow label="预估成本" value={task.estimatedCost == null ? '—' : `${task.estimatedCost} 元`} />
+            <InfoRow label="实际成本" value={task.actualCost == null ? '—' : `${task.actualCost} 元`} />
           </dl>
         </section>
         <section className="rounded-xl border border-slate-200 bg-white p-5">
