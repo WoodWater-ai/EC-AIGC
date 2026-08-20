@@ -325,6 +325,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       channelInstanceId: paramsSnapshot.channelId ?? '',
       modelCode: paramsSnapshot.modelId ?? undefined,
       taskParamsJson,
+      // [2026-08-19] 多张图:把 selectedTypes × typeCounts 求和传给后端,后端 × costRate
+      count: totalCount,
     }).then((resp) => {
       setPreflightResult({ estimatedCost: resp.estimatedCost });
     }).catch(() => {

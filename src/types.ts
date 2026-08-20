@@ -751,6 +751,8 @@ export interface ImageTaskPreflightRequest {
   modelCode?: string | null;
   modelId?: string | null;
   taskParamsJson?: string;
+  /** 本次要生成的总张数(后端 × costRate);不传则视为 1 */
+  count?: number;
 }
 
 /** 生成图片 VO(对齐后端 GeneratedImageVO) */
