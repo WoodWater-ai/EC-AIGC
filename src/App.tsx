@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   AppScreen,
   GenerationTask,
@@ -27,8 +27,8 @@ import ProductManagePage from './components/ProductManagePage';
 import DictCategoryList from './components/DictCategoryList';
 import DictItemList from './components/DictItemList';
 import { ModelLibrary } from './components/ModelLibrary';
-import { AssistantPage } from './components/Assistant/AssistantPage';
 import { GarmentWorkspace } from './components/garment/GarmentWorkspace';
+import { AssistantPage } from './components/Assistant/AssistantPage';
 import type { AssistantTaskPrefill } from './api/modules/assistant';
 import {
   ModelProfileCreator,
@@ -37,6 +37,7 @@ import {
 } from './components/ModelProfileCreator';
 
 import { useAuth } from './auth/AuthContext';
+import { useUrlScreen } from './hooks/useUrlScreen';
 import { setLoginRequiredHandler } from './api/error';
 import { useServiceQuery } from './api/hooks/useServiceQuery';
 import { userApi, type UserDTO } from './api/modules/user';
@@ -46,7 +47,6 @@ import { assetApi, type AssetResourceItem } from './api/modules/asset';
 import type { ProductSkuView } from './components/productManagement/productManagementModel';
 import { toUIGenerationTask } from './components/createTask/taskAdapter';
 import { type TaskReusePrefill } from './lib/task/taskReuse';
-import { toast } from 'sonner';
 
 import {
   mockProducts,
@@ -101,7 +101,7 @@ function adaptAuthUser(authUser: ReturnType<typeof useAuth>['user']): SystemUser
   };
 }
 
-/** 模特资源库分页 pageSize:5 列 × 10 行,与 AssetTransitModal 产品 tab 一致 */
+/** 模特资源库分页 pageSize:5 列 × 10 行,与 AssetAssetPicker 产品 tab 一致 */
 const profilePageSize = 50;
 
 export default function App() {
@@ -112,12 +112,13 @@ export default function App() {
     logout,
     canAccessScreen,
     firstAccessibleScreen,
+    embedMode,
   } = useAuth();
 
   // 初次加载默认 DASHBOARD —— initializing=true 时显示 spinner 不进 switch；
   // initializing=false 后根据 isAuthenticated 决定 LOGIN 还是 DASHBOARD。
   // 旧版本初始值是 LOGIN（依赖 user 未持久化），现在 AuthProvider 会用 /me 恢复 user。
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
+  const [currentScreen, setCurrentScreen] = useUrlScreen(AppScreen.DASHBOARD);
   const [highlightGroupId, setHighlightGroupId] = useState<string | null>(null);
   const [highlightTaskKind, setHighlightTaskKind] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
   const [creationTemplateId, setCreationTemplateId] = useState<string | null>(null);
@@ -125,6 +126,7 @@ export default function App() {
   const [assistantTaskPrefill, setAssistantTaskPrefill] = useState<AssistantTaskPrefill | null>(null);
   // 从任务结果或产品 SKU 进入创作时，只保留本次临时上下文，不写入草稿。
   const [creationAssetPrefill, setCreationAssetPrefill] = useState<AssetResourceItem | null>(null);
+  // 从历史任务复用配置进入创作时，临时保存任务组 + 原始素材 + 上下文；离开创建页即清空。
   const [taskReusePrefill, setTaskReusePrefill] = useState<TaskReusePrefill | null>(null);
 
   const setScreen = (
@@ -151,6 +153,8 @@ export default function App() {
     );
   };
 
+  const showChrome = isAuthenticated && !embedMode;
+
   // 记录"进入创建任务页之前的菜单",onBack 时回到那里。
   // - lastScreenRef 跟踪上一次的 currentScreen(在 useEffect 里维护)
   // - previousScreenRef 只在进入 CREATE_* 时刷新,记录"进入那一刻的上一个菜单"
@@ -170,7 +174,6 @@ export default function App() {
   const handleBack = () => {
     setAssistantTaskPrefill(null);
     setCreationAssetPrefill(null);
-    setTaskReusePrefill(null);
     setCurrentScreen(previousScreenRef.current);
   };
 
@@ -182,14 +185,14 @@ export default function App() {
     setAssistantTaskPrefill(null);
     setCreationTemplateId(null);
     setCreationAssetPrefill(asset);
-    setTaskReusePrefill(null);
     setCurrentScreen(screen);
   };
 
   const reuseTask = async (group: TaskGroupResponse, task: TaskGroupItemResponse) => {
     const context = await taskApi.reuseContext(task.id);
     if (context.assets.length === 0) {
-      toast.error('该历史任务未记录可复用的原始素材');
+      // 简单提示：toast 已经在 AuthContext 外无法直接使用，由 TaskList 提供 UI 反馈
+      console.warn('[App] 该历史任务未记录可复用的原始素材');
       return;
     }
 
@@ -217,7 +220,7 @@ export default function App() {
       sourceId: result.id,
     }]);
     if (!asset) {
-      toast.error('未能将该图片成果转换为视频首帧素材');
+      console.warn('[App] 未能将该图片成果转换为视频首帧素材');
       return;
     }
     if (!canAccessScreen(AppScreen.CREATE_VIDEO_TASK)) return;
@@ -438,7 +441,7 @@ export default function App() {
   const handleUpdateUserRole = (userId: string, newRole: any, newDeptId?: string) => {
     setUsers(prev => prev.map(u => u.id === userId
       ? { ...u, role: newRole, ...(newDeptId !== undefined ? { deptId: newDeptId } : {}) }
-      : u
+      : {}
     ));
   };
 
@@ -659,8 +662,8 @@ export default function App() {
   return (
     <div className="flex h-screen overflow-hidden bg-bg-base font-sans antialiased text-text-main" id="app-root-container">
 
-      {/* 1. Sidebar Nav */}
-      <Sidebar
+      {/* 1. Sidebar Nav —— embed mode 下隐藏 */}
+      {showChrome && <Sidebar
         currentScreen={currentScreen}
         setScreen={setScreen}
         users={users}
@@ -672,19 +675,19 @@ export default function App() {
           void logout();
         }}
         openTransit={() => setIsTransitOpen(true)}
-      />
+      />}
 
       {/* 2. Main Area (Header + Scrollable Body) */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        {/* Header toolbar */}
-        <Header
+        {/* Header toolbar —— embed mode 下隐藏 */}
+        {showChrome && <Header
           currentScreen={currentScreen}
           setScreen={setScreen}
           currentUser={currentUser}
           notifications={notifications}
           markAllAsRead={handleMarkAllNotificationsAsRead}
-        />
+        />}
 
         {/* Scrollable Workspace panel */}
         <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-5 sm:pb-24 lg:p-8 lg:pb-8" id="main-content-scroll">
