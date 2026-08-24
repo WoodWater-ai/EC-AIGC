@@ -100,6 +100,24 @@
   box-shadow: 0 8px 24px -4px rgba(53, 44, 37, 0.1);
 }
 
+/* 服装组件向导统一表单控件；保留原生 select 行为和清晰键盘焦点。 */
+.form-input {
+  width: 100%;
+  border: 1px solid #e7e5e4;
+  border-radius: 0.5rem;
+  background: #fff;
+  padding: 0.625rem 0.75rem;
+  color: #292524;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: #d85c42;
+  box-shadow: 0 0 0 3px rgba(216, 92, 66, 0.12);
+}
+
 /* ==================== Sonner Toast 自适应宽度 ==================== */
 /* sonner 默认 min-width: 356px,导致"文件上传成功"也撑大。
    改成 width: fit-content,让 toast 宽度贴合文本(配合 max-width 防溢出)。 */

@@ -18,6 +18,11 @@ export type UploadTokenPurpose =
   | 'MODEL'
   | 'DICT'
   | 'IMAGE_EDIT_MASK'
+  | 'GARMENT_RENDER'
+  | 'PERSON_CONSENT'
+  | 'COMMERCIAL_RIGHTS'
+  | 'PROVIDER_AGREEMENT'
+  | 'TRYON_RESULT'
   | 'OTHER'
   | 'UP_DOWN_MERGE';
 

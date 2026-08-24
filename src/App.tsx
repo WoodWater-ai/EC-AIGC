@@ -28,6 +28,7 @@ import DictCategoryList from './components/DictCategoryList';
 import DictItemList from './components/DictItemList';
 import { ModelLibrary } from './components/ModelLibrary';
 import { AssistantPage } from './components/Assistant/AssistantPage';
+import { GarmentWorkspace } from './components/garment/GarmentWorkspace';
 import type { AssistantTaskPrefill } from './api/modules/assistant';
 import {
   ModelProfileCreator,
@@ -503,6 +504,8 @@ export default function App() {
             onCreateProfile={() => setModelCreatorOpen(true)}
           />
         );
+      case AppScreen.GARMENT:
+        return <GarmentWorkspace />;
       case AppScreen.ANALYTICS:
         return <DataAnalytics />;
       case AppScreen.SYSTEM_CONFIG:

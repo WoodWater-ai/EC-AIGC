@@ -49,6 +49,7 @@ httpRaw.interceptors.request.use((config) => {
 // 响应拦截器：只做错误检查，不修改 resp.data（保持 axios 类型兼容）
 httpRaw.interceptors.response.use(
   (resp) => {
+    if (resp.config.responseType === 'blob') return resp;
     const r = resp.data as ServiceResult<unknown>;
     if (!r.success) {
       const err = new ApiError(r.errCode ?? 'UNKNOWN', r.errMessage ?? '请求失败');
@@ -84,6 +85,19 @@ export const http = {
 
   delete: <T>(url: string, config?: AxiosRequestConfig): Promise<T> =>
     httpRaw.delete<ServiceResult<T>>(url, config).then((r) => r.data.data as T),
+
+  getBlob: (url: string): Promise<Blob> =>
+    httpRaw.get<Blob>(url, { responseType: 'blob' }).then(async (response) => {
+      const contentType = String(response.headers['content-type'] ?? '').toLowerCase();
+      if (contentType.includes('application/json')) {
+        const payload = JSON.parse(await response.data.text()) as ServiceResult<unknown>;
+        throw new ApiError(payload.errCode ?? 'UNKNOWN', payload.errMessage ?? '证据原件读取失败');
+      }
+      if (!contentType.includes('application/pdf')) {
+        throw new ApiError('INVALID_EVIDENCE_RESPONSE', '证据原件响应类型不正确');
+      }
+      return response.data;
+    }),
 };
 
 export default http;
