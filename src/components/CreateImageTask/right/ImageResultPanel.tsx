@@ -19,7 +19,7 @@ const RESULT_STATUS_LABELS: Record<string, string> = {
   PENDING_SCORE: '待审美评分',
   PENDING_REVIEW: '待审美评分',
   PASSED: '审核通过',
-  ARCHIVED: '审核通过',
+  ARCHIVED: '已归档',
   REJECTED: '已打回',
   UNAVAILABLE: '不可用',
   待评分: '待审美评分',

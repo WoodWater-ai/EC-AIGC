@@ -27,6 +27,11 @@ const generatedAssetLabel = (asset: ProductLibraryAsset): string => {
   return GENERATED_IMAGE_TYPE_LABELS[imageType] ?? '生成图片';
 };
 
+const isArchivedProductAsset = (asset: ProductLibraryAsset): boolean =>
+  asset.status === 'ARCHIVED'
+  || asset.rawStatus === 'ARCHIVED'
+  || asset.rawStatus === '已归档';
+
 const toGeneratedTransitAsset = (asset: ProductLibraryAsset): AssetResourceItem => ({
   id: asset.id,
   name: [asset.productName, asset.imageType ?? asset.taskType]
@@ -48,7 +53,8 @@ const toGeneratedTransitAsset = (asset: ProductLibraryAsset): AssetResourceItem 
   productId: asset.productId,
   sourceType: asset.mediaType === 'IMAGE' ? 'GENERATED_IMAGE' : 'GENERATED_VIDEO',
   sourceId: asset.id,
-  status: 'NORMAL',
+  // 归档以生成结果原始状态为准；展示状态仅作为兼容旧接口的兜底。
+  status: isArchivedProductAsset(asset) ? 'ARCHIVED' : 'NORMAL',
   visibility: 'PUBLIC',
   categoryIds: [],
   createTime: asset.createTime,
@@ -74,6 +80,7 @@ const toInputTransitAsset = (
   uploadUserId: '',
   productId,
   sourceType: 'UPLOAD',
+  // 输入素材走真删除流程,不会出现在 ARCHIVED 状态;硬编码 NORMAL
   status: 'NORMAL',
   visibility: 'PUBLIC',
   categoryIds: [],

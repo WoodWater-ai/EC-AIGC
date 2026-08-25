@@ -556,7 +556,7 @@ const resultWorkStatusLabel = (status?: string | null) => {
   if (!status) return '已生成';
   const labels: Record<string, string> = {
     PASSED: '审核通过',
-    ARCHIVED: '审核通过',
+    ARCHIVED: '已归档',
     REJECTED: '已打回',
     PENDING_SCORE: '待审美评分',
     PENDING_REVIEW: '待审美评分',
