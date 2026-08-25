@@ -1518,7 +1518,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                       key={kind}
                       type="button"
                       onClick={() => {
-                        setMediaFilter((current) => current === kind ? 'ALL' : kind);
+                        const nextMediaFilter = mediaFilter === kind ? 'ALL' : kind;
+                        setMediaFilter(nextMediaFilter);
                         setSelectedAssetIds([]);
                       }}
                       className={`flex h-8 items-center justify-center gap-1 rounded-md text-[11px] font-bold ${
@@ -1897,8 +1898,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
               </div>
             </div>
 
-            {/* [2026-08-25] 已归档 tab 只在 PRODUCT + focusedProduct (进入具体 SKU 后) 显示:
-                UPLOAD 走真删除不产生 ARCHIVED,PRODUCT 列表视图也无需该 tab */}
+            {/* 产品素材详情只保留状态/时间筛选，不显示通用素材的图片槽位标签。 */}
             {activeSource === 'PRODUCT' && focusedProduct && (
               <div className="flex min-h-14 items-center gap-2 border-b border-slate-200 bg-white px-5">
                 {(['all', 'recent', 'archived'] as const).map((value) => (
@@ -1915,28 +1915,46 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                     {value === 'all' ? '全部' : value === 'recent' ? '最近使用' : '已归档'}
                   </button>
                 ))}
-                {activeSource === 'UPLOAD' && (
-                  <div className="ml-2 flex flex-wrap items-center gap-1.5">
-                    {SLOT_TAGS.map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => setSlotTagFilter((current) =>
-                          current.includes(tag)
-                            ? current.filter((item) => item !== tag)
-                            : [...current, tag],
-                        )}
-                        className={`h-8 rounded-md border px-3 text-[11px] font-bold ${
-                          slotTagFilter.includes(tag)
-                            ? 'border-blue-200 bg-blue-50 text-blue-700'
-                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                        }`}
-                      >
-                        {tag.replace(/参考$/, '')}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              </div>
+            )}
+
+            {/* 通用图片、视频及全部类型共用时间筛选和槽位快捷筛选；音频不展示。 */}
+            {activeSource === 'UPLOAD' && mediaFilter !== 'AUDIO' && (
+              <div className="flex min-h-14 flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-5 py-2">
+                {(['all', 'recent'] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setPrimaryFilter(value)}
+                    className={`h-8 rounded-md border px-3 text-[11px] font-bold ${
+                      primaryFilter === value
+                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {value === 'all' ? '全部' : '最近使用'}
+                  </button>
+                ))}
+                <div className="ml-2 flex flex-wrap items-center gap-1.5">
+                  {SLOT_TAGS.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setSlotTagFilter((current) =>
+                        current.includes(tag)
+                          ? current.filter((item) => item !== tag)
+                          : [...current, tag],
+                      )}
+                      className={`h-8 rounded-md border px-3 text-[11px] font-bold ${
+                        slotTagFilter.includes(tag)
+                          ? 'border-blue-200 bg-blue-50 text-blue-700'
+                          : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                      }`}
+                    >
+                      {tag.replace(/参考$/, '')}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
