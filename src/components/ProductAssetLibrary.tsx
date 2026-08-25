@@ -68,7 +68,7 @@ interface GeneratedAsset {
   ratioDuration: string;
   channel: string;
   modelName: string;
-  status: '生成中' | '生成失败' | '待审美评分' | '审核通过' | '已打回';
+  status: '生成中' | '生成失败' | '待审美评分' | '已归档' | '审核通过' | '已打回';
   rawStatus?: string;
   score: number | null;
   promptVersion: string;
@@ -124,9 +124,15 @@ const STATUS_LABELS: Record<ProductLibraryDisplayStatus, GeneratedAsset['status'
   GENERATING: '生成中',
   FAILED: '生成失败',
   PENDING_REVIEW_SCORE: '待审美评分',
-  ARCHIVED: '审核通过',
+  PASSED: '审核通过',
+  ARCHIVED: '已归档',
   REJECTED: '已打回',
 };
+
+const displayStatusOf = (asset: ProductLibraryAsset): ProductLibraryDisplayStatus =>
+  asset.rawStatus === 'ARCHIVED' || asset.rawStatus === '已归档'
+    ? 'ARCHIVED'
+    : asset.status;
 
 const TASK_TYPE_LABELS: Record<string, string> = {
   PRODUCT_MAIN: '商品主图',
@@ -173,13 +179,11 @@ const EMPTY_ASSET: GeneratedAsset = {
 
 const statusClass = (status: GeneratedAsset['status']) => {
   if (status === '审核通过') return 'bg-emerald-50 text-emerald-600';
+  if (status === '已归档') return 'bg-slate-200 text-slate-500';
   if (status === '待审美评分') return 'bg-amber-50 text-amber-600';
   if (status === '生成中') return 'bg-blue-50 text-blue-600';
   return 'bg-rose-50 text-rose-600';
 };
-
-const isDiscardedAsset = (asset: GeneratedAsset) =>
-  asset.rawStatus === 'ARCHIVED' || asset.status === '已打回';
 
 const toGeneratedAsset = (asset: ProductLibraryAsset): GeneratedAsset => ({
   id: asset.id,
@@ -198,7 +202,7 @@ const toGeneratedAsset = (asset: ProductLibraryAsset): GeneratedAsset => ({
     : [asset.aspectRatio, asset.width && asset.height ? `${asset.width}x${asset.height}` : ''].filter(Boolean).join(' · '),
   channel: asset.modelChannelName || asset.channelType || '—',
   modelName: asset.modelCode || '—',
-  status: STATUS_LABELS[asset.status],
+  status: STATUS_LABELS[displayStatusOf(asset)],
   rawStatus: asset.rawStatus,
   score: asset.score ?? null,
   promptVersion: asset.promptVersion || '—',
@@ -255,7 +259,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
   // 2. Local states for filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部品类');
-  const [selectedAssetType, setSelectedAssetType] = useState<'全部' | '图片' | '视频' | '废弃'>('全部');
+  const [selectedAssetType, setSelectedAssetType] = useState<'全部' | '图片' | '视频' | '已归档' | '已打回'>('全部');
   const [selectedTaskType, setSelectedTaskType] = useState('全部任务');
   const [selectedStyle, setSelectedStyle] = useState('全部风格');
   const [selectedScene, setSelectedScene] = useState('全部场景');
@@ -289,12 +293,14 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
   // Checkbox states for batch operations in Table View
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [onlyShowPending, setOnlyShowPending] = useState(false);
-  const apiStatus: ProductLibraryDisplayStatus | undefined = onlyShowPending
-    ? 'PENDING_REVIEW_SCORE'
+  const apiStatus: ProductLibraryDisplayStatus | undefined =
+    selectedAssetType === '已归档' ? 'ARCHIVED'
+    : selectedAssetType === '已打回' ? 'REJECTED'
+    : onlyShowPending ? 'PENDING_REVIEW_SCORE'
     : selectedStatus === '生成中' ? 'GENERATING'
       : selectedStatus === '生成失败' ? 'FAILED'
         : selectedStatus === '待审美评分' ? 'PENDING_REVIEW_SCORE'
-          : selectedStatus === '审核通过' ? 'ARCHIVED'
+          : selectedStatus === '审核通过' ? 'PASSED'
             : selectedStatus === '已打回' ? 'REJECTED'
               : undefined;
   const creationStartTime = useMemo(() => {
@@ -325,7 +331,8 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
       pageSize: assetPageSize,
       keyword: searchQuery || undefined,
       mediaType: selectedAssetType === '图片' ? 'IMAGE' : selectedAssetType === '视频' ? 'VIDEO' : undefined,
-      archivedOnly: selectedAssetType === '废弃' || undefined,
+      // [2026-08-25] 后端过滤:已归档/已打回 tab 显式传 status;默认视图传 excludeArchived=true
+      excludeArchived: selectedAssetType === '全部',
       taskType: selectedTaskType === '全部任务' ? undefined : selectedTaskType,
       style: selectedStyle === '全部风格' ? undefined : selectedStyle,
       scene: selectedScene === '全部场景' ? undefined : selectedScene,
@@ -504,7 +511,10 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
       // 2. Asset Type Filter (from subtabs & segmented controls)
       if (selectedAssetType === '图片' && asset.type !== '图片') return false;
       if (selectedAssetType === '视频' && asset.type !== '视频') return false;
-      if (selectedAssetType === '废弃' && !isDiscardedAsset(asset)) return false;
+      if (selectedAssetType === '已归档' && asset.status !== '已归档') return false;
+      if (selectedAssetType === '已打回' && asset.status !== '已打回') return false;
+
+      // [2026-08-25] 移除前端 ARCHIVED 默认排除;已交给后端 excludeArchived 参数(配合 tab 传 status)
 
       // 4. Task Type Filter
       if (selectedTaskType !== '全部任务' && asset.taskType !== selectedTaskType) return false;
@@ -736,7 +746,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
           <div>
             <label className="text-[10px] font-bold text-slate-400 block mb-1">素材类型</label>
             <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
-              {(['全部', '图片', '视频', '废弃'] as const).map((t) => (
+              {(['全部', '图片', '视频', '已归档', '已打回'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setSelectedAssetType(t)}
@@ -864,7 +874,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
             </div>
           ) : viewMode === 'grid' ? (
             <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
-              {(['全部', '图片', '视频', '废弃'] as const).map((t) => (
+              {(['全部', '图片', '视频', '已归档', '已打回'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setSelectedAssetType(t)}

@@ -201,7 +201,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const [productCategoryTree, setProductCategoryTree] = useState<ProductCategoryNode[]>([]);
   const [productCategoryTreeError, setProductCategoryTreeError] = useState<string | null>(null);
   const [collapsedProductCategoryIds, setCollapsedProductCategoryIds] = useState<Set<string>>(new Set());
-  const [primaryFilter, setPrimaryFilter] = useState<'all' | 'recent'>('all');
+  const [primaryFilter, setPrimaryFilter] = useState<'all' | 'recent' | 'archived'>('all');
   // [2026-08-15] 槽位筛选(多选;空数组 = 不过滤;点选切换,再点取消)
   const [slotTagFilter, setSlotTagFilter] = useState<string[]>([]);
   /** 分类树折叠状态 —— 存被折叠的节点 id,默认空 = 全部展开 */
@@ -374,13 +374,19 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     assetLoadingVersionRef.current = version;
     setLoading(true);
     try {
-      const detail = await productLibraryApi.productDetail(focusedProduct.productId);
+      const detail = await productLibraryApi.productDetail(
+        focusedProduct.productId,
+        primaryFilter !== 'archived',  // [2026-08-25] 已归档 tab 显式传 false;其余(全部/最近使用)默认 true 排除已归档
+      );
       if (version !== assetQueryVersionRef.current) return;
       const recentThreshold = primaryFilter === 'recent'
         ? Date.now() - 30 * 24 * 60 * 60 * 1000
         : null;
       const keyword = searchQuery.trim().toLowerCase();
       const nextAssets = buildProductDetailAssets(detail, mediaFilter).filter((asset) => {
+        // [2026-08-25] 已归档 tab:productDetail 没有 onlyArchived 参数,前端再过滤一次
+        // (其他 tab 由后端 excludeArchived 控制,这里不重复过滤)
+        if (primaryFilter === 'archived' && asset.status !== 'ARCHIVED') return false;
         if (recentThreshold !== null) {
           const createdAt = asset.createTime ? new Date(asset.createTime).getTime() : 0;
           if (!createdAt || createdAt < recentThreshold) return false;
@@ -585,6 +591,11 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredAssets = assets.filter((asset) => {
+    if (activeSource === 'PRODUCT') {
+      return primaryFilter === 'archived'
+        ? asset.status === 'ARCHIVED'
+        : asset.status !== 'ARCHIVED';
+    }
     if (activeSource !== 'UPLOAD') return true;
     if (asset.productId) return false;
     if (asset.inModelLibrary) return false;
@@ -1886,9 +1897,11 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
               </div>
             </div>
 
-            {activeSource !== 'MODEL' && (
+            {/* [2026-08-25] 已归档 tab 只在 PRODUCT + focusedProduct (进入具体 SKU 后) 显示:
+                UPLOAD 走真删除不产生 ARCHIVED,PRODUCT 列表视图也无需该 tab */}
+            {activeSource === 'PRODUCT' && focusedProduct && (
               <div className="flex min-h-14 items-center gap-2 border-b border-slate-200 bg-white px-5">
-                {(['all', 'recent'] as const).map((value) => (
+                {(['all', 'recent', 'archived'] as const).map((value) => (
                   <button
                     key={value}
                     type="button"
@@ -1899,7 +1912,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                         : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700'
                     }`}
                   >
-                    {value === 'all' ? '全部' : '最近使用'}
+                    {value === 'all' ? '全部' : value === 'recent' ? '最近使用' : '已归档'}
                   </button>
                 ))}
                 {activeSource === 'UPLOAD' && (
