@@ -20,9 +20,9 @@ export interface AssetResourceQueryRequest {
   productId?: string | number;
   categoryId?: number;
   keyword?: string;
-  /** 创建时间起点(包含,ISO 字符串) */
+  /** 创建时间起点(包含,毫秒时间戳字符串,如 "1720000000000") */
   startTime?: string;
-  /** 创建时间终点(包含,ISO 字符串) */
+  /** 创建时间终点(包含,毫秒时间戳字符串) */
   endTime?: string;
   /** [2026-08-15] 标签过滤(任一命中,OR 语义;资源中心通用素材按槽位标签筛选) */
   tags?: string[];

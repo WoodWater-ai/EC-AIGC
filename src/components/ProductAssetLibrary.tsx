@@ -305,7 +305,7 @@ export const ProductAssetLibrary: React.FC<ProductAssetLibraryProps> = ({
     if (!days) return undefined;
     const date = new Date();
     date.setDate(date.getDate() - days);
-    return date.toISOString().slice(0, 19);
+    return String(date.getTime());
   }, [creationTimeRange]);
 
   const statisticsQuery = useServiceQuery(() => productLibraryApi.statistics(), []);

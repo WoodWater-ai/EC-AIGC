@@ -146,7 +146,9 @@ export interface ProductLibraryAssetQuery {
   channelType?: string;
   status?: ProductLibraryDisplayStatus;
   archivedOnly?: boolean;
+  /** 创建时间起点(包含,毫秒时间戳字符串) */
   startTime?: string;
+  /** 创建时间终点(包含,毫秒时间戳字符串) */
   endTime?: string;
   sortBy?: 'latest' | 'score' | 'cost';
 }
