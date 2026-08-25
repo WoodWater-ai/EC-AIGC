@@ -260,7 +260,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     if (primaryFilter === 'recent') {
       const since = new Date();
       since.setDate(since.getDate() - 30);
-      base.startTime = since.toISOString();
+      base.startTime = String(since.getTime());
     }
     // [2026-08-15] 槽位筛选走后端(tags 过滤,任一命中);前端不再二次过滤
     if (slotTagFilter.length > 0) {
