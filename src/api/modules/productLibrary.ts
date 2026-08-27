@@ -5,6 +5,7 @@ export type ProductLibraryDisplayStatus =
   | 'GENERATING'
   | 'FAILED'
   | 'PENDING_REVIEW_SCORE'
+  | 'PASSED'
   | 'ARCHIVED'
   | 'REJECTED';
 
@@ -146,6 +147,8 @@ export interface ProductLibraryAssetQuery {
   channelType?: string;
   status?: ProductLibraryDisplayStatus;
   archivedOnly?: boolean;
+  /** [2026-08-25] 是否排除已归档(默认视图传 true,「已归档」tab 传 false) */
+  excludeArchived?: boolean;
   /** 创建时间起点(包含,毫秒时间戳字符串) */
   startTime?: string;
   /** 创建时间终点(包含,毫秒时间戳字符串) */
@@ -163,11 +166,11 @@ export const productLibraryApi = {
   assetPage: (req: ProductLibraryAssetQuery) =>
     http.post<PageInfo<ProductLibraryAsset>>('/v1/admin/product-library/asset/page', req),
 
-  productDetail: (productId: string) =>
+  productDetail: (productId: string, excludeArchived: boolean = false) =>
     http.post<ProductLibraryProductDetail>(
       '/v1/admin/product-library/product/detail',
       {},
-      { params: { productId } },
+      { params: { productId, excludeArchived } },
     ),
 
   assetDetail: (mediaType: 'IMAGE' | 'VIDEO', assetId: string) =>

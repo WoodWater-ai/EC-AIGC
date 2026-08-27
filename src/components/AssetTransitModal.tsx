@@ -201,7 +201,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const [productCategoryTree, setProductCategoryTree] = useState<ProductCategoryNode[]>([]);
   const [productCategoryTreeError, setProductCategoryTreeError] = useState<string | null>(null);
   const [collapsedProductCategoryIds, setCollapsedProductCategoryIds] = useState<Set<string>>(new Set());
-  const [primaryFilter, setPrimaryFilter] = useState<'all' | 'recent'>('all');
+  const [primaryFilter, setPrimaryFilter] = useState<'all' | 'recent' | 'archived'>('all');
   // [2026-08-15] 槽位筛选(多选;空数组 = 不过滤;点选切换,再点取消)
   const [slotTagFilter, setSlotTagFilter] = useState<string[]>([]);
   /** 分类树折叠状态 —— 存被折叠的节点 id,默认空 = 全部展开 */
@@ -374,13 +374,19 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     assetLoadingVersionRef.current = version;
     setLoading(true);
     try {
-      const detail = await productLibraryApi.productDetail(focusedProduct.productId);
+      const detail = await productLibraryApi.productDetail(
+        focusedProduct.productId,
+        primaryFilter !== 'archived',  // [2026-08-25] 已归档 tab 显式传 false;其余(全部/最近使用)默认 true 排除已归档
+      );
       if (version !== assetQueryVersionRef.current) return;
       const recentThreshold = primaryFilter === 'recent'
         ? Date.now() - 30 * 24 * 60 * 60 * 1000
         : null;
       const keyword = searchQuery.trim().toLowerCase();
       const nextAssets = buildProductDetailAssets(detail, mediaFilter).filter((asset) => {
+        // [2026-08-25] 已归档 tab:productDetail 没有 onlyArchived 参数,前端再过滤一次
+        // (其他 tab 由后端 excludeArchived 控制,这里不重复过滤)
+        if (primaryFilter === 'archived' && asset.status !== 'ARCHIVED') return false;
         if (recentThreshold !== null) {
           const createdAt = asset.createTime ? new Date(asset.createTime).getTime() : 0;
           if (!createdAt || createdAt < recentThreshold) return false;
@@ -585,6 +591,11 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredAssets = assets.filter((asset) => {
+    if (activeSource === 'PRODUCT') {
+      return primaryFilter === 'archived'
+        ? asset.status === 'ARCHIVED'
+        : asset.status !== 'ARCHIVED';
+    }
     if (activeSource !== 'UPLOAD') return true;
     if (asset.productId) return false;
     if (asset.inModelLibrary) return false;
@@ -1513,7 +1524,8 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                       key={kind}
                       type="button"
                       onClick={() => {
-                        setMediaFilter((current) => current === kind ? 'ALL' : kind);
+                        const nextMediaFilter = mediaFilter === kind ? 'ALL' : kind;
+                        setMediaFilter(nextMediaFilter);
                         setSelectedAssetIds([]);
                       }}
                       className={`flex h-8 items-center justify-center gap-1 rounded-md text-[11px] font-bold ${
@@ -1892,8 +1904,29 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
               </div>
             </div>
 
-            {activeSource !== 'MODEL' && (
+            {/* 产品素材详情只保留状态/时间筛选，不显示通用素材的图片槽位标签。 */}
+            {activeSource === 'PRODUCT' && focusedProduct && (
               <div className="flex min-h-14 items-center gap-2 border-b border-slate-200 bg-white px-5">
+                {(['all', 'recent', 'archived'] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setPrimaryFilter(value)}
+                    className={`h-8 rounded-md border px-3 text-[11px] font-bold ${
+                      primaryFilter === value
+                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {value === 'all' ? '全部' : value === 'recent' ? '最近使用' : '已归档'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 通用图片、视频及全部类型共用时间筛选和槽位快捷筛选；音频不展示。 */}
+            {activeSource === 'UPLOAD' && mediaFilter !== 'AUDIO' && (
+              <div className="flex min-h-14 flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-5 py-2">
                 {(['all', 'recent'] as const).map((value) => (
                   <button
                     key={value}
@@ -1908,28 +1941,26 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                     {value === 'all' ? '全部' : '最近使用'}
                   </button>
                 ))}
-                {activeSource === 'UPLOAD' && (
-                  <div className="ml-2 flex flex-wrap items-center gap-1.5">
-                    {SLOT_TAGS.map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => setSlotTagFilter((current) =>
-                          current.includes(tag)
-                            ? current.filter((item) => item !== tag)
-                            : [...current, tag],
-                        )}
-                        className={`h-8 rounded-md border px-3 text-[11px] font-bold ${
-                          slotTagFilter.includes(tag)
-                            ? 'border-blue-200 bg-blue-50 text-blue-700'
-                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                        }`}
-                      >
-                        {tag.replace(/参考$/, '')}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <div className="ml-2 flex flex-wrap items-center gap-1.5">
+                  {SLOT_TAGS.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setSlotTagFilter((current) =>
+                        current.includes(tag)
+                          ? current.filter((item) => item !== tag)
+                          : [...current, tag],
+                      )}
+                      className={`h-8 rounded-md border px-3 text-[11px] font-bold ${
+                        slotTagFilter.includes(tag)
+                          ? 'border-blue-200 bg-blue-50 text-blue-700'
+                          : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                      }`}
+                    >
+                      {tag.replace(/参考$/, '')}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
