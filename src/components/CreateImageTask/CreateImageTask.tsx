@@ -3,28 +3,31 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner';
 import { AppScreen } from '../../types';
 import type { ProductAsset } from '../../types';
-import type { TaskResultPreviewResponse, TaskStatus } from '../../types';
+import type { TaskGroupResponse, TaskResultPreviewResponse, TaskStatus } from '../../types';
 import { taskApi } from '../../api/modules/task';
 import { productInfoApi, type ProductDTO } from '../../api/modules/productInfo';
 import type { AssetResourceItem } from '../../api/modules/asset';
 import type { ImageGenerationType } from '../../lib/createImageTask/readinessChecks';
 import type { ReferenceSlot } from '../../lib/createImageTask/extractReferenceInsights';
 import type { ProductFactsInput } from '../../lib/createImageTask/extractProductFacts';
+import { parseReusablePrompt } from '../../lib/createImageTask/buildPromptFromFacts';
 import { toSlotRef } from '../common/TransitPickerButton';
 
 import { TopHeader } from './header/TopHeader';
 import { ThreeColumnLayout } from './layout/ThreeColumnLayout';
 import { ImageSourceSection } from './left/ImageSourceSection';
+import { CompositeSection } from './left/CompositeSection';
+import type { AppliedCompositeAsset } from '../common/OutfitComposePanel';
 import { ReferenceGrid } from './left/ReferenceGrid';
-import { ImageTypeSelector } from './center/ImageTypeSelector';
-import { TemplatePicker } from './center/TemplatePicker';
+import { mergeProductFactsWithErp, ProductFactsDialog } from './left/ProductFactsDialog';
 import { StyleScenePoseRow } from './center/StyleScenePoseRow';
-import { ImageContentSection } from './center/ImageContentSection';
-import { ProductFactsEditor } from './center/ProductFactsEditor';
+import { PromptWorkspace } from './center/PromptWorkspace';
+import { PromptTemplateDrawer } from './center/PromptTemplateDrawer';
 import { ImageSettingsSection, type TaskParamsSnapshot } from './right/ImageSettingsSection';
 import { ImageResultPanel } from './right/ImageResultPanel';
+import { TaskTimelinePanel, type TimelineTask } from './right/TaskTimelinePanel';
+import { GenerationConfigBar } from './footer/GenerationConfigBar';
 import { ConflictDialog } from './dialogs/ConflictDialog';
-import { TemplateOverwriteDialog } from './dialogs/TemplateOverwriteDialog';
 import { ExecutionConfirmDialog } from './dialogs/ExecutionConfirmDialog';
 import { CreateProductFromAssetDialog } from './dialogs/CreateProductFromAssetDialog';
 import { AssetTransitModal } from '../AssetTransitModal';
@@ -32,7 +35,10 @@ import { useCreateImageTaskState } from '../../hooks/useCreateImageTaskState';
 import { useDictOptions } from '../../api/hooks/useDict';
 import { REFERENCE_SLOTS_INTERNAL } from '../../lib/createImageTask/referencesConfig';
 import { withCosThumbnail } from '../../utils/cosImage';
-import { creationTemplateApi } from '../../api/modules/creationTemplate';
+import {
+  creationTemplateApi,
+  type CreationTemplateReuseContext,
+} from '../../api/modules/creationTemplate';
 import { useServiceQuery } from '../../api/hooks/useServiceQuery';
 import type { PrefillState } from '../createTask/useTaskParams';
 import type { AssistantTaskPrefill } from '../../api/modules/assistant';
@@ -43,6 +49,14 @@ import {
   sameReferenceAsset,
   type TaggedReference,
 } from '../../lib/createImageTask/imageCreationUi';
+import {
+  getEffectiveNegativePrompt,
+  getEffectivePrompt,
+  PROMPT_WORKSPACE_TYPES,
+  toPromptWorkspaceType,
+  type PromptWorkspaceType,
+} from '../../lib/createImageTask/promptWorkspace';
+import { messages } from '../../labels/createImageTask';
 
 interface CreateImageTaskProps {
   products: ProductAsset[];
@@ -73,7 +87,7 @@ interface CreateImageTaskProps {
 type PendingSlot = 'main' | ReferenceSlot | null;
 
 const IMAGE_TYPE_PREFILL_MAP: Record<string, ImageGenerationType> = {
-  PRODUCT_MAIN: 'product_main',
+  PRODUCT_MAIN: 'scene_detail',
   SCENE_DETAIL: 'scene_detail',
   DETAIL_SCENE: 'scene_detail',
   DETAIL_CLOSEUP: 'detail_closeup',
@@ -103,9 +117,6 @@ const parseTaskParams = (value?: string | null): Record<string, unknown> => {
   }
 };
 
-// 模板选择入口暂时隐藏；后续需要时改为 true 即可恢复。
-const SHOW_TEMPLATE_PICKER = false;
-
 const renderReusablePrompt = (prompt: string, facts: ProductFactsInput) => {
   const values: Record<string, string> = {
     name: facts.name,
@@ -120,6 +131,78 @@ const renderReusablePrompt = (prompt: string, facts: ProductFactsInput) => {
   };
   return prompt.replace(/\{\{([^}]+)}}/g, (match, key: string) =>
     values[key] || match);
+};
+
+const ACTIVE_IMAGE_TASK_STATUSES: TaskStatus[] = ['DRAFT', 'PENDING', 'GENERATING'];
+
+const toTimelineTask = (group: TaskGroupResponse): TimelineTask => {
+  const typeCounts: Record<ImageGenerationType, number> = {
+    product_main: 0,
+    scene_detail: 0,
+    detail_closeup: 0,
+    model_triple_view: 0,
+  };
+  const promptParts: string[] = [];
+  const previews: TaskResultPreviewResponse[] = [];
+  group.tasks.forEach((task) => {
+    const type = toPromptWorkspaceType(task.imageType ?? task.taskType);
+    if (type) {
+      typeCounts[type] += task.count ?? 1;
+      if (task.taskPrompt) promptParts.push(`${messages.type[type]}：${task.taskPrompt}`);
+    }
+    previews.push(...task.resultPreviews);
+  });
+  const selectedTypes = PROMPT_WORKSPACE_TYPES.filter((type) => typeCounts[type] > 0);
+  const firstTask = group.tasks[0];
+  const reusablePrompt = parseReusablePrompt(firstTask?.taskPrompt ?? '');
+  const promptType = toPromptWorkspaceType(firstTask?.imageType ?? firstTask?.taskType);
+  const schemaParams = parseTaskParams(firstTask?.taskParamsJson);
+  const errorTask = group.tasks.find((task) => task.failReason);
+  return {
+    groupId: group.groupId,
+    productId: group.productId ?? null,
+    submittedAt: group.submittedAt,
+    status: ACTIVE_IMAGE_TASK_STATUSES.includes(group.status) ? 'loading' : 'done',
+    taskStatus: group.status,
+    progressPercent: group.progressPercent,
+    resultCount: group.resultCount,
+    error: errorTask?.failReason ?? null,
+    resultPreviews: previews,
+    snapshot: {
+      taskId: firstTask?.id ?? null,
+      promptType,
+      totalCount: group.tasks.reduce((sum, task) => sum + (task.count ?? 1), 0),
+      selectedTypes,
+      typeCounts,
+      prompt: promptParts.join('\n\n'),
+      positivePrompt: reusablePrompt.designerInstruction,
+      negativePrompt: firstTask?.negativePrompt ?? reusablePrompt.negativePrompt ?? '',
+      modelId: firstTask?.modelDisplayName ?? firstTask?.modelCode ?? null,
+      aspectRatio: firstTask?.aspectRatio ?? String(schemaParams.aspect_ratio ?? ''),
+      resolution: String(schemaParams.resolution ?? ''),
+      referenceCount: 0,
+    },
+  };
+};
+
+const templateContextToPrefill = (context: CreationTemplateReuseContext): PrefillState => {
+  const snapshot = context.snapshot;
+  const route = context.effectiveExecution;
+  return {
+    templateId: context.templateId,
+    templateVersionId: context.versionId,
+    channelInstanceId: route?.channelInstanceId ?? snapshot.channelInstanceId ?? null,
+    channelType: route?.channelType ?? snapshot.channelType ?? null,
+    capability: route?.capabilityCode ?? snapshot.capability ?? 'REF_IMG_EDIT',
+    model: route?.modelCode ?? snapshot.modelCode ?? null,
+    schemaParams: snapshot.schemaParams,
+    lockExecution: false,
+    resolved: Boolean(route || context.executionUnavailableReason),
+    source: route?.source,
+    fallbackApplied: route?.fallbackApplied ?? false,
+    fallbackReason: route?.fallbackReason ?? null,
+    unavailableReason: context.executionUnavailableReason ?? null,
+  };
 };
 
 export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
@@ -139,14 +222,32 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     [creationTemplateId],
   );
   const creationPrefill = creationPrefillQuery.data;
+  const [activePromptType, setActivePromptType] = useState<PromptWorkspaceType>('scene_detail');
+  const [inlineTaskReusePrefill, setInlineTaskReusePrefill] = useState<TaskReusePrefill | null>(null);
+  const [pendingPromptReplacement, setPendingPromptReplacement] = useState<{
+    taskId: string;
+    type: PromptWorkspaceType;
+    positivePrompt: string;
+    negativePrompt: string;
+  } | null>(null);
+  const [templateDrawerOpen, setTemplateDrawerOpen] = useState(false);
+  const [templateApplyingId, setTemplateApplyingId] = useState<string | null>(null);
+  const [inlineTemplateContext, setInlineTemplateContext] = useState<CreationTemplateReuseContext | null>(null);
+  const templateCampQuery = useServiceQuery(
+    () => creationTemplateApi.camp('IMAGE', 1, 100),
+    [],
+    templateDrawerOpen,
+  );
   const imageParamsPrefill = useMemo<PrefillState | null>(() => {
-    if (taskReusePrefill?.task.taskKind === 'IMAGE') {
+    if (inlineTemplateContext) return templateContextToPrefill(inlineTemplateContext);
+    const effectiveTaskReusePrefill = inlineTaskReusePrefill ?? taskReusePrefill;
+    if (effectiveTaskReusePrefill?.task.taskKind === 'IMAGE') {
       return {
-        channelInstanceId: taskReusePrefill.task.modelChannelId ?? null,
+        channelInstanceId: effectiveTaskReusePrefill.task.modelChannelId ?? null,
         channelType: null,
-        capability: taskReusePrefill.task.capability ?? 'REF_IMG_EDIT',
-        model: taskReusePrefill.task.modelCode ?? null,
-        schemaParams: parseTaskParams(taskReusePrefill.task.taskParamsJson),
+        capability: effectiveTaskReusePrefill.task.capability ?? 'REF_IMG_EDIT',
+        model: effectiveTaskReusePrefill.task.modelCode ?? null,
+        schemaParams: parseTaskParams(effectiveTaskReusePrefill.task.taskParamsJson),
         lockExecution: false,
       };
     }
@@ -164,28 +265,13 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       };
     }
     if (!creationPrefill || creationPrefill.mediaType !== 'IMAGE') return null;
-    const snapshot = creationPrefill.snapshot;
-    const route = creationPrefill.effectiveExecution;
-    return {
-      templateId: creationPrefill.templateId,
-      templateVersionId: creationPrefill.versionId,
-      channelInstanceId: route?.channelInstanceId ?? null,
-      channelType: route?.channelType ?? snapshot.channelType ?? null,
-      capability: route?.capabilityCode ?? snapshot.capability ?? 'REF_IMG_EDIT',
-      model: route?.modelCode ?? null,
-      schemaParams: snapshot.schemaParams,
-      lockExecution: false,
-      resolved: true,
-      source: route?.source,
-      fallbackApplied: route?.fallbackApplied ?? false,
-      fallbackReason: route?.fallbackReason ?? null,
-      unavailableReason: creationPrefill.executionUnavailableReason ?? null,
-    };
-  }, [assistantPrefill, creationPrefill, taskReusePrefill]);
+    return templateContextToPrefill(creationPrefill);
+  }, [assistantPrefill, creationPrefill, inlineTaskReusePrefill, inlineTemplateContext, taskReusePrefill]);
 
   // ---- local form state ----
   const [productFacts, setProductFacts] = useState<ProductFactsInput>(EMPTY_PRODUCT_FACTS);
   const [seoName, setSeoName] = useState('');
+  const [productFactsOpen, setProductFactsOpen] = useState(false);
   const [mainValue, setMainValue] = useState<{
     /** asset_resource.id(后端 aiAnalyze + 提交 assetId 用)—— 雪花 ID 必须 string 避免 JS 精度丢失 */
     id?: string;
@@ -201,6 +287,12 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   const [unboundMainAsset, setUnboundMainAsset] = useState<AssetResourceItem | null>(null);
   const [matchingProduct, setMatchingProduct] = useState(false);
   const selectedMainResourceIdRef = useRef<string | null>(null);
+  const formFactsSetterRef = useRef<(facts: ProductFactsInput) => void>(() => undefined);
+  const handleAiFactsComplete = useCallback((facts: ProductFactsInput) => {
+    const mergedFacts = mergeProductFactsWithErp(selectedFromLibrary, facts);
+    setProductFacts(mergedFacts);
+    formFactsSetterRef.current(mergedFacts);
+  }, [selectedFromLibrary]);
   const appliedResultAssetRef = useRef<string | null>(null);
 
   // ---- 本页自己的资源中心 picker(替代 App.tsx 全局 manager modal)----
@@ -241,9 +333,8 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     mainImage: mainValue,
     // productId 由主体素材关联的商品提供，雪花 ID 全程保持 string。
     productId: selectedFromLibrary?.id ?? null,
-    // AI 助手成功后,把后端 6 字段一次回写到顶层 productFacts state,
-    // 让 ProductFactsEditor 的 input 实时刷新。
-    onAiComplete: setProductFacts,
+    // AI 助手成功后,把后端 6 字段一次回写到顶层 productFacts state。
+    onAiComplete: handleAiFactsComplete,
     channel: {
       id: paramsSnapshot.channelId ?? '',
       name: paramsSnapshot.channelId ?? '',
@@ -266,11 +357,11 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     channelType: paramsSnapshot.channelType,
     capability: paramsSnapshot.capability,
     executionSelectionSource: paramsSnapshot.selectionSource,
-    sourceCreationTemplateId: creationPrefill?.templateId ?? null,
-    sourceCreationTemplateVersionId: creationPrefill?.versionId ?? null,
+    sourceCreationTemplateId: inlineTemplateContext?.templateId ?? creationPrefill?.templateId ?? null,
+    sourceCreationTemplateVersionId: inlineTemplateContext?.versionId ?? creationPrefill?.versionId ?? null,
     executionParamsReady: paramsSnapshot.executionParamsReady,
     promptProductName: seoName,
-    templateName: creationPrefill?.templateName ?? '默认模板',
+    templateName: inlineTemplateContext?.templateName ?? creationPrefill?.templateName ?? '默认模板',
     toSubmit: async () => '',
     onAddTask,
     setScreen,
@@ -278,64 +369,139 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
 
   const {
     selectedTypes, typeCounts, template,
-    style, scene, pose, negativePrompt,
-    promptOverrides,
-    assistantState, references,
-    conflictOpen, templatePickerOpen, pendingTemplate,
-    templateOverwriteOpen, executionConfirmOpen,
+    style, scene, pose,
+    promptOverrides, negativePromptOverrides,
+    references,
+    conflictOpen, executionConfirmOpen,
     isSubmitting,
-    setConflictOpen, setTemplateOverwriteOpen, setExecutionConfirmOpen,
-    prompts, promptsComplete,
+    setConflictOpen, setExecutionConfirmOpen,
+    prompts,
     isSupported, totalCount,
-    toggleType, changeTypeCount, requestTemplateChange, applyTemplate,
+    setTypeCount,
     setTemplate,
     setStyle, setScene, setPose, setNegativePrompt,
-    updateProductFact, setFormFactsExternal,
-    setPromptOverride, runAssistantAnalysis,
-    regeneratePrompts, applyAiOptimizeToSelected,
+    setFormFactsExternal,
+    setPromptOverride, resetPromptOverride,
+    setNegativePromptOverride, resetNegativePromptOverride,
     selectReference, updateReferenceOrder, checkAndGenerate, submitTasks,
   } = state;
+  useEffect(() => {
+    formFactsSetterRef.current = setFormFactsExternal;
+  }, [setFormFactsExternal]);
   const appliedCreationTemplateRef = useRef<string | null>(null);
   const appliedAssistantPrefillRef = useRef<string | null>(null);
   const appliedTaskReuseRef = useRef<string | null>(null);
+  const applyReusablePrompt = useCallback((type: ImageGenerationType, prompt: string) => {
+    const parsed = parseReusablePrompt(prompt);
+    setPromptOverride(type, parsed.designerInstruction);
+    if (parsed.negativePrompt !== undefined) {
+      setNegativePromptOverride(type, parsed.negativePrompt);
+    } else {
+      resetNegativePromptOverride(type);
+    }
+  }, [resetNegativePromptOverride, setNegativePromptOverride, setPromptOverride]);
 
   // ---- [2026-08-15] 仅提交模式:右侧「本次生成结果」轮询展示 ----
   // submitStatus: idle=未提交 / loading=提交后轮询中 / done=全部任务结束
   const [submittedGroup, setSubmittedGroup] = useState<{ groupId: string } | null>(null);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [workspaceView, setWorkspaceView] = useState<'compose' | 'result'>('compose');
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [taskTimeline, setTaskTimeline] = useState<TimelineTask[]>([]);
+  const [continuingTask, setContinuingTask] = useState(false);
+  const [resultDraft, setResultDraft] = useState<{
+    taskId: string;
+    positivePrompt: string;
+    negativePrompt: string;
+  } | null>(null);
+  const productHistoryQuery = useServiceQuery(
+    () => selectedFromLibrary?.id
+      ? taskApi.groupPage({
+        pageNum: 1,
+        pageSize: 10,
+        taskKind: 'IMAGE',
+        productId: selectedFromLibrary.id,
+      })
+      : Promise.resolve(null),
+    [selectedFromLibrary?.id],
+    Boolean(selectedFromLibrary?.id),
+  );
+  const visibleTimeline = useMemo(() => {
+    const productId = selectedFromLibrary?.id;
+    if (!productId) return [];
+    const recent = (productHistoryQuery.data?.list ?? [])
+      .filter((group) => group.productId === productId)
+      .map(toTimelineTask);
+    const local = taskTimeline.filter((task) => task.productId === productId);
+    const currentIds = new Set(local.map((task) => task.groupId));
+    return [...local, ...recent.filter((task) => !currentIds.has(task.groupId))];
+  }, [productHistoryQuery.data, selectedFromLibrary?.id, taskTimeline]);
 
-  // [2026-08-19] 图片任务预检状态:在确认弹窗打开时拉取预估消耗
+  // 切换商品时，结果预览和当前批次不能残留到下一个商品的工作区。
+  useEffect(() => {
+    setActiveTaskId(null);
+    setSubmittedGroup(null);
+    setSubmitGroups([]);
+    setSubmitError(null);
+    setSubmitStatus('idle');
+    setWorkspaceView('compose');
+  }, [selectedFromLibrary?.id]);
+
+  // 预估金额复用现有 preflight 接口；编辑态即展示，确认弹窗不再重复请求。
   const [preflightResult, setPreflightResult] = useState<{ estimatedCost?: number | null } | null>(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
 
-  // [2026-08-19] 确认弹窗打开 → 触发 preflight
+  const preflightRequestKey = useMemo(() => {
+    if (!paramsSnapshot.executionParamsReady || !paramsSnapshot.channelId || !paramsSnapshot.capability) {
+      return null;
+    }
+    return JSON.stringify({
+      capability: paramsSnapshot.capability,
+      channelType: paramsSnapshot.channelType ?? 'VIDU',
+      channelInstanceId: paramsSnapshot.channelId,
+      modelCode: paramsSnapshot.modelId,
+      taskParamsJson: JSON.stringify(paramsSnapshot.schemaParams ?? {}),
+      count: totalCount,
+    });
+  }, [paramsSnapshot, totalCount]);
+
   useEffect(() => {
-    if (!executionConfirmOpen) {
-      // 关闭时清理,避免下次打开残留
+    if (!preflightRequestKey) {
       setPreflightResult(null);
       setPreflightLoading(false);
       return;
     }
+    let cancelled = false;
     setPreflightLoading(true);
     setPreflightResult(null);
-    const taskParamsJson = JSON.stringify(paramsSnapshot.schemaParams ?? {});
-    taskApi.preflightImageTask({
-      capability: 'REF_IMG_EDIT',
-      channelType: 'VIDU',
-      channelInstanceId: paramsSnapshot.channelId ?? '',
-      modelCode: paramsSnapshot.modelId ?? undefined,
-      taskParamsJson,
-      // [2026-08-19] 多张图:把 selectedTypes × typeCounts 求和传给后端,后端 × costRate
-      count: totalCount,
-    }).then((resp) => {
-      setPreflightResult({ estimatedCost: resp.estimatedCost });
-    }).catch(() => {
-      // 失败时降级:不展示预估消耗
-      setPreflightResult({ estimatedCost: null });
-    }).finally(() => {
-      setPreflightLoading(false);
-    });
-  }, [executionConfirmOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+    const request = JSON.parse(preflightRequestKey) as {
+      capability: string;
+      channelType: string;
+      channelInstanceId: string;
+      modelCode?: string | null;
+      taskParamsJson: string;
+      count: number;
+    };
+    const timer = window.setTimeout(() => {
+      void taskApi.preflightImageTask(request).then((resp) => {
+        if (!cancelled) setPreflightResult({ estimatedCost: resp.estimatedCost });
+      }).catch(() => {
+        if (!cancelled) setPreflightResult({ estimatedCost: null });
+      }).finally(() => {
+        if (!cancelled) setPreflightLoading(false);
+      });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [preflightRequestKey]);
+
+  const estimatedCostLabel = useMemo(() => {
+    if (!paramsSnapshot.executionParamsReady) return '费用待确认';
+    if (preflightResult?.estimatedCost == null) return '费用待确认';
+    return `预计 ¥${preflightResult.estimatedCost.toFixed(2)}`;
+  }, [paramsSnapshot.executionParamsReady, preflightResult]);
   // [2026-08-15] 结果按图片类型分组:每个任务一行(imageType + taskStatus + 该任务的产物)
   const [submitGroups, setSubmitGroups] = useState<Array<{
     imageType: string;
@@ -344,8 +510,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     previews: TaskResultPreviewResponse[];
   }>>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const ACTIVE_TASK_STATUSES: TaskStatus[] = ['DRAFT', 'PENDING', 'GENERATING'];
-
   useEffect(() => {
     if (!submittedGroup) return;
     let cancelled = false;
@@ -372,7 +536,18 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         }));
         setSubmitGroups(groups);
         const allDone = tasks.length > 0
-          && tasks.every((task) => !ACTIVE_TASK_STATUSES.includes(task.status));
+          && tasks.every((task) => !ACTIVE_IMAGE_TASK_STATUSES.includes(task.status));
+        setTaskTimeline((previous) => previous.map((timelineTask) => timelineTask.groupId === submittedGroup.groupId
+          ? {
+            ...timelineTask,
+            submittedAt: group.submittedAt || timelineTask.submittedAt,
+            taskStatus: group.status,
+            progressPercent: group.progressPercent,
+            resultCount: group.resultCount,
+            error: null,
+            status: allDone ? 'done' : 'loading',
+          }
+          : timelineTask));
         if (allDone) {
           setSubmitStatus('done');
           setSubmitError(null);
@@ -381,7 +556,13 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
           setSubmitStatus('loading');
         }
       } catch (err) {
-        if (!cancelled) setSubmitError((err as Error).message);
+        if (!cancelled) {
+          const error = (err as Error).message;
+          setSubmitError(error);
+          setTaskTimeline((previous) => previous.map((timelineTask) => timelineTask.groupId === submittedGroup.groupId
+            ? { ...timelineTask, error }
+            : timelineTask));
+        }
       }
     };
     void tick();
@@ -394,11 +575,119 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     const resp = await submitTasks('stay');
     if (resp) {
       setSubmittedGroup({ groupId: resp.groupId });
+      setActiveTaskId(resp.groupId);
+      setWorkspaceView('result');
       setSubmitStatus('loading');
       setSubmitGroups([]);
       setSubmitError(null);
+      const submittedPrompt = selectedTypes
+        .map((type) => `${messages.type[type]}：${getEffectivePrompt(type, prompts, promptOverrides)}`)
+        .join('\n\n');
+      const submittedPromptType = activePromptType;
+      setTaskTimeline((previous) => [{
+        groupId: resp.groupId,
+        productId: selectedFromLibrary?.id ?? null,
+        submittedAt: new Date().toISOString(),
+        status: 'loading',
+        taskStatus: 'PENDING',
+        progressPercent: 0,
+        resultCount: 0,
+        error: null,
+        snapshot: {
+          taskId: resp.taskIds[0] ?? null,
+          promptType: submittedPromptType,
+          totalCount,
+          selectedTypes,
+          typeCounts: { ...typeCounts },
+          prompt: submittedPrompt,
+          positivePrompt: getEffectivePrompt(submittedPromptType, prompts, promptOverrides),
+          negativePrompt: getEffectiveNegativePrompt(submittedPromptType, negativePromptOverrides),
+          modelId: paramsSnapshot.modelId,
+          aspectRatio: String(paramsSnapshot.schemaParams?.aspect_ratio ?? ''),
+          resolution: String(paramsSnapshot.schemaParams?.resolution ?? ''),
+          referenceCount: groupedReferences.length + (mainValue ? 1 : 0),
+        },
+      }, ...previous.filter((task) => task.groupId !== resp.groupId)]);
     }
   };
+
+  const handleSelectTask = useCallback((groupId: string) => {
+    const activeTask = activeTaskId ? visibleTimeline.find((task) => task.groupId === activeTaskId) : null;
+    const draftIsDirty = workspaceView === 'result'
+      && activeTask
+      && resultDraft?.taskId === activeTaskId
+      && (resultDraft.positivePrompt !== activeTask.snapshot.positivePrompt
+        || resultDraft.negativePrompt !== activeTask.snapshot.negativePrompt);
+    if (draftIsDirty && !window.confirm('提示词尚未带回编辑区，确定放弃修改吗？')) return;
+    if (groupId === activeTaskId && workspaceView === 'result') {
+      setResultDraft(null);
+      setWorkspaceView('compose');
+      return;
+    }
+    const target = visibleTimeline.find((task) => task.groupId === groupId);
+    if (!target) return;
+    setActiveTaskId(groupId);
+    setSubmittedGroup({ groupId });
+    setSubmitStatus(target.status === 'done' ? 'done' : 'loading');
+    setSubmitGroups([]);
+    setSubmitError(target.error);
+    setResultDraft(null);
+    setWorkspaceView('result');
+  }, [activeTaskId, resultDraft, visibleTimeline, workspaceView]);
+
+  const activeTimelineTask = useMemo(
+    () => activeTaskId ? visibleTimeline.find((task) => task.groupId === activeTaskId) ?? null : null,
+    [activeTaskId, visibleTimeline],
+  );
+  const activeResultParams = useMemo<TaskParamsSnapshot>(() => {
+    if (!activeTimelineTask) return paramsSnapshot;
+    return {
+      ...paramsSnapshot,
+      modelId: activeTimelineTask.snapshot.modelId,
+      schemaParams: {
+        ...paramsSnapshot.schemaParams,
+        aspect_ratio: activeTimelineTask.snapshot.aspectRatio,
+        resolution: activeTimelineTask.snapshot.resolution,
+      },
+    };
+  }, [activeTimelineTask, paramsSnapshot]);
+
+  const handleContinueEditing = useCallback(async (draft: { positivePrompt: string; negativePrompt: string }) => {
+    const taskId = activeTimelineTask?.snapshot.taskId;
+    const promptType = activeTimelineTask?.snapshot.promptType;
+    if (!taskId || !promptType || !activeTimelineTask) {
+      toast.error('该历史任务缺少可恢复的编辑上下文');
+      return;
+    }
+    setContinuingTask(true);
+    try {
+      const context = await taskApi.reuseContext(taskId);
+      const restoredPrefill: TaskReusePrefill = {
+        group: {
+          groupId: activeTimelineTask.groupId,
+          productId: context.productId ?? activeTimelineTask.productId ?? null,
+          productName: selectedFromLibrary?.name ?? '',
+        },
+        task: context,
+        imageAssets: context.assets.filter((asset) => asset.assetKind === 'IMAGE'),
+        videoAssets: context.assets.filter((asset) => asset.assetKind === 'VIDEO'),
+      };
+      setPendingPromptReplacement({
+        taskId: context.taskId,
+        type: promptType,
+        positivePrompt: draft.positivePrompt,
+        negativePrompt: draft.negativePrompt,
+      });
+      setInlineTaskReusePrefill(restoredPrefill);
+      setResultDraft(null);
+      setWorkspaceView('compose');
+      toast.success('提示词已带回原任务，可检查参考图后重新生成');
+    } catch {
+      // 请求层已展示具体错误，避免重复 toast。
+    } finally {
+      setContinuingTask(false);
+    }
+  }, [activeTimelineTask, selectedFromLibrary?.name]);
 
   // [2026-08-15] 风格/场景/姿势完全以字典为准、三者独立:
   // 去掉 CANONICAL_STYLES 硬编码清单,也不再按风格联动收窄场景/姿势选项;
@@ -451,14 +740,14 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       categoryIds: [],
     });
     if (assistantPrefill.negativePrompt) setNegativePrompt(assistantPrefill.negativePrompt);
-    const targetType = selectedTypes[0] ?? 'product_main';
-    if (assistantPrefill.prompt) setPromptOverride(targetType, assistantPrefill.prompt);
+    const targetType = selectedTypes[0] ?? 'scene_detail';
+    if (assistantPrefill.prompt) applyReusablePrompt(targetType, assistantPrefill.prompt);
     toast.success('已一次性带入助手生成图片与 Prompt；离开本页后不会恢复');
   }, [
     assistantPrefill,
     selectedTypes,
     setNegativePrompt,
-    setPromptOverride,
+    applyReusablePrompt,
   ]);
 
   useEffect(() => {
@@ -485,19 +774,14 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       ? IMAGE_TYPE_PREFILL_MAP[snapshot.imageType]
       : undefined;
     if (targetType) {
-      // toggleType 不允许取消最后一个已选类型。先加入做同款的目标类型，
-      // 再移除其余类型，避免非商品主图模板与默认“商品主图”同时被选中。
-      if (!selectedTypes.includes(targetType)) toggleType(targetType);
-      selectedTypes.filter((type) => type !== targetType).forEach(toggleType);
-      const currentCount = typeCounts[targetType] ?? 1;
+      const workspaceType = toPromptWorkspaceType(targetType);
+      if (workspaceType) setActivePromptType(workspaceType);
+      PROMPT_WORKSPACE_TYPES
+        .filter((type) => type !== targetType)
+        .forEach((type) => setPromptOverride(type, ''));
       const targetCount = Math.max(1, Math.min(5, snapshot.count ?? 1));
-      for (let index = currentCount; index < targetCount; index += 1) {
-        changeTypeCount(targetType, 1);
-      }
-      for (let index = currentCount; index > targetCount; index -= 1) {
-        changeTypeCount(targetType, -1);
-      }
-      if (snapshot.prompt) setPromptOverride(targetType, snapshot.prompt);
+      setTypeCount(targetType, targetCount);
+      if (snapshot.prompt) applyReusablePrompt(targetType, snapshot.prompt);
     }
 
     const referenceSlotMap: Record<string, ReferenceSlot> = {
@@ -526,19 +810,16 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     });
     toast.success(`已应用模板：${creationPrefill.templateName}，请重新选择主体素材`);
   }, [
-    changeTypeCount,
     creationPrefill,
-    selectedTypes,
     selectReference,
     setFormFactsExternal,
     setNegativePrompt,
     setPose,
-    setPromptOverride,
+    applyReusablePrompt,
     setScene,
     setStyle,
     setTemplate,
-    toggleType,
-    typeCounts,
+    setTypeCount,
   ]);
 
   const handleReferenceRolesChange = useCallback((
@@ -567,32 +848,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     if (reference.key === forceOpenRoleKey) setForceOpenRoleKey(null);
   }, [forceOpenRoleKey, references, selectReference]);
 
-  const handleProductFactChange = <K extends keyof ProductFactsInput,>(
-    key: K,
-    value: ProductFactsInput[K],
-  ) => {
-    setProductFacts((current) => ({ ...current, [key]: value }));
-    updateProductFact(key, value);
-  };
-
-  // ---- AI assistant ----
-  const handleAssistantClick = useCallback(() => {
-    runAssistantAnalysis();
-  }, [runAssistantAnalysis]);
-
-  // ---- regenerate: clear overrides to fall back to computed prompts ----
-  const handleRegenerateAll = useCallback(() => {
-    regeneratePrompts();
-  }, [regeneratePrompts]);
-
-  // ---- AI optimize selected types ----
-  const handleAiOptimizeSelected = useCallback(() => {
-    applyAiOptimizeToSelected(selectedTypes);
-  }, [applyAiOptimizeToSelected, selectedTypes]);
-
   // 主体素材匹配到商品后，把商品字段同步到商品事实和可复用模板 Prompt。
   const applyMatchedProduct = useCallback(
-    (product: ProductDTO) => {
+    (product: ProductDTO, applyTemplatePrompt = true) => {
       setSelectedFromLibrary(product);
       const nextFacts: ProductFactsInput = {
         name: (product.name ?? '').trim(),
@@ -610,22 +868,71 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       ].map((value) => value?.trim()).filter(Boolean).join(' '));
       // 关键:也回写到 hook 的 formInput,触发 `prompts` useMemo 重算 → 4 类型 Prompt 自动重写
       setFormFactsExternal(nextFacts);
-      const reusablePrompt = creationPrefill?.snapshot.prompt;
-      const sourceImageType = creationPrefill?.snapshot.imageType;
+      const activeTemplateContext = inlineTemplateContext ?? creationPrefill;
+      const reusablePrompt = activeTemplateContext?.snapshot.prompt;
+      const sourceImageType = activeTemplateContext?.snapshot.imageType;
       const targetType = sourceImageType
         ? IMAGE_TYPE_PREFILL_MAP[sourceImageType]
         : undefined;
-      if (reusablePrompt && targetType) {
-        setPromptOverride(targetType, renderReusablePrompt(reusablePrompt, nextFacts));
+      if (applyTemplatePrompt && reusablePrompt && targetType) {
+        applyReusablePrompt(targetType, renderReusablePrompt(reusablePrompt, nextFacts));
       }
     },
-    [creationPrefill, setFormFactsExternal, setPromptOverride],
+    [applyReusablePrompt, creationPrefill, inlineTemplateContext, setFormFactsExternal],
   );
+
+  const handleSelectPromptTemplate = useCallback(async (templateId: string) => {
+    if (templateApplyingId) return;
+    setTemplateApplyingId(templateId);
+    try {
+      const context = await creationTemplateApi.reuseContext(templateId);
+      if (context.mediaType !== 'IMAGE') {
+        toast.error('该模板不是图片模板');
+        return;
+      }
+      const snapshot = context.snapshot;
+      const targetType = toPromptWorkspaceType(snapshot.imageType) ?? activePromptType;
+      setActivePromptType(targetType);
+      setTypeCount(targetType, snapshot.count ?? 1);
+      if (snapshot.prompt) {
+        applyReusablePrompt(targetType, renderReusablePrompt(snapshot.prompt, productFacts));
+      } else {
+        resetPromptOverride(targetType);
+        resetNegativePromptOverride(targetType);
+      }
+      setStyle(snapshot.style ?? '');
+      setScene(snapshot.scene ?? '');
+      setPose(snapshot.pose ?? '');
+      setNegativePrompt(snapshot.negativePrompt ?? '');
+      setTemplate(context.templateName);
+      setInlineTemplateContext(context);
+      setTemplateDrawerOpen(false);
+      toast.success(`已应用模板：${context.templateName}`);
+    } catch {
+      toast.error('模板读取失败，请稍后重试');
+    } finally {
+      setTemplateApplyingId(null);
+    }
+  }, [
+    activePromptType,
+    productFacts,
+    applyReusablePrompt,
+    resetPromptOverride,
+    resetNegativePromptOverride,
+    setNegativePrompt,
+    setPose,
+    setScene,
+    setStyle,
+    setTemplate,
+    setTypeCount,
+    templateApplyingId,
+  ]);
 
   const resetProductContext = useCallback(() => {
     setSelectedFromLibrary(null);
     setProductFacts(EMPTY_PRODUCT_FACTS);
     setSeoName('');
+    setProductFactsOpen(false);
     setFormFactsExternal(EMPTY_PRODUCT_FACTS);
   }, [setFormFactsExternal]);
 
@@ -639,8 +946,9 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   }, [resetProductContext]);
 
   useEffect(() => {
-    if (!taskReusePrefill || taskReusePrefill.task.taskKind !== 'IMAGE') return;
-    const { group, imageAssets, task } = taskReusePrefill;
+    const effectiveTaskReusePrefill = inlineTaskReusePrefill ?? taskReusePrefill;
+    if (!effectiveTaskReusePrefill || effectiveTaskReusePrefill.task.taskKind !== 'IMAGE') return;
+    const { group, imageAssets, task } = effectiveTaskReusePrefill;
     if (appliedTaskReuseRef.current === task.taskId || imageAssets.length === 0) return;
     const orderedAssets = [...imageAssets].sort((left, right) =>
       (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
@@ -668,6 +976,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     setStyle(task.style ?? '');
     setScene(task.scene ?? '');
     setPose(task.action ?? '');
+    setNegativePrompt(task.negativePrompt ?? '');
     REFERENCE_SLOTS_INTERNAL.forEach((slot) => selectReference(slot, undefined));
     const referenceSlotMap: Record<string, ReferenceSlot> = {
       REFERENCE_DETAIL: 'detail',
@@ -695,20 +1004,20 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       ? IMAGE_TYPE_PREFILL_MAP[task.imageType]
       : undefined;
     if (targetType) {
-      if (!selectedTypes.includes(targetType)) toggleType(targetType);
-      selectedTypes.filter((type) => type !== targetType).forEach(toggleType);
-      const currentCount = typeCounts[targetType] ?? 1;
+      const workspaceType = toPromptWorkspaceType(targetType);
+      if (workspaceType) setActivePromptType(workspaceType);
+      PROMPT_WORKSPACE_TYPES
+        .filter((type) => type !== targetType)
+        .forEach((type) => setPromptOverride(type, ''));
       const targetCount = Math.max(1, Math.min(5, task.count ?? 1));
-      for (let index = currentCount; index < targetCount; index += 1) {
-        changeTypeCount(targetType, 1);
+      setTypeCount(targetType, targetCount);
+      if (task.taskPrompt) applyReusablePrompt(targetType, task.taskPrompt);
+      if (pendingPromptReplacement?.taskId === task.taskId) {
+        setPromptOverride(targetType, pendingPromptReplacement.positivePrompt);
+        setNegativePromptOverride(targetType, pendingPromptReplacement.negativePrompt);
+        setPendingPromptReplacement(null);
       }
-      for (let index = currentCount; index > targetCount; index -= 1) {
-        changeTypeCount(targetType, -1);
-      }
-      if (task.taskPrompt) setPromptOverride(targetType, task.taskPrompt);
     }
-    setNegativePrompt(task.negativePrompt ?? '');
-
     const productId = group.productId;
     if (!productId) {
       setUnboundMainAsset({
@@ -727,7 +1036,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     void productInfoApi.detail({ id: productId })
       .then((product) => {
         if (selectedMainResourceIdRef.current === mainAsset.assetId) {
-          applyMatchedProduct(product);
+          applyMatchedProduct(product, false);
           toast.success(`已恢复任务：${task.taskCode}`);
         }
       })
@@ -748,18 +1057,19 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       });
   }, [
     applyMatchedProduct,
-    changeTypeCount,
     selectReference,
-    selectedTypes,
     setFormFactsExternal,
     setNegativePrompt,
     setPose,
-    setPromptOverride,
+    applyReusablePrompt,
     setScene,
     setStyle,
+    setTypeCount,
+    setNegativePromptOverride,
+    setPromptOverride,
+    inlineTaskReusePrefill,
+    pendingPromptReplacement,
     taskReusePrefill,
-    toggleType,
-    typeCounts,
   ]);
 
   const handleProductCreated = useCallback((product: ProductDTO) => {
@@ -767,6 +1077,47 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
     applyMatchedProduct(product);
     setUnboundMainAsset(null);
   }, [applyMatchedProduct, unboundMainAsset]);
+
+  const handleCompositeApplied = useCallback((asset: AppliedCompositeAsset) => {
+    selectedMainResourceIdRef.current = asset.fileResourceId;
+    setMainValue({
+      id: asset.fileResourceId,
+      fileResourceId: asset.fileResourceId,
+      originalUrl: asset.originalUrl,
+      thumbnailUrl: asset.thumbnailUrl,
+      name: asset.name,
+    });
+    setUnboundMainAsset(null);
+    setMatchingProduct(true);
+
+    const productId = selectedFromLibrary && asset.productIds.includes(selectedFromLibrary.id)
+      ? selectedFromLibrary.id
+      : asset.productIds[0];
+    void productInfoApi.detail({ id: productId })
+      .then((product) => {
+        if (selectedMainResourceIdRef.current !== asset.fileResourceId) return;
+        applyMatchedProduct(product);
+        toast.success('合成套图已回填主体素材，并保存到两个商品素材库');
+      })
+      .catch(() => {
+        if (selectedMainResourceIdRef.current !== asset.fileResourceId) return;
+        resetProductContext();
+        toast.warning('合成图已保存并回填，但商品信息读取失败，请重新选择主体素材');
+      })
+      .finally(() => {
+        if (selectedMainResourceIdRef.current === asset.fileResourceId) setMatchingProduct(false);
+      });
+  }, [applyMatchedProduct, resetProductContext, selectedFromLibrary]);
+
+  const handleShowProductFacts = useCallback(() => {
+    if (selectedFromLibrary) setProductFactsOpen(true);
+  }, [selectedFromLibrary]);
+
+  const handleProductFactsChange = useCallback((facts: ProductFactsInput) => {
+    const mergedFacts = mergeProductFactsWithErp(selectedFromLibrary, facts);
+    setProductFacts(mergedFacts);
+    setFormFactsExternal(mergedFacts);
+  }, [selectedFromLibrary, setFormFactsExternal]);
 
   // ---- 主图点击 → 打开 picker,target='main' ----
   const openMainPicker = useCallback(() => {
@@ -866,44 +1217,45 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
   }, []);
 
   useEffect(() => {
-    if (!resultAssetPrefill || appliedResultAssetRef.current === resultAssetPrefill.id) return;
-    appliedResultAssetRef.current = resultAssetPrefill.id;
-    selectedMainResourceIdRef.current = resultAssetPrefill.id;
+    const resultAsset = resultAssetPrefill;
+    if (!resultAsset || appliedResultAssetRef.current === resultAsset.id) return;
+    appliedResultAssetRef.current = resultAsset.id;
+    selectedMainResourceIdRef.current = resultAsset.id;
     resetProductContext();
     setUnboundMainAsset(null);
     setMainValue({
-      id: resultAssetPrefill.id,
-      fileResourceId: resultAssetPrefill.id,
-      originalUrl: resultAssetPrefill.originalUrl ?? resultAssetPrefill.thumbnailUrl,
+      id: resultAsset.id,
+      fileResourceId: resultAsset.id,
+      originalUrl: resultAsset.originalUrl ?? resultAsset.thumbnailUrl,
       thumbnailUrl: withCosThumbnail(
-        resultAssetPrefill.thumbnailUrl ?? resultAssetPrefill.originalUrl,
+        resultAsset.thumbnailUrl ?? resultAsset.originalUrl,
         256,
-      ) ?? resultAssetPrefill.thumbnailUrl ?? resultAssetPrefill.originalUrl,
-      name: resultAssetPrefill.name,
+      ) ?? resultAsset.thumbnailUrl ?? resultAsset.originalUrl,
+      name: resultAsset.name,
     });
 
-    if (!resultAssetPrefill.productId) {
-      setUnboundMainAsset(resultAssetPrefill);
+    if (!resultAsset.productId) {
+      setUnboundMainAsset(resultAsset);
       toast.warning('该结果未关联产品，请先选择或新建产品');
       return;
     }
 
     setMatchingProduct(true);
-    void productInfoApi.detail({ id: resultAssetPrefill.productId })
+    void productInfoApi.detail({ id: resultAsset.productId })
       .then((product) => {
-        if (selectedMainResourceIdRef.current === resultAssetPrefill.id) {
+        if (selectedMainResourceIdRef.current === resultAsset.id) {
           applyMatchedProduct(product);
           toast.success(`已带入产品与生成结果：${product.name}`);
         }
       })
       .catch(() => {
-        if (selectedMainResourceIdRef.current === resultAssetPrefill.id) {
-          setUnboundMainAsset(resultAssetPrefill);
+        if (selectedMainResourceIdRef.current === resultAsset.id) {
+          setUnboundMainAsset(resultAsset);
           toast.warning('已带入结果，但产品信息读取失败');
         }
       })
       .finally(() => {
-        if (selectedMainResourceIdRef.current === resultAssetPrefill.id) setMatchingProduct(false);
+        if (selectedMainResourceIdRef.current === resultAsset.id) setMatchingProduct(false);
       });
   }, [applyMatchedProduct, resetProductContext, resultAssetPrefill]);
 
@@ -914,10 +1266,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       {/* Header */}
       <TopHeader
         onBack={onBack ?? (() => setScreen(AppScreen.DASHBOARD))}
-        productName={selectedFromLibrary?.name}
-        productCategory={selectedFromLibrary?.categoryName ?? productFacts.productCategory}
-        imageUrl={mainValue?.thumbnailUrl ?? mainValue?.originalUrl}
-        isMatched={isProductBound}
       />
 
       {/* 3-column layout */}
@@ -929,6 +1277,10 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
               productName={selectedFromLibrary?.name}
               matchingProduct={matchingProduct}
               onPickMain={openMainPicker}
+              onShowProductFacts={handleShowProductFacts}
+            />
+            <CompositeSection
+              onApplied={handleCompositeApplied}
             />
             <ReferenceGrid
               orderedRefs={state.orderedRefs}
@@ -938,90 +1290,116 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
               forceOpenRoleKey={forceOpenRoleKey}
               onForceOpenConsumed={() => setForceOpenRoleKey(null)}
             />
-            <ProductFactsEditor
-              value={productFacts}
-              isProductBound={isProductBound}
-              seoName={seoName}
-              onSeoNameChange={setSeoName}
-              onChange={handleProductFactChange}
-            />
           </>
         }
         center={
-          <>
-            <ImageContentSection
-              isProductBound={isProductBound}
-              assistantState={assistantState}
-              onAssistantClick={handleAssistantClick}
-              selectedTypes={selectedTypes}
-              typeCounts={typeCounts}
-              defaultPrompts={prompts}
-              promptOverrides={promptOverrides}
-              templateName={template}
-              promptsComplete={promptsComplete}
-              onChangePromptOverride={setPromptOverride}
-              onRegenerateAll={handleRegenerateAll}
-              onAiOptimizeSelected={handleAiOptimizeSelected}
-              typeSelector={
-                <ImageTypeSelector
-                  selectedTypes={selectedTypes}
-                  typeCounts={typeCounts}
-                  maxCountPerType={5}
-                  onToggle={toggleType}
-                  onChangeCount={changeTypeCount}
-                />
-              }
-              tagSelector={
-                <StyleScenePoseRow
-                  styleOptions={styleOptions}
-                  sceneOptions={sceneOptions}
-                  poseOptions={poseOptions}
-                  loadingStyle={loadingStyle}
-                  loadingScene={loadingScene}
-                  loadingPose={loadingPose}
-                  style={style}
-                  scene={scene}
-                  pose={pose}
-                  lockedByReference={lockedByReference}
-                  onStyleChange={handleStyleChange} // 已简化为仅 setStyle,不联动场景/姿势
-                  onSceneChange={setScene}
-                  onPoseChange={setPose}
-                />
-              }
-              templateSelector={
-                SHOW_TEMPLATE_PICKER ? (
-                  <TemplatePicker
-                    value={template}
-                    options={[{ id: 'default', name: '默认模板' }]}
-                    onPickRequest={requestTemplateChange}
-                  />
-                ) : null
-              }
-              executionSettings={
-                <ImageSettingsSection
-                  prefill={imageParamsPrefill}
-                  prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
-                  onParamsChange={setParamsSnapshot}
-                />
-              }
+          workspaceView === 'result' && activeTaskId ? (
+            <ImageResultPanel
+              selectedTypes={activeTimelineTask?.snapshot.selectedTypes ?? selectedTypes}
+              typeCounts={activeTimelineTask?.snapshot.typeCounts ?? typeCounts}
+              totalCount={activeTimelineTask?.snapshot.totalCount ?? totalCount}
+              params={activeResultParams}
+              submitStatus={submitStatus}
+              submitGroups={submitGroups}
+              submitError={submitError}
+              taskId={activeTimelineTask?.snapshot.taskId}
+              initialPositivePrompt={activeTimelineTask?.snapshot.positivePrompt}
+              initialNegativePrompt={activeTimelineTask?.snapshot.negativePrompt}
+              onContinueEditing={handleContinueEditing}
+              onDraftChange={(draft) => {
+                if (activeTimelineTask?.snapshot.taskId) {
+                  setResultDraft({ taskId: activeTimelineTask.snapshot.taskId, ...draft });
+                }
+              }}
+              continuing={continuingTask}
             />
-          </>
+          ) : (
+            <div className="relative">
+              <PromptWorkspace
+                activeType={activePromptType}
+                isProductBound={isProductBound}
+                defaultPrompts={prompts}
+                promptOverrides={promptOverrides}
+                negativePromptOverrides={negativePromptOverrides}
+                referenceGroups={groupedReferences.map((reference) => reference.roles)}
+                onActiveTypeChange={setActivePromptType}
+                onChangePromptOverride={setPromptOverride}
+                onRestorePrompt={resetPromptOverride}
+                onChangeNegativePrompt={setNegativePromptOverride}
+                onRestoreNegativePrompt={resetNegativePromptOverride}
+                onOpenTemplates={() => setTemplateDrawerOpen(true)}
+                tagSelector={
+                  <StyleScenePoseRow
+                    styleOptions={styleOptions}
+                    sceneOptions={sceneOptions}
+                    poseOptions={poseOptions}
+                    loadingStyle={loadingStyle}
+                    loadingScene={loadingScene}
+                    loadingPose={loadingPose}
+                    style={style}
+                    scene={scene}
+                    pose={pose}
+                    lockedByReference={lockedByReference}
+                    onStyleChange={handleStyleChange} // 已简化为仅 setStyle,不联动场景/姿势
+                    onSceneChange={setScene}
+                    onPoseChange={setPose}
+                  />
+                }
+                executionSettings={
+                  <ImageSettingsSection
+                    prefill={imageParamsPrefill}
+                    prefillPending={Boolean(creationTemplateId) && creationPrefillQuery.loading}
+                    onParamsChange={setParamsSnapshot}
+                    outputCount={{
+                      label: messages.type[activePromptType],
+                      value: typeCounts[activePromptType],
+                      max: 5,
+                      disabled: !isProductBound,
+                      onChange: (count) => setTypeCount(activePromptType, count),
+                    }}
+                  />
+                }
+              />
+              {templateDrawerOpen && (
+                <PromptTemplateDrawer
+                  activeType={activePromptType}
+                  templates={templateCampQuery.data?.list ?? []}
+                  loading={templateCampQuery.loading}
+                  error={templateCampQuery.error?.message}
+                  applyingId={templateApplyingId}
+                  onSelect={(templateId) => void handleSelectPromptTemplate(templateId)}
+                  onClose={() => setTemplateDrawerOpen(false)}
+                />
+              )}
+            </div>
+          )
         }
         right={
-          <ImageResultPanel
-            selectedTypes={selectedTypes}
-            typeCounts={typeCounts}
-            totalCount={totalCount}
-            params={paramsSnapshot}
-            onGenerate={checkAndGenerate}
-            submitStatus={submitStatus}
-            submitGroups={submitGroups}
-            submitError={submitError}
+          <TaskTimelinePanel
+            tasks={visibleTimeline}
+            activeTaskId={activeTaskId}
+            onSelect={handleSelectTask}
+            productName={selectedFromLibrary?.name}
+            productImage={mainValue?.thumbnailUrl ?? mainValue?.originalUrl}
           />
         }
       />
 
-      {/* 本页自己的 picker modal:由 pendingSlot state 决定路由到主图/参考图 slot。
+      {workspaceView === 'compose' && (
+        <GenerationConfigBar
+          model={paramsSnapshot.modelId}
+          aspectRatio={String(paramsSnapshot.schemaParams?.aspect_ratio ?? '')}
+          resolution={String(paramsSnapshot.schemaParams?.resolution ?? '')}
+          totalCount={totalCount}
+          costLabel={estimatedCostLabel}
+          costLoading={preflightLoading}
+          disabled={submitStatus === 'loading'}
+          submitting={isSubmitting}
+          onGenerate={checkAndGenerate}
+        />
+      )}
+
+      {/* 本页自己的 picker modal:主体素材走产品素材,模特走模特库,场景/细节走通用素材。
           mode='picker' 让确认按钮可用;onConfirmSelection 直接拿 AssetResourceItem[]。 */}
       {isTransitOpen && (
         <AssetTransitModal
@@ -1029,7 +1407,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
           targetSlot={pendingSlot === 'model' ? 'reference-model' : pendingSlot ?? 'main'}
           purpose="OTHER"
           assetKind="IMAGE"
-          initialSource={pendingSlot === 'model' ? 'MODEL' : 'PRODUCT'}
+          initialSource={pendingSlot === 'model' ? 'MODEL' : pendingSlot === 'main' ? 'PRODUCT' : 'UPLOAD'}
           onCreateModel={pendingSlot === 'model'
             ? () => {
                 setPendingSlot(null);
@@ -1042,14 +1420,6 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
       )}
 
       {/* Dialogs (from hook state) */}
-      <TemplateOverwriteDialog
-        open={templateOverwriteOpen}
-        onCancel={() => setTemplateOverwriteOpen(false)}
-        onConfirm={() => {
-          if (pendingTemplate) applyTemplate(pendingTemplate);
-          setTemplateOverwriteOpen(false);
-        }}
-      />
       <ExecutionConfirmDialog
         open={executionConfirmOpen}
         isSubmitting={isSubmitting}
@@ -1083,6 +1453,16 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
         onCancel={clearMainSelection}
         onCreated={handleProductCreated}
       />
+      {productFactsOpen && selectedFromLibrary && (
+        <ProductFactsDialog
+          product={selectedFromLibrary}
+          facts={productFacts}
+          seoName={seoName}
+          onFactsChange={handleProductFactsChange}
+          onSeoNameChange={setSeoName}
+          onClose={() => setProductFactsOpen(false)}
+        />
+      )}
     </div>
   );
 };

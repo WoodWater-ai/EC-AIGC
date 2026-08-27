@@ -544,6 +544,8 @@ export interface TaskGroupQueryRequest {
   pageSize: number;
   taskKind?: 'IMAGE' | 'VIDEO';
   statuses?: TaskStatus[];
+  /** 仅查询关联该 ERP 商品的任务批次。 */
+  productId?: string;
   keyword?: string;
 }
 

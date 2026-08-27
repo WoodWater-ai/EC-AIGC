@@ -720,14 +720,20 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     const productIds = selectedProductIds;
     try {
       const details = await Promise.all(productIds.map((id) => productLibraryApi.productDetail(id)));
-      const whiteBaseAssets = details.map((detail) => buildProductDetailAssets(detail, 'IMAGE')
-        .find((asset) => ['PRODUCT_ORIGINAL', 'WHITE_BACKGROUND'].includes(asset.assetType ?? '')));
-      if (whiteBaseAssets.some((asset) => !asset)) {
-        toast.warning('所选 SKU 中存在缺少白底图的产品，无法搭配合成');
+      const defaultComposeAssets = details.map((detail) => {
+        const assets = buildProductDetailAssets(detail, 'IMAGE');
+        const preferred = assets.find((asset) => asset.isProductCover)
+          ?? assets.find((asset) => asset.isProductMainImage)
+          ?? assets.find((asset) => ['PRODUCT_ORIGINAL', 'WHITE_BACKGROUND'].includes(asset.assetType ?? ''))
+          ?? assets[0];
+        return preferred ? { ...preferred, name: detail.name } : undefined;
+      });
+      if (defaultComposeAssets.some((asset) => !asset)) {
+        toast.warning('所选 SKU 中存在缺少可用商品图的产品，无法搭配合成');
         return;
       }
       setMergeTargetProductIds(productIds);
-      setMergeDrawerItems(whiteBaseAssets.filter((asset): asset is AssetResourceItem => Boolean(asset)));
+      setMergeDrawerItems(defaultComposeAssets.filter((asset): asset is AssetResourceItem => Boolean(asset)));
     } catch {
       toast.error('读取产品白底图失败，请稍后重试');
     }
@@ -986,7 +992,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
         return;
       }
       const asset = await assetApi.get(String(detail.imageId));
-      onConfirmSelection?.([asset]);
+      onConfirmSelection?.([{ ...asset, productId: asset.productId ?? sku.productId }]);
       onClose();
     } catch (err) {
       toast.error('素材获取失败：' + (err as Error).message);
@@ -2386,10 +2392,14 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                   && mergeTargetProductIds[0] === focusedProduct.productId
                   ? 'VERTICAL'
                   : undefined}
-                onAssetCreated={mergeTargetProductIds.length === 1 && focusedProduct
-                  && mergeTargetProductIds[0] === focusedProduct.productId
+                onAssetCreated={mergeTargetProductIds.length > 0
                   ? async (assetId) => {
-                    await productLibraryApi.setInputAssetCover(focusedProduct.productId, assetId);
+                    const results = await Promise.allSettled(
+                      mergeTargetProductIds.map((productId) =>
+                        productLibraryApi.setInputAssetCover(productId, assetId)),
+                    );
+                    const failureCount = results.filter((result) => result.status === 'rejected').length;
+                    if (failureCount > 0) throw new Error(`${failureCount} 个 SKU 更新失败`);
                   }
                   : undefined}
                 onClose={() => {

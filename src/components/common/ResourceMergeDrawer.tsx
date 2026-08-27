@@ -4,6 +4,7 @@ import type { AssetResourceItem } from '../../api/modules/asset';
 import { assetApi } from '../../api/modules/asset';
 import { useFileUpload } from '../../hooks/useFileUpload';
 import { mergeImages, type MergeDirection } from '../../utils/mergeImages';
+import { buildCompositeResourceName } from '../../lib/assets/compositeNaming';
 import { AssetImage } from '../AssetImage';
 
 interface CompositePreview {
@@ -26,12 +27,6 @@ interface ResourceMergeDrawerProps {
   onUploaded: () => void | Promise<void>;
 }
 
-const defaultResourceName = () => {
-  const now = new Date();
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `合并套图-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
-};
-
 export function ResourceMergeDrawer({
   items,
   categoryId,
@@ -48,7 +43,8 @@ export function ResourceMergeDrawer({
   const primaryProductId = targetProductIds[0];
   const [orderedItems, setOrderedItems] = useState(items);
   const [direction, setDirection] = useState<MergeDirection>(defaultDirection);
-  const [resourceName, setResourceName] = useState(defaultResourceName);
+  const [resourceName, setResourceName] = useState(() =>
+    buildCompositeResourceName(items.map((item) => item.name)));
   const [preview, setPreview] = useState<CompositePreview | null>(null);
   const [isComposing, setIsComposing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -148,7 +144,7 @@ export function ResourceMergeDrawer({
       try {
         await onAssetCreated?.(assetId);
       } catch (callbackError) {
-        toast.error(`合并素材已加入当前 SKU，但设为封面失败：${(callbackError as Error).message}`);
+        toast.error(`合成素材已创建，但设为封面失败：${(callbackError as Error).message}`);
         await onUploaded();
         return;
       }

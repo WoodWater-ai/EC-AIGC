@@ -30,6 +30,8 @@ export interface SlotRef {
   width?: number;
   /** 图片原始高度(px) —— 商品主体图区显示用 */
   height?: number;
+  /** 素材所属商品 ID；合成套图时用于把结果同时归档到上衣、下装商品。 */
+  productId?: string;
 }
 
 export interface SlotMeta {

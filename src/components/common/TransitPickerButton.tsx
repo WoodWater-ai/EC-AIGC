@@ -51,6 +51,7 @@ export function toSlotRef(item: AssetResourceItem): SlotRef {
     fileSize: item.fileSize,
     width: item.width,
     height: item.height,
+    productId: item.productId,
   };
 }
 

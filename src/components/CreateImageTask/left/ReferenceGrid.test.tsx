@@ -21,28 +21,25 @@ const emptyCallbacks = () => ({
   onForceOpenConsumed: () => undefined,
 });
 
-const ALL_SLOTS: ReferenceSlot[] = ['model', 'detail', 'style', 'scene', 'pose'];
+const ALL_SLOTS: ReferenceSlot[] = ['model', 'pose', 'scene', 'detail'];
 
-test('empty state: single + placeholder, no slot-specific labels', () => {
+test('empty state: model and common libraries render vertically with separate entries', () => {
   const html = renderToStaticMarkup(React.createElement(ReferenceGrid, {
     orderedRefs: [],
     ...emptyCallbacks(),
   }));
 
-  // 单 + 卡
-  assert.match(html, /添加参考/);
-  assert.match(html, /<svg[^>]*lucide-plus/);
-
-  // 不再有 3 卡文案
-  assert.doesNotMatch(html, /添加模特参考/);
-  assert.doesNotMatch(html, /添加细节参考/);
-  assert.doesNotMatch(html, /添加风格参考/);
-
-  // 0/5 计数
-  assert.match(html, /0\s*\/\s*5/);
+  assert.match(html, /模特库/);
+  assert.match(html, /通用素材库/);
+  assert.match(html, /添加模特/);
+  assert.match(html, /添加场景 \/ 细节/);
+  assert.doesNotMatch(html, /标签会随任务提交同步到素材中心/);
+  assert.doesNotMatch(html, /选择人物形象或姿势参考/);
+  assert.doesNotMatch(html, /风格/);
+  assert.match(html, /0\s*\/\s*4/);
 });
 
-test('one slot occupied: trailing + card rendered', () => {
+test('one common reference renders in common library and keeps other entries available', () => {
   const ref = makeRef('r1', '图一');
   const html = renderToStaticMarkup(React.createElement(ReferenceGrid, {
     orderedRefs: [{ slot: 'detail', ref }],
@@ -50,11 +47,14 @@ test('one slot occupied: trailing + card rendered', () => {
   }));
 
   assert.match(html, /图一/);
-  assert.match(html, /添加参考/);
-  assert.match(html, /1\s*\/\s*5/);
+  assert.match(html, /添加模特/);
+  assert.match(html, /添加场景 \/ 细节/);
+  assert.match(html, /1\s*\/\s*4/);
+  assert.doesNotMatch(html, /每张图片至少选择一个标签/);
+  assert.match(html, /grid-cols-1/);
 });
 
-test('all 5 slots occupied: trailing + card not rendered', () => {
+test('all 4 roles occupied: both library add entries are disabled', () => {
   const orderedRefs = ALL_SLOTS.map((slot, i) => ({
     slot,
     ref: makeRef(`r${i}`, `图${i}`),
@@ -64,12 +64,12 @@ test('all 5 slots occupied: trailing + card not rendered', () => {
     ...emptyCallbacks(),
   }));
 
-  assert.match(html, /5\s*\/\s*5/);
-  const plusMatches = html.match(/<svg[^>]*lucide-plus/g) ?? [];
-  assert.equal(plusMatches.length, 0, `+ icon should not render when slots full, got ${plusMatches.length}`);
+  assert.match(html, /4\s*\/\s*4/);
+  const disabledMatches = html.match(/<button[^>]*disabled=""/g) ?? [];
+  assert.equal(disabledMatches.length, 2, 'each library add entry should be disabled when its roles are occupied');
 });
 
-test('same image covering all 5 slots: trailing + card not rendered', () => {
+test('same image covering all 4 roles: all labels remain visible without style', () => {
   const sameRef = makeRef('r0', '同一图');
   const orderedRefs = ALL_SLOTS.map((slot) => ({ slot, ref: sameRef }));
   const html = renderToStaticMarkup(React.createElement(ReferenceGrid, {
@@ -77,14 +77,14 @@ test('same image covering all 5 slots: trailing + card not rendered', () => {
     ...emptyCallbacks(),
   }));
 
-  const plusMatches = html.match(/<svg[^>]*lucide-plus/g) ?? [];
-  assert.equal(plusMatches.length, 0, '+ icon should not render when slots fully covered');
-  // 5 个 role 标签都显示在该图下方
+  assert.match(html, /1\s*\/\s*4/);
+  const disabledMatches = html.match(/<button[^>]*disabled=""/g) ?? [];
+  assert.equal(disabledMatches.length, 2);
   assert.match(html, /模特/);
   assert.match(html, /细节/);
-  assert.match(html, /风格/);
   assert.match(html, /场景/);
   assert.match(html, /姿势/);
+  assert.doesNotMatch(html, /风格/);
 });
 
 test('forceOpenRoleKey matches a reference: its RolePicker open by default', () => {
@@ -102,7 +102,7 @@ test('forceOpenRoleKey matches a reference: its RolePicker open by default', () 
   assert.match(html, />\s*图 2\s*</);
 });
 
-test('reference image fits inside container via object-contain (no cover crop)', () => {
+test('reference image uses a large high-quality preview without cover crop', () => {
   const ref = makeRef('r1', '图一');
   const html = renderToStaticMarkup(React.createElement(ReferenceGrid, {
     orderedRefs: [{ slot: 'detail', ref }],
@@ -111,11 +111,10 @@ test('reference image fits inside container via object-contain (no cover crop)',
 
   // 容器 div 含 flex + items-center + justify-center (居中)
   assert.match(html, /class="relative aspect-\[4\/3\][^"]*flex items-center justify-center/);
-  // img 使用 object-contain + max-h-full + max-w-full (contain 适配,不裁切)
-  // 不依赖 className 内部 Tailwind 排序,任一关键字存在即可
+  // 原图优先，并请求适合大卡片和高分屏的 960px COS 预览。
+  assert.match(html, /r1\.jpg\?imageMogr2\/thumbnail\/960x/);
+  assert.doesNotMatch(html, /r1-thumb\.jpg\?imageMogr2\/thumbnail\/960x/);
   assert.match(html, /class="[^"]*object-contain[^"]*"/);
-  assert.match(html, /class="[^"]*max-h-full[^"]*"/);
-  assert.match(html, /class="[^"]*max-w-full[^"]*"/);
   // img 不再使用 object-cover (防回滚)
   assert.doesNotMatch(html, /object-cover/);
 });
@@ -139,7 +138,7 @@ test('occupiedByAnother: refB sees detail as disabled when refA already owns it'
   const html = renderToStaticMarkup(React.createElement(ReferenceGrid, {
     orderedRefs: [
       { slot: 'detail', ref: refA },
-      { slot: 'style', ref: refB }, // refB 当前占 style,detail 由 refA 占
+      { slot: 'scene', ref: refB }, // refB 当前占 scene,detail 由 refA 占
     ],
     forceOpenRoleKey: 'b', // refB 的 RolePicker 强制打开
     ...emptyCallbacks(),

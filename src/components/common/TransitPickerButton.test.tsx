@@ -25,6 +25,7 @@ test('toSlotRef(item) → SlotRef 映射(fileResourceId 必填)', () => {
     name: 'test',
     assetKind: 'IMAGE' as const,
     uploadUserId: '1',
+    productId: 'product-1',
     fileResourceId: '99',
     categoryIds: [],
     status: 'NORMAL' as const,
@@ -32,6 +33,7 @@ test('toSlotRef(item) → SlotRef 映射(fileResourceId 必填)', () => {
   const ref: SlotRef = toSlotRef(item);
   assert.equal(ref.fileResourceId, '1');
   assert.equal(ref.name, 'test');
+  assert.equal(ref.productId, 'product-1');
 });
 
 test('toSlotRef 优先用 thumbnailUrl,fallback 到 originalUrl', () => {

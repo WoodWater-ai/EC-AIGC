@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { Box, Cpu, Maximize2, RectangleHorizontal, Route, Sparkles, SlidersHorizontal } from 'lucide-react';
+import { Box, Cpu, Maximize2, Minus, Plus, RectangleHorizontal, Route, Sparkles, SlidersHorizontal } from 'lucide-react';
 import { useTaskParams } from '../../createTask/useTaskParams';
 import { ParamSchemaForm } from '../../common/ParamSchemaForm';
 import { localValidate } from '../../common/ParamSchemaForm/utils/validate';
@@ -24,6 +24,14 @@ export interface ImageSettingsSectionProps {
   onParamsChange?: (snapshot: TaskParamsSnapshot) => void;
   prefill?: PrefillState | null;
   prefillPending?: boolean;
+  outputCount?: {
+    label: string;
+    value: number;
+    min?: number;
+    max: number;
+    disabled?: boolean;
+    onChange: (value: number) => void;
+  };
 }
 
 const INLINE_FIELD_KEYS = new Set(['aspect_ratio', 'size', 'resolution', 'quality']);
@@ -39,6 +47,7 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
   onParamsChange,
   prefill,
   prefillPending = false,
+  outputCount,
 }) => {
   const tp = useTaskParams('IMAGE', prefill, 'REF_IMG_EDIT', prefillPending);
 
@@ -112,6 +121,36 @@ export const ImageSettingsSection: React.FC<ImageSettingsSectionProps> = ({
         <p className="basis-full border border-red-200 bg-red-50 px-2 py-1.5 text-[10px] text-red-700">
           {tp.unavailableReason}
         </p>
+      )}
+
+      {outputCount && (
+        <div className="flex h-9 min-w-[150px] items-center border border-slate-200 bg-white">
+          <span className="min-w-0 flex-1 px-2">
+            <span className="block text-[9px] font-bold text-slate-400">张数</span>
+            <span className="block truncate text-[10px] font-bold text-slate-700">{outputCount.label}</span>
+          </span>
+          <button
+            type="button"
+            disabled={outputCount.disabled || outputCount.value <= (outputCount.min ?? 1)}
+            onClick={() => outputCount.onChange(outputCount.value - 1)}
+            className="grid h-full w-7 place-items-center border-l border-slate-100 text-slate-500 disabled:text-slate-300"
+            title="减少一张"
+            aria-label="减少一张"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <span className="w-6 text-center text-[11px] font-black text-slate-700">{outputCount.value}</span>
+          <button
+            type="button"
+            disabled={outputCount.disabled || outputCount.value >= outputCount.max}
+            onClick={() => outputCount.onChange(outputCount.value + 1)}
+            className="grid h-full w-7 place-items-center border-l border-slate-100 text-slate-500 disabled:text-slate-300"
+            title="增加一张"
+            aria-label="增加一张"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
 
       <CompactParamPicker

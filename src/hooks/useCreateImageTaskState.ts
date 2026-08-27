@@ -15,7 +15,9 @@ import {
   type ProductFacts,
   type ProductFactsInput,
 } from '../lib/createImageTask/extractProductFacts';
-import { buildPromptFromFacts } from '../lib/createImageTask/buildPromptFromFacts';
+import {
+  buildPromptFromFacts,
+} from '../lib/createImageTask/buildPromptFromFacts';
 import { extractReferenceInsights } from '../lib/createImageTask/extractReferenceInsights';
 import { applyAiOptimizePerType, type AllTypePrompts } from '../lib/createImageTask/applyAiOptimizePerType';
 import { buildGenerationTask } from '../lib/createImageTask/buildGenerationTask';
@@ -23,6 +25,12 @@ import { compactReferenceOrder, moveReferenceInOrder, assignNextOrder, REFERENCE
 import { taskApi } from '../api/modules/task';
 import { messages } from '../labels/createImageTask';
 import { groupReferenceSlots } from '../lib/createImageTask/imageCreationUi';
+import {
+  createInitialPromptDefaults,
+  derivePromptTypes,
+  getEffectiveNegativePrompt,
+  getEffectivePrompt,
+} from '../lib/createImageTask/promptWorkspace';
 
 // 与 referencesConfig 保持同步的 5 个参考图 slot 名。
 // 重新声明一份以避免 export-re-export 在 Vite HMR 下偶发的 TDZ
@@ -137,8 +145,8 @@ export interface UseCreateImageTaskStateReturn {
   style: string;
   scene: string;
   pose: string;
-  negativePrompt: string;
   promptOverrides: Partial<Record<ImageGenerationType, string>>;
+  negativePromptOverrides: Partial<Record<ImageGenerationType, string>>;
   promptHasEdits: boolean;
   /**
    * [2026-07-26] AI 助手是否降级到本地拼 prompt(后端 imagePlanApi.analyze 失败时为 true)。
@@ -167,8 +175,8 @@ export interface UseCreateImageTaskStateReturn {
   isSupported: boolean;
   totalCount: number;
   // actions
-  toggleType(t: ImageGenerationType): void;
   changeTypeCount(t: ImageGenerationType, delta: number): void;
+  setTypeCount(t: ImageGenerationType, count: number): void;
   setTemplate(name: string): void;
   requestTemplateChange(name: string): void;
   applyTemplate(name: string): void;
@@ -180,6 +188,9 @@ export interface UseCreateImageTaskStateReturn {
   // 顶层灌入"产品事实"路径(被选产品等):同步 hook 内部 formInput 让 prompts 重算
   setFormFactsExternal(facts: ProductFactsInput): void;
   setPromptOverride(t: ImageGenerationType, v: string): void;
+  resetPromptOverride(t: ImageGenerationType): void;
+  setNegativePromptOverride(t: ImageGenerationType, v: string): void;
+  resetNegativePromptOverride(t: ImageGenerationType): void;
   runAssistantAnalysis(): Promise<void>;
   regeneratePrompts(): void;
   applyAiOptimizeToSelected(selected: ImageGenerationType[]): void;
@@ -213,7 +224,6 @@ export function useCreateImageTaskState(
   opts: UseCreateImageTaskStateOpts,
 ): UseCreateImageTaskStateReturn {
   // ---------- state ----------
-  const [selectedTypes, setSelectedTypes] = useState<ImageGenerationType[]>(['product_main']);
   const [typeCounts, setTypeCounts] = useState<Record<ImageGenerationType, number>>({
     product_main: 1, scene_detail: 1, detail_closeup: 1, model_triple_view: 1,
   });
@@ -221,8 +231,8 @@ export function useCreateImageTaskState(
   const [style, setStyle] = useState<string>('');
   const [scene, setScene] = useState<string>('');
   const [pose, setPose] = useState<string>('');
-  const [negativePrompt, setNegativePrompt] = useState<string>('blurry, bad quality, distorted');
   const [promptOverrides, setPromptOverrides] = useState<Partial<Record<ImageGenerationType, string>>>({});
+  const [negativePromptOverrides, setNegativePromptOverrides] = useState<Partial<Record<ImageGenerationType, string>>>({});
   const [promptHasEdits, setPromptHasEdits] = useState<boolean>(false);
   const [assistantState, setAssistantState] = useState<'idle' | 'processing' | 'complete'>('idle');
   /**
@@ -297,23 +307,15 @@ export function useCreateImageTaskState(
   }), [opts.promptProductName]);
 
   const prompts = useMemo<AllTypePrompts>(() => {
-    const facts = withPromptProductName(productFacts ?? extractProductFacts(formInput));
-    const result: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_triple_view: '' };
-    (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[]).forEach((t) => {
-      result[t] = buildPromptFromFacts(t, facts, style, scene, pose, promptReferenceGroups);
-    });
-    return result;
-  }, [productFacts, formInput, style, scene, pose, promptReferenceGroups, withPromptProductName]);
+    return createInitialPromptDefaults();
+  }, []);
 
-  const promptsComplete = useMemo(() => {
-    if (selectedTypes.length === 0) return false;
-    return selectedTypes.every((t) => {
-      // promptOverrides 是 Partial<Record, string>>(可选编辑覆盖),
-      // 兜底 prompts[t](由 buildPromptFromFacts 生成,保证 string);再兜底空串。
-      const prompt = promptOverrides[t] ?? prompts[t] ?? '';
-      return typeof prompt === 'string' && prompt.trim().length > 0;
-    });
-  }, [selectedTypes, promptOverrides, prompts]);
+  const selectedTypes = useMemo(
+    () => derivePromptTypes(prompts, promptOverrides),
+    [prompts, promptOverrides],
+  );
+
+  const promptsComplete = selectedTypes.length > 0;
 
   const isSupported = useMemo(() => {
     // [2026-07-25 P0 修复] 删 model.capability.ratios/resolutions 写死字段(Phase 2 清理);
@@ -342,21 +344,18 @@ export function useCreateImageTaskState(
   const readinessCount = readinessChecks.filter((c) => c.complete).length;
 
 // ---------- actions ----------
-  const toggleType = useCallback((t: ImageGenerationType) => {
-    setSelectedTypes((prev) => {
-      if (prev.includes(t)) {
-        return prev.length > 1 ? prev.filter((x) => x !== t) : prev;
-      }
-      return [...prev, t];
-    });
-  }, []);
-
   const changeTypeCount = useCallback((t: ImageGenerationType, delta: number) => {
     const cap = opts.model.capability.maxCount;
     setTypeCounts((prev) => {
       const next = Math.min(Math.max(prev[t] + delta, MIN_TYPE_COUNT), Math.min(cap, MAX_TYPE_COUNT));
       return { ...prev, [t]: next };
     });
+  }, [opts.model.capability.maxCount]);
+
+  const setTypeCount = useCallback((t: ImageGenerationType, count: number) => {
+    const cap = opts.model.capability.maxCount;
+    const next = Math.min(Math.max(count, MIN_TYPE_COUNT), Math.min(cap, MAX_TYPE_COUNT));
+    setTypeCounts((prev) => ({ ...prev, [t]: next }));
   }, [opts.model.capability.maxCount]);
 
   const requestTemplateChange = useCallback((name: string) => {
@@ -373,6 +372,7 @@ export function useCreateImageTaskState(
   const applyTemplate = useCallback((name: string) => {
     setTemplateName(name);
     setPromptOverrides({});
+    setNegativePromptOverrides({});
     setPromptHasEdits(false);
     setTemplatePickerOpen(false);
     setTemplateOverwriteOpen(false);
@@ -395,6 +395,37 @@ export function useCreateImageTaskState(
     setPromptHasEdits(true);
   }, []);
 
+  const resetPromptOverride = useCallback((t: ImageGenerationType) => {
+    setPromptOverrides((prev) => {
+      const next = { ...prev };
+      delete next[t];
+      setPromptHasEdits(Object.keys(next).length > 0);
+      return next;
+    });
+  }, []);
+
+  const setNegativePromptOverride = useCallback((t: ImageGenerationType, v: string) => {
+    setNegativePromptOverrides((prev) => ({ ...prev, [t]: v }));
+  }, []);
+
+  const resetNegativePromptOverride = useCallback((t: ImageGenerationType) => {
+    setNegativePromptOverrides((prev) => {
+      const next = { ...prev };
+      delete next[t];
+      return next;
+    });
+  }, []);
+
+  /** 兼容旧任务、模板和助手的单一负面词：带入时复制到每个可用图片类型。 */
+  const setNegativePrompt = useCallback((value: string) => {
+    setNegativePromptOverrides(() => ({
+      product_main: value,
+      scene_detail: value,
+      detail_closeup: value,
+      model_triple_view: value,
+    }));
+  }, []);
+
   /**
    * [2026-07-26] 前端 ReferenceSlot -> 后端 ImagePlanReferenceSlot 映射。
    * 前端 5 个 slot(detail/style/scene/pose/model) -> 后端 5 个槽位(全大写 + _REF 后缀)。
@@ -415,12 +446,7 @@ export function useCreateImageTaskState(
    * 用 buildPromptFromFacts 拼 4 类 prompt,语义跟 imagePlanServiceImpl.buildFallbackPrompt 一致。
    */
   const fallbackToLocalPrompts = (facts: ProductFacts) => {
-    const nextOverrides: Partial<Record<ImageGenerationType, string>> = {};
-    selectedTypes.forEach((t) => {
-      nextOverrides[t] = buildPromptFromFacts(t, withPromptProductName(facts), style, scene, pose, promptReferenceGroups);
-    });
-    setPromptOverrides(nextOverrides);
-    setPromptHasEdits(true);
+    setProductFacts(facts);
     setAssistantState('complete');
   };
 
@@ -451,7 +477,6 @@ export function useCreateImageTaskState(
     }, 300_000);
 
     // 优先调后端 imagePlanApi.analyze(2026-07-26 新增)
-    let remoteSuccess = false;
     try {
       // dynamic import 避免 module-level 加载 http 客户端(测试环境无 jsdom)
       const { imagePlanApi } = await import('../api/modules/imagePlan');
@@ -481,22 +506,10 @@ export function useCreateImageTaskState(
       const extractedFacts = extractProductFacts(analyzedFacts);
       setFormInput(analyzedFacts);
       setProductFacts(extractedFacts);
-      // 后端负责识别商品事实；最终 Prompt 统一由前端 Profile 编译器生成，
-      // 避免模型自由输出改变区块结构、参考图编号或保真约束。
-      const nextOverrides: Partial<Record<ImageGenerationType, string>> = {};
-      (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[])
-        .forEach((t) => {
-          nextOverrides[t] = buildPromptFromFacts(
-            t, withPromptProductName(extractedFacts), style, scene, pose, promptReferenceGroups,
-          );
-        });
-      setPromptOverrides(nextOverrides);
       setNegativePrompt(resp.negativePrompt);
-      setPromptHasEdits(true);
       setAssistantState('complete');
       opts.onAiComplete?.(analyzedFacts);
       toast.success(messages.assistant.complete);
-      remoteSuccess = true;
     } catch (err) {
       // 降级到本地拼 prompt
       if (timedOut) return;
@@ -511,12 +524,12 @@ export function useCreateImageTaskState(
     }
   }, [
     opts.isProductBound, opts.mainAssetId, opts.mainImage, opts.onAiComplete,
-    assistantState, formInput, selectedTypes, style, scene, pose, orderedRefs,
-    promptReferenceGroups, withPromptProductName,
+    assistantState, formInput, orderedRefs,
   ]);
 
   const regeneratePrompts = useCallback(() => {
     setPromptOverrides({});
+    setNegativePromptOverrides({});
     setPromptHasEdits(false);
     if (opts.isProductBound && formInput.name.trim()) {
       setProductFacts(extractProductFacts(formInput));
@@ -524,11 +537,12 @@ export function useCreateImageTaskState(
   }, [opts.isProductBound, formInput]);
 
   const applyAiOptimizeToSelected = useCallback((selected: ImageGenerationType[]) => {
-    const facts = withPromptProductName(productFacts ?? extractProductFacts(formInput));
-    const basePrompts: AllTypePrompts = { product_main: '', scene_detail: '', detail_closeup: '', model_triple_view: '' };
-    (['product_main', 'scene_detail', 'detail_closeup', 'model_triple_view'] as ImageGenerationType[]).forEach((t) => {
-      basePrompts[t] = buildPromptFromFacts(t, facts, style, scene, pose, promptReferenceGroups);
-    });
+    const basePrompts: AllTypePrompts = {
+      product_main: getEffectivePrompt('product_main', prompts, promptOverrides),
+      scene_detail: getEffectivePrompt('scene_detail', prompts, promptOverrides),
+      detail_closeup: getEffectivePrompt('detail_closeup', prompts, promptOverrides),
+      model_triple_view: getEffectivePrompt('model_triple_view', prompts, promptOverrides),
+    };
     const optimized = applyAiOptimizePerType(basePrompts, selected);
     setPromptOverrides((prev) => {
       const next = { ...prev };
@@ -536,7 +550,7 @@ export function useCreateImageTaskState(
       return next;
     });
     setPromptHasEdits(true);
-  }, [productFacts, formInput, style, scene, pose, promptReferenceGroups, withPromptProductName]);
+  }, [promptOverrides, prompts]);
 
   const checkAndGenerate = useCallback(() => {
     const issue = readinessChecks.find((c) => !c.complete);
@@ -621,10 +635,19 @@ export function useCreateImageTaskState(
       });
 
       // 拼 imageTypes[]:每种 imageType 配 prompt/negativePrompt/count
+      const promptFacts = withPromptProductName(productFacts ?? extractProductFacts(formInput));
       const imageTypes: ImageTypeEntry[] = selectedTypes.map((t) => ({
         imageType: mapImageGenerationType(t),
-        prompt: promptOverrides[t] ?? prompts[t] ?? '',
-        negativePrompt,
+        prompt: buildPromptFromFacts(
+          t,
+          promptFacts,
+          style,
+          scene,
+          pose,
+          promptReferenceGroups,
+          getEffectivePrompt(t, prompts, promptOverrides),
+        ),
+        negativePrompt: getEffectiveNegativePrompt(t, negativePromptOverrides),
         count: typeCounts[t] ?? 1,
       }));
 
@@ -680,7 +703,8 @@ export function useCreateImageTaskState(
     }
   }, [
     isSubmitting, opts, references, referenceOrder, selectedTypes, promptOverrides,
-    prompts, negativePrompt, formInput, style, scene, pose, setExecutionConfirmOpen,
+    negativePromptOverrides, prompts, formInput, productFacts, style, scene, pose,
+    promptReferenceGroups, withPromptProductName, setExecutionConfirmOpen,
   ]);
 
   const selectReference = useCallback((slot: ReferenceSlot, ref: any | undefined) => {
@@ -733,8 +757,8 @@ export function useCreateImageTaskState(
     style,
     scene,
     pose,
-    negativePrompt,
     promptOverrides,
+    negativePromptOverrides,
     promptHasEdits,
     assistantState,
     reviewEnabled,
@@ -756,8 +780,8 @@ export function useCreateImageTaskState(
     promptsComplete,
     isSupported,
     totalCount,
-    toggleType,
     changeTypeCount,
+    setTypeCount,
     setTemplate: setTemplateName,
     requestTemplateChange,
     applyTemplate,
@@ -768,6 +792,9 @@ export function useCreateImageTaskState(
     updateProductFact,
     setFormFactsExternal,
     setPromptOverride,
+    resetPromptOverride,
+    setNegativePromptOverride,
+    resetNegativePromptOverride,
     runAssistantAnalysis,
     regeneratePrompts,
     applyAiOptimizeToSelected,

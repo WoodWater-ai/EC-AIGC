@@ -6,6 +6,9 @@ import { withCosThumbnail } from '../../utils/cosImage';
 import { useFileUpload } from '../../hooks/useFileUpload';
 import { assetApi } from '../../api/modules/asset';
 import type { AssetResourceItem } from '../../api/modules/asset';
+import { productInfoApi } from '../../api/modules/productInfo';
+import { productLibraryApi } from '../../api/modules/productLibrary';
+import { buildCompositeResourceName } from '../../lib/assets/compositeNaming';
 import { toast } from 'sonner';
 
 // ── 对外暴露的类型(供 consumer 用) ─────────────────────────────────────
@@ -24,8 +27,10 @@ export interface AppliedCompositeAsset {
   thumbnailUrl: string;
   /** 原图 URL(COS accessUrl) */
   originalUrl: string;
-  /** 资源名(默认 '智能合成套图') */
+  /** 资源名，格式为“上衣商品名+下装商品名”。 */
   name: string;
+  /** 合成图同时归档到的上衣、下装商品。 */
+  productIds: string[];
 }
 
 interface ComposeSlotRef {
@@ -33,6 +38,7 @@ interface ComposeSlotRef {
   thumbnailUrl?: string;
   originalUrl?: string;
   name?: string;
+  productId?: string;
 }
 
 interface CompositePreview {
@@ -44,20 +50,14 @@ interface CompositePreview {
 
 // ── Props ──────────────────────────────────────────────────────────────
 export interface OutfitComposePanelProps {
-  /**
-   * 用于 `assetApi.create` 时把合成图关联到产品(新建场景下不传)。
-   * **不传给 `useFileUpload`** —— `useFileUpload.productId` 是 `number`,
-   * 雪花 ID 会丢精度;此 prop 仅作为 `assetApi.create({ productId: String(prop) })` 的入参。
-   */
-  productId?: string | number;
   /** 合成 + 上传 + 登记全部成功后的回调;调用方把 asset.fileResourceId 写回自己的 imageRef */
   onApplied: (asset: AppliedCompositeAsset) => void;
-  /** 默认折叠;默认 true(产品管理路径使用)。CreateImageTask 路径传 false */
+  /** 默认折叠。 */
   defaultCollapsed?: boolean;
 }
 
 export function OutfitComposePanel(props: OutfitComposePanelProps) {
-  const { productId, onApplied, defaultCollapsed = true } = props;
+  const { onApplied, defaultCollapsed = true } = props;
 
   // —— 折叠状态 ——
   const [open, setOpen] = useState(!defaultCollapsed);
@@ -98,6 +98,14 @@ export function OutfitComposePanel(props: OutfitComposePanelProps) {
   // —— 操作 ——
   async function handleCompositePreview(): Promise<void> {
     if (!topRef || !bottomRef) return;
+    if (!topRef.productId || !bottomRef.productId) {
+      setUploadError('请选择商品素材库中的上衣和下装');
+      return;
+    }
+    if (topRef.productId === bottomRef.productId) {
+      setUploadError('上衣和下装需来自两个不同商品');
+      return;
+    }
     const topUrl = topRef.originalUrl ?? topRef.thumbnailUrl;
     const bottomUrl = bottomRef.originalUrl ?? bottomRef.thumbnailUrl;
     if (!topUrl || !bottomUrl) {
@@ -123,26 +131,43 @@ export function OutfitComposePanel(props: OutfitComposePanelProps) {
 
   async function handleApplyComposite(): Promise<void> {
     if (!compositePreview) return;
+    const selectedProductIds = Array.from(new Set(
+      [topRef?.productId, bottomRef?.productId].filter((id): id is string => Boolean(id)),
+    ));
+    if (selectedProductIds.length !== 2) {
+      setUploadError('请选择两个不同商品的上衣和下装');
+      return;
+    }
     setUploadError(null);
     setIsApplying(true);
     try {
-      const file = new File([compositePreview.blob], '智能合成套图.png', { type: 'image/png' });
+      const compositeName = buildCompositeResourceName([topRef?.name, bottomRef?.name]);
+      const file = new File([compositePreview.blob], `${compositeName}.png`, { type: 'image/png' });
       // upload() 返回 file_resource.id(中间产物,仅用于 assetApi.create 的入参)
       const { fileResourceId, accessUrl, fileMd5 } = await upload(file);
       // assetApi.create 返回 asset_resource.id(业务 id,product.image_id 关联的就是这个)
       const assetId = await assetApi.create({
         fileResourceId,
         fileMd5,
-        name: '智能合成套图',
-        productId: productId != null ? String(productId) : undefined,
+        name: compositeName,
+        productIds: selectedProductIds,
         assetKind: 'IMAGE',
         assetType: 'PRODUCT_ORIGINAL',
       });
+      const coverResults = await Promise.allSettled(
+        selectedProductIds.map((productId) =>
+          productLibraryApi.setInputAssetCover(productId, String(assetId))),
+      );
+      const coverFailureCount = coverResults.filter((result) => result.status === 'rejected').length;
+      if (coverFailureCount > 0) {
+        toast.warning(`合成图已创建，${coverFailureCount} 个商品封面更新失败`);
+      }
       onApplied({
         fileResourceId: String(assetId), // asset_resource.id —— 后端业务主键,不是 file_resource.id
         thumbnailUrl: withCosThumbnail(accessUrl, 256),
         originalUrl: accessUrl,
-        name: '智能合成套图',
+        name: compositeName,
+        productIds: selectedProductIds,
       });
       reset();
     } catch (e) {
@@ -163,13 +188,23 @@ export function OutfitComposePanel(props: OutfitComposePanelProps) {
     setOpen(false);
   }
 
-  function handlePickerConfirm(items: AssetResourceItem[]): void {
+  async function handlePickerConfirm(items: AssetResourceItem[]): Promise<void> {
     if (!pickerSlot || items.length === 0) {
       setPickerSlot(null);
       return;
     }
-    const ref = toSlotRef(items[0]); // 单选,取首项
-    if (pickerSlot === 'top') setTopRef(ref);
+    const targetSlot = pickerSlot;
+    const item = items[0];
+    let ref = toSlotRef(item);
+    if (item.productId) {
+      try {
+        const product = await productInfoApi.detail({ id: item.productId });
+        ref = { ...ref, name: product.name || ref.name };
+      } catch {
+        toast.warning('商品名称读取失败，合成图将暂用素材名称');
+      }
+    }
+    if (targetSlot === 'top') setTopRef(ref);
     else setBottomRef(ref);
     setPickerSlot(null);
   }
@@ -268,6 +303,9 @@ export function OutfitComposePanel(props: OutfitComposePanelProps) {
         <AssetTransitModal
           mode="picker"
           assetKind="IMAGE"
+          initialSource="PRODUCT"
+          allowedSources={['PRODUCT']}
+          selectionOnly
           multiSelect={false}
           onClose={() => setPickerSlot(null)}
           onConfirmSelection={handlePickerConfirm}

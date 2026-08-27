@@ -1,12 +1,13 @@
 // src/components/CreateImageTask/left/ImageSourceSection.tsx
 import React from 'react';
-import { TransitPickerButton } from '../../common/TransitPickerButton';
+import { Info } from 'lucide-react';
 
 export interface ImageSourceSectionProps {
   mainValue: import('../../createTask/slots').SlotRef | null;
   productName?: string;
   matchingProduct?: boolean;
   onPickMain: () => void;
+  onShowProductFacts?: () => void;
 }
 
 /**
@@ -20,6 +21,7 @@ export const ImageSourceSection: React.FC<ImageSourceSectionProps> = ({
   productName,
   matchingProduct,
   onPickMain,
+  onShowProductFacts,
 }) => {
   return (
     <section id="image-source-section" className="border border-[#dfe3e8] bg-white p-3">
@@ -75,8 +77,21 @@ export const ImageSourceSection: React.FC<ImageSourceSectionProps> = ({
       {mainValue && (
         <div className="mt-2 flex items-center justify-between gap-3 border border-[#dfe3e8] bg-[#fbfcfd] px-2 py-2">
           <span className="shrink-0 text-[11px] font-bold text-slate-500">关联商品</span>
-          <span className="min-w-0 truncate text-xs font-black text-primary">
-            {matchingProduct ? '正在匹配商品…' : productName || '待创建商品'}
+          <span className="flex min-w-0 items-center justify-end gap-1.5">
+            <span className="min-w-0 truncate text-xs font-black text-primary">
+              {matchingProduct ? '正在匹配商品…' : productName || '待创建商品'}
+            </span>
+            {productName && !matchingProduct && onShowProductFacts && (
+              <button
+                type="button"
+                onClick={onShowProductFacts}
+                className="grid h-5 w-5 shrink-0 place-items-center text-slate-400 transition-colors hover:text-primary"
+                title="查看 ERP 商品事实"
+                aria-label="查看 ERP 商品事实"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            )}
           </span>
         </div>
       )}

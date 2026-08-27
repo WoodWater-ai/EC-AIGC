@@ -6,7 +6,7 @@ export const messages = {
     selectMain:
       '请先选择已关联商品资产的主体素材。',
     completePrompts:
-      '请先为全部已选图片类型生成或补充 Prompt。',
+      '请至少填写一个图片类型的 Prompt。',
     selectExecutionParams:
       '请选择完整的执行参数。',
     unsupportedSpec:
@@ -30,7 +30,7 @@ export const messages = {
   },
   type: {
     product_main: '商品主图',
-    scene_detail: '场景图',
+    scene_detail: '场景主图',
     detail_closeup: '细节图',
     model_triple_view: '三视图',
     labelHelper: '可多选',
