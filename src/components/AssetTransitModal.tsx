@@ -650,9 +650,7 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const canDownloadSelected =
   selectedAssetIds.length > 0
   && selectedItems.length === selectedAssetIds.length
-  && selectedItems.every((item) =>
-    String(item.uploadUserId) === currentUserId && Boolean(item.originalUrl),
-  );
+  && selectedItems.every((item) => Boolean(item.originalUrl));
   const canSetProductCover = canMove
     && activeSource === 'PRODUCT'
     && focusedProduct !== null
