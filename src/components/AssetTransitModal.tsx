@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Globe, Lock, ChevronRight, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { downloadAssetsSequentially } from '../utils/downloadAssets';
 import type { ProductAsset } from '../types';
 import { assetApi, type AssetResourceItem, type AssetResourceQueryRequest } from '../api/modules/asset';
 import { ApiError } from '../api/error';
@@ -646,6 +647,12 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
   const selectedItems = selectedAssetIds
     .map((id) => assets.find((asset) => asset.id === id))
     .filter((item): item is AssetResourceItem => item !== undefined);
+  const canDownloadSelected =
+  selectedAssetIds.length > 0
+  && selectedItems.length === selectedAssetIds.length
+  && selectedItems.every((item) =>
+    String(item.uploadUserId) === currentUserId && Boolean(item.originalUrl),
+  );
   const canSetProductCover = canMove
     && activeSource === 'PRODUCT'
     && focusedProduct !== null
@@ -714,6 +721,30 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
     setSelectedProductCategoryId(null);
     setMergeDrawerItems(null);
     setMergeTargetProductIds([]);
+  };
+
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ current: number; total: number }>(
+    { current: 0, total: 0 },
+  );
+
+  const handleDownloadSelected = async () => {
+    if (!canDownloadSelected || isDownloading) return;
+    const snapshot = selectedItems; // 防并发选择变化
+    setIsDownloading(true);
+    setDownloadProgress({ current: 0, total: snapshot.length });
+    try {
+      const result = await downloadAssetsSequentially(snapshot, {
+        onItemComplete: (idx) => setDownloadProgress({ current: idx + 1, total: snapshot.length }),
+      });
+      if (result.failed.length === 0) {
+        toast.success(`${result.success} 个资源已开始下载`);
+      } else {
+        toast.warning(`${result.success} 个已下载,${result.failed.length} 个失败`);
+      }
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleMergeClick = () => {
@@ -2370,6 +2401,19 @@ export const AssetTransitModal: React.FC<AssetTransitModalProps> = ({
                         className="text-xs font-bold text-blue-600 hover:underline"
                       >
                         关联产品
+                      </button>
+                    )}
+                    {canDownloadSelected && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDownloadSelected()}
+                        disabled={isDownloading}
+                        className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+                      >
+                        <span className="material-symbols-outlined text-sm">download</span>
+                        {isDownloading
+                          ? `下载中 ${downloadProgress.current}/${downloadProgress.total}`
+                          : '下载'}
                       </button>
                     )}
                   </>
