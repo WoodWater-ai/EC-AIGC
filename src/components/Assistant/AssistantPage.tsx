@@ -33,6 +33,8 @@ import {
   computeNextHeight,
 } from './inputHeight';
 
+import { triggerBrowserDownload, fetchAsBlob, inferExtensionFromMime } from '../../utils/downloadFile';
+
 interface AssistantPageProps {
   onCreateTask: (screen: AppScreen, prefill: AssistantTaskPrefill) => void;
 }
@@ -183,15 +185,6 @@ const createRequestId = () => {
 };
 
 const downloadFileName = (result: AssistantGenerationResult, mimeType?: string) => {
-  const mimeExtensions: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
-    'video/mp4': 'mp4',
-    'video/webm': 'webm',
-    'video/quicktime': 'mov',
-  };
   const pathExtension = (() => {
     try {
       return new URL(result.url).pathname.match(/\.([a-zA-Z0-9]{2,5})$/)?.[1]?.toLowerCase();
@@ -199,30 +192,15 @@ const downloadFileName = (result: AssistantGenerationResult, mimeType?: string) 
       return undefined;
     }
   })();
-  const extension = (mimeType && mimeExtensions[mimeType])
-    || pathExtension
-    || (result.resultKind === 'IMAGE' ? 'png' : 'mp4');
+  const extension = (mimeType && inferExtensionFromMime(mimeType, undefined) !== 'unknown'
+    ? inferExtensionFromMime(mimeType)
+    : undefined) ?? pathExtension ?? (result.resultKind === 'IMAGE' ? 'png' : 'mp4');
   return `创作助手-${result.resultKind === 'IMAGE' ? '原图' : '视频'}-${result.id}.${extension}`;
-};
-
-const triggerBrowserDownload = (url: string, fileName: string, openInNewTab = false) => {
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  if (openInNewTab) {
-    link.target = '_blank';
-    link.rel = 'noreferrer';
-  }
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
 };
 
 const downloadOriginalResult = async (result: AssistantGenerationResult) => {
   try {
-    const response = await fetch(result.url);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const blob = await response.blob();
+    const blob = await fetchAsBlob(result.url);
     const blobUrl = URL.createObjectURL(blob);
     try {
       triggerBrowserDownload(blobUrl, downloadFileName(result, blob.type));
