@@ -35,6 +35,17 @@ export async function md5FileHex(file: Blob): Promise<string> {
   return hasher.finalize().toString(CryptoJS.enc.Hex).toLowerCase();
 }
 
+/** 计算原始文件 SHA-256，用于授权证据完整性留痕。 */
+export async function sha256FileHex(file: Blob): Promise<string> {
+  const hasher = CryptoJS.algo.SHA256.create();
+  const chunkSize = 4 * 1024 * 1024;
+  for (let offset = 0; offset < file.size; offset += chunkSize) {
+    const buffer = await file.slice(offset, offset + chunkSize).arrayBuffer();
+    hasher.update(CryptoJS.lib.WordArray.create(buffer));
+  }
+  return hasher.finalize().toString(CryptoJS.enc.Hex).toLowerCase();
+}
+
 /**
  * HMAC-SHA256 加密（用于请求签名）
  *
@@ -43,3 +54,4 @@ export async function md5FileHex(file: Blob): Promise<string> {
 export function hmacSha256Hex(message: string, secret: string): string {
   return CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);
 }
+

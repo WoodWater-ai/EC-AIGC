@@ -35,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { screen: AppScreen.ASSISTANT, label: '创作', icon: 'auto_awesome', group: '创作' },
     { screen: AppScreen.TASKS, label: '任务', icon: 'auto_schedule', group: '创作' },
     { screen: AppScreen.TEMPLATES, label: '模板', icon: 'dashboard_customize', group: '创作' },
+    { screen: AppScreen.GARMENT, label: '服装', icon: 'checkroom', group: '创作' },
     { screen: AppScreen.PRODUCT_MANAGE, label: '产品', icon: 'inventory_2', group: '业务' },
     { screen: AppScreen.ANALYTICS, label: '复盘', icon: 'insights', group: '业务' },
     { screen: AppScreen.DICT_ITEM, label: '字典', icon: 'menu_book', group: '管理' },

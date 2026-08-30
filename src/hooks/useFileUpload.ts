@@ -6,6 +6,10 @@ import { md5FileHex } from '../utils/crypto';
 
 /** [2026-07-16 P0] 图片最大 32 MB(产品/avatar/合成都适用),后端 file-size-limit 是 200 MB 但太松 */
 const IMAGE_MAX_BYTES = 32 * 1024 * 1024;
+const EVIDENCE_PDF_MAX_BYTES = 20 * 1024 * 1024;
+const EVIDENCE_PURPOSES = new Set<FileUploadPurpose>([
+  'PERSON_CONSENT', 'COMMERCIAL_RIGHTS', 'PROVIDER_AGREEMENT',
+]);
 
 /**
  * 把图片文件压缩到 ≤ maxBytes。
@@ -137,6 +141,11 @@ export type FileUploadPurpose =
   | 'MODEL'
   | 'DICT'
   | 'IMAGE_EDIT_MASK'
+  | 'GARMENT_RENDER'
+  | 'PERSON_CONSENT'
+  | 'COMMERCIAL_RIGHTS'
+  | 'PROVIDER_AGREEMENT'
+  | 'TRYON_RESULT'
   | 'OTHER'
   | 'UP_DOWN_MERGE';
 
@@ -254,6 +263,20 @@ export function useFileUpload(options: UseFileUploadOptions) {
       try {
         // [2026-07-16 P0] 图片超过 32MB 自动压缩(前后端限制统一)
         let uploadFile = file;
+        if (EVIDENCE_PURPOSES.has(purpose)) {
+          if (!file.name.toLowerCase().endsWith('.pdf')) {
+            throw new Error('合规证据只允许上传 PDF 原件');
+          }
+          if (file.size <= 0 || file.size > EVIDENCE_PDF_MAX_BYTES) {
+            throw new Error('合规证据 PDF 必须大于 0 且不超过 20MB');
+          }
+          // Windows/部分浏览器可能不给 .pdf 设置 MIME；只修正 Blob 元数据，不改变文件字节。
+          if (file.type !== 'application/pdf') {
+            uploadFile = new File([file], file.name, {
+              type: 'application/pdf', lastModified: file.lastModified,
+            });
+          }
+        }
         if (file.type.startsWith('image/') && file.size > IMAGE_MAX_BYTES) {
           toast.info(`图片 ${(file.size / 1024 / 1024).toFixed(1)}MB 超出 32MB 上限,正在压缩...`);
           uploadFile = await compressImageUnder(file, IMAGE_MAX_BYTES);

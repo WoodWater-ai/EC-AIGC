@@ -18,6 +18,7 @@ const SCREEN_PERMISSION_MAP: Readonly<Record<AppScreen, readonly string[]>> = {
   [AppScreen.TEMPLATES]: ['template:view'],
   [AppScreen.ASSETS]: ['asset:view'],
   [AppScreen.MODEL_LIBRARY]: ['model-profile:view'],
+  [AppScreen.GARMENT]: ['garment:view'],
   [AppScreen.ANALYTICS]: ['analytics:view'],
   [AppScreen.SYSTEM_CONFIG]: [
     'system-config:view',
@@ -45,6 +46,7 @@ export const ACCESSIBLE_SCREEN_ORDER: readonly AppScreen[] = [
   AppScreen.TEMPLATES,
   AppScreen.ASSETS,
   AppScreen.MODEL_LIBRARY,
+  AppScreen.GARMENT,
   AppScreen.ANALYTICS,
   AppScreen.SYSTEM_CONFIG,
   AppScreen.ASYNC_TASKS,

@@ -57,6 +57,8 @@ interface AuthState {
    * App 层用它在挂载瞬间展示全屏 spinner，避免"闪过 LOGIN → 再进 dashboard"
    */
   initializing: boolean;
+  /** [v1 2026-08-24 spec:iframe 嵌入] 是否处于嵌入模式(URL 首屏消费 token 后为 true) */
+  embedMode: boolean;
 }
 
 interface AuthContextValue extends AuthState {
@@ -99,10 +101,41 @@ interface AuthContextValue extends AuthState {
   firstAccessibleScreen: AppScreen;
 }
 
+/**
+ * [v1 2026-08-24 spec:iframe 嵌入] 把 bootstrap 阶段的 URL/storage 解析拆成纯函数,
+ * 便于独立单测。返回 urlToken / tokenToUse / shouldEnterEmbedMode / otherSearchEntries。
+ */
+export interface BootstrapInputs {
+  urlToken: string | null;
+  tokenToUse: string | null;
+  shouldEnterEmbedMode: boolean;
+  /** URL 里除 token 外的其他 search entries(供 replaceState 时保留) */
+  otherSearchEntries: Array<[string, string]>;
+}
+
+export function extractBootstrapInputs(
+  location: Location,
+  storedToken: string | null,
+): BootstrapInputs {
+  const params = new URLSearchParams(location.search);
+  const urlToken = params.get('token');
+  const otherSearchEntries: Array<[string, string]> = [];
+  params.forEach((value, key) => {
+    if (key !== 'token') otherSearchEntries.push([key, value]);
+  });
+  return {
+    urlToken,
+    tokenToUse: urlToken ?? storedToken,
+    shouldEnterEmbedMode: urlToken != null && urlToken.length > 0,
+    otherSearchEntries,
+  };
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<LoginResponse | null>(null);
+  const [embedMode, setEmbedMode] = useState<boolean>(false);
   // initializing 启动时为 true；mount 后调 me()，无论成功失败都置 false
   const [initializing, setInitializing] = useState<boolean>(true);
 
@@ -146,36 +179,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   useEffect(() => {
     let cancelled = false;
+    const storedToken = getToken();
+    const inputs = extractBootstrapInputs(window.location, storedToken);
+    const { tokenToUse, shouldEnterEmbedMode, otherSearchEntries } = inputs;
 
-    const bootstrap = async () => {
-      const token = getToken();
-      if (!token) {
-        // 没 token → 直接结束初始化，跳 LOGIN
-        if (!cancelled) setInitializing(false);
-        return;
-      }
+    if (!tokenToUse) {
+      if (!cancelled) setInitializing(false);
+      return;
+    }
+
+    // URL 带 token 时,先把 token 落 localStorage,让 axios 拦截器立即可用
+    if (inputs.urlToken) {
+      setTokenToStorage(inputs.urlToken);
+    }
+
+    (async () => {
       try {
         const resp = await authApi.me();
-        if (!cancelled) {
-          setUser(resp);
+        if (cancelled) return;
+        setUser(resp);
+        setEmbedMode(shouldEnterEmbedMode);
+        if (shouldEnterEmbedMode) {
+          // 摘掉 URL 中的 token,保留其他 query 参数
+          const params = new URLSearchParams();
+          for (const [k, v] of otherSearchEntries) params.set(k, v);
+          const restSearch = params.toString();
+          const cleanPath =
+            window.location.pathname + (restSearch ? `?${restSearch}` : '');
+          window.history.replaceState({}, '', cleanPath);
         }
-      } catch (err) {
-        // me() 失败 —— 大概率 token 已过期
-        // axios 拦截器已 toast（业务错误）或 console（网络错误）
-        // 这里仅清前端状态，让 App 渲染 LOGIN
-        if (!cancelled) {
-          clearToken();
-          setUser(null);
-        }
+      } catch {
+        if (cancelled) return;
+        clearToken();
+        setUser(null);
+        setEmbedMode(false);
       } finally {
         if (!cancelled) setInitializing(false);
       }
-    };
+    })();
 
-    void bootstrap();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const login = useCallback(async (username: string, passwordPlain: string) => {
@@ -199,6 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     clearToken();
     setUser(null);
+    setEmbedMode(false); // ★ 新增
   }, []);
 
   const hasPermission = useCallback(
@@ -235,6 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated,
       isAdmin,
       initializing,
+      embedMode, // ★ 新增
       login,
       logout,
       hasPermission,
@@ -243,7 +288,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canAccessScreen,
       firstAccessibleScreen,
     }),
-    [user, roles, permissions, menuTree, isAuthenticated, isAdmin, initializing, login, logout, hasPermission, hasAnyPermission, hasRole, canAccessScreen, firstAccessibleScreen]
+    [user, roles, permissions, menuTree, isAuthenticated, isAdmin, initializing, embedMode, login, logout, hasPermission, hasAnyPermission, hasRole, canAccessScreen, firstAccessibleScreen]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
