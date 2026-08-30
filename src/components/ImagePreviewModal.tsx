@@ -1,16 +1,37 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { fetchAsBlob, triggerBrowserDownload } from '../utils/downloadFile';
 
 export interface PreviewImage {
   /** 原图完整 URL(不带 imageMogr2 缩略参数) */
   url: string;
   /** 可选:批次/版本说明,展示在计数旁 */
   label?: string;
+  /** 调用方显式指定的下载文件名(含扩展名) */
+  filename?: string;
 }
 
 export interface ImagePreviewModalProps {
   images: PreviewImage[];
   initialIndex?: number;
   onClose: () => void;
+}
+
+/**
+ * filename 优先 → URL 路径最后一段 → preview-N.<ext>
+ */
+function resolveFilename(
+  item: { url: string; filename?: string },
+  index: number,
+  ext: 'jpg',
+): string {
+  if (item.filename) return item.filename;
+  try {
+    const last = new URL(item.url).pathname.split('/').pop();
+    if (last) return last;
+  } catch {
+    /* fallthrough */
+  }
+  return `preview-${index + 1}.${ext}`;
 }
 
 /**
@@ -27,9 +48,32 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   const safeInitial = Math.min(Math.max(initialIndex, 0), Math.max(images.length - 1, 0));
   const [index, setIndex] = useState(safeInitial);
   const [errored, setErrored] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const total = images.length;
   const current = images[index];
+
+  const handleDownloadCurrent = useCallback(async () => {
+    if (!current) return;
+    const filename = resolveFilename(current, index, 'jpg');
+    setIsDownloading(true);
+    try {
+      try {
+        const blob = await fetchAsBlob(current.url);
+        const blobUrl = URL.createObjectURL(blob);
+        try {
+          triggerBrowserDownload(blobUrl, filename);
+        } finally {
+          window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        }
+      } catch {
+        // CORS / 网络失败 → 新标签页打开作为降级(对齐 AssistantPage)
+        triggerBrowserDownload(current.url, filename, true);
+      }
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [current, index]);
 
   const goPrev = useCallback(() => {
     setErrored(false);
@@ -63,6 +107,17 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         className="relative flex flex-col items-center gap-3"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* 下载按钮(关闭按钮左边) */}
+        <button
+          onClick={() => void handleDownloadCurrent()}
+          disabled={isDownloading || !current}
+          className="absolute -top-2 right-10 z-10 w-8 h-8 rounded-full bg-white/90 shadow-md flex items-center justify-center text-slate-500 hover:text-slate-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          aria-label="下载"
+          title="下载当前图片"
+        >
+          <span className="material-symbols-outlined text-lg">download</span>
+        </button>
+
         {/* 关闭按钮 */}
         <button
           onClick={onClose}
