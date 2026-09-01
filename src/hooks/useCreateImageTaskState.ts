@@ -65,7 +65,7 @@ const REFERENCE_SLOT_MAP: Record<ReferenceSlot, TaskAssetSlot> = {
 };
 
 /**
- * 前端 UI 的小写 imageType(product_main / scene_detail / detail_closeup / model_triple_view)
+ * 前端 UI 的小写 imageType(product_main / scene_detail / detail_closeup / model_triple_view / product_detail)
  * → 后端 EnumImageTaskType 大写枚举值。
  */
 function mapImageGenerationType(t: string): ImageTaskType {
@@ -74,6 +74,7 @@ function mapImageGenerationType(t: string): ImageTaskType {
     case 'scene_detail': return 'SCENE_DETAIL';
     case 'detail_closeup': return 'DETAIL_CLOSEUP';
     case 'model_triple_view': return 'MODEL_TRIPLE_VIEW';
+    case 'product_detail': return 'PRODUCT_DETAIL';
     default:
       throw new Error(`unknown image type: ${t}`);
   }
@@ -225,7 +226,7 @@ export function useCreateImageTaskState(
 ): UseCreateImageTaskStateReturn {
   // ---------- state ----------
   const [typeCounts, setTypeCounts] = useState<Record<ImageGenerationType, number>>({
-    product_main: 1, scene_detail: 1, detail_closeup: 1, model_triple_view: 1,
+    product_main: 1, scene_detail: 1, detail_closeup: 1, model_triple_view: 1, product_detail: 1,
   });
   const [template, setTemplateName] = useState<string>(opts.templateName);
   const [style, setStyle] = useState<string>('');
@@ -423,6 +424,7 @@ export function useCreateImageTaskState(
       scene_detail: value,
       detail_closeup: value,
       model_triple_view: value,
+      product_detail: value,
     }));
   }, []);
 
@@ -443,7 +445,7 @@ export function useCreateImageTaskState(
 
   /**
    * [2026-07-26] 后端 AI 助手失败时的本地降级:
-   * 用 buildPromptFromFacts 拼 4 类 prompt,语义跟 imagePlanServiceImpl.buildFallbackPrompt 一致。
+   * 用 buildPromptFromFacts 拼 5 类 prompt,语义跟 imagePlanServiceImpl.buildFallbackPrompt 一致。
    */
   const fallbackToLocalPrompts = (facts: ProductFacts) => {
     setProductFacts(facts);
@@ -542,6 +544,7 @@ export function useCreateImageTaskState(
       scene_detail: getEffectivePrompt('scene_detail', prompts, promptOverrides),
       detail_closeup: getEffectivePrompt('detail_closeup', prompts, promptOverrides),
       model_triple_view: getEffectivePrompt('model_triple_view', prompts, promptOverrides),
+      product_detail: getEffectivePrompt('product_detail', prompts, promptOverrides),
     };
     const optimized = applyAiOptimizePerType(basePrompts, selected);
     setPromptOverrides((prev) => {

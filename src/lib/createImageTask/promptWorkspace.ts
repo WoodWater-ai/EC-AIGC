@@ -7,6 +7,7 @@ export const PROMPT_WORKSPACE_TYPES: readonly PromptWorkspaceType[] = [
   'scene_detail',
   'detail_closeup',
   'model_triple_view',
+  'product_detail',
 ] as const;
 
 type PromptDefaults = Record<ImageGenerationType, string>;
@@ -18,6 +19,7 @@ export function createInitialPromptDefaults(): PromptDefaults {
     scene_detail: '',
     detail_closeup: '',
     model_triple_view: '',
+    product_detail: '',
   };
 }
 
@@ -58,6 +60,8 @@ const TEMPLATE_TYPE_MAP: Record<string, PromptWorkspaceType> = {
   MODEL_TRIPLE_VIEW: 'model_triple_view',
   model_triple_view: 'model_triple_view',
   ON_MODEL: 'model_triple_view',
+  PRODUCT_DETAIL: 'product_detail',
+  product_detail: 'product_detail',
 };
 
 export function toPromptWorkspaceType(value?: string | null): PromptWorkspaceType | null {

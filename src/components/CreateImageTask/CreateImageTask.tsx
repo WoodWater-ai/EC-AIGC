@@ -94,6 +94,7 @@ const IMAGE_TYPE_PREFILL_MAP: Record<string, ImageGenerationType> = {
   DETAIL: 'detail_closeup',
   MODEL_TRIPLE_VIEW: 'model_triple_view',
   ON_MODEL: 'model_triple_view',
+  PRODUCT_DETAIL: 'product_detail',
 };
 
 const EMPTY_PRODUCT_FACTS: ProductFactsInput = {
@@ -141,6 +142,7 @@ const toTimelineTask = (group: TaskGroupResponse): TimelineTask => {
     scene_detail: 0,
     detail_closeup: 0,
     model_triple_view: 0,
+    product_detail: 0,
   };
   const promptParts: string[] = [];
   const previews: TaskResultPreviewResponse[] = [];

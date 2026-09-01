@@ -14,6 +14,7 @@ const snapshot: TimelineTask['snapshot'] = {
     scene_detail: 4,
     detail_closeup: 0,
     model_triple_view: 0,
+    product_detail: 0,
   },
   prompt: 'test prompt',
   positivePrompt: '正面提示词',

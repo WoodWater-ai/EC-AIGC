@@ -9,11 +9,12 @@ import {
   toPromptWorkspaceType,
 } from '../promptWorkspace';
 
-test('prompt workspace exposes only scene main, detail and triple view', () => {
+test('prompt workspace exposes scene main, detail, triple view and product detail', () => {
   assert.deepEqual(PROMPT_WORKSPACE_TYPES, [
     'scene_detail',
     'detail_closeup',
     'model_triple_view',
+    'product_detail',
   ]);
 });
 
@@ -29,6 +30,7 @@ test('prompt workspace keeps detail and triple-view template categories', () => 
   assert.equal(toPromptWorkspaceType('DETAIL'), 'detail_closeup');
   assert.equal(toPromptWorkspaceType('MODEL_TRIPLE_VIEW'), 'model_triple_view');
   assert.equal(toPromptWorkspaceType('ON_MODEL'), 'model_triple_view');
+  assert.equal(toPromptWorkspaceType('PRODUCT_DETAIL'), 'product_detail');
   assert.equal(toPromptWorkspaceType('UNKNOWN'), null);
 });
 
@@ -38,6 +40,7 @@ test('effective prompt prefers an explicit override including an empty value', (
     scene_detail: '默认场景主图',
     detail_closeup: '默认细节图',
     model_triple_view: '',
+    product_detail: '',
   };
 
   assert.equal(getEffectivePrompt('scene_detail', defaults, {}), '默认场景主图');
@@ -57,6 +60,7 @@ test('prompt types are derived only from non-empty designer instructions in work
     scene_detail: '场景主图 Prompt',
     detail_closeup: '',
     model_triple_view: '   ',
+    product_detail: '',
   };
 
   assert.deepEqual(derivePromptTypes(defaults, {
@@ -71,5 +75,6 @@ test('a new task starts with empty designer instructions', () => {
     scene_detail: '',
     detail_closeup: '',
     model_triple_view: '',
+    product_detail: '',
   });
 });

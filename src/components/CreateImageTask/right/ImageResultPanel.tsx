@@ -47,10 +47,12 @@ const IMAGE_TYPE_LABELS: Record<string, string> = {
   SCENE_DETAIL: '场景主图',
   DETAIL_CLOSEUP: '细节图',
   MODEL_TRIPLE_VIEW: '模特三视图',
+  PRODUCT_DETAIL: '详情图',
   product_main: '商品主图',
   scene_detail: '场景主图',
   detail_closeup: '细节图',
   model_triple_view: '模特三视图',
+  product_detail: '详情图',
 };
 
 export interface SubmitGroup {

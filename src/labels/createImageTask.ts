@@ -33,6 +33,7 @@ export const messages = {
     scene_detail: '场景主图',
     detail_closeup: '细节图',
     model_triple_view: '三视图',
+    product_detail: '详情图',
     labelHelper: '可多选',
   },
   template: {
@@ -46,6 +47,7 @@ export const messages = {
     scene_detail: 'landscape',
     detail_closeup: 'zoom_in',
     model_triple_view: 'accessibility_new',
+    product_detail: 'article',
   } as const,
   refSlot: {
     detail: '细节', style: '风格', scene: '场景', pose: '姿势', model: '模特',

@@ -7,6 +7,7 @@ const TYPE_INSTRUCTIONS: Record<ImageGenerationType, string> = {
   scene_detail: '商品为画面中心，场景仅服务于氛围、尺度和使用感。',
   detail_closeup: '微距聚焦商品材质、工艺与关键细节，背景干净虚化，细节必须可核验。',
   model_triple_view: '相同人物、光线和机位展示正面、侧面、背面；手部不得遮挡商品关键结构。',
+  product_detail: '围绕一个核心卖点展示商品完整形态、关键结构和实际穿着效果，画面适合直接用于电商详情页。',
 };
 
 /** 不允许被用户删除的基础出图要求，始终拼入正面 Prompt。 */
@@ -15,6 +16,7 @@ export const DEFAULT_TYPE_REQUIREMENTS: Record<ImageGenerationType, string> = {
   scene_detail: '保持商品颜色、材质、版型、图案和关键工艺；不新增商品、文字、Logo或配饰。',
   detail_closeup: '细节必须来自主图或细节参考图，不虚构纹理、面料、走线和工艺。',
   model_triple_view: '保持同一模特、同一商品和一致光线；展示正面、侧面、背面，关键结构无遮挡。',
+  product_detail: '保持商品颜色、材质、版型、图案和关键工艺；不生成文字、长图、多图拼接或不存在的功能。',
 };
 
 /** 用户未填写时，各图片类型共用的负面提示词初始值。 */

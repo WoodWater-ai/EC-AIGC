@@ -3,7 +3,7 @@ import React from 'react';
 import type { ImageGenerationType } from '../../../lib/createImageTask/readinessChecks';
 import { messages } from '../../../labels/createImageTask';
 
-const TYPE_ORDER: ImageGenerationType[] = ['product_main','scene_detail','detail_closeup','model_triple_view'];
+const TYPE_ORDER: ImageGenerationType[] = ['product_main','scene_detail','detail_closeup','model_triple_view','product_detail'];
 const MIN_TYPE_COUNT = 1;
 const MAX_TYPE_COUNT = 5;
 
@@ -17,7 +17,7 @@ export interface ImageTypeSelectorProps {
 
 /**
  * 生成图片类型(可多选)— 对齐 demo 主版:
- * - 4 宫格 grid,每张卡片 76px min-height
+ * - 5 宫格 grid,每张卡片 76px min-height
  * - 选中:border-primary + bg-blue-50 + icon text-primary + 右上角 4×4 圆框带 check icon
  * - 卡片横向布局(icon 左 + label 中 + 选中框右),给张数调节器预留 pr-24
  * - 张数调节器:仅选中时显示,absolute bottom-2 right-2,白底带边框阴影
@@ -26,7 +26,7 @@ export const ImageTypeSelector: React.FC<ImageTypeSelectorProps> = ({
   selectedTypes, typeCounts, maxCountPerType, onToggle, onChangeCount,
 }) => (
   <div>
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
       {TYPE_ORDER.map((t) => {
         const isSelected = selectedTypes.includes(t);
         const count = typeCounts[t];

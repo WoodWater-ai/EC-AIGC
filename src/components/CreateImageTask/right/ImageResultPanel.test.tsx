@@ -12,6 +12,7 @@ test('loading placeholders include only types with non-empty prompts', () => {
       scene_detail: 2,
       detail_closeup: 3,
       model_triple_view: 4,
+      product_detail: 5,
     },
     totalCount: 3,
     params: {
@@ -38,6 +39,7 @@ test('completed result keeps prompts beside images and exposes the continue-crea
       scene_detail: 1,
       detail_closeup: 1,
       model_triple_view: 1,
+      product_detail: 1,
     },
     totalCount: 1,
     params: {

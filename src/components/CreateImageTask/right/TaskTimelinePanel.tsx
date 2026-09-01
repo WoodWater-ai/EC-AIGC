@@ -49,6 +49,7 @@ const IMAGE_TYPE_LABELS: Record<ImageGenerationType, string> = {
   scene_detail: '场景主图',
   detail_closeup: '细节图',
   model_triple_view: '三视图',
+  product_detail: '详情图',
 };
 
 const MAX_VISIBLE_THUMBNAILS = 3;

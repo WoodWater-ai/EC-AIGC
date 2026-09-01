@@ -10,6 +10,7 @@ const allTypes: ImageGenerationType[] = [
   'scene_detail',
   'detail_closeup',
   'model_triple_view',
+  'product_detail',
 ];
 
 test('renders one independent prompt editor for every selected image type', () => {

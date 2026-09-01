@@ -13,7 +13,7 @@ export function applyAiOptimizePerType(
 ): AllTypePrompts {
   const set = new Set(selectedTypes);
   const out: AllTypePrompts = { ...prompts };
-  for (const t of ['product_main','scene_detail','detail_closeup','model_triple_view'] as ImageGenerationType[]) {
+  for (const t of ['product_main','scene_detail','detail_closeup','model_triple_view','product_detail'] as ImageGenerationType[]) {
     if (!set.has(t)) continue;
     out[t] = `[画质增强] 电影级背光、真实感影棚渲染,${prompts[t]},光线追踪反射、电影级调色、温暖环境光`;
   }

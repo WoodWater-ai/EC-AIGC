@@ -13,6 +13,7 @@ const TASK_LABELS: Record<ImageGenerationType, string> = {
   scene_detail: '场景细节',
   detail_closeup: '细节特写',
   model_triple_view: '模特三视图',
+  product_detail: '详情图',
 };
 
 interface ModelLibraryProps {

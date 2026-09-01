@@ -1,7 +1,7 @@
 // src/lib/createImageTask/readinessChecks.ts
 import { messages } from '../../labels/createImageTask';
 
-export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'model_triple_view';
+export type ImageGenerationType = 'product_main' | 'scene_detail' | 'detail_closeup' | 'model_triple_view' | 'product_detail';
 
 export type ReadinessTargetId = 'image-source-section' | 'image-content-section' | 'image-settings-section';
 

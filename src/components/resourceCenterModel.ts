@@ -19,6 +19,8 @@ const GENERATED_IMAGE_TYPE_LABELS: Record<string, string> = {
   model_triple_view: '三视图',
   MODEL_TRIPLE_VIEW: '三视图',
   ON_MODEL: '三视图',
+  product_detail: '详情图',
+  PRODUCT_DETAIL: '详情图',
 };
 
 const generatedAssetLabel = (asset: ProductLibraryAsset): string => {

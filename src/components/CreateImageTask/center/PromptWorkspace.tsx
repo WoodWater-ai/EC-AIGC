@@ -74,7 +74,7 @@ export const PromptWorkspace: React.FC<PromptWorkspaceProps> = ({
   return (
     <section id="image-content-section" className="border border-[#dfe3e8] bg-white">
       <div className="flex min-h-12 items-stretch justify-between gap-3 border-b border-slate-200 px-3">
-        <div className="grid min-w-0 flex-1 grid-cols-3" role="tablist" aria-label="提示词分类">
+        <div className="grid min-w-0 flex-1 grid-cols-4" role="tablist" aria-label="提示词分类">
           {PROMPT_WORKSPACE_TYPES.map((type) => {
             const active = activeType === type;
             const label = messages.type[type];

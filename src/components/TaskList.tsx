@@ -61,6 +61,7 @@ const IMAGE_TYPE_LABELS: Record<string, string> = {
   DETAIL: '细节图',
   MODEL_TRIPLE_VIEW: '模特三视图',
   ON_MODEL: '模特三视图',
+  PRODUCT_DETAIL: '详情图',
   VIDEO: '视频任务',
 };
 

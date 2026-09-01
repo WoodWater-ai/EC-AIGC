@@ -4,7 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PromptWorkspace } from './PromptWorkspace';
 
-test('prompt workspace renders three tabs and only the active prompt editor', () => {
+test('prompt workspace renders four tabs and only the active prompt editor', () => {
   const html = renderToStaticMarkup(React.createElement(PromptWorkspace, {
     activeType: 'scene_detail',
     defaultPrompts: {
@@ -12,6 +12,7 @@ test('prompt workspace renders three tabs and only the active prompt editor', ()
       scene_detail: '暖调窗边场景',
       detail_closeup: '细节图 Prompt',
       model_triple_view: '三视图 Prompt',
+      product_detail: '详情图 Prompt',
     },
     promptOverrides: {},
     negativePromptOverrides: {},
@@ -30,6 +31,7 @@ test('prompt workspace renders three tabs and only the active prompt editor', ()
   assert.match(html, /场景主图/);
   assert.match(html, /细节图/);
   assert.match(html, /三视图/);
+  assert.match(html, /详情图/);
   assert.match(html, /aria-label="场景主图正面提示词"/);
   assert.match(html, /正面提示词/);
   assert.match(html, /min-h-\[270px\]/);
@@ -51,7 +53,7 @@ test('prompt workspace renders three tabs and only the active prompt editor', ()
   assert.match(html, /模板/);
   assert.match(html, /标签控件/);
   assert.match(html, /执行参数控件/);
-  assert.equal((html.match(/role="tab"/g) ?? []).length, 3);
+  assert.equal((html.match(/role="tab"/g) ?? []).length, 4);
   assert.doesNotMatch(html, /加入生成|取消生成/);
   assert.doesNotMatch(html, /overflow-x-auto/);
   assert.doesNotMatch(html, /细节图 Prompt<\/textarea>/);
@@ -67,6 +69,7 @@ test('prompt workspace shows restore action only for a manually edited prompt', 
       scene_detail: '',
       detail_closeup: '默认细节',
       model_triple_view: '',
+      product_detail: '',
     },
     isProductBound: true,
     negativePromptOverrides: {},
