@@ -86,6 +86,12 @@ interface CreateImageTaskProps {
  */
 type PendingSlot = 'main' | ReferenceSlot | null;
 
+/**
+ * 风格 / 场景 / 姿势暂时从创建图片任务页面隐藏。
+ * 保留原组件和完整参数链路，后续需要恢复时改为 true 即可。
+ */
+const SHOW_STYLE_SCENE_POSE = false;
+
 const IMAGE_TYPE_PREFILL_MAP: Record<string, ImageGenerationType> = {
   PRODUCT_MAIN: 'scene_detail',
   SCENE_DETAIL: 'scene_detail',
@@ -1330,7 +1336,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
                 onChangeNegativePrompt={setNegativePromptOverride}
                 onRestoreNegativePrompt={resetNegativePromptOverride}
                 onOpenTemplates={() => setTemplateDrawerOpen(true)}
-                tagSelector={
+                tagSelector={SHOW_STYLE_SCENE_POSE ? (
                   <StyleScenePoseRow
                     styleOptions={styleOptions}
                     sceneOptions={sceneOptions}
@@ -1346,7 +1352,7 @@ export const CreateImageTask: React.FC<CreateImageTaskProps> = (props) => {
                     onSceneChange={setScene}
                     onPoseChange={setPose}
                   />
-                }
+                ) : null}
                 executionSettings={
                   <ImageSettingsSection
                     prefill={imageParamsPrefill}

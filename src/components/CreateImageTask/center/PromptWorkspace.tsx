@@ -176,9 +176,11 @@ export const PromptWorkspace: React.FC<PromptWorkspaceProps> = ({
           />
         </div>
 
-        <div className="border-t border-slate-100 pt-3">
-          <div className="flex flex-wrap items-center gap-2">{tagSelector}</div>
-        </div>
+        {tagSelector && (
+          <div className="border-t border-slate-100 pt-3">
+            <div className="flex flex-wrap items-center gap-2">{tagSelector}</div>
+          </div>
+        )}
 
         <div className="border-t border-slate-100 pt-3">
           <div className="flex flex-wrap items-center gap-2">{executionSettings}</div>
